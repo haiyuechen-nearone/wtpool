@@ -1,4 +1,4 @@
-//! The agent guard of `wtpool free` and `wtpool fg`.
+//! The [`AgentGuard`] of `wtpool free` and `wtpool fg`.
 
 use std::path::Path;
 
@@ -11,20 +11,20 @@ use super::Pool;
 /// The rule of `free` and `fg` for agents in a worktree they would detach or repoint.
 #[derive(Clone, Copy)]
 pub enum AgentGuard<'a> {
-    /// Refuse while an agent works or waits there, as `wtpool status` shows the activity records
-    /// with the clock and process table of these [`Sources`].
+    /// Refuse while an agent there works, waits or is quiet, as `wtpool status` reads it from
+    /// these [`Sources`].
     Refuse(&'a Sources),
     /// Go ahead whatever the agents there do, as `--force` asks.
     Force,
 }
 
 impl<F> Pool<F> {
-    /// Refuses the first of `worktrees` with an agent that works or waits, unless `guard` is
-    /// [`AgentGuard::Force`]. `common` is the repository's common git directory.
+    /// Refuses the first of `worktrees` with a busy agent, unless `guard` is
+    /// [`AgentGuard::Force`].
     pub(super) fn refuse_busy_agents(
         &self,
         guard: AgentGuard<'_>,
-        common: &Path,
+        common_dir: &Path,
         worktrees: &[&Worktree],
     ) -> Result<(), Error> {
         let AgentGuard::Refuse(sources) = guard else {
@@ -34,8 +34,8 @@ impl<F> Pool<F> {
             .iter()
             .map(|worktree| worktree.path().as_path())
             .collect();
-        let (config, common) = (self.config.clone(), common.to_path_buf());
-        let actors = status::actors_at(config, common, sources, &paths, self.git().mode())?;
+        let (config, common_dir) = (self.config.clone(), common_dir.to_path_buf());
+        let actors = status::actors_at(config, common_dir, sources, &paths, self.git().mode())?;
         for (worktree, actors) in worktrees.iter().zip(actors) {
             let agents: Vec<String> = actors.iter().filter_map(busy).collect();
             if !agents.is_empty() {
@@ -50,9 +50,7 @@ impl<F> Pool<F> {
     }
 }
 
-/// `<label> (<state>)` of an actor that works or waits, `None` for one that keeps no command
-/// out. `quiet` counts, as an agent silent for a while may still work. The key stands in for an
-/// empty label.
+/// A quiet [`Actor`] may still work, so it counts as busy.
 fn busy(actor: &Actor) -> Option<String> {
     let state = match actor.state {
         ActorState::Working => "working",

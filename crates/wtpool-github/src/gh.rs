@@ -32,15 +32,14 @@ const AUTH_REQUIRED: i32 = 4;
 pub(crate) enum ViewPrError {
     /// The GitHub CLI is not installed.
     Unavailable,
-    /// `gh` has no GitHub login: `said` is the last line it wrote to standard error.
+    /// `gh` has no GitHub login.
     NotLoggedIn {
-        said: String,
+        stderr_line: String,
     },
     NotFound,
-    /// `gh` failed for another reason, such as no network: `said` is the last line it wrote
-    /// to standard error, `code` its exit status.
+    /// `gh` failed for another reason, such as no network.
     GhFailed {
-        said: String,
+        stderr_line: String,
         code: Option<i32>,
     },
     /// An answer of GitHub that is not a PR head.
@@ -92,11 +91,10 @@ impl ViewPr for GhCli {
     }
 }
 
-/// The cause of a failed `gh pr view`, from its exit status and standard error: no login, no
-/// such PR, or another failure. Only GitHub's own answer that no PR has the number counts as
-/// not found.
+/// The cause of a failed `gh pr view`. Only GitHub's own answer that no PR has the number counts
+/// as not found.
 fn failure(code: Option<i32>, stderr: &str) -> ViewPrError {
-    let said = stderr
+    let stderr_line = stderr
         .lines()
         .rev()
         .map(str::trim)
@@ -104,11 +102,11 @@ fn failure(code: Option<i32>, stderr: &str) -> ViewPrError {
         .unwrap_or_default()
         .to_owned();
     if code == Some(AUTH_REQUIRED) || stderr.contains("gh auth login") {
-        ViewPrError::NotLoggedIn { said }
+        ViewPrError::NotLoggedIn { stderr_line }
     } else if stderr.contains("Could not resolve to a PullRequest") {
         ViewPrError::NotFound
     } else {
-        ViewPrError::GhFailed { said, code }
+        ViewPrError::GhFailed { stderr_line, code }
     }
 }
 
@@ -123,11 +121,11 @@ mod tests {
     const LAST_LOGIN_LINE: &str = "Alternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.";
 
     #[rstest]
-    #[case::not_logged_in(Some(4), LOGIN, format!("NotLoggedIn {{ said: {LAST_LOGIN_LINE:?} }}"))]
+    #[case::not_logged_in(Some(4), LOGIN, format!("NotLoggedIn {{ stderr_line: {LAST_LOGIN_LINE:?} }}"))]
     #[case::bad_token(
         Some(1),
         "HTTP 401: Bad credentials (https://api.github.com/graphql)\nTry authenticating with:  gh auth login\n",
-        r#"NotLoggedIn { said: "Try authenticating with:  gh auth login" }"#.to_owned()
+        r#"NotLoggedIn { stderr_line: "Try authenticating with:  gh auth login" }"#.to_owned()
     )]
     #[case::no_such_pr(
         Some(1),
@@ -137,14 +135,14 @@ mod tests {
     #[case::no_network(
         Some(1),
         "error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com\n",
-        r#"GhFailed { said: "check your internet connection or https://githubstatus.com", code: Some(1) }"#.to_owned()
+        r#"GhFailed { stderr_line: "check your internet connection or https://githubstatus.com", code: Some(1) }"#.to_owned()
     )]
     #[case::no_such_repository(
         Some(1),
         "GraphQL: Could not resolve to a Repository with the name 'acme/app'. (repository)\n",
-        r#"GhFailed { said: "GraphQL: Could not resolve to a Repository with the name 'acme/app'. (repository)", code: Some(1) }"#.to_owned()
+        r#"GhFailed { stderr_line: "GraphQL: Could not resolve to a Repository with the name 'acme/app'. (repository)", code: Some(1) }"#.to_owned()
     )]
-    #[case::silent(None, "", r#"GhFailed { said: "", code: None }"#.to_owned())]
+    #[case::silent(None, "", r#"GhFailed { stderr_line: "", code: None }"#.to_owned())]
     fn failure__should_tell_a_missing_login_from_a_missing_pr(
         #[case] code: Option<i32>,
         #[case] stderr: &str,

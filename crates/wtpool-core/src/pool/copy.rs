@@ -132,8 +132,7 @@ fn make_folders(slot: &Path, path: &Path) -> io::Result<Option<String>> {
     Ok(None)
 }
 
-/// `true` when git ignores `path` in the main worktree `main`. A tracked file is not
-/// ignored. Fails when git cannot tell.
+/// A tracked file counts as not ignored. Fails when git cannot tell.
 fn ignored(main: &AbsolutePath, path: &CopyPath, report: &mut impl Report) -> Result<bool, Error> {
     let ran = Git::at(main).run([
         OsStr::new("check-ignore"),
@@ -155,8 +154,7 @@ fn ignored(main: &AbsolutePath, path: &CopyPath, report: &mut impl Report) -> Re
     }
 }
 
-/// Copies the file `source` to `target`, a path that must not exist yet, with the
-/// permissions `permissions`. A partly written `target` is removed again.
+/// `target` must not exist yet. A partly written `target` is removed again.
 fn write_copy(source: &Path, target: &Path, permissions: Permissions) -> io::Result<()> {
     let mut from = open_without_following(source)?;
     let mut to = create_new(target)?;
@@ -167,8 +165,8 @@ fn write_copy(source: &Path, target: &Path, permissions: Permissions) -> io::Res
     copied
 }
 
-/// Creates `path`, failing when anything is there, a symlink included. Only the
-/// owner can read it until the copy's own permissions are set.
+/// Fails when anything is at `path`, a symlink included. Only the owner can read the new file
+/// until the copy's own permissions are set.
 fn create_new(path: &Path) -> io::Result<File> {
     open_private(OpenOptions::new().write(true).create_new(true), path)
 }

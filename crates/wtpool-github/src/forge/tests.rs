@@ -10,7 +10,7 @@ use super::*;
 const HEAD: &str = "1111111111111111111111111111111111111111";
 const ORIGIN: &str = "git@github.com:acme/app.git";
 
-/// A [`ViewPr`] that gives its answer to the first lookup and keeps what each lookup asked for.
+/// A [`ViewPr`] that gives its answer to the first lookup and records each lookup.
 struct FakePr {
     answer: RefCell<Option<Result<PrView, ViewPrError>>>,
     asked: RefCell<Vec<String>>,
@@ -43,7 +43,7 @@ fn reason(refused: Refused) -> String {
 }
 
 /// The head of the PR `reference` names, on a remote `origin` at `url`, when gh answers
-/// `answer`, and what gh was asked for.
+/// `answer`, and the lookups gh was asked for.
 fn must_head(
     answer: Result<PrView, ViewPrError>,
     reference: &str,
@@ -169,35 +169,35 @@ fn repository__should_name_only_a_github_remote(#[case] url: &str, #[case] expec
     &["acme/app #42"]
 )]
 #[case::gh_not_logged_in(
-    Err(ViewPrError::NotLoggedIn { said: "Alternatively, populate the GH_TOKEN environment variable.".to_owned() }),
+    Err(ViewPrError::NotLoggedIn { stderr_line: "Alternatively, populate the GH_TOKEN environment variable.".to_owned() }),
     "42",
     Some(ORIGIN),
     "gh is not logged in: run `gh auth login` (gh: Alternatively, populate the GH_TOKEN environment variable.)",
     &["acme/app #42"]
 )]
 #[case::gh_not_logged_in_silently(
-    Err(ViewPrError::NotLoggedIn { said: String::new() }),
+    Err(ViewPrError::NotLoggedIn { stderr_line: String::new() }),
     "42",
     Some(ORIGIN),
     "gh is not logged in: run `gh auth login`",
     &["acme/app #42"]
 )]
 #[case::gh_failed(
-    Err(ViewPrError::GhFailed { said: "error connecting to api.github.com".to_owned(), code: Some(1) }),
+    Err(ViewPrError::GhFailed { stderr_line: "error connecting to api.github.com".to_owned(), code: Some(1) }),
     "42",
     Some(ORIGIN),
     "gh could not look up PR #42 in acme/app: error connecting to api.github.com",
     &["acme/app #42"]
 )]
 #[case::gh_failed_silently(
-    Err(ViewPrError::GhFailed { said: String::new(), code: Some(2) }),
+    Err(ViewPrError::GhFailed { stderr_line: String::new(), code: Some(2) }),
     "42",
     Some(ORIGIN),
     "gh could not look up PR #42 in acme/app (exit status 2)",
     &["acme/app #42"]
 )]
 #[case::gh_killed(
-    Err(ViewPrError::GhFailed { said: String::new(), code: None }),
+    Err(ViewPrError::GhFailed { stderr_line: String::new(), code: None }),
     "42",
     Some(ORIGIN),
     "gh could not look up PR #42 in acme/app (killed by a signal)",

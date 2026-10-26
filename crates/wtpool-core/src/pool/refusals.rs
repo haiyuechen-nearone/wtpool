@@ -9,19 +9,16 @@ use crate::names::{BranchName, ObjectId};
 use crate::worktree::{self, Worktree};
 use crate::worktree_state::{Operation, Role, Uncommitted, Unreferenced};
 
-/// The work in a worktree that `wtpool` must not lose or interrupt, read once before a decision.
+/// The work in a worktree, read once before a decision.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct WorktreeState {
     pub(super) dirty: Uncommitted,
     pub(super) operation: Operation,
     pub(super) unreferenced: Unreferenced,
-    /// The commit `HEAD` names, shown in the refusal of commits on no branch.
     pub(super) head_commit: Option<ObjectId>,
 }
 
 impl WorktreeState {
-    /// The state of `worktree`, its commits on no branch counted in `repo`, the repository it
-    /// belongs to.
     pub(super) fn read(worktree: &Worktree, repo: &Git) -> Result<Self, Error> {
         Ok(Self {
             dirty: worktree.uncommitted()?,
@@ -32,8 +29,8 @@ impl WorktreeState {
     }
 }
 
-/// The refusal of the detached slot `name` that `bg` would reuse: uncommitted files first, then
-/// an operation in progress, then commits on no branch.
+/// The refusal of the worktree `name` for any work at risk in it, such as in a detached slot that
+/// `bg` would reuse.
 pub(super) fn refusal(name: &str, state: &WorktreeState) -> Option<Refusal> {
     dirty_refusal(name, state.dirty)
         .or_else(|| operation_refusal(name, state.operation))

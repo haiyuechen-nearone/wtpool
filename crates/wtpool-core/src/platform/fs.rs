@@ -1,5 +1,5 @@
-//! Opens that never follow a symlink, what a file's metadata tells of its identity, owner and
-//! age, and the prefix a path starts with.
+//! Opens that never follow a symlink, a file's identity, owner and age from its metadata, and the
+//! prefix a path starts with.
 
 use std::fs::{File, Metadata, OpenOptions};
 use std::io;
@@ -93,7 +93,8 @@ pub fn owner(_: &Metadata) -> Option<u32> {
     None
 }
 
-/// When the file `meta` describes last changed, in seconds and nanoseconds since the Unix epoch.
+/// The modification time of the file `meta` describes, in seconds and nanoseconds since the Unix
+/// epoch.
 #[cfg(unix)]
 #[must_use]
 pub fn modified(meta: &Metadata) -> (i64, i64) {

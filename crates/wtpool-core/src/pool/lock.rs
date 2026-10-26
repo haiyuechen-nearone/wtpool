@@ -17,16 +17,15 @@ use super::{Pool, git};
 #[must_use]
 pub(super) struct PoolLock {
     pub(super) foreground: Worktree,
-    /// The repository's common git directory, the parent of [`ACTIVITY_DIR`].
     pub(super) common_dir: PathBuf,
     /// Closing the file releases the lock.
     _file: File,
 }
 
 impl<F> Pool<F> {
-    /// Takes the pool lock in the repository's common git directory, waiting while
-    /// another run holds it. Creates `wtpool-activity/` there first, so hooks have
-    /// somewhere to write once the pool has been changed.
+    /// Takes the pool lock in the repository's common git directory, waiting while another run
+    /// holds it. Creates [`ACTIVITY_DIR`] there first, so hooks have somewhere to write once the
+    /// pool has been changed.
     #[must_use = "the lock is released when the returned guard is dropped"]
     pub(super) fn lock(&self, report: &mut impl Report) -> Result<PoolLock, Error> {
         let foreground = self.foreground_worktree(report)?;
@@ -68,8 +67,8 @@ impl<F> Pool<F> {
         })
     }
 
-    /// The configured foreground as a listed worktree. A path inside a worktree
-    /// would leave every foreground guard comparing against the wrong directory.
+    /// The configured foreground as a listed worktree. Refuses a folder inside one, as every
+    /// foreground check would then compare against the wrong directory.
     fn foreground_worktree(&self, report: &mut impl Report) -> Result<Worktree, Error> {
         let foreground = &self.config.foreground;
         if !foreground.is_dir() {

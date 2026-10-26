@@ -16,9 +16,9 @@ use super::{AgentGuard, Pool, git};
 const FOREGROUND_NOT_CHANGED: &str = "foreground not changed";
 
 impl<F> Pool<F> {
-    /// `wtpool fg`: checks a branch or PR out in the foreground, releasing it from the slot that
-    /// holds it, and returns the foreground's path. Progress goes to standard error, so standard
-    /// output carries the path alone.
+    /// `wtpool fg`: checks the branch a `<ref>` names out in the foreground, releasing it from the
+    /// slot that holds it, and returns the foreground's path. Progress goes to standard error, so
+    /// standard output carries the path alone.
     ///
     /// # Errors
     ///

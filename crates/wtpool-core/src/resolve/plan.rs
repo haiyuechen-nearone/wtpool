@@ -6,7 +6,10 @@ use crate::names::BranchName;
 use crate::pool::Pool;
 use crate::report::Report;
 
-/// A `<ref>` resolved to the local branch it names, with lookups only.
+const GET_URL_NO_SUCH_REMOTE: i32 = 2;
+const LS_REMOTE_NO_MATCH: i32 = 2;
+
+/// A `<ref>` resolved to the local branch it names.
 #[derive(Debug, Clone)]
 pub(crate) struct Plan {
     pub(super) branch: BranchName,
@@ -54,7 +57,6 @@ impl From<Error> for Unresolved {
 }
 
 impl<F> Pool<F> {
-    /// Resolves a reference to a branch name with lookups only.
     pub(crate) fn plan(&self, reference: &str, report: &mut impl Report) -> Result<Plan, Unresolved>
     where
         F: Forge,
@@ -120,10 +122,9 @@ impl<F> Pool<F> {
         let ran = self
             .git()
             .run(["remote", "get-url", self.config.remote.as_str()])?;
-        // git exits with 2 when there is no such remote.
         match ran.code {
             Some(0) => Ok(ran.line().map(str::to_owned)),
-            Some(2) => Ok(None),
+            Some(GET_URL_NO_SUCH_REMOTE) => Ok(None),
             _ => {
                 ran.forward_stderr(report);
                 ran.check().map(|()| None)
@@ -151,10 +152,9 @@ impl<F> Pool<F> {
             remote.as_str(),
             branch_ref(branch).as_str(),
         ])?;
-        // `--exit-code` exits with 2 when nothing matches.
         match ran.code {
             Some(0) => Ok(Some(true)),
-            Some(2) => Ok(Some(false)),
+            Some(LS_REMOTE_NO_MATCH) => Ok(Some(false)),
             _ => {
                 ran.forward_stderr(report);
                 Err(GitError::LookUpRemote {

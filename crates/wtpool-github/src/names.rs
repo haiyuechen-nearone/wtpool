@@ -5,7 +5,6 @@ use std::fmt;
 pub(crate) struct PrNumber(String);
 
 impl PrNumber {
-    /// `None` unless `digits` is one or more ASCII digits.
     pub(crate) fn new(digits: &str) -> Option<Self> {
         (!digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()))
             .then(|| Self(digits.to_owned()))
@@ -30,7 +29,6 @@ pub(crate) struct RepoSlug {
 }
 
 impl RepoSlug {
-    /// `None` when either part is empty or contains a `/`.
     pub(crate) fn new(owner: &str, name: &str) -> Option<Self> {
         let valid = |part: &str| !part.is_empty() && !part.contains('/');
         (valid(owner) && valid(name)).then(|| Self {
@@ -39,7 +37,7 @@ impl RepoSlug {
         })
     }
 
-    /// Compares with another slug, ignoring case as GitHub does.
+    /// Ignores case, as GitHub does.
     pub(crate) fn matches(&self, other: &RepoSlug) -> bool {
         self.owner.eq_ignore_ascii_case(&other.owner) && self.name.eq_ignore_ascii_case(&other.name)
     }

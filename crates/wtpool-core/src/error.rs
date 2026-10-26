@@ -326,7 +326,7 @@ fn no_such_branch(branch: &str, remote: Option<&str>) -> String {
     }
 }
 
-/// How a message names the exit of a process with `code`, `None` when a signal ended it.
+/// The exit of a process with `code` as messages word it, `None` when a signal ended it.
 #[must_use]
 pub fn exit_status(code: Option<i32>) -> String {
     match code {

@@ -28,7 +28,6 @@ pub(crate) const REPOSITORY_ENV: [&str; 13] = [
     "GIT_COMMON_DIR",
 ];
 
-/// The options of every git command run in [`GitMode::ReadOnly`].
 const READ_ONLY_OPTIONS: [&str; 3] = ["--no-optional-locks", "-c", "core.fsmonitor=false"];
 
 /// The writes allowed to git while it runs a command.

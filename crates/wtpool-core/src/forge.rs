@@ -1,5 +1,4 @@
-//! [`Forge`]: a git hosting service, such as GitHub, as `fg`, `bg` and `wtpool status` use it: the
-//! changes a `<ref>` can name, such as pull requests, their heads, and the names of repositories.
+//! [`Forge`], a git hosting service such as GitHub, and the heads of the changes it hosts.
 
 use std::path::Path;
 
@@ -19,8 +18,8 @@ pub trait Forge {
     /// such as `a PR number, a github.com PR URL`.
     fn change_forms(&self) -> &'static str;
 
-    /// The head of `change` in the repository of `remote`. Without one to use, reports why and
-    /// returns [`Unresolved::Quiet`].
+    /// The head of `change` in the repository of `remote`. Without one to use, reports the reason
+    /// and returns [`Unresolved::Quiet`].
     fn head(
         &self,
         change: Self::Change,
@@ -50,13 +49,12 @@ pub struct ChangeHead {
     /// The local branch the change is checked out on.
     pub branch: BranchName,
     pub head: ObjectId,
-    /// What a refresh of the local branch fetches.
     pub fetch: Fetch,
     /// A new local branch comes from here when the remote has no branch of its name.
     pub change_ref: ChangeRef,
 }
 
-/// What a refresh of the local branch of a change fetches.
+/// The ref that a refresh of the local branch of a change fetches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Fetch {
     /// The remote's branch of the same name.
@@ -69,6 +67,6 @@ pub enum Fetch {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChangeRef {
     pub refspec: String,
-    /// The warning for a local branch made from this ref, which therefore tracks nothing.
+    /// The warning for a local branch made from this ref, as such a branch tracks nothing.
     pub note: String,
 }

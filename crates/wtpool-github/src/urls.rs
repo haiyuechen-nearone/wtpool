@@ -9,8 +9,7 @@ const REMOTE_PREFIXES: [&str; 3] = [
     "ssh://git@github.com/",
 ];
 
-/// The repository of a remote URL in one of [`REMOTE_PREFIXES`]. Each part holds ASCII letters,
-/// digits, `-`, `_` and `.`, and is no `.` or `..`. Anything else is `None`.
+/// The repository of a remote URL in one of [`REMOTE_PREFIXES`]. Anything else is `None`.
 pub(crate) fn remote_repository(url: &str) -> Option<RepoSlug> {
     let path = REMOTE_PREFIXES
         .iter()
@@ -33,8 +32,7 @@ fn is_slug_part(part: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
 }
 
-/// The repository and number of a URL starting with
-/// `http(s)://github.com/<owner>/<repo>/pull/<n>`.
+/// The repository and number of a PR URL. Text after the number, such as `/files`, is ignored.
 pub(crate) fn pull_request(reference: &str) -> Option<(RepoSlug, PrNumber)> {
     let rest = reference
         .strip_prefix("https://")

@@ -21,12 +21,11 @@ pub(super) struct SlotFacts<T> {
 pub(super) enum SlotHead {
     Branch(String),
     Detached(WorktreeState),
-    /// git recorded neither a branch nor a detached `HEAD`.
     Unknown,
 }
 
 impl<F> Pool<F> {
-    /// The facts of each managed slot whose directory exists. Warns about the others.
+    /// The facts of each of the [`Pool::managed_slots`].
     pub(super) fn slot_facts(
         &self,
         report: &mut impl Report,

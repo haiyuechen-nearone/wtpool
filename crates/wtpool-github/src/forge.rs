@@ -60,7 +60,7 @@ impl Forge for GitHub {
     }
 }
 
-/// Why a pull request gives no head to use.
+/// The reason a pull request gives no head to use.
 #[derive(Debug)]
 enum Refused {
     /// The reason, for the user.
@@ -97,22 +97,24 @@ fn head_of(prs: &impl ViewPr, pr: &PullRequest, remote: Remote<'_>) -> Result<Ch
     change_head(number, view)
 }
 
-/// Why `gh` gave no head of PR `number` in `slug`.
 fn refused(error: ViewPrError, number: &PrNumber, slug: &RepoSlug) -> Refused {
     let warning = match error {
         ViewPrError::Failed(error) => return Refused::Failed(error),
         ViewPrError::Unavailable => format!(
             "gh is not installed, so PR #{number} cannot be looked up; install it from https://cli.github.com"
         ),
-        ViewPrError::NotLoggedIn { said } => {
-            format!("gh is not logged in: run `gh auth login`{}", gh_said(&said))
+        ViewPrError::NotLoggedIn { stderr_line } => {
+            format!(
+                "gh is not logged in: run `gh auth login`{}",
+                gh_said(&stderr_line)
+            )
         }
         ViewPrError::NotFound => format!("no PR #{number} in {slug}"),
-        ViewPrError::GhFailed { said, code } => {
-            let cause = if said.is_empty() {
+        ViewPrError::GhFailed { stderr_line, code } => {
+            let cause = if stderr_line.is_empty() {
                 format!(" ({})", exit_status(code))
             } else {
-                format!(": {said}")
+                format!(": {stderr_line}")
             };
             format!("gh could not look up PR #{number} in {slug}{cause}")
         }
@@ -153,11 +155,11 @@ fn change_head(number: &PrNumber, view: PrView) -> Result<ChangeHead, Refused> {
 }
 
 /// gh's last line on standard error, as a message shows it after its own words.
-fn gh_said(said: &str) -> String {
-    if said.is_empty() {
+fn gh_said(line: &str) -> String {
+    if line.is_empty() {
         String::new()
     } else {
-        format!(" (gh: {said})")
+        format!(" (gh: {line})")
     }
 }
 

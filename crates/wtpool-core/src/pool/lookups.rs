@@ -1,5 +1,5 @@
-//! Finding worktrees of the pool: by path or slot name, by the branch they hold, and the words
-//! for one whose directory is gone.
+//! Finding worktrees of the pool: by path or slot name, by the branch they hold, and the refusal
+//! of one whose directory is gone.
 
 use std::path::Path;
 

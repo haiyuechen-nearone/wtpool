@@ -37,7 +37,7 @@ impl RefArgs {
     }
 }
 
-/// What to do with a local branch that already exists.
+/// The handling of a local branch that already exists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SyncMode {
     /// Reuse it as is, warning when it lags or has diverged.

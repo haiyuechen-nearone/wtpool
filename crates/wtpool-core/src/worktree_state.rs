@@ -1,5 +1,4 @@
-//! What the pool knows of each worktree: its role and what it holds. The front end decides how
-//! to show it, so the `wtpool ls` table lives in the binary.
+//! The role of each worktree and the work it holds, as `wtpool ls` lists them.
 
 use crate::names::BranchName;
 
@@ -14,7 +13,7 @@ pub struct Row {
     pub state: State,
 }
 
-/// How a worktree relates to the pool.
+/// The relation of a worktree to the pool.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
@@ -23,7 +22,7 @@ pub enum Role {
     Unmanaged,
 }
 
-/// What a worktree holds that `wtpool` must not lose or interrupt.
+/// The work in a worktree that `wtpool` must not lose or interrupt.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct State {
     pub dirty: Uncommitted,
@@ -67,8 +66,8 @@ impl Default for Upstream {
     }
 }
 
-/// The commits on `HEAD` that no local branch, remote tracking ref, tag or
-/// `refs/wtpool-backup/` ref contains. Removing the worktree deletes its `HEAD` reflog, the last record of them.
+/// The commits on `HEAD` that no local branch, remote tracking ref, tag or `refs/wtpool-backup/`
+/// ref contains. Removing the worktree deletes its `HEAD` reflog, the last record of them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Unreferenced {
     Commits(usize),

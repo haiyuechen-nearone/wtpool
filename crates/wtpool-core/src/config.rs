@@ -17,10 +17,10 @@ pub struct Config {
     /// Where [`foreground`](Self::foreground) came from, for the error when it is
     /// not a worktree.
     pub foreground_source: Source,
-    /// Where new slots are created. Only worktrees whose directory name starts with
-    /// [`slot_prefix`](Self::slot_prefix) are slots; any other worktree is listed
-    /// as unmanaged and never picked.
+    /// Where new slots are created.
     pub slot_dir: AbsolutePath,
+    /// Only worktrees whose directory name starts with it are slots. Any other worktree is
+    /// listed as unmanaged and never picked.
     pub slot_prefix: SlotPrefix,
     /// Where [`slot_prefix`](Self::slot_prefix) came from, for the error when a
     /// slot name lacks it.
@@ -36,14 +36,12 @@ pub struct Config {
     /// The main worktree, the source of [`SlotSetup::copy`]. `None` when the
     /// repository is bare or unknown.
     pub main_worktree: Option<AbsolutePath>,
-    /// The setup of each slot `wtpool` creates.
     pub slot_setup: SlotSetup,
-    /// Process names that count as builds besides `cargo`, `cargo-*` and `rustc` (S4).
+    /// Process names that count as builds besides `cargo`, `cargo-*` and `rustc`.
     pub build_processes: Vec<String>,
 }
 
 impl Config {
-    /// The role of `worktree` in this pool: the foreground, a slot, or neither.
     pub(crate) fn role_of(&self, worktree: &Worktree) -> Role {
         if paths::same_path(worktree.path(), &self.foreground) {
             Role::Foreground

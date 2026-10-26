@@ -4,7 +4,7 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BranchName(String);
 
-/// Why [`BranchName::try_new`] refused a name.
+/// The reason [`BranchName::try_new`] refused a name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[must_use]
 pub enum InvalidBranchName {
@@ -77,8 +77,8 @@ impl fmt::Display for BranchName {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SlotName(String);
 
-/// Why [`SlotName::try_new`] or [`SlotPrefix::try_new`] refused a name, or why
-/// `wtpool new` refused one.
+/// The reason [`SlotName::try_new`], [`SlotPrefix::try_new`] or
+/// [`Pool::new_slot`](crate::Pool::new_slot) refused a name.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[must_use]
 pub enum InvalidSlotName {
@@ -90,8 +90,8 @@ pub enum InvalidSlotName {
     LeadingDash,
     #[error("a slot name cannot contain {0:?}")]
     ForbiddenChar(char),
-    /// The name lacks the slot prefix, which the text names with its source, such
-    /// as `WTPOOL_SLOT_PREFIX 'app-wt'`.
+    /// The name lacks the slot prefix, named with its source, such as
+    /// `WTPOOL_SLOT_PREFIX 'app-wt'`.
     #[error("a slot name must start with {0}")]
     MissingPrefix(String),
 }
@@ -147,8 +147,7 @@ impl SlotPrefix {
         SlotName(format!("{}{n}", self.0))
     }
 
-    /// Whether a worktree directory name marks a managed slot. Like the shell
-    /// glob `<prefix>*`, any name starting with the prefix counts.
+    /// Like the shell glob `<prefix>*`, any name starting with the prefix counts.
     #[must_use]
     pub fn manages(&self, dir_name: &str) -> bool {
         dir_name.starts_with(&self.0)
@@ -160,19 +159,19 @@ impl SlotPrefix {
     }
 }
 
-/// The name of a git remote: what `git remote` lists, never an option or a URL.
+/// The name of a git remote as `git remote` lists it, never an option or a URL.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemoteName(String);
 
-/// Why [`RemoteName::try_new`] refused a name.
+/// The reason [`RemoteName::try_new`] refused a name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[error("not a valid git remote name")]
 #[must_use]
 pub struct InvalidRemoteName;
 
 impl RemoteName {
-    /// `name`, refused when git would not accept it as a remote name. git checks
-    /// that `refs/remotes/<name>/...` is a valid ref, as the rules for branch names do.
+    /// git takes a remote name when `refs/remotes/<name>/...` is a valid ref, so the rules for
+    /// branch names apply.
     pub fn try_new(name: &str) -> Result<Self, InvalidRemoteName> {
         BranchName::try_new(name).map_err(|_| InvalidRemoteName)?;
         Ok(Self(name.to_owned()))

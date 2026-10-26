@@ -1,8 +1,8 @@
-/// Where the pool sends what it has to say. The core never writes to the terminal
-/// itself, so a front end decides on streams, colour and transport. [`Report::warn`],
-/// [`Report::info`] and [`Report::note`] carry wtpool's own lines, and a front end may escape
-/// them, as they can hold branch names and commit subjects from a remote; `out` and `err` carry
-/// the output of other programs.
+/// The sink of everything the pool has to say. The core never writes to the terminal itself, so a
+/// front end decides on streams, colour and transport. [`Report::warn`], [`Report::info`] and
+/// [`Report::note`] carry wtpool's own lines, and a front end may escape them, as they can hold
+/// branch names and commit subjects from a remote. [`Report::out`] and [`Report::err`] carry the
+/// output of other programs.
 pub trait Report {
     /// Raw text for standard output, written as is.
     fn out(&mut self, text: &str);

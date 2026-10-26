@@ -25,9 +25,9 @@ enum Parking {
 }
 
 impl<F> Pool<F> {
-    /// `wtpool bg`: parks a branch or PR in a free slot and returns the slot's path, or the path
-    /// of the slot that already holds it. Creates a slot only while the pool is below its slot
-    /// count. Progress goes to standard error, so standard output carries the path alone.
+    /// `wtpool bg`: parks the branch a `<ref>` names in a free slot and returns the slot's path,
+    /// or the path of the slot that already holds it. Creates a slot only while the pool is below
+    /// its slot count. Progress goes to standard error, so standard output carries the path alone.
     ///
     /// # Errors
     ///

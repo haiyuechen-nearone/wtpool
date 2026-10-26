@@ -7,8 +7,7 @@ use crate::paths::AbsolutePath;
 use crate::report::Discard;
 use crate::worktree::Worktree;
 
-/// A git repository, known by its common git directory, which every worktree of
-/// the repository shares.
+/// A git repository, known by the common git directory that all its worktrees share.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Repository {
     common_dir: AbsolutePath,

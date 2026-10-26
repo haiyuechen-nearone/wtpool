@@ -7,8 +7,6 @@ use crate::git::Git;
 use crate::report::Report;
 use crate::run::Ran;
 
-/// Runs `git` with `args` and passes its standard error on to `report`. A caller that fails
-/// like a shell under `set -e` adds [`Ran::check`].
 pub(crate) fn run_reported<I, S>(git: &Git, args: I, report: &mut impl Report) -> Result<Ran, Error>
 where
     I: IntoIterator<Item = S>,

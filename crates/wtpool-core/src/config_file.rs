@@ -25,7 +25,6 @@ pub(crate) struct Values {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct RepoOnly {
     pub build_processes: Vec<String>,
-    /// `copy` and `on_new_slot`.
     pub slot_setup: SlotSetup,
 }
 
@@ -51,7 +50,7 @@ struct WtpoolToml {
     on_new_slot: Option<String>,
 }
 
-/// Checks the values of `wtpool.toml`. Relative paths resolve against `base`.
+/// Checks the values of `wtpool.toml`.
 struct Checker<'a, H> {
     file: &'a Path,
     base: &'a AbsolutePath,

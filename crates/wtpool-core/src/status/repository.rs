@@ -1,5 +1,4 @@
-//! The repository a pool belongs to: the main worktree's folder name and the name a forge gives
-//! the repository a remote's URL points to, read without the network.
+//! The [`Repository`] of a pool, read without the network.
 
 use super::document::Repository;
 use crate::git::Git;

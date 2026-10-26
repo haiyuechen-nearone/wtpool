@@ -18,7 +18,6 @@ pub(crate) use git::run_reported;
 use crate::config::Config;
 
 /// The worktree pool of one repository: a foreground worktree and background slots.
-/// The changes a `<ref>` names, such as pull requests, are looked up on `forge`.
 ///
 /// Commands that change the pool hold an exclusive lock on `wtpool.lock` in the
 /// repository's common git directory, so parallel runs wait for each other.
@@ -29,7 +28,8 @@ pub struct Pool<F> {
 }
 
 impl<F> Pool<F> {
-    /// A pool that looks changes up on `forge`, a [`Forge`](crate::Forge) for `fg` and `bg`.
+    /// A pool that looks the changes a `<ref>` names, such as pull requests, up on `forge`, the
+    /// [`Forge`](crate::Forge) that [`Pool::foreground`] and [`Pool::background`] need.
     #[must_use]
     pub fn new(config: Config, forge: F) -> Self {
         Self { config, forge }

@@ -32,7 +32,6 @@ enum CheckoutFacts {
     /// git could not name the branches a stopped rebase or bisect uses.
     Unreadable,
     Live {
-        /// The branches a stopped rebase or bisect returns to or moves.
         operation_branches: Vec<String>,
         operation: Operation,
     },

@@ -39,8 +39,9 @@ pub(crate) const OPERATION_MARKERS: [(&str, Marker); 8] = [
     (BISECT_LOG, Marker::Of(Operation::Bisect)),
 ];
 
-/// The files naming the branches a stopped rebase or bisect returns to or moves. git counts
-/// those branches as checked out in that worktree.
+/// The files naming the branches a stopped rebase or bisect returns to or moves. `HEAD` is
+/// detached during a rebase, and a bisect may be left for another branch, so git counts these
+/// branches as checked out in that worktree although `HEAD` does not name them.
 pub(crate) const OPERATION_BRANCH_FILES: [&str; 4] = [
     "rebase-merge/head-name",
     "rebase-apply/head-name",

@@ -50,7 +50,7 @@ impl<F> Pool<F> {
             path.as_os_str(),
             OsStr::new("HEAD"),
         ])?;
-        if !ran.success && !self.has_a_commit()? {
+        if !ran.success && !self.foreground_has_a_commit()? {
             // git's own `invalid reference: HEAD` names no fix.
             return Err(Refusal::NoCommits(self.config.foreground.to_path_buf()).into());
         }
@@ -63,19 +63,15 @@ impl<F> Pool<F> {
         Ok(path)
     }
 
-    /// `true` when the foreground has a commit checked out for a new slot to start from. An
-    /// unborn branch, as in a repository without commits, has none.
-    fn has_a_commit(&self) -> Result<bool, Error> {
+    /// An unborn branch, as in a repository without commits, has none.
+    fn foreground_has_a_commit(&self) -> Result<bool, Error> {
         Ok(self
             .git()
             .run(["rev-parse", "--verify", "--quiet", "HEAD^{commit}"])?
             .success)
     }
 
-    /// Copies each `copy` file that `slot` lacks from the main worktree, when git
-    /// ignores it there. A path git does not ignore, or one that is not a regular
-    /// file, is skipped with a warning, so the slot stays clean and no symlink is
-    /// followed. A file the main worktree does not have is skipped quietly.
+    /// Copies each `copy` file into `slot`, as [`copy::copy_path`] does.
     pub(super) fn copy_into(
         &self,
         slot: &AbsolutePath,
@@ -97,9 +93,8 @@ impl<F> Pool<F> {
         }
     }
 
-    /// Runs `on_new_slot` in `slot` through the platform shell. Its standard output
-    /// goes to standard error too, as `wtpool bg` prints the slot's path on standard
-    /// output.
+    /// The command's standard output goes to standard error too, as `wtpool bg` prints the slot's
+    /// path on standard output.
     fn run_on_new_slot(
         &self,
         slot: &AbsolutePath,

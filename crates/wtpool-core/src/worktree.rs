@@ -85,7 +85,6 @@ impl Worktree {
         &self.head
     }
 
-    /// Whether `HEAD` is `branch`.
     pub(crate) fn holds_branch(&self, branch: &BranchName) -> bool {
         matches!(&self.head, Head::Branch(name) if name == branch.as_str())
     }
@@ -100,10 +99,10 @@ impl Worktree {
         if self.prunable {
             return Ok(Uncommitted::Unknown);
         }
-        // The flags override `status.showUntrackedFiles`, `diff.ignoreSubmodules`
-        // and `submodule.<name>.ignore`, which would hide work from this check.
-        // Without `--no-optional-locks`, status takes `index.lock` to refresh the
-        // index, and git run by an agent in the same worktree then fails.
+        // The flags override `status.showUntrackedFiles`, `diff.ignoreSubmodules` and
+        // `submodule.<name>.ignore`, as these would hide work from this check. Without
+        // `--no-optional-locks`, status takes `index.lock` to refresh the index, and git run by an
+        // agent in the same worktree then fails.
         let ran = self.git().run([
             "--no-optional-locks",
             "status",
@@ -118,9 +117,8 @@ impl Worktree {
         })
     }
 
-    /// When `HEAD` is not a branch, the commits on it that no branch, remote tracking
-    /// ref, tag or `refs/wtpool-backup/` ref contains, counted in `repo`, the repository
-    /// the worktree belongs to.
+    /// The [`Unreferenced`] commits of a detached `HEAD`, counted in `repo`, the repository the
+    /// worktree belongs to.
     pub fn unreferenced(&self, repo: &Git) -> Result<Unreferenced, Error> {
         if let Head::Branch(_) = self.head {
             return Ok(Unreferenced::Commits(0));
@@ -165,11 +163,8 @@ impl Worktree {
         Ok(Operation::Idle)
     }
 
-    /// The branches a stopped rebase or bisect in this worktree returns to or
-    /// moves. `HEAD` is detached during a rebase, and a bisect may be left for
-    /// another branch, so git counts these as checked out here although `HEAD`
-    /// does not name them. `None` when git fails, a file cannot be read or the
-    /// worktree is prunable.
+    /// The branches the [`layout::OPERATION_BRANCH_FILES`] of this worktree name. `None` when git
+    /// fails, a file cannot be read or the worktree is prunable.
     pub fn operation_branches(&self) -> Result<Option<Vec<String>>, Error> {
         if self.prunable {
             return Ok(None);
@@ -226,9 +221,8 @@ fn sequencer_operation(todo: &Path) -> Operation {
     }
 }
 
-/// Reads `git worktree list --porcelain -z`. The branch comes from git's own
-/// record, which stays right when the worktree's `.git` link is broken. `None`
-/// when a listed path is not absolute.
+/// Reads `git worktree list --porcelain -z`. The branch comes from git's own record, so it stays
+/// right when the worktree's `.git` link is broken. `None` when a listed path is not absolute.
 fn parse_list(listing: &str, mode: GitMode) -> Option<Vec<Worktree>> {
     let mut worktrees: Vec<Worktree> = Vec::new();
     for field in listing.split('\0') {

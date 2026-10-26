@@ -5,8 +5,8 @@ use crate::git::command::REPOSITORY_ENV;
 use crate::platform;
 use crate::report::Report;
 
-/// What happened to a finished command. Output is always captured, so the core
-/// stays free of terminal I/O. Callers forward the parts the user should see.
+/// The result of a finished command. Output is always captured, so the core stays free of
+/// terminal I/O. Callers forward the parts the user should see.
 #[derive(Debug, Clone)]
 #[must_use]
 pub struct Ran {

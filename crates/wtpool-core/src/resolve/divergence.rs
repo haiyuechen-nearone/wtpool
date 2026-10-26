@@ -66,7 +66,7 @@ pub(super) enum SyncStep<T> {
 }
 
 /// Chooses the move to a fetched commit for a local branch that compares with it as
-/// `divergence`. Only [`SyncMode::Reset`] moves a diverged branch.
+/// `divergence`.
 pub(super) fn plan_sync<T>(
     divergence: Option<Divergence>,
     mode: SyncMode,

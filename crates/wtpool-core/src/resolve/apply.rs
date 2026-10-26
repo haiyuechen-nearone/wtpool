@@ -133,8 +133,8 @@ impl<F> Pool<F> {
         }
     }
 
-    /// Fetches `src` from the remote and returns the fetched commit. Read from
-    /// [`FETCHED`], not `FETCH_HEAD`, as any other fetch in the foreground rewrites it.
+    /// The commit fetched as `src`, `None` when the fetch fails. Read from [`FETCHED`], not
+    /// `FETCH_HEAD`, as any other fetch in the foreground rewrites it.
     fn fetch(&self, src: &str, report: &mut impl Report) -> Result<Option<ObjectId>, Error> {
         let refspec = format!("+{src}:{FETCHED}");
         let args = ["fetch", "--quiet", self.config.remote.as_str(), &refspec];
