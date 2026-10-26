@@ -1,7 +1,7 @@
-//! The probe command of the job checks (jobs.md, "Verification plan", test interface 3): the
-//! command a `wtpool job` runs. Copied under a program's name, such as `cargo` or `go`, it takes
-//! any arguments, so a check can give a job exactly the command line it wants, and reads what it
-//! does from variables, which a job passes through untouched (J2):
+//! The probe command of the job checks: the command a `wtpool job` runs. Copied under a program's
+//! name, such as `cargo` or `go`, it takes any arguments, so a check can give a job exactly the
+//! command line it wants, and reads what it does from variables, which a job passes through
+//! untouched:
 //!
 //! - `WTPOOL_PROBE_MARKS`: a folder. At its start the probe writes `<label>.start` there, a JSON
 //!   object of its `pid`, the wall clock `at` in nanoseconds since the epoch, its `args` after the
@@ -13,7 +13,8 @@
 //! - `WTPOOL_PROBE_STDIN=copy`: copies stdin to stdout and to stderr, byte for byte, to its end.
 //! - `WTPOOL_PROBE_EXIT`: the exit code, 0 by default.
 //! - `WTPOOL_PROBE_SIGNAL`: a signal name such as `TERM`, which the probe sends itself instead of
-//!   exiting, through `kill`; exit code 70 if it outlives it.
+//!   exiting, through `kill`; exit code 70 if it outlives it. `PIPE` comes from a shell that
+//!   replaces the probe, as a Rust program ignores SIGPIPE from its start.
 //!
 //! A program rather than a shell script: no shell reads the clock below the second or tells a
 //! terminal apart the same way on every system.
@@ -125,6 +126,15 @@ fn main() -> ExitCode {
         write_whole(dir, &format!("{label}.end"), &end);
     }
     if let Some(signal) = var("WTPOOL_PROBE_SIGNAL") {
+        #[cfg(unix)]
+        if signal == "PIPE" {
+            // Command gives the shell SIGPIPE's default action back before it replaces this
+            // process, so `$$`, still this pid, dies by it.
+            use std::os::unix::process::CommandExt;
+            let error = Command::new("sh").args(["-c", "kill -s PIPE $$"]).exec();
+            eprintln!("probe: sh: {error}");
+            return ExitCode::from(70);
+        }
         let _ = Command::new("kill")
             .args(["-s", &signal, &std::process::id().to_string()])
             .status();

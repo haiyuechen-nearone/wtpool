@@ -1213,3 +1213,11 @@ reason = "The five int checks of the pull request lookup of wtpool bg, bg__shoul
 "docs/design/status-panel/status-panel.md" = "29e579232429717cee9c9c095914f082fc8bd0c5bb0edbd1eaa969f67168b284"
 "docs/design/status-panel/verification.md" = "be73bb10092787a135e7d8d1b6ce6cb4df377703d3463030a4911f0ba3ac8917"
 "verify/trace.toml" = "cff27e8e148397543f662a8f0b6e760bf47de3a03aebb61bb82b7067bbbf2a9f"
+
+[[change]]
+id = "p4-oracle-fixes"
+reason = "Two fixes of the oracle. The probe of the job checks, xtask/src/bin/probe.rs, sends itself SIGPIPE from a shell that replaces it, sh -c 'kill -s PIPE $$' through exec, as a Rust program ignores SIGPIPE from its start and its own kill of it did nothing, so it exited 70; Command gives the shell SIGPIPE's default action back, so the probe in that mode dies by signal 13, which the command_pipe case of job__should_mirror_signals needs, and every other signal it still sends itself through kill. The probe's header drops its design references. --only static:ascii_bundles, static:eslint or static:stylelint selected nothing, as verify/checks.toml lists none of them: Wanted::layer in xtask/src/layers.rs now wants the static layer for these names, listed as UNREGISTERED in xtask/src/layers/statics.rs, and a unit test covers each case; the Rust static checks of the part, such as static:fmt, start no web build. No check's verdict changes."
+[change.files]
+"xtask/src/bin/probe.rs" = "cac831790e4bf4cc4c4e46223d146dbb0d37a02ce374b120ff6e5263d2569ce4"
+"xtask/src/layers.rs" = "b6a948e67c274d40cd6a957c749bb883caf65876b042cab31c5e10a0a7d32987"
+"xtask/src/layers/statics.rs" = "fc54d70898934fbd5d3ae799c948652ac6ff7f7214081e53eb2e86e80ea33638"

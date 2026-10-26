@@ -229,6 +229,10 @@ fn html_sink(line: &str) -> Option<String> {
         .map(|sink| (*sink).to_owned())
 }
 
+/// The static layer's checks that verify/checks.toml does not list, which `--only` still names.
+pub(super) const UNREGISTERED: [&str; 3] =
+    ["static:ascii_bundles", "static:eslint", "static:stylelint"];
+
 pub(super) fn static_checks(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
     let mut results = Vec::new();
     if wanted.check("lint__no_html_sinks") {

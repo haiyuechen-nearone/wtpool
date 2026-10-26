@@ -45,11 +45,14 @@ impl Wanted<'_> {
     fn layer(&self, layer: &str) -> bool {
         match &self.ctx.only {
             None => true,
-            Some(only) => self
-                .registry
-                .layers
-                .get(only)
-                .is_some_and(|layers| layers.contains(layer)),
+            Some(only) => {
+                (layer == "static" && statics::UNREGISTERED.contains(&only.as_str()))
+                    || self
+                        .registry
+                        .layers
+                        .get(only)
+                        .is_some_and(|layers| layers.contains(layer))
+            }
         }
     }
 
@@ -81,5 +84,60 @@ impl Wanted<'_> {
             .map(|check| web::title_pattern(check))
             .collect();
         Some(patterns.join("|"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::path::PathBuf;
+    use std::time::Instant;
+
+    use rstest::rstest;
+
+    use super::*;
+
+    fn ctx(only: Option<&str>) -> Ctx {
+        Ctx {
+            root: PathBuf::from("."),
+            phase: 4,
+            run_dir: PathBuf::from("."),
+            commit: String::new(),
+            only: only.map(str::to_owned),
+            deadline: Instant::now(),
+            low_priority: false,
+            later: BTreeSet::new(),
+        }
+    }
+
+    #[rstest]
+    #[case::every_layer_without_only(None, "static", true)]
+    #[case::a_static_check_no_registry_lists(Some("static:ascii_bundles"), "static", true)]
+    #[case::eslint(Some("static:eslint"), "static", true)]
+    #[case::stylelint(Some("static:stylelint"), "static", true)]
+    #[case::no_other_layer(Some("static:ascii_bundles"), "render", false)]
+    #[case::a_rust_check_the_part_runs(Some("static:fmt"), "static", false)]
+    #[case::a_registered_check(Some("rows__a"), "render", true)]
+    #[case::not_its_layer(Some("rows__a"), "static", false)]
+    fn wanted_layer__should_follow_the_only_check(
+        #[case] only: Option<&str>,
+        #[case] layer: &str,
+        #[case] expected: bool,
+    ) {
+        // Given
+        let ctx = ctx(only);
+        let registry = Registry {
+            layers: BTreeMap::from([("rows__a".to_owned(), BTreeSet::from(["render".to_owned()]))]),
+        };
+        let wanted = Wanted {
+            ctx: &ctx,
+            registry: &registry,
+        };
+
+        // When
+        let found = wanted.layer(layer);
+
+        // Then
+        assert_eq!(found, expected);
     }
 }

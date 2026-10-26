@@ -200,3 +200,5 @@ accept cover-gaps d33b1f358b9ef928969cf69ae4e61e7c78eb48767d9386170e3fd8873dbfc4
 accept forge-github d1a7ebed8adef422ccea2f30011ae0cea1222aad48f364220f6edc45d7ea3abe
 # The pull request lookup checks of wtpool bg trace to S10, from phase 3, and S10 gains a sentence on the lookup already built.
 accept trace-pr f4a15b7f4bc7e379b07d6d603c770b397ebf0485e7de50a1c6663caa4ba93249
+# The probe dies by SIGPIPE through a shell that replaces it, and --only names the static layer's checks that verify/checks.toml does not list.
+accept p4-oracle-fixes eedf883dd37dc7a2f2aef02d3d9735f6e98c3a206688d613903a19de1865d172
