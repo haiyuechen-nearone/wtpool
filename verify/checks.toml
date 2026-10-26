@@ -198,6 +198,11 @@ budget__b8 = ["bench-chromium"]
 # bench, phase 2: wtpool hook latency over the fixtures (B1) and the watcher under 3 agents (B6).
 budget__b1 = ["bench"]
 budget__b6 = ["bench"]
+# bench, phase 4 (jobs.md, "Budgets"): what wtpool job adds (B12), the handover between jobs (B13)
+# and wtpool hook policy at each policy (B14).
+budget__b12 = ["bench"]
+budget__b13 = ["bench"]
+budget__b14 = ["bench"]
 
 # int, phase 2: W4's second sentence, which the trace list of verification.md does not name
 # (phase 1 review 2, N3). The other int checks need no entry.
@@ -224,3 +229,48 @@ contract__should_run_in_the_sandbox = ["cc"]
 # The scrubber over the recordings of the oracle's live run (verification.md, "Contract test"),
 # skipped where those recordings do not exist.
 fixtures__should_match_a_fresh_scrub = ["static"]
+
+# Phase 4, the panel side of heavy jobs (docs/design/jobs/jobs.md, "Verification plan") and
+# several agents in one row (U12, U13).
+# render: the webview's pattern check (J18), builds outside a job (A8, U14), the heading's machine
+# button and its counts (S14, U8, U10), the machine strip (U11, X20), the pattern editor (U15,
+# X22), the count of agent lines (U12) and the line icons (U13).
+pattern__should_match_the_cli_grammar = ["render"]
+not_queued__should_mark_builds_outside_jobs = ["render"]
+heading__should_count_jobs = ["render"]
+heading__should_offer_the_machine_button = ["render"]
+machine_strip__should_show_settings_patterns_and_jobs = ["render"]
+machine_strip__should_update_in_place = ["render"]
+machine_strip__should_follow_the_keyboard = ["render"]
+heavy_editor__should_show_each_scope = ["render"]
+heavy_editor__should_follow_the_keyboard = ["render"]
+count__should_follow_the_agent_lines = ["render"]
+line_icons__should_match_each_state = ["render"]
+# host: the extension runs wtpool job limit, enforce and heavy for each jobSettings and answers (X21).
+job_settings__should_run_wtpool_once_each_and_report = ["host"]
+# shot: nothing clipped at 1100 and 600 px, axe, contrast, chip outlines and focus rings at 3:1 in
+# the strip, the editor and the button (U10, U11, U14, U15, X20, X22); the count on the word's
+# line (U12); line icons aligned, of one size and never moving (U13).
+machine_strip__should_clip_nothing_in_every_theme = ["shot"]
+heavy_editor__should_clip_nothing_in_every_theme = ["shot"]
+machine_strip__should_show_every_ring_whole_in_contrast = ["shot"]
+heavy_editor__should_show_every_ring_whole_in_contrast = ["shot"]
+machine_button__should_meet_aa_and_show_its_ring = ["shot"]
+not_queued__should_meet_aa_in_every_theme = ["shot"]
+count__should_keep_to_the_word_line = ["shot"]
+line_icons__should_align_and_share_one_size = ["shot"]
+line_icons__should_never_move = ["shot"]
+# e2e: the phase 4 user flows of verification.md.
+flow__jobs_open_from_heading = ["e2e"]
+flow__jobs_running_and_queued = ["e2e"]
+flow__jobs_change_settings = ["e2e"]
+flow__jobs_lower_limit = ["e2e"]
+flow__jobs_not_queued = ["e2e"]
+flow__jobs_require_refuses = ["e2e"]
+flow__jobs_first_open = ["e2e"]
+flow__jobs_edit_patterns = ["e2e"]
+flow__jobs_invalid_value = ["e2e"]
+flow__jobs_old_wtpool = ["e2e"]
+flow__jobs_wtpool_missing = ["e2e"]
+flow__jobs_remote_window = ["e2e"]
+flow__several_agents_in_one_row = ["e2e"]

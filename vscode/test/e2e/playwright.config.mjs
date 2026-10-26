@@ -11,7 +11,7 @@ export default defineConfig({
   testDir: here,
   testMatch: '*.spec.mjs',
   // playwright.exclusive.config.mjs runs these alone, after this run.
-  testIgnore: 'flows-exclusive.spec.mjs',
+  testIgnore: 'flows-exclusive*.spec.mjs',
   // Finds or downloads VS Code once, before the checks (verification.md, "Portability").
   globalSetup: path.join(here, 'global-setup.mjs'),
   timeout: 300_000,

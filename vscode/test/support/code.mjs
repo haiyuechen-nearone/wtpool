@@ -1,7 +1,8 @@
 // What every VS Code the oracle starts shares: the flags that keep it off the owner's keychain and
-// away from system dialogs, short socket paths, and the scan for keychain errors.
+// away from system dialogs, short socket paths, the scan for keychain errors, and the machine
+// config of its sandbox home.
 import { createHash } from 'node:crypto';
-import { lstatSync, mkdirSync, rmSync, symlinkSync } from 'node:fs';
+import { chmodSync, lstatSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { cacheRoot } from './vscode-app.mjs';
@@ -105,4 +106,23 @@ export function keychainErrors(text) {
     .split('\n')
     .filter((line) => /keychain|OSCrypt|safeStorage/i.test(line))
     .filter((line) => !/'use-mock-keychain' is not in the list of known options/.test(line));
+}
+
+/**
+ * The machine config every sandbox home starts with: processes named `cargo`, `cargo-*` or
+ * `rustc`, the builds of phases 1 to 3, as heavy patterns of the machine. From phase 4 only a
+ * process that matches a heavy pattern is a build, so the checks of the earlier phases keep their
+ * builds through this list, and a wtpool before phase 4 reads no such file. A check of heavy jobs
+ * writes its own.
+ */
+export const EARLIER_BUILDS = '# The builds of phases 1 to 3 as heavy patterns.\n[jobs]\nheavy = ["cargo", "cargo-*", "rustc"]\n';
+
+/** Writes {@link EARLIER_BUILDS} as the `machine.toml` of `home`, folder 0700 and file 0600. */
+export function writeEarlierBuilds(home) {
+  const folder = path.join(home, '.config', 'wtpool');
+  mkdirSync(folder, { recursive: true });
+  chmodSync(folder, 0o700);
+  const file = path.join(folder, 'machine.toml');
+  writeFileSync(file, EARLIER_BUILDS, { mode: 0o600 });
+  chmodSync(file, 0o600);
 }

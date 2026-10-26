@@ -1,7 +1,8 @@
 # The trace list of docs/design/status-panel/verification.md as data, read by `trace_complete`.
 # An ID's `checks` are its own named checks, `ids` the IDs whose checks it stands for. Scenario
 # checks come from `covers` in verify/scenarios/*.json. A check runs from the later of its ID's
-# phase and its own phase in `check_phase`.
+# phase and its own phase in `check_phase`, the earliest such phase when several IDs name it; no
+# layer of a run of an earlier phase runs or counts it (crate::trace::later_checks).
 
 [harness]
 oracle_unchanged = 0
@@ -72,6 +73,57 @@ ls__should_show_controls_bidi_and_zero_width_as_escapes = 3
 bg__should_show_controls_in_the_fetching_line_as_escapes = 3
 fg__should_show_controls_in_the_commit_subject_as_escapes = 3
 config__should_show_controls_in_paths_as_escapes = 3
+# S10: a pull request of wtpool fg and wtpool bg resolves through gh on the remote's repository.
+bg__should_take_the_pr_head_from_gh = 3
+bg__should_park_the_head_branch_of_the_pr_gh_names = 3
+bg__should_name_the_failure_of_gh = 3
+bg__should_say_gh_is_missing = 3
+bg__should_refuse_a_pr_without_a_head_to_use = 3
+
+# Heavy jobs (jobs.md, phase 4): S4's heavy patterns and queued builds, which replace its cargo
+# names, and the budgets of jobs.md, "Budgets", R7's B14 among them.
+builds__should_match_heavy_patterns = 4
+builds__should_say_when_a_job_holds_them = 4
+budget__b12 = 4
+budget__b13 = 4
+budget__b14 = 4
+
+# The panel side of heavy jobs and several agents in one row (jobs.md, "Verification plan"), from
+# phase 4, also where they stand for an ID of an earlier phase (U8, S4, A1, R9, R10).
+pattern__should_match_the_cli_grammar = 4
+not_queued__should_mark_builds_outside_jobs = 4
+heading__should_count_jobs = 4
+heading__should_offer_the_machine_button = 4
+machine_strip__should_show_settings_patterns_and_jobs = 4
+machine_strip__should_update_in_place = 4
+machine_strip__should_follow_the_keyboard = 4
+heavy_editor__should_show_each_scope = 4
+heavy_editor__should_follow_the_keyboard = 4
+count__should_follow_the_agent_lines = 4
+line_icons__should_match_each_state = 4
+job_settings__should_run_wtpool_once_each_and_report = 4
+machine_strip__should_clip_nothing_in_every_theme = 4
+heavy_editor__should_clip_nothing_in_every_theme = 4
+machine_strip__should_show_every_ring_whole_in_contrast = 4
+heavy_editor__should_show_every_ring_whole_in_contrast = 4
+machine_button__should_meet_aa_and_show_its_ring = 4
+not_queued__should_meet_aa_in_every_theme = 4
+count__should_keep_to_the_word_line = 4
+line_icons__should_align_and_share_one_size = 4
+line_icons__should_never_move = 4
+flow__jobs_open_from_heading = 4
+flow__jobs_running_and_queued = 4
+flow__jobs_change_settings = 4
+flow__jobs_lower_limit = 4
+flow__jobs_not_queued = 4
+flow__jobs_require_refuses = 4
+flow__jobs_first_open = 4
+flow__jobs_edit_patterns = 4
+flow__jobs_invalid_value = 4
+flow__jobs_old_wtpool = 4
+flow__jobs_wtpool_missing = 4
+flow__jobs_remote_window = 4
+flow__several_agents_in_one_row = 4
 
 [ids.R1]
 phase = 1
@@ -101,7 +153,7 @@ checks = ["budget__b4"]
 
 [ids.R7]
 phase = 1
-checks = ["budget__b1", "budget__b2", "budget__b5", "budget__b10"]
+checks = ["budget__b1", "budget__b2", "budget__b5", "budget__b10", "budget__b14"]
 
 [ids.R8]
 phase = 1
@@ -112,11 +164,11 @@ ids = ["S2", "X4", "X10", "X11", "X12", "X17"]
 # unknown properties are accepted.
 [ids.R9]
 phase = 1
-checks = ["flow__workspace_folder_pool", "flow__no_folder_open", "spawn__should_run_in_the_workspace_folder"]
+checks = ["flow__workspace_folder_pool", "flow__no_folder_open", "spawn__should_run_in_the_workspace_folder", "flow__jobs_remote_window"]
 
 [ids.R10]
 phase = 1
-checks = ["flow__wtpool_error_shown"]
+checks = ["flow__wtpool_error_shown", "flow__jobs_wtpool_missing"]
 
 [ids.R11]
 phase = 1
@@ -282,7 +334,7 @@ checks = ["plugin__should_hold_the_printed_block", "install__should_report_the_p
 # A1 (round publish): a background task of a session or subagent keeps it working.
 [ids.A1]
 phase = 2
-checks = ["decay__should_match_the_table", "cc_interrupt", "builds__should_keep_the_session_that_started_them_working", "builds__should_keep_no_session_working_through_other_children", "background__should_keep_a_session_working_until_its_task_ends", "background__should_keep_a_subagent_working_until_its_task_ends"]
+checks = ["decay__should_match_the_table", "cc_interrupt", "builds__should_keep_the_session_that_started_them_working", "builds__should_keep_no_session_working_through_other_children", "background__should_keep_a_session_working_until_its_task_ends", "background__should_keep_a_subagent_working_until_its_task_ends", "flow__jobs_not_queued"]
 
 [ids.A2]
 phase = 2
@@ -320,9 +372,17 @@ checks = ["status__should_leave_every_file_unchanged", "status__should_not_start
 phase = 1
 checks = []
 
+# S4 from phase 4 (jobs.md): a build is a process that matches a heavy pattern; the cargo names
+# of phases 1 to 3 stay builds through the machine list every sandbox starts with.
 [ids.S4]
 phase = 1
-checks = ["builds__should_match_cargo_star_and_rustc", "builds__should_read_the_setting"]
+checks = [
+  "builds__should_match_cargo_star_and_rustc",
+  "builds__should_read_the_setting",
+  "builds__should_match_heavy_patterns",
+  "builds__should_say_when_a_job_holds_them",
+  "flow__jobs_not_queued",
+]
 
 [ids.S5]
 phase = 2
@@ -348,7 +408,14 @@ checks = ["free__should_agree_with_wtpool_bg"]
 # document as a contract.
 [ids.S10]
 phase = 1
-checks = ["status__should_name_the_repository"]
+checks = [
+  "status__should_name_the_repository",
+  "bg__should_take_the_pr_head_from_gh",
+  "bg__should_park_the_head_branch_of_the_pr_gh_names",
+  "bg__should_name_the_failure_of_gh",
+  "bg__should_say_gh_is_missing",
+  "bg__should_refuse_a_pr_without_a_head_to_use",
+]
 
 [ids.S11]
 phase = 1
@@ -536,7 +603,7 @@ checks = ["ages__should_tick_without_messages"]
 # U8 (status-panel.md revision 16): one heading per pool, repository then machine.
 [ids.U8]
 phase = 1
-checks = ["heading__should_name_the_repository_then_the_machine"]
+checks = ["heading__should_name_the_repository_then_the_machine", "heading__should_offer_the_machine_button", "machine_button__should_meet_aa_and_show_its_ring", "flow__jobs_open_from_heading"]
 
 # U9 (status-panel.md revision 20): the Output section of the detail strip.
 [ids.U9]
@@ -593,3 +660,275 @@ checks = ["budget__b10"]
 [ids.B11]
 phase = 1
 checks = ["budget__b11"]
+
+# Heavy jobs (docs/design/jobs/jobs.md, "Verification plan"), phase 4: the int column, the CLI side.
+[ids.J1]
+phase = 4
+checks = ["job__should_run_once_a_place_is_free", "job__should_refuse_without_a_command"]
+
+[ids.J2]
+phase = 4
+checks = ["job_ls__should_state_the_rules_then_list_jobs"]
+
+[ids.J3]
+phase = 4
+checks = [
+  "job_settings__should_print_set_and_reset",
+  "flow__jobs_change_settings",
+  "flow__jobs_edit_patterns",
+  "flow__jobs_first_open",
+]
+
+[ids.J4]
+phase = 4
+checks = [
+  "machine_config__should_follow_xdg_and_home",
+  "machine_config__should_ignore_the_repository",
+]
+
+[ids.J5]
+phase = 4
+checks = [
+  "machine_config__should_reject_invalid_files",
+  "machine_config__should_default_to_a_quarter_of_the_cores",
+  "machine_config__should_read_through_a_symlink",
+]
+
+[ids.J6]
+phase = 4
+checks = [
+  "job_settings__should_write_atomically_and_privately",
+  "job_settings__should_refuse_a_symlink_or_bad_toml",
+  "job_settings__should_edit_in_place",
+  "flow__jobs_invalid_value",
+  "flow__jobs_edit_patterns",
+]
+
+[ids.J7]
+phase = 4
+checks = ["job__should_refuse_an_unsafe_folder"]
+
+[ids.J8]
+phase = 4
+checks = ["job__should_record_only_its_summary", "job__should_not_pass_its_lock_to_the_command"]
+
+[ids.J9]
+phase = 4
+checks = ["job__should_free_the_place_of_a_killed_job"]
+
+[ids.J10]
+phase = 4
+checks = [
+  "job__should_start_waiters_in_order",
+  "job__should_never_run_more_than_the_limit",
+  "flow__jobs_running_and_queued",
+]
+
+[ids.J11]
+phase = 4
+checks = ["job__should_keep_running_jobs_when_the_limit_drops", "flow__jobs_lower_limit"]
+
+[ids.J12]
+phase = 4
+checks = ["job__should_run_a_nested_job_in_its_parent_place"]
+
+[ids.J13]
+phase = 4
+checks = [
+  "job__should_pass_streams_and_exit_codes_through",
+  "job__should_keep_a_terminal_a_terminal",
+]
+
+[ids.J14]
+phase = 4
+checks = ["job__should_mirror_signals"]
+
+[ids.J15]
+phase = 4
+checks = ["job__should_note_only_a_wait_on_stderr"]
+
+[ids.J16]
+phase = 4
+checks = ["job__should_summarise_by_pattern_else_h14"]
+
+[ids.J17]
+phase = 4
+checks = ["job__should_run_on_windows"]
+
+[ids.J18]
+phase = 4
+checks = ["pattern__should_follow_the_grammar", "pattern__should_match_the_cli_grammar"]
+
+[ids.J19]
+phase = 4
+checks = ["pattern__should_match_shell_words", "pattern__should_match_processes"]
+
+[ids.J20]
+phase = 4
+checks = [
+  "heavy__should_merge_machine_repository_and_build_processes",
+  "builds__should_count_suggestions_until_a_list",
+]
+
+[ids.J21]
+phase = 4
+checks = [
+  "policy__should_flag_only_under_warn_and_require",
+  "flow__jobs_not_queued",
+  "flow__jobs_require_refuses",
+]
+
+[ids.J22]
+phase = 4
+checks = ["plugin__should_hold_the_heavy_jobs_skill"]
+
+[ids.J23]
+phase = 4
+checks = [
+  "suggest__should_follow_the_marker_table",
+  "suggest__should_read_only_names",
+  "flow__jobs_first_open",
+]
+
+[ids.J24]
+phase = 4
+checks = ["suggest__should_read_package_json_scripts", "flow__jobs_first_open"]
+
+# H29 (status-panel.md): the Claude Code adapter of the policy, `wtpool hook policy`.
+[ids.H29]
+phase = 4
+checks = [
+  "hook_policy__should_deny_only_unwrapped_heavy_calls_under_require",
+  "hook_policy__should_print_nothing_on_any_error",
+  "hook_policy__should_quote_the_wrapped_command",
+  "flow__jobs_require_refuses",
+]
+
+# A8: a job's actor shows `queued:` while the job waits; the decay table gains its job cases from
+# phase 4, and the scenarios jobs_queue and build_not_queued cover it.
+[ids.A8]
+phase = 4
+checks = [
+  "decay__should_match_the_table",
+  "not_queued__should_mark_builds_outside_jobs",
+  "not_queued__should_meet_aa_in_every_theme",
+  "flow__jobs_not_queued",
+]
+
+[ids.S14]
+phase = 4
+checks = [
+  "status__should_list_jobs",
+  "heading__should_count_jobs",
+  "flow__jobs_old_wtpool",
+]
+
+[ids.S15]
+phase = 4
+checks = ["status__should_attribute_jobs"]
+
+[ids.W10]
+phase = 4
+checks = [
+  "watch__should_see_jobs_within_a_second",
+  "watch__should_see_a_dead_job_within_a_heartbeat",
+  "watch__should_see_new_settings_within_a_second",
+  "flow__jobs_change_settings",
+]
+
+[ids.B12]
+phase = 4
+checks = ["budget__b12"]
+
+[ids.B13]
+phase = 4
+checks = ["budget__b13"]
+
+[ids.B14]
+phase = 4
+checks = ["budget__b14"]
+
+# Phase 4, the panel side (jobs.md, "Verification plan": the render, host, shot and e2e columns).
+# U12 and U13 also take the scenario five_agents_one_worktree through its covers, U14 the scenario
+# build_not_queued; X11's jobSettings cases join messages__should_ignore_everything_outside_the_set.
+[ids.U10]
+phase = 4
+checks = [
+  "heading__should_offer_the_machine_button",
+  "machine_button__should_meet_aa_and_show_its_ring",
+  "flow__jobs_open_from_heading",
+]
+
+[ids.U11]
+phase = 4
+checks = [
+  "machine_strip__should_show_settings_patterns_and_jobs",
+  "machine_strip__should_update_in_place",
+  "machine_strip__should_clip_nothing_in_every_theme",
+  "flow__jobs_open_from_heading",
+  "flow__jobs_running_and_queued",
+  "flow__jobs_old_wtpool",
+  "flow__jobs_remote_window",
+]
+
+[ids.U12]
+phase = 4
+checks = [
+  "count__should_follow_the_agent_lines",
+  "count__should_keep_to_the_word_line",
+  "flow__several_agents_in_one_row",
+]
+
+[ids.U13]
+phase = 4
+checks = [
+  "line_icons__should_match_each_state",
+  "line_icons__should_align_and_share_one_size",
+  "line_icons__should_never_move",
+  "flow__several_agents_in_one_row",
+  "flow__reduced_motion",
+]
+
+[ids.U14]
+phase = 4
+checks = [
+  "not_queued__should_mark_builds_outside_jobs",
+  "not_queued__should_meet_aa_in_every_theme",
+  "flow__jobs_not_queued",
+]
+
+[ids.U15]
+phase = 4
+checks = [
+  "heavy_editor__should_show_each_scope",
+  "heavy_editor__should_clip_nothing_in_every_theme",
+  "flow__jobs_edit_patterns",
+]
+
+[ids.X20]
+phase = 4
+checks = [
+  "machine_strip__should_follow_the_keyboard",
+  "machine_strip__should_show_every_ring_whole_in_contrast",
+  "flow__jobs_open_from_heading",
+  "flow__jobs_invalid_value",
+  "flow__keyboard_only",
+]
+
+[ids.X21]
+phase = 4
+checks = [
+  "job_settings__should_run_wtpool_once_each_and_report",
+  "flow__jobs_change_settings",
+  "flow__jobs_edit_patterns",
+  "flow__jobs_wtpool_missing",
+]
+
+[ids.X22]
+phase = 4
+checks = [
+  "heavy_editor__should_follow_the_keyboard",
+  "heavy_editor__should_show_every_ring_whole_in_contrast",
+  "flow__jobs_edit_patterns",
+  "flow__keyboard_only",
+]

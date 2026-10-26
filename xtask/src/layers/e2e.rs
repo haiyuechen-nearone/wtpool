@@ -66,7 +66,6 @@ pub(super) fn e2e(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
             "WTPOOL_VERIFY_RELEASE_BIN".to_owned(),
             release.to_string_lossy().into_owned(),
         ),
-        ("WTPOOL_VERIFY_PHASE".to_owned(), ctx.phase.to_string()),
     ];
     let guard = focus::watch(ctx, "e2e");
     // First every check that may share the machine, in parallel; its outcomes are read with

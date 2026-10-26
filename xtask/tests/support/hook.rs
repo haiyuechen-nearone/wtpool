@@ -78,6 +78,8 @@ pub struct Proc {
     pub name: String,
     pub cwd: PathBuf,
     pub started: String,
+    /// The arguments, the program first (J19); `None` for none readable.
+    pub cmd: Option<Vec<String>>,
 }
 
 /// A sandbox pool, its process table and clock.
@@ -101,6 +103,8 @@ pub struct RunOptions {
     pub remove: Vec<String>,
     /// Raw stdin instead of the payload.
     pub stdin: Option<Vec<u8>>,
+    /// Arguments after `hook`, such as `policy` (H29).
+    pub args: Vec<String>,
 }
 
 pub struct HookRun {
@@ -174,16 +178,19 @@ impl Hooks {
 
     /// Adds or replaces a process of the table, a child of `ppid`.
     pub fn start_child(&mut self, pid: u32, ppid: u32, name: &str, cwd: &Path, started: &str) {
-        self.procs.insert(
+        self.start_proc(Proc {
             pid,
-            Proc {
-                pid,
-                ppid,
-                name: name.to_owned(),
-                cwd: cwd.to_path_buf(),
-                started: started.to_owned(),
-            },
-        );
+            ppid,
+            name: name.to_owned(),
+            cwd: cwd.to_path_buf(),
+            started: started.to_owned(),
+            cmd: None,
+        });
+    }
+
+    /// Adds or replaces `proc` in the table.
+    pub fn start_proc(&mut self, proc: Proc) {
+        self.procs.insert(proc.pid, proc);
         self.write_table();
     }
 
@@ -195,16 +202,17 @@ impl Hooks {
     fn write_table(&self) {
         let mut text = String::new();
         for proc in self.procs.values() {
-            text.push_str(
-                &json!({
-                    "pid": proc.pid,
-                    "ppid": proc.ppid,
-                    "started": proc.started,
-                    "name": proc.name,
-                    "cwd": proc.cwd.to_string_lossy(),
-                })
-                .to_string(),
-            );
+            let mut line = json!({
+                "pid": proc.pid,
+                "ppid": proc.ppid,
+                "started": proc.started,
+                "name": proc.name,
+                "cwd": proc.cwd.to_string_lossy(),
+            });
+            if let Some(cmd) = &proc.cmd {
+                line["cmd"] = json!(cmd);
+            }
+            text.push_str(&line.to_string());
             text.push('\n');
         }
         fs::write(&self.table, text).expect("setup: write the process table");
@@ -242,6 +250,7 @@ impl Hooks {
             .arg(now_micros())
             .arg(must_wtpool_bin())
             .arg("hook")
+            .args(&options.args)
             .env("WTPOOL_VERIFY_CLOCK", &self.clock);
         for (key, value) in &options.envs {
             command.env(key, value);

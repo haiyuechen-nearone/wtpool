@@ -1,10 +1,11 @@
 // Status documents and view messages for the render, shot and host layers. Every document is
-// valid against verify/schema/status.schema.json; `mustValidate` proves it before a test uses it.
+// valid against verify/schema/status.phase-4.schema.json, which only adds properties to
+// status.schema.json; `mustValidate` proves it before a test uses it.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 
-import { SCENARIOS, SCHEMA } from './paths.mjs';
+import { SCENARIOS, SCHEMA_PHASE_4 } from './paths.mjs';
 
 export const GENERATED = '2026-10-20T12:00:00Z';
 export const NOW = Date.parse(GENERATED);
@@ -194,7 +195,7 @@ let validator;
 export function mustValidate(status) {
   if (!validator) {
     const ajv = new Ajv2020({ allErrors: true, strict: false });
-    validator = ajv.compile(JSON.parse(readFileSync(SCHEMA, 'utf8')));
+    validator = ajv.compile(JSON.parse(readFileSync(SCHEMA_PHASE_4, 'utf8')));
   }
   if (!validator(status)) {
     throw new Error(`setup: a test document breaks the schema: ${JSON.stringify(validator.errors)}`);

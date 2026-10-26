@@ -174,6 +174,12 @@ accept status-lines 4bd6c19b8fe9f67108943f199600a98b39aa842eda9de612bb0901bb59ad
 accept comments-bin bf8b5f52d495240b5f17792c40c2f7a346d6f7e8ad89071810a64602ea51a45c
 # The quick part's static layer checks that every built bundle, out/*.js and media/*.js, is ASCII only, as the coverage converter needs a bundle's bytes to equal its UTF-16 length.
 accept comments-ts f83bbbb2d041499006ae2d821442eab68952d4c7b027091990fa1ef867ef864d
+# The phase 4 oracle of heavy jobs, the CLI side: the int checks of J1 to J24, H29, S4, A8, S14, S15 and W10, the scenarios jobs_queue and build_not_queued, B12 to B14, the schemas of machine.jobs and wtpool job ls, the phase-gated rewords, and a phase gate for every layer.
+accept p4-oracle-cli c07472348a7a5d4a3c8f0728ed58a95b9a73e0e7ec548a16d4fdf4b58ff4a422
+# The phase 4 oracle of the panel side of heavy jobs and of several agents in one row: render, host, shot and e2e checks of U8, U10 to U15, A8, S14, J18, X11, X20 to X22, the phase 4 user flows, the fake wtpool's job answers and the scenario five_agents_one_worktree; motion__should_stop_the_spinner judges only the Activity cell.
+accept p4-oracle-panel d92e080bf6b244977e1ac2727db4d8ad9b5ec9e5a369fbcd914784e3863ff51c
+# The two phase 4 oracle branches merged: the union of their trace entries, the self test's 152 IDs, catalog 34 to 36, machine.jobs.source as an object in the panel's documents, the int sandboxes' machine config in the host and e2e homes, the phase gate in the split modules, flows gated by their row's phase, later tests left out of Playwright runs, freeze judging new checks against the commit under the changes, S14's source as an object, six checks the builders found wrong (the count, the separators line, the heading in place, the 1 to 64 limits, build: make (not queued), U10's name starting with its visible text), Job::wait_exit no longer waiting on a held command's streams, the policy's no-repository case run in /, running scenario jobs awaited to their start mark, and cc_policy_deny out of this round.
+accept p4-oracle-merge bbb150e9110b173451c88dd860e1405ab79da40cd014af97532b2d37b71e6eea
 # The CLI escapes the extension's set: the int checks of the CLI's escapes take Cc, Cf, U+2028, U+2029 and the tag block from Node's Unicode tables, the ls and bg branch adds U+2028 and U+FFF9, and the config check's slot_dir probes every character of the set and the code points just outside each run.
 accept cli-invisible 616e995b1c7668c0cf3e97a78ce16587c3161c2f83f4c0fa469bf00994b4e05d
 # X7: a new e2e check hides and shows the tab ten times in a row and wants the pool's rows back within 2 s each time, the header never left at starting….
@@ -192,3 +198,5 @@ accept flake-fixes c88a7f91f584a711b078e3962980bf79679c5576d72db9f32764a67524c4e
 accept cover-gaps d33b1f358b9ef928969cf69ae4e61e7c78eb48767d9386170e3fd8873dbfc414
 # GitHub moves out of wtpool-core into crates/wtpool-github, a new workspace member, with one strict remote URL parser; two int checks run wtpool bg on a PR through a fake gh, with no real gh on PATH, and a fake ssh: PRs fetched new and refreshed, and every refusal of a PR without a head to use.
 accept forge-github d1a7ebed8adef422ccea2f30011ae0cea1222aad48f364220f6edc45d7ea3abe
+# The pull request lookup checks of wtpool bg trace to S10, from phase 3, and S10 gains a sentence on the lookup already built.
+accept trace-pr f4a15b7f4bc7e379b07d6d603c770b397ebf0485e7de50a1c6663caa4ba93249

@@ -1,5 +1,6 @@
 //! `wtpool hook` as a process: no stdout, exit 0, the watchdog, stdin, ids and its log (H2 to H5,
-//! H17, H23).
+//! H17, H23). From phase 4 the exit and watchdog checks also run `wtpool hook policy` (H3, H4,
+//! H29), which alone may print a decision; the hook_policy checks judge what it prints.
 
 use std::fs;
 use std::io::Write;
@@ -38,6 +39,19 @@ fn malformed() -> Vec<(&'static str, Vec<u8>)> {
     ]
 }
 
+/// A machine config under which `wtpool hook policy` refuses the fixtures' shell calls, so the
+/// exit and watchdog checks reach its decision path too (H29).
+const REQUIRE: &str =
+    "[jobs]\nenforce = \"require\"\nheavy = [\"git status\", \"cargo test\", \"ls\"]\n";
+
+/// Options of a run of `wtpool hook policy`.
+fn policy_options() -> RunOptions {
+    RunOptions {
+        args: vec!["policy".to_owned()],
+        ..RunOptions::default()
+    }
+}
+
 /// How many records `wtpool-activity/` holds.
 fn records_written(hooks: &Hooks) -> usize {
     hooks
@@ -47,6 +61,8 @@ fn records_written(hooks: &Hooks) -> usize {
         .count()
 }
 
+/// H2: `wtpool hook` alone prints nothing; from phase 4 `wtpool hook policy` may print one
+/// decision (H29), so it is not run here.
 #[test]
 fn hook__should_print_nothing_for_every_fixture() {
     // Given
@@ -95,7 +111,7 @@ fn hook__should_exit_zero_for_every_fixture() {
     let fixtures = every_fixture(&hooks.pool);
 
     // When
-    let runs: Vec<(String, String, Option<i32>)> = fixtures
+    let mut runs: Vec<(String, String, Option<i32>)> = fixtures
         .iter()
         .map(|(name, payload)| {
             let run = hooks.run(payload);
@@ -110,6 +126,26 @@ fn hook__should_exit_zero_for_every_fixture() {
             (name.to_owned(), run.describe(), run.code())
         }))
         .collect();
+
+    if crate::support::phase() >= 4 {
+        hooks.sandbox.write_machine(REQUIRE);
+        runs.extend(
+            fixtures
+                .iter()
+                .map(|(name, payload)| {
+                    let run = hooks.run_with(payload, &policy_options());
+                    (format!("policy {name}"), run.describe(), run.code())
+                })
+                .chain(malformed().into_iter().map(|(name, input)| {
+                    let options = RunOptions {
+                        stdin: Some(input),
+                        ..policy_options()
+                    };
+                    let run = hooks.run_with(&Value::Null, &options);
+                    (format!("policy {name}"), run.describe(), run.code())
+                })),
+        );
+    }
 
     // Then
     let failed: Vec<String> = runs
@@ -184,6 +220,34 @@ fn hook__should_exit_within_a_second_when_the_record_is_a_fifo() {
         "wtpool hook took {:?} with a FIFO as its record",
         run.elapsed
     );
+    if crate::support::phase() >= 4 {
+        policy_with_a_fifo_config(&hooks);
+    }
+}
+
+/// From phase 4: `wtpool hook policy` whose `machine.toml` is a FIFO no one writes exits 0 within
+/// its watchdog, with no output (H4, H29).
+fn policy_with_a_fifo_config(hooks: &Hooks) {
+    let config = hooks.sandbox.machine_config();
+    let _ = fs::remove_file(&config);
+    let made = std::process::Command::new("mkfifo")
+        .arg(&config)
+        .status()
+        .expect("setup: run mkfifo");
+    assert!(made.success(), "setup: mkfifo failed");
+    let payload = with(
+        event(&hooks.pool, "PreToolUse-Bash", "s1", &hooks.pool.fg),
+        &[(
+            "tool_input",
+            json!({ "command": "cargo test", "description": "Test" }),
+        )],
+    );
+    let run = hooks.run_with(&payload, &policy_options());
+    assert!(
+        run.code() == Some(0) && run.output.stdout.is_empty() && run.elapsed <= WATCHDOG,
+        "wtpool hook policy with a FIFO as machine.toml: {}",
+        run.describe()
+    );
 }
 
 #[test]
@@ -216,6 +280,40 @@ fn hook__should_exit_within_a_second_when_stdin_stays_open() {
     assert!(
         elapsed <= WATCHDOG,
         "wtpool hook with stdin left open ran {elapsed:?}"
+    );
+    if crate::support::phase() >= 4 {
+        policy_with_stdin_open(&hooks);
+    }
+}
+
+/// From phase 4: `wtpool hook policy` whose stdin stays open exits 0 within its watchdog, with
+/// no output (H4, H29), under a policy that would refuse the call.
+fn policy_with_stdin_open(hooks: &Hooks) {
+    hooks.sandbox.write_machine(REQUIRE);
+    let payload = with(
+        event(&hooks.pool, "PreToolUse-Bash", "s1", &hooks.pool.fg),
+        &[(
+            "tool_input",
+            json!({ "command": "cargo test", "description": "Test" }),
+        )],
+    );
+    let mut command = hooks.command(&payload, &policy_options());
+    command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let started = Instant::now();
+    let mut child = command.spawn().expect("setup: start wtpool hook policy");
+    let mut stdin = child.stdin.take().expect("setup: stdin");
+    let _ = stdin.write_all(payload.to_string().as_bytes());
+    let output = wait_output(child, Duration::from_secs(5));
+    let elapsed = started.elapsed();
+    drop(stdin);
+    assert!(
+        output.status.code() == Some(0) && output.stdout.is_empty() && elapsed <= WATCHDOG,
+        "wtpool hook policy with stdin left open: exit {:?} after {elapsed:?}, stdout {:?}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout)
     );
 }
 

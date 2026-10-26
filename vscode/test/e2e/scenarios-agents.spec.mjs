@@ -13,7 +13,7 @@ import { age, rowOrder, shownActors } from '../support/grammar.mjs';
 import { SCENARIOS, runDir } from '../support/paths.mjs';
 import { AgentSteps } from './agents.mjs';
 import { flowSession } from './flows.mjs';
-import { expectedRows, shownRows, waitForRows } from './rows.mjs';
+import { expectedLineFacts, expectedRows, lineFacts, lineProblems, shownRows, waitForRows } from './rows.mjs';
 import { close, panelFrame, runCommand, statusJson } from './vscode.mjs';
 
 const PHASE = Number(process.env.WTPOOL_VERIFY_PHASE ?? 1);
@@ -66,7 +66,10 @@ for (const name of names) {
         const shown = await shownRows(frame);
         const status = statusJson(session.dirs, session.pool);
         const to = Date.now();
-        seen.push({ index, expected, rows, shown, status, from, to });
+        // From phase 4 a row also counts its agent lines and starts each with its state for
+        // screen readers (U12, U13); a scenario of phase 4 checks that too.
+        const lines = scenario.phase >= 4 ? lineProblems(await lineFacts(frame), expectedLineFacts(documents[index], session.pool)) : [];
+        seen.push({ index, expected, rows, shown, status, from, to, lines });
         if (SHOTS.has(name)) {
           mkdirSync(path.join(runDir(), 'shots'), { recursive: true });
           await session.window.screenshot({ path: path.join(runDir(), 'shots', `e2e-${name}-${index + 1}.png`) });
@@ -84,6 +87,7 @@ for (const name of names) {
     for (const shot of seen) {
       const where = `${name}, document ${shot.index + 1}`;
       assert.deepEqual(shot.rows, shot.expected, `${where}: the icon word, worktree, branch, git or agent text`);
+      assert.deepEqual(shot.lines, [], `${where}: the count and the lines' screen reader text`);
       const byPath = new Map(rowOrder(shot.status.pools[0].worktrees).map((w) => [w.path, w]));
       for (const row of shot.shown) {
         const worktree = byPath.get(row.id);

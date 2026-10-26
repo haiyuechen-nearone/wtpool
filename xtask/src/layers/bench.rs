@@ -119,11 +119,13 @@ fn rust_bench(ctx: &Ctx, wanted: &Wanted, release: &Path) -> Vec<CheckResult> {
         .env("WTPOOL_VERIFY_REPO", &ctx.root)
         .env("WTPOOL_VERIFY_RUN_DIR", &ctx.run_dir)
         .env("WTPOOL_RELEASE_BIN", release)
-        .env("WTPOOL_BIN", release)
-        .env("WTPOOL_VERIFY_PHASE", ctx.phase.to_string());
+        .env("WTPOOL_BIN", release);
     let filter = match &ctx.only {
         Some(only) => format!("test(/^{BENCH_MODULE}{only}$/)"),
-        None => format!("test(/^{BENCH_MODULE}/)"),
+        None => format!(
+            "test(/^{BENCH_MODULE}/){}",
+            crate::trace::nextest_exclusion(&ctx.later)
+        ),
     };
     tests.args(["-E", &filter]);
     let ran = ctx.run_logged("bench_tests", &mut tests, LAYER_LIMIT);

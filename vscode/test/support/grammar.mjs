@@ -132,11 +132,19 @@ export function shownActors(worktree) {
   return [...worktree.actors].sort((a, b) => Date.parse(b.updated) - Date.parse(a.updated));
 }
 
-export function agentLines(worktree) {
+/**
+ * The agent lines of a row. With the document's `machine.jobs`, a build outside a job reads
+ * ` (not queued)` after its name while `enforce` is not `off`.
+ */
+export function agentLines(worktree, jobs) {
   if (worktree.actors.length) {
     return shownActors(worktree).map((actor) => `${visible(actor.label)}${DOT}${doing(actor)}`);
   }
-  if (worktree.builds.length) return [`build: ${visible(worktree.builds[0].name)}`];
+  if (worktree.builds.length) {
+    const [build] = worktree.builds;
+    const flagged = jobs !== undefined && jobs.enforce !== 'off' && build.queued === false;
+    return [`build: ${visible(build.name)}${flagged ? ' (not queued)' : ''}`];
+  }
   return ['no agent'];
 }
 
@@ -168,13 +176,13 @@ export function headingText(pool, machine) {
 }
 
 /** The text of every cell of a worktree's row. */
-export function expectedRow(worktree, nowMs) {
+export function expectedRow(worktree, nowMs, jobs) {
   return {
     activity: WORDS[worktree.activity],
     worktree: worktreeText(worktree),
     branch: branchText(worktree),
     git: gitText(worktree.git),
-    agent: agentLines(worktree),
+    agent: agentLines(worktree, jobs),
     last: lastLines(worktree, nowMs),
   };
 }

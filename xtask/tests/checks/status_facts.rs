@@ -242,22 +242,39 @@ fn builds__should_match_cargo_star_and_rustc(#[case] process: Proc, #[case] owne
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
+/// `build_processes` and, from phase 4, the repository's `heavy` (J20), each name of the first
+/// read as a one-word pattern then; `cargo` stays a build through the machine's list of every
+/// sandbox (support::jobs::EARLIER_BUILDS).
 #[rstest]
-#[case::listed_program(&["make"], "make", true)]
-#[case::other_program(&["make"], "ninja", false)]
-#[case::cargo_still_counts(&["make"], "cargo", true)]
+#[case::listed_program(&["make"], &[], "make", true, 1)]
+#[case::other_program(&["make"], &[], "ninja", false, 1)]
+#[case::cargo_still_counts(&["make"], &[], "cargo", true, 1)]
+#[case::repository_heavy(&[], &["ninja"], "ninja", true, 4)]
+#[case::only_the_listed_patterns(&[], &["ninja"], "make", false, 4)]
+#[case::both_keys_heavy(&["make"], &["ninja"], "ninja", true, 4)]
+#[case::both_keys_build_processes(&["make"], &["ninja"], "make", true, 4)]
+#[case::build_processes_as_a_pattern(&["protoc-*"], &[], "protoc-gen-go", true, 4)]
 fn builds__should_read_the_setting(
     #[case] setting: &[&str],
+    #[case] heavy: &[&str],
     #[case] program: &'static str,
     #[case] counted: bool,
+    #[case] from_phase: u8,
 ) {
+    if crate::support::phase() < from_phase {
+        return;
+    }
     // Given
     let sandbox = Sandbox::must_new("builds-setting");
     let pool = sandbox.must_pool(&spec(&[]));
     let config = pool.common.join("wtpool.toml");
     let mut text = fs::read_to_string(&config).expect("setup: read wtpool.toml");
-    let list: Vec<String> = setting.iter().map(|s| format!("\"{s}\"")).collect();
-    text.push_str(&format!("build_processes = [{}]\n", list.join(", ")));
+    for (key, names) in [("build_processes", setting), ("heavy", heavy)] {
+        if !names.is_empty() {
+            let list: Vec<String> = names.iter().map(|s| format!("\"{s}\"")).collect();
+            text.push_str(&format!("{key} = [{}]\n", list.join(", ")));
+        }
+    }
     fs::write(&config, text).expect("setup: write wtpool.toml");
     let procs = sandbox.must_write_procs(&[(4343, program, &pool.worktree("wt2"))]);
 
@@ -279,7 +296,7 @@ fn builds__should_read_the_setting(
     let expected: Vec<&str> = if counted { vec![program] } else { vec![] };
     assert_eq!(
         names, expected,
-        "wt2.builds with build_processes {setting:?}"
+        "wt2.builds with build_processes {setting:?} and heavy {heavy:?}"
     );
 }
 

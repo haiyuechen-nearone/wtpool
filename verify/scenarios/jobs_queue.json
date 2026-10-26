@@ -1,0 +1,1023 @@
+{
+  "phase": 4,
+  "covers": [
+    "S14",
+    "S15",
+    "A8",
+    "W10",
+    "R3",
+    "U1"
+  ],
+  "layers": [
+    "int",
+    "render",
+    "host"
+  ],
+  "pool": {
+    "agents": true,
+    "worktrees": {
+      "fg": {
+        "branch": "main",
+        "upstream": true
+      },
+      "wt1": {
+        "detached": true
+      },
+      "wt2": {
+        "detached": true
+      },
+      "wt3": {
+        "detached": true
+      },
+      "x": {
+        "branch": "side"
+      }
+    }
+  },
+  "steps": [
+    {
+      "machine": "[jobs]\nlimit = 1\nheavy = [\"cargo build\", \"cargo test\"]\n"
+    },
+    {
+      "process": {
+        "start": {
+          "pid": 7001,
+          "name": "claude",
+          "in": "fg"
+        }
+      }
+    },
+    {
+      "hook": {
+        "fixture": "UserPromptSubmit",
+        "session": "s1",
+        "cwd": "fg",
+        "process": 7001
+      }
+    },
+    {
+      "hook": {
+        "fixture": "PreToolUse-Bash",
+        "session": "s1",
+        "cwd": "fg",
+        "process": 7001,
+        "with": {
+          "tool_input": {
+            "command": "cd {pool}/wt1 && wtpool job -- cargo build",
+            "description": "Build"
+          },
+          "tool_use_id": "toolu_01"
+        }
+      }
+    },
+    {
+      "job": {
+        "start": {
+          "name": "j1",
+          "in": "wt1",
+          "parent": 7001,
+          "command": [
+            "cargo",
+            "build"
+          ],
+          "command_pid": 5101,
+          "state": "running"
+        }
+      }
+    },
+    {
+      "hook": {
+        "fixture": "SubagentStart",
+        "session": "s1",
+        "cwd": "fg",
+        "process": 7001,
+        "agent": "a1",
+        "with": {
+          "agent_type": "general-purpose"
+        }
+      }
+    },
+    {
+      "hook": {
+        "fixture": "PreToolUse-Bash",
+        "session": "s1",
+        "cwd": "fg",
+        "process": 7001,
+        "agent": "a1",
+        "with": {
+          "tool_input": {
+            "command": "cd {pool}/wt1 && wtpool job -- cargo test",
+            "description": "Test"
+          },
+          "tool_use_id": "toolu_02",
+          "agent_type": "general-purpose"
+        }
+      }
+    },
+    {
+      "job": {
+        "start": {
+          "name": "j2",
+          "in": "wt1",
+          "parent": 7001,
+          "command": [
+            "cargo",
+            "test"
+          ],
+          "command_pid": 5102,
+          "state": "waiting"
+        }
+      }
+    },
+    {
+      "expect": {
+        "type": "status",
+        "version": 1,
+        "generated": "2026-10-20T12:00:04Z",
+        "machine": {
+          "name": "verify-mac",
+          "jobs": {
+            "limit": 1,
+            "default": 1,
+            "min": 1,
+            "max": 64,
+            "enforce": "warn",
+            "source": {
+              "limit": "machine",
+              "enforce": "default"
+            },
+            "config": "{config}",
+            "error": null,
+            "heavy": [
+              {
+                "pattern": "cargo build",
+                "source": "machine"
+              },
+              {
+                "pattern": "cargo test",
+                "source": "machine"
+              }
+            ],
+            "suggested": [],
+            "running": [
+              {
+                "id": "{job:j1}",
+                "summary": "cargo build",
+                "label": null,
+                "worktree": "{pool}/wt1",
+                "actor": "s1",
+                "since": "2026-10-20T12:00:00Z"
+              }
+            ],
+            "waiting": [
+              {
+                "id": "{job:j2}",
+                "summary": "cargo test",
+                "label": null,
+                "worktree": "{pool}/wt1",
+                "actor": "s1.a1",
+                "since": "2026-10-20T12:00:00Z"
+              }
+            ],
+            "outside": []
+          }
+        },
+        "pools": [
+          {
+            "common_dir": "{common}",
+            "repository": {
+              "name": "fg",
+              "github": null
+            },
+            "agents": "on",
+            "skipped_records": 0,
+            "worktrees": [
+              {
+                "path": "{pool}/fg",
+                "name": "fg",
+                "role": "foreground",
+                "missing": false,
+                "branch": "main",
+                "upstream": "origin/main",
+                "git": {
+                  "dirty": 0,
+                  "ahead": 0,
+                  "behind": 0,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "foreground"
+                ],
+                "activity": "foreground",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:55:00Z"
+              },
+              {
+                "path": "{pool}/wt1",
+                "name": "wt1",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "working",
+                "actors": [
+                  {
+                    "key": "s1",
+                    "kind": "session",
+                    "harness": "claude-code",
+                    "label": "session 12:00",
+                    "state": "working",
+                    "reason": null,
+                    "action": {
+                      "tool": "Bash",
+                      "target": "cargo build"
+                    },
+                    "placed_by": "path",
+                    "error": null,
+                    "since": "2026-10-20T12:00:01Z",
+                    "updated": "2026-10-20T12:00:02Z"
+                  },
+                  {
+                    "key": "s1.a1",
+                    "kind": "subagent",
+                    "harness": "claude-code",
+                    "label": "general-purpose",
+                    "state": "working",
+                    "reason": null,
+                    "action": {
+                      "tool": "queued:",
+                      "target": "cargo test"
+                    },
+                    "placed_by": "path",
+                    "error": null,
+                    "since": "2026-10-20T12:00:03Z",
+                    "updated": "2026-10-20T12:00:04Z"
+                  }
+                ],
+                "builds": [
+                  {
+                    "pid": 5101,
+                    "name": "cargo build",
+                    "queued": true
+                  }
+                ],
+                "last_event": "2026-10-20T12:00:04Z",
+                "last_change": "2026-10-20T11:57:00Z"
+              },
+              {
+                "path": "{pool}/wt2",
+                "name": "wt2",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:59:58Z"
+              },
+              {
+                "path": "{pool}/wt3",
+                "name": "wt3",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T10:00:00Z"
+              },
+              {
+                "path": "{pool}/x",
+                "name": "x",
+                "role": "unmanaged",
+                "missing": false,
+                "branch": "side",
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "unmanaged"
+                ],
+                "activity": "unused",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-18T09:00:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "clock": "2026-10-20T12:05:04Z"
+    },
+    {
+      "expect": {
+        "type": "status",
+        "version": 1,
+        "generated": "2026-10-20T12:05:04Z",
+        "machine": {
+          "name": "verify-mac",
+          "jobs": {
+            "limit": 1,
+            "default": 1,
+            "min": 1,
+            "max": 64,
+            "enforce": "warn",
+            "source": {
+              "limit": "machine",
+              "enforce": "default"
+            },
+            "config": "{config}",
+            "error": null,
+            "heavy": [
+              {
+                "pattern": "cargo build",
+                "source": "machine"
+              },
+              {
+                "pattern": "cargo test",
+                "source": "machine"
+              }
+            ],
+            "suggested": [],
+            "running": [
+              {
+                "id": "{job:j1}",
+                "summary": "cargo build",
+                "label": null,
+                "worktree": "{pool}/wt1",
+                "actor": "s1",
+                "since": "2026-10-20T12:00:00Z"
+              }
+            ],
+            "waiting": [
+              {
+                "id": "{job:j2}",
+                "summary": "cargo test",
+                "label": null,
+                "worktree": "{pool}/wt1",
+                "actor": "s1.a1",
+                "since": "2026-10-20T12:00:00Z"
+              }
+            ],
+            "outside": []
+          }
+        },
+        "pools": [
+          {
+            "common_dir": "{common}",
+            "repository": {
+              "name": "fg",
+              "github": null
+            },
+            "agents": "on",
+            "skipped_records": 0,
+            "worktrees": [
+              {
+                "path": "{pool}/fg",
+                "name": "fg",
+                "role": "foreground",
+                "missing": false,
+                "branch": "main",
+                "upstream": "origin/main",
+                "git": {
+                  "dirty": 0,
+                  "ahead": 0,
+                  "behind": 0,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "foreground"
+                ],
+                "activity": "foreground",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:55:00Z"
+              },
+              {
+                "path": "{pool}/wt1",
+                "name": "wt1",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "working",
+                "actors": [
+                  {
+                    "key": "s1",
+                    "kind": "session",
+                    "harness": "claude-code",
+                    "label": "session 12:00",
+                    "state": "working",
+                    "reason": null,
+                    "action": {
+                      "tool": "Bash",
+                      "target": "cargo build"
+                    },
+                    "placed_by": "path",
+                    "error": null,
+                    "since": "2026-10-20T12:00:01Z",
+                    "updated": "2026-10-20T12:00:02Z"
+                  },
+                  {
+                    "key": "s1.a1",
+                    "kind": "subagent",
+                    "harness": "claude-code",
+                    "label": "general-purpose",
+                    "state": "working",
+                    "reason": null,
+                    "action": {
+                      "tool": "queued:",
+                      "target": "cargo test"
+                    },
+                    "placed_by": "path",
+                    "error": null,
+                    "since": "2026-10-20T12:00:03Z",
+                    "updated": "2026-10-20T12:00:04Z"
+                  }
+                ],
+                "builds": [
+                  {
+                    "pid": 5101,
+                    "name": "cargo build",
+                    "queued": true
+                  }
+                ],
+                "last_event": "2026-10-20T12:00:04Z",
+                "last_change": "2026-10-20T11:57:00Z"
+              },
+              {
+                "path": "{pool}/wt2",
+                "name": "wt2",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:59:58Z"
+              },
+              {
+                "path": "{pool}/wt3",
+                "name": "wt3",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T10:00:00Z"
+              },
+              {
+                "path": "{pool}/x",
+                "name": "x",
+                "role": "unmanaged",
+                "missing": false,
+                "branch": "side",
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "unmanaged"
+                ],
+                "activity": "unused",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-18T09:00:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "job": {
+        "end": "j1"
+      }
+    },
+    {
+      "job": {
+        "await": {
+          "name": "j2",
+          "state": "running"
+        }
+      }
+    },
+    {
+      "expect": {
+        "type": "status",
+        "version": 1,
+        "generated": "2026-10-20T12:05:04Z",
+        "machine": {
+          "name": "verify-mac",
+          "jobs": {
+            "limit": 1,
+            "default": 1,
+            "min": 1,
+            "max": 64,
+            "enforce": "warn",
+            "source": {
+              "limit": "machine",
+              "enforce": "default"
+            },
+            "config": "{config}",
+            "error": null,
+            "heavy": [
+              {
+                "pattern": "cargo build",
+                "source": "machine"
+              },
+              {
+                "pattern": "cargo test",
+                "source": "machine"
+              }
+            ],
+            "suggested": [],
+            "running": [
+              {
+                "id": "{job:j2}",
+                "summary": "cargo test",
+                "label": null,
+                "worktree": "{pool}/wt1",
+                "actor": "s1.a1",
+                "since": "2026-10-20T12:00:00Z"
+              }
+            ],
+            "waiting": [],
+            "outside": []
+          }
+        },
+        "pools": [
+          {
+            "common_dir": "{common}",
+            "repository": {
+              "name": "fg",
+              "github": null
+            },
+            "agents": "on",
+            "skipped_records": 0,
+            "worktrees": [
+              {
+                "path": "{pool}/fg",
+                "name": "fg",
+                "role": "foreground",
+                "missing": false,
+                "branch": "main",
+                "upstream": "origin/main",
+                "git": {
+                  "dirty": 0,
+                  "ahead": 0,
+                  "behind": 0,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "foreground"
+                ],
+                "activity": "foreground",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:55:00Z"
+              },
+              {
+                "path": "{pool}/wt1",
+                "name": "wt1",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "working",
+                "actors": [
+                  {
+                    "key": "s1",
+                    "kind": "session",
+                    "harness": "claude-code",
+                    "label": "session 12:00",
+                    "state": "quiet",
+                    "reason": null,
+                    "action": {
+                      "tool": "Bash",
+                      "target": "cargo build"
+                    },
+                    "placed_by": "path",
+                    "error": null,
+                    "since": "2026-10-20T12:00:01Z",
+                    "updated": "2026-10-20T12:00:02Z"
+                  },
+                  {
+                    "key": "s1.a1",
+                    "kind": "subagent",
+                    "harness": "claude-code",
+                    "label": "general-purpose",
+                    "state": "working",
+                    "reason": null,
+                    "action": {
+                      "tool": "Bash",
+                      "target": "cargo test"
+                    },
+                    "placed_by": "path",
+                    "error": null,
+                    "since": "2026-10-20T12:00:03Z",
+                    "updated": "2026-10-20T12:00:04Z"
+                  }
+                ],
+                "builds": [
+                  {
+                    "pid": 5102,
+                    "name": "cargo test",
+                    "queued": true
+                  }
+                ],
+                "last_event": "2026-10-20T12:00:04Z",
+                "last_change": "2026-10-20T11:57:00Z"
+              },
+              {
+                "path": "{pool}/wt2",
+                "name": "wt2",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:59:58Z"
+              },
+              {
+                "path": "{pool}/wt3",
+                "name": "wt3",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T10:00:00Z"
+              },
+              {
+                "path": "{pool}/x",
+                "name": "x",
+                "role": "unmanaged",
+                "missing": false,
+                "branch": "side",
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "unmanaged"
+                ],
+                "activity": "unused",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-18T09:00:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "job": {
+        "end": "j2"
+      }
+    }
+  ],
+  "expect": {
+    "type": "status",
+    "version": 1,
+    "generated": "2026-10-20T12:05:04Z",
+    "machine": {
+      "name": "verify-mac",
+      "jobs": {
+        "limit": 1,
+        "default": 1,
+        "min": 1,
+        "max": 64,
+        "enforce": "warn",
+        "source": {
+          "limit": "machine",
+          "enforce": "default"
+        },
+        "config": "{config}",
+        "error": null,
+        "heavy": [
+          {
+            "pattern": "cargo build",
+            "source": "machine"
+          },
+          {
+            "pattern": "cargo test",
+            "source": "machine"
+          }
+        ],
+        "suggested": [],
+        "running": [],
+        "waiting": [],
+        "outside": []
+      }
+    },
+    "pools": [
+      {
+        "common_dir": "{common}",
+        "repository": {
+          "name": "fg",
+          "github": null
+        },
+        "agents": "on",
+        "skipped_records": 0,
+        "worktrees": [
+          {
+            "path": "{pool}/fg",
+            "name": "fg",
+            "role": "foreground",
+            "missing": false,
+            "branch": "main",
+            "upstream": "origin/main",
+            "git": {
+              "dirty": 0,
+              "ahead": 0,
+              "behind": 0,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "foreground"
+            ],
+            "activity": "foreground",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T11:55:00Z"
+          },
+          {
+            "path": "{pool}/wt1",
+            "name": "wt1",
+            "role": "slot",
+            "missing": false,
+            "branch": null,
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": true,
+            "reasons": [],
+            "activity": "idle",
+            "actors": [
+              {
+                "key": "s1",
+                "kind": "session",
+                "harness": "claude-code",
+                "label": "session 12:00",
+                "state": "quiet",
+                "reason": null,
+                "action": {
+                  "tool": "Bash",
+                  "target": "cargo build"
+                },
+                "placed_by": "path",
+                "error": null,
+                "since": "2026-10-20T12:00:01Z",
+                "updated": "2026-10-20T12:00:02Z"
+              },
+              {
+                "key": "s1.a1",
+                "kind": "subagent",
+                "harness": "claude-code",
+                "label": "general-purpose",
+                "state": "quiet",
+                "reason": null,
+                "action": {
+                  "tool": "Bash",
+                  "target": "cargo test"
+                },
+                "placed_by": "path",
+                "error": null,
+                "since": "2026-10-20T12:00:03Z",
+                "updated": "2026-10-20T12:00:04Z"
+              }
+            ],
+            "builds": [],
+            "last_event": "2026-10-20T12:00:04Z",
+            "last_change": "2026-10-20T11:57:00Z"
+          },
+          {
+            "path": "{pool}/wt2",
+            "name": "wt2",
+            "role": "slot",
+            "missing": false,
+            "branch": null,
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": true,
+            "reasons": [],
+            "activity": "free",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T11:59:58Z"
+          },
+          {
+            "path": "{pool}/wt3",
+            "name": "wt3",
+            "role": "slot",
+            "missing": false,
+            "branch": null,
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": true,
+            "reasons": [],
+            "activity": "free",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T10:00:00Z"
+          },
+          {
+            "path": "{pool}/x",
+            "name": "x",
+            "role": "unmanaged",
+            "missing": false,
+            "branch": "side",
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "unmanaged"
+            ],
+            "activity": "unused",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-18T09:00:00Z"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wtpool.invalid/verify/status.phase-4.schema.json",
+  "title": "wtpool status document from phase 4, as the oracle reads status-panel.md and jobs.md",
+  "description": "One line of `wtpool status --json` or `--watch` with type status. The oracle's reading of the Document paragraph of status-panel.md, section 2, and of S10 to S12: every listed field is required, and objects stay open, so a consumer accepts properties it does not know (R11). The oracle's strict check closes every object, as wtpool emits only the listed properties (S12). Times are RFC 3339 UTC. Activity values use snake_case (`not_reusable`); the panel shows them with spaces.",
+  "type": "object",
+  "required": ["type", "version", "generated", "machine", "pools"],
+  "properties": {
+    "type": { "description": "Always status; a watch also prints alive lines.", "const": "status" },
+    "version": { "description": "The document version; within 1 changes only add (S12).", "const": 1 },
+    "generated": { "description": "When wtpool computed the document.", "$ref": "#/$defs/time" },
+    "machine": {
+      "description": "The machine wtpool runs on.",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "description": "The machine's name, shown in each pool heading (U8).", "type": "string", "minLength": 1 },
+        "jobs": {
+          "description": "The heavy jobs of this user and machine (S14); absent from a wtpool without wtpool job.",
+          "$ref": "#/$defs/jobs"
+        }
+      }
+    },
+    "pools": {
+      "description": "The pools: wtpool status prints one (S1).",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/pool" }
+    }
+  },
+  "$defs": {
+    "time": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
+    },
+    "count": { "type": ["integer", "null"], "minimum": 0 },
+    "pool": {
+      "type": "object",
+      "required": ["common_dir", "repository", "agents", "skipped_records", "worktrees"],
+      "properties": {
+        "common_dir": { "description": "The repository's git common dir.", "type": "string", "minLength": 1 },
+        "repository": {
+          "description": "The repository the pool belongs to (S10).",
+          "type": "object",
+          "required": ["name", "github"],
+          "properties": {
+            "name": { "description": "The main worktree's folder name.", "type": "string", "minLength": 1 },
+            "github": {
+              "description": "The <owner>/<repo> of the configured remote's GitHub URL, else null.",
+              "type": ["string", "null"]
+            }
+          }
+        },
+        "agents": { "description": "Whether wtpool-activity/ exists, so agent activity shows (S8).", "enum": ["on", "off"] },
+        "skipped_records": { "description": "Records skipped for an unknown version or a parse error (S6).", "type": "integer", "minimum": 0 },
+        "worktrees": { "description": "Every worktree of the pool.", "type": "array", "items": { "$ref": "#/$defs/worktree" } }
+      }
+    },
+    "worktree": {
+      "type": "object",
+      "required": [
+        "path",
+        "name",
+        "role",
+        "missing",
+        "branch",
+        "upstream",
+        "git",
+        "free",
+        "reasons",
+        "activity",
+        "actors",
+        "builds",
+        "last_event",
+        "last_change"
+      ],
+      "properties": {
+        "path": { "description": "The worktree's absolute path, which names its row.", "type": "string", "minLength": 1 },
+        "name": { "description": "The worktree's folder name.", "type": "string", "minLength": 1 },
+        "role": { "description": "Foreground, slot or unmanaged (S3).", "enum": ["foreground", "slot", "unmanaged"] },
+        "missing": { "description": "Whether the worktree's folder is gone (S3).", "type": "boolean" },
+        "branch": { "description": "The checked out branch, or null when detached.", "type": ["string", "null"] },
+        "upstream": { "description": "The branch's upstream, or null.", "type": ["string", "null"] },
+        "git": { "description": "The worktree's git facts.", "$ref": "#/$defs/git" },
+        "free": { "description": "Whether wtpool bg may reuse this slot (S9).", "type": "boolean" },
+        "reasons": {
+          "description": "Why the worktree is not free (S9).",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "foreground",
+              "unmanaged",
+              "branch",
+              "dirty",
+              "unreferenced",
+              "operation",
+              "unknown",
+              "missing"
+            ]
+          }
+        },
+        "activity": {
+          "description": "The row's activity (A4, A5).",
+          "enum": [
+            "missing",
+            "waiting",
+            "working",
+            "building",
+            "idle",
+            "foreground",
+            "free",
+            "not_reusable",
+            "unknown",
+            "unused"
+          ]
+        },
+        "actors": { "description": "The shown actors placed in the worktree (A1).", "type": "array", "items": { "$ref": "#/$defs/actor" } },
+        "builds": { "description": "The build processes working in the worktree (S4).", "type": "array", "items": { "$ref": "#/$defs/build" } },
+        "last_event": {
+          "description": "The newest update of a record placed here, or null (A6).",
+          "oneOf": [{ "$ref": "#/$defs/time" }, { "type": "null" }]
+        },
+        "last_change": {
+          "description": "The last change of HEAD or the index, or null (A6).",
+          "oneOf": [{ "$ref": "#/$defs/time" }, { "type": "null" }]
+        }
+      }
+    },
+    "git": {
+      "type": "object",
+      "required": ["dirty", "ahead", "behind", "unreferenced", "operation", "unknown"],
+      "properties": {
+        "dirty": { "description": "Changed and untracked files, or null when git cannot tell.", "$ref": "#/$defs/count" },
+        "ahead": { "description": "Commits ahead of the upstream, or null.", "$ref": "#/$defs/count" },
+        "behind": { "description": "Commits behind the upstream, or null.", "$ref": "#/$defs/count" },
+        "unreferenced": { "description": "Commits no branch or tag holds, or null.", "$ref": "#/$defs/count" },
+        "operation": {
+          "description": "The git operation in progress, or null.",
+          "enum": ["rebase", "am", "merge", "cherry-pick", "revert", "bisect", null]
+        },
+        "unknown": { "description": "Whether git could not tell the facts.", "type": "boolean" }
+      }
+    },
+    "actor": {
+      "type": "object",
+      "required": [
+        "key",
+        "kind",
+        "harness",
+        "label",
+        "state",
+        "reason",
+        "action",
+        "placed_by",
+        "error",
+        "since",
+        "updated"
+      ],
+      "properties": {
+        "key": { "description": "The record's key: the session id, or session and agent id.", "type": "string", "minLength": 1 },
+        "kind": { "description": "Session or subagent.", "enum": ["session", "subagent"] },
+        "harness": { "description": "The harness the actor's record names, such as claude-code (S11).", "type": "string", "minLength": 1 },
+        "label": { "description": "The actor's label (H16).", "type": "string" },
+        "state": { "description": "The shown state (A1).", "enum": ["working", "quiet", "waiting", "idle", "done"] },
+        "reason": { "description": "What a waiting actor waits for, else null.", "enum": ["permission", "question", "plan", "input", null] },
+        "action": {
+          "description": "The actor's last tool and target, or null (H14).",
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["tool", "target"],
+              "properties": {
+                "tool": { "description": "The harness's own tool name.", "type": "string", "minLength": 1 },
+                "target": { "description": "What the tool acts on.", "type": "string" }
+              }
+            },
+            { "type": "null" }
+          ]
+        },
+        "placed_by": { "description": "Whether the cwd or a path placed the actor (H10).", "enum": ["cwd", "path"] },
+        "error": { "description": "The API error of the last turn, else null.", "type": ["string", "null"] },
+        "since": { "description": "When the actor's record began.", "$ref": "#/$defs/time" },
+        "updated": { "description": "The actor's last event.", "$ref": "#/$defs/time" },
+        "outputs": {
+          "description": "The actor's running background tasks, newest first, then the one that ended last; absent when it has none (S13).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/output" }
+        }
+      }
+    },
+    "build": {
+      "type": "object",
+      "required": ["pid", "name"],
+      "properties": {
+        "pid": { "description": "The build process's id.", "type": "integer", "minimum": 1 },
+        "name": { "description": "The build process's name.", "type": "string", "minLength": 1 },
+        "queued": {
+          "description": "Whether a live job's process is the build or one of its ancestors, true for a build only a suggestion matches (S4).",
+          "type": "boolean"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["task", "path", "summary", "running", "started", "ended"],
+      "properties": {
+        "task": { "description": "The background task's id, as the harness names it.", "type": "string", "minLength": 1 },
+        "path": { "description": "The absolute path of the task's output file on this machine (H27).", "type": "string", "minLength": 1 },
+        "summary": { "description": "The command's summary (H14).", "type": "string" },
+        "running": { "description": "Whether the task still runs (H27).", "type": "boolean" },
+        "started": { "description": "When the task started.", "$ref": "#/$defs/time" },
+        "ended": { "description": "When the task ended, null while it runs.", "oneOf": [{ "$ref": "#/$defs/time" }, { "type": "null" }] }
+      }
+    },
+    "jobs": {
+      "type": "object",
+      "required": ["limit", "default", "min", "max", "enforce", "source", "config", "error", "heavy", "suggested", "running", "waiting", "outside"],
+      "properties": {
+        "limit": { "description": "How many jobs run at once, null while error is set (J5).", "type": ["integer", "null"], "minimum": 1, "maximum": 64 },
+        "default": { "description": "The default limit: a quarter of the cores, 1 to 8 (J5).", "type": "integer", "minimum": 1, "maximum": 8 },
+        "min": { "description": "The lowest limit (J5).", "const": 1 },
+        "max": { "description": "The highest limit (J5).", "const": 64 },
+        "enforce": { "description": "The policy for heavy commands outside a job (J21).", "enum": ["off", "warn", "require"] },
+        "source": {
+          "description": "Where the limit and the policy each come from: machine.toml or the defaults (J4).",
+          "type": "object",
+          "required": ["limit", "enforce"],
+          "properties": {
+            "limit": { "description": "The source of the limit.", "enum": ["machine", "default"] },
+            "enforce": { "description": "The source of the policy.", "enum": ["machine", "default"] }
+          }
+        },
+        "config": { "description": "The path of machine.toml, whether it exists or not (J4).", "type": "string", "minLength": 1 },
+        "error": { "description": "Why the machine config or the job folder cannot be read, else null.", "type": ["string", "null"] },
+        "heavy": { "description": "Each heavy pattern with its source (J20).", "type": "array", "items": { "$ref": "#/$defs/heavy" } },
+        "suggested": { "description": "This repository's suggestions the heavy list lacks (J23).", "type": "array", "items": { "$ref": "#/$defs/suggestion" } },
+        "running": { "description": "The running jobs.", "type": "array", "items": { "$ref": "#/$defs/job" } },
+        "waiting": { "description": "The waiting jobs in queue order.", "type": "array", "items": { "$ref": "#/$defs/job" } },
+        "outside": { "description": "The outermost heavy processes no job holds, newest first.", "type": "array", "items": { "$ref": "#/$defs/job" } }
+      }
+    },
+    "heavy": {
+      "type": "object",
+      "required": ["pattern", "source"],
+      "properties": {
+        "pattern": { "description": "The pattern (J18).", "type": "string", "minLength": 1 },
+        "source": { "description": "The list it comes from (J20).", "enum": ["machine", "repository", "build_processes"] }
+      }
+    },
+    "suggestion": {
+      "type": "object",
+      "required": ["pattern", "from"],
+      "properties": {
+        "pattern": { "description": "The suggested pattern (J23, J24).", "type": "string", "minLength": 1 },
+        "from": { "description": "The source it came from, such as the marker Cargo.toml or package.json; an open string.", "type": "string", "minLength": 1 }
+      }
+    },
+    "job": {
+      "type": "object",
+      "required": ["id", "summary", "label", "worktree", "actor", "since"],
+      "properties": {
+        "id": { "description": "The job's id, or an id of a heavy process outside any job.", "type": "string", "minLength": 1 },
+        "summary": { "description": "The words of the heavy pattern it matches, else the summary of its arguments (J16).", "type": "string" },
+        "label": { "description": "Its label, else null (J16).", "type": ["string", "null"] },
+        "worktree": { "description": "The path of the worktree of this pool its folder lies in, else null (S15).", "type": ["string", "null"] },
+        "actor": { "description": "The key of the actor of this pool it belongs to, else null (S15).", "type": ["string", "null"] },
+        "since": { "description": "When it started, or for a waiting job when it queued.", "$ref": "#/$defs/time" }
+      }
+    }
+  }
+}

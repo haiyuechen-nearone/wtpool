@@ -1,4 +1,4 @@
-//! The Rust budgets of the bench part, in the int test binary but run only by the bench part (verification.md, "Budgets"): B1, B3 to B6, measured on
+//! The Rust budgets of the bench part, in the int test binary but run only by the bench part (verification.md, "Budgets"): B1, B3 to B6 and from phase 4 B12 to B14, measured on
 //! the release `wtpool` (`WTPOOL_BIN`) in a pool with 4 worktrees cloned from the repository
 //! `WTPOOL_BENCH_SOURCE` names, by default this one; naming a larger repository measures on it. The
 //! harness waits for an idle machine first and reports `machine_busy` otherwise. No budget is
@@ -15,6 +15,7 @@ use xtask::pool::git_in;
 use crate::support::{Sandbox, Watch, is_alive, is_status, must_status_json, worktree};
 
 mod agents;
+mod jobs;
 
 pub(super) const SLOTS: [&str; 3] = ["wt1", "wt2", "wt3"];
 
@@ -312,4 +313,19 @@ fn budget__b1() {
 #[test]
 fn budget__b6() {
     agents::budget_b6();
+}
+
+#[test]
+fn budget__b12() {
+    jobs::budget_b12();
+}
+
+#[test]
+fn budget__b13() {
+    jobs::budget_b13();
+}
+
+#[test]
+fn budget__b14() {
+    jobs::budget_b14();
 }

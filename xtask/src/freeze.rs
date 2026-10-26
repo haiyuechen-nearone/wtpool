@@ -32,7 +32,6 @@ pub fn freeze(root: &Path, phase: u8, dry_run: bool) -> Result<(), String> {
         .ok()
         .and_then(|text| oracle::load_lock_text(&text).ok())
         .unwrap_or_default();
-    let previous: BTreeSet<String> = previous_lock.checks.iter().cloned().collect();
     let entries = match fs::read_to_string(root.join(ORACLE_CHANGES)) {
         Ok(text) => oracle::parse_entries(&text)?,
         Err(_) => Vec::new(),
@@ -55,6 +54,9 @@ pub fn freeze(root: &Path, phase: u8, dry_run: bool) -> Result<(), String> {
     let clone = ScratchClone::prepare(root, "freeze")?;
     fs::write(clone.dir.join(LOCK), &lock_text).map_err(|e| e.to_string())?;
     let frozen = clone.commit_freeze(phase)?;
+    let at_head = clone.checks_at_source_head()?;
+    // Each new check's part comes from the frozen tree's registry, which lists it.
+    clone.reset_to(&frozen)?;
     let mut refused = Vec::new();
     let mut judge = |check: &str, result: &crate::results::CheckResult, with: String| {
         if caught(result) {
@@ -74,7 +76,7 @@ pub fn freeze(root: &Path, phase: u8, dry_run: bool) -> Result<(), String> {
     // Test once: checks without a canary run in one invocation per part against the frozen
     // tree; only a canary needs a run of its own (verification.md, "The report").
     let mut by_part: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
-    for check in checks.difference(&previous) {
+    for check in &new_checks(&checks, &at_head) {
         if absent.contains(check) {
             println!("absent: {check} tests an absence listed in verify/absent.toml");
             continue;
@@ -140,6 +142,12 @@ pub fn freeze(root: &Path, phase: u8, dry_run: bool) -> Result<(), String> {
         git(root, &["rev-parse", "--short", "HEAD"])?.trim()
     );
     Ok(())
+}
+
+/// The checks the author adds: implemented in the tree, not at the commit under it, whose checks
+/// all came in through accepted entries, whether or not an earlier lock lists them.
+fn new_checks(tree: &BTreeSet<String>, at_head: &BTreeSet<String>) -> BTreeSet<String> {
+    tree.difference(at_head).cloned().collect()
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -346,5 +354,21 @@ mod tests {
 
         // Then
         assert_eq!(same, equal);
+    }
+
+    #[test]
+    fn new_checks__should_be_only_those_the_head_lacks() {
+        // Given: the tree adds a check, keeps one an earlier lock never listed, drops none.
+        let set = |names: &[&str]| -> BTreeSet<String> {
+            names.iter().map(|name| (*name).to_owned()).collect()
+        };
+        let at_head = set(&["rows__a", "guard__added_after_the_lock"]);
+        let tree = set(&["rows__a", "guard__added_after_the_lock", "job__new"]);
+
+        // When
+        let found = new_checks(&tree, &at_head);
+
+        // Then
+        assert_eq!(found, set(&["job__new"]));
     }
 }

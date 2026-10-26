@@ -1,0 +1,605 @@
+{
+  "phase": 4,
+  "covers": [
+    "S4",
+    "A8",
+    "U14",
+    "R3",
+    "U1"
+  ],
+  "layers": [
+    "int",
+    "render",
+    "host"
+  ],
+  "pool": {
+    "agents": true,
+    "worktrees": {
+      "fg": {
+        "branch": "main",
+        "upstream": true
+      },
+      "wt1": {
+        "detached": true
+      },
+      "wt2": {
+        "detached": true
+      },
+      "wt3": {
+        "detached": true
+      },
+      "x": {
+        "branch": "side"
+      }
+    }
+  },
+  "steps": [
+    {
+      "wtpool_toml": "heavy = [\"make\"]\n"
+    },
+    {
+      "machine": "[jobs]\nlimit = 4\nenforce = \"warn\"\n"
+    },
+    {
+      "process": {
+        "start": {
+          "pid": 4400,
+          "name": "make",
+          "in": "wt2",
+          "cmd": [
+            "make",
+            "-j8"
+          ]
+        }
+      }
+    },
+    {
+      "expect": {
+        "type": "status",
+        "version": 1,
+        "generated": "2026-10-20T12:00:00Z",
+        "machine": {
+          "name": "verify-mac",
+          "jobs": {
+            "limit": 4,
+            "default": 1,
+            "min": 1,
+            "max": 64,
+            "enforce": "warn",
+            "source": {
+              "limit": "machine",
+              "enforce": "machine"
+            },
+            "config": "{config}",
+            "error": null,
+            "heavy": [
+              {
+                "pattern": "make",
+                "source": "repository"
+              }
+            ],
+            "suggested": [],
+            "running": [],
+            "waiting": [],
+            "outside": [
+              {
+                "id": "process",
+                "summary": "make",
+                "label": null,
+                "worktree": "{pool}/wt2",
+                "actor": null,
+                "since": "2026-10-20T12:00:00Z"
+              }
+            ]
+          }
+        },
+        "pools": [
+          {
+            "common_dir": "{common}",
+            "repository": {
+              "name": "fg",
+              "github": null
+            },
+            "agents": "on",
+            "skipped_records": 0,
+            "worktrees": [
+              {
+                "path": "{pool}/fg",
+                "name": "fg",
+                "role": "foreground",
+                "missing": false,
+                "branch": "main",
+                "upstream": "origin/main",
+                "git": {
+                  "dirty": 0,
+                  "ahead": 0,
+                  "behind": 0,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "foreground"
+                ],
+                "activity": "foreground",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:55:00Z"
+              },
+              {
+                "path": "{pool}/wt1",
+                "name": "wt1",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:57:00Z"
+              },
+              {
+                "path": "{pool}/wt2",
+                "name": "wt2",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "building",
+                "actors": [],
+                "builds": [
+                  {
+                    "pid": 4400,
+                    "name": "make",
+                    "queued": false
+                  }
+                ],
+                "last_event": null,
+                "last_change": "2026-10-20T11:59:58Z"
+              },
+              {
+                "path": "{pool}/wt3",
+                "name": "wt3",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T10:00:00Z"
+              },
+              {
+                "path": "{pool}/x",
+                "name": "x",
+                "role": "unmanaged",
+                "missing": false,
+                "branch": "side",
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "unmanaged"
+                ],
+                "activity": "unused",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-18T09:00:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "process": {
+        "stop": 4400
+      }
+    },
+    {
+      "job": {
+        "start": {
+          "name": "j1",
+          "in": "wt2",
+          "parent": 1,
+          "command": [
+            "make",
+            "-j8"
+          ],
+          "command_pid": 4401,
+          "state": "running"
+        }
+      }
+    },
+    {
+      "expect": {
+        "type": "status",
+        "version": 1,
+        "generated": "2026-10-20T12:00:00Z",
+        "machine": {
+          "name": "verify-mac",
+          "jobs": {
+            "limit": 4,
+            "default": 1,
+            "min": 1,
+            "max": 64,
+            "enforce": "warn",
+            "source": {
+              "limit": "machine",
+              "enforce": "machine"
+            },
+            "config": "{config}",
+            "error": null,
+            "heavy": [
+              {
+                "pattern": "make",
+                "source": "repository"
+              }
+            ],
+            "suggested": [],
+            "running": [
+              {
+                "id": "{job:j1}",
+                "summary": "make",
+                "label": null,
+                "worktree": "{pool}/wt2",
+                "actor": null,
+                "since": "2026-10-20T12:00:00Z"
+              }
+            ],
+            "waiting": [],
+            "outside": []
+          }
+        },
+        "pools": [
+          {
+            "common_dir": "{common}",
+            "repository": {
+              "name": "fg",
+              "github": null
+            },
+            "agents": "on",
+            "skipped_records": 0,
+            "worktrees": [
+              {
+                "path": "{pool}/fg",
+                "name": "fg",
+                "role": "foreground",
+                "missing": false,
+                "branch": "main",
+                "upstream": "origin/main",
+                "git": {
+                  "dirty": 0,
+                  "ahead": 0,
+                  "behind": 0,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "foreground"
+                ],
+                "activity": "foreground",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:55:00Z"
+              },
+              {
+                "path": "{pool}/wt1",
+                "name": "wt1",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:57:00Z"
+              },
+              {
+                "path": "{pool}/wt2",
+                "name": "wt2",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "building",
+                "actors": [],
+                "builds": [
+                  {
+                    "pid": 4401,
+                    "name": "make",
+                    "queued": true
+                  }
+                ],
+                "last_event": null,
+                "last_change": "2026-10-20T11:59:58Z"
+              },
+              {
+                "path": "{pool}/wt3",
+                "name": "wt3",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T10:00:00Z"
+              },
+              {
+                "path": "{pool}/x",
+                "name": "x",
+                "role": "unmanaged",
+                "missing": false,
+                "branch": "side",
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "unmanaged"
+                ],
+                "activity": "unused",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-18T09:00:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "job": {
+        "end": "j1"
+      }
+    }
+  ],
+  "expect": {
+    "type": "status",
+    "version": 1,
+    "generated": "2026-10-20T12:00:00Z",
+    "machine": {
+      "name": "verify-mac",
+      "jobs": {
+        "limit": 4,
+        "default": 1,
+        "min": 1,
+        "max": 64,
+        "enforce": "warn",
+        "source": {
+          "limit": "machine",
+          "enforce": "machine"
+        },
+        "config": "{config}",
+        "error": null,
+        "heavy": [
+          {
+            "pattern": "make",
+            "source": "repository"
+          }
+        ],
+        "suggested": [],
+        "running": [],
+        "waiting": [],
+        "outside": []
+      }
+    },
+    "pools": [
+      {
+        "common_dir": "{common}",
+        "repository": {
+          "name": "fg",
+          "github": null
+        },
+        "agents": "on",
+        "skipped_records": 0,
+        "worktrees": [
+          {
+            "path": "{pool}/fg",
+            "name": "fg",
+            "role": "foreground",
+            "missing": false,
+            "branch": "main",
+            "upstream": "origin/main",
+            "git": {
+              "dirty": 0,
+              "ahead": 0,
+              "behind": 0,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "foreground"
+            ],
+            "activity": "foreground",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T11:55:00Z"
+          },
+          {
+            "path": "{pool}/wt1",
+            "name": "wt1",
+            "role": "slot",
+            "missing": false,
+            "branch": null,
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": true,
+            "reasons": [],
+            "activity": "free",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T11:57:00Z"
+          },
+          {
+            "path": "{pool}/wt2",
+            "name": "wt2",
+            "role": "slot",
+            "missing": false,
+            "branch": null,
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": true,
+            "reasons": [],
+            "activity": "free",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T11:59:58Z"
+          },
+          {
+            "path": "{pool}/wt3",
+            "name": "wt3",
+            "role": "slot",
+            "missing": false,
+            "branch": null,
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": true,
+            "reasons": [],
+            "activity": "free",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T10:00:00Z"
+          },
+          {
+            "path": "{pool}/x",
+            "name": "x",
+            "role": "unmanaged",
+            "missing": false,
+            "branch": "side",
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "unmanaged"
+            ],
+            "activity": "unused",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-18T09:00:00Z"
+          }
+        ]
+      }
+    ]
+  }
+}

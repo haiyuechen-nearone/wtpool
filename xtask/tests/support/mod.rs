@@ -1,6 +1,7 @@
 //! Plumbing of the int checks. `cargo xtask verify --part int` sets the variables these read.
 
 pub mod hook;
+pub mod jobs;
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -109,6 +110,16 @@ pub fn contains_bytes(haystack: &[u8], needle: &str) -> bool {
         .any(|window| window == needle.as_bytes())
 }
 
+/// The phase the harness verifies, `WTPOOL_VERIFY_PHASE`, which the int and bench parts set;
+/// 1 when unset. A check of an earlier phase that phase 4 rewords asserts the new behaviour only
+/// from that phase on.
+pub fn phase() -> u8 {
+    std::env::var("WTPOOL_VERIFY_PHASE")
+        .ok()
+        .and_then(|text| text.parse().ok())
+        .unwrap_or(1)
+}
+
 static SANDBOXES: AtomicUsize = AtomicUsize::new(0);
 
 /// A home, temp and XDG folder set inside the run folder, and a pool there that does not exist.
@@ -134,7 +145,9 @@ impl Sandbox {
         ] {
             fs::create_dir_all(root.join(dir)).expect("setup: create the sandbox");
         }
-        Self { root }
+        let sandbox = Self { root };
+        sandbox.write_machine(jobs::EARLIER_BUILDS);
+        sandbox
     }
 
     pub fn run(&self, binary: &Path, args: &[&str]) -> Output {
@@ -207,14 +220,23 @@ impl Sandbox {
         command
     }
 
-    /// `PATH` with the logging git first once [`Sandbox::must_log_git`] installed it.
+    /// `PATH` with the logging git first once [`Sandbox::must_log_git`] installed it, and the
+    /// probe copies of [`Sandbox::must_install_probe`] first once there are any.
     fn path_variable(&self) -> std::ffi::OsString {
         let real = std::env::var_os("PATH").unwrap_or_default();
         let shim = self.root.join("shim");
-        if !shim.join(GIT).exists() {
+        let probes = self.probe_bin();
+        let mut dirs: Vec<PathBuf> = Vec::new();
+        if probes.is_dir() {
+            dirs.push(probes);
+        }
+        if shim.join(GIT).exists() {
+            dirs.push(shim);
+        }
+        if dirs.is_empty() {
             return real;
         }
-        let dirs = std::iter::once(shim).chain(std::env::split_paths(&real));
+        dirs.extend(std::env::split_paths(&real));
         std::env::join_paths(dirs).expect("setup: join PATH")
     }
 
@@ -559,9 +581,20 @@ pub fn worktree<'a>(document: &'a serde_json::Value, name: &str) -> &'a serde_js
         .unwrap_or(&serde_json::Value::Null)
 }
 
-/// Problems of `document` against `verify/schema/status.schema.json`.
+/// The oracle's schema of the status document for this run's phase, below `verify/schema/`:
+/// `status.schema.json`, and from phase 4 `status.phase-4.schema.json`, which adds `machine.jobs`
+/// (S14) and `build.queued` (S4) while an earlier wtpool's own schema still matches the first.
+pub fn status_schema_file() -> &'static str {
+    if phase() >= 4 {
+        "status.phase-4.schema.json"
+    } else {
+        "status.schema.json"
+    }
+}
+
+/// Problems of `document` against the oracle's status schema of this run's phase.
 pub fn schema_errors(document: &serde_json::Value) -> Vec<String> {
-    let path = must_repo().join("verify/schema/status.schema.json");
+    let path = must_repo().join("verify/schema").join(status_schema_file());
     let text = fs::read_to_string(&path).expect("setup: read the status schema");
     let schema: serde_json::Value = serde_json::from_str(&text).expect("setup: parse the schema");
     let validator = jsonschema::validator_for(&schema).expect("setup: compile the schema");

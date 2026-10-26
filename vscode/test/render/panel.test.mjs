@@ -14,7 +14,7 @@ import {
   worktree,
 } from '../support/docs.mjs';
 import { chipCounts, normalizeEscapes, rowOrder, visible } from '../support/grammar.mjs';
-import { cells, isShown, mount, rowById, rows, text } from '../support/webview.mjs';
+import { cells, isShown, mount, rowById, rows, seen, text } from '../support/webview.mjs';
 
 let webview;
 afterEach(() => {
@@ -516,7 +516,7 @@ test('render__should_escape_and_isolate_controls separators_and_format', async (
   // Then
   const { data } = cells(wt1);
   assert.equal(normalizeEscapes(text(data[2])), normalizeEscapes(escapedFormat(hidden)), 'separators or format characters in a branch do not show as \\u{XXXX}');
-  assert.ok(normalizeEscapes(text(data[4])).startsWith(normalizeEscapes(escapedFormat(hidden))), 'separators or format characters in an agent label do not show as \\u{XXXX}');
+  assert.ok(normalizeEscapes(seen(webview.window, data[4])).startsWith(normalizeEscapes(escapedFormat(hidden))), 'separators or format characters in an agent label do not show as \\u{XXXX}');
   const page = webview.document.body.textContent;
   const raw = SEPARATORS_AND_FORMAT.filter((c) => page.includes(c)).map((c) => c.codePointAt(0).toString(16));
   assert.deepEqual(raw, [], 'a raw separator or format character reached the page');

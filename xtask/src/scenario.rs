@@ -14,6 +14,17 @@
 //!   steps instead, so `updated` orders the actors the same way.
 //! - `gc` runs `wtpool hook gc`.
 //! - `files` lists every file name `<common>/wtpool-activity/` holds then, `.verify-sandbox` left out.
+//!
+//! Phase 4 steps, `int` only (jobs.md):
+//! - `machine` writes its text as `<config>/wtpool/machine.toml`.
+//! - `wtpool_toml` appends its text to `<common>/wtpool.toml`.
+//! - `job` starts a real `wtpool job` in a worktree ([`JobStart`]), ends one, or awaits one's state.
+//!   The fake process table gets the job's own process, a child of `parent`, and once its command
+//!   runs, that command as `command_pid`, a child of the job's process.
+//! - A `process` may name its `cmd` and its `parent`, or the `job` whose process it descends from.
+//!
+//! Documents may also use `{config}` for the sandbox's `machine.toml` and `{job:<name>}` for the id
+//! of a job a `job` step started.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -46,6 +57,47 @@ pub enum Step {
     Gc(GcStep),
     Files(Vec<String>),
     Expect(serde_json::Value),
+    Machine(String),
+    WtpoolToml(String),
+    Job(JobStep),
+}
+
+/// A `job` step: `{"start": {...}}`, `{"end": <name>}` or `{"await": {"name", "state"}}`.
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum JobStep {
+    Start(JobStart),
+    /// Lets the named job's command end and waits until its `wtpool job` exits.
+    End(String),
+    Await(JobAwait),
+}
+
+/// A `wtpool job -- <command>` that a step starts, as the probe under the command's program name.
+#[derive(Deserialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct JobStart {
+    /// The step's own name for the job, which later steps and `{job:<name>}` use.
+    pub name: String,
+    #[serde(rename = "in")]
+    pub worktree: String,
+    /// The fake process the job's process descends from, such as a `claude` of a `process` step.
+    pub parent: u32,
+    /// The program and its arguments.
+    pub command: Vec<String>,
+    /// The fake pid of the command's process once it runs.
+    pub command_pid: u32,
+    #[serde(default)]
+    pub label: Option<String>,
+    /// `running` or `waiting`: the state its record reaches before the next step.
+    pub state: String,
+}
+
+/// Waits until the named job's record reaches `state`.
+#[derive(Deserialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct JobAwait {
+    pub name: String,
+    pub state: String,
 }
 
 /// The time the `int` clock starts at in a scenario with hook steps.
@@ -105,6 +157,15 @@ pub struct Process {
     /// pid already listed is that pid reused. `int` only: e2e starts real processes.
     #[serde(default)]
     pub started: Option<String>,
+    /// Phase 4, `int` only: its arguments, the program first (J19).
+    #[serde(default)]
+    pub cmd: Option<Vec<String>>,
+    /// Phase 4, `int` only: its parent's pid, 1 when absent.
+    #[serde(default)]
+    pub parent: Option<u32>,
+    /// Phase 4, `int` only: the job of a `job` step whose process is its parent.
+    #[serde(default)]
+    pub job: Option<String>,
 }
 
 /// The start time of a scenario process without `started`.

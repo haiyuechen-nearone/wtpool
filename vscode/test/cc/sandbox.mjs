@@ -73,6 +73,8 @@ export function makeRunDirs(runDir) {
     data: path.join(root, 'data'),
     cache: path.join(root, 'cache'),
     config: path.join(root, 'claude-config'),
+    // wtpool's machine config folder: the run's, never the owner's ~/.config.
+    xdgConfig: path.join(root, 'xdg-config'),
   };
   for (const dir of Object.values(dirs)) mkdirSync(dir, { recursive: true });
   return dirs;
@@ -137,6 +139,7 @@ export function sessionEnv(dirs, pool, extra = {}) {
     XDG_STATE_HOME: dirs.state,
     XDG_DATA_HOME: dirs.data,
     XDG_CACHE_HOME: dirs.cache,
+    XDG_CONFIG_HOME: dirs.xdgConfig,
     WTPOOL_FOREGROUND: pool.fg,
     WTPOOL_SLOT_DIR: pool.dir,
     WTPOOL_VERIFY_SANDBOX: '1',
@@ -154,6 +157,7 @@ export function wtpoolEnv(dirs, pool) {
     HOME: home,
     TMPDIR: os.tmpdir(),
     XDG_STATE_HOME: dirs.state,
+    XDG_CONFIG_HOME: dirs.xdgConfig,
     WTPOOL_FOREGROUND: pool.fg,
     WTPOOL_SLOT_DIR: pool.dir,
     WTPOOL_VERIFY_SANDBOX: '1',

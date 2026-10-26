@@ -37,6 +37,40 @@ const ASYNC: [&str; 5] = [
     "PostToolBatch",
 ];
 
+/// The arguments of the policy entry, which the block holds from phase 4 (H1, H29).
+pub(super) const POLICY_ARGS: [&str; 2] = ["hook", "policy"];
+/// The matcher of the policy entry's group (H1).
+pub(super) const POLICY_MATCHER: &str = "Bash|PowerShell|Monitor";
+
+/// Whether this run verifies phase 4 or later, whose block also holds the policy entry (H1).
+pub(super) fn has_policy() -> bool {
+    crate::support::phase() >= 4
+}
+
+/// Whether `entry` runs `wtpool hook policy`.
+pub(super) fn is_policy(entry: &Value) -> bool {
+    entry["args"] == json!(POLICY_ARGS)
+}
+
+/// The matcher of each group of the block's `PreToolUse` that holds the policy entry.
+pub(super) fn policy_matchers(block: &Value) -> Vec<Value> {
+    let inner = block
+        .get("hooks")
+        .filter(|h| h.is_object())
+        .unwrap_or(block);
+    inner["PreToolUse"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|group| {
+            group["hooks"]
+                .as_array()
+                .is_some_and(|hooks| hooks.iter().any(is_policy))
+        })
+        .map(|group| group["matcher"].clone())
+        .collect()
+}
+
 /// A copy of the verify build outside any `target` folder, which install may run from.
 pub(super) fn installed_copy(sandbox: &Sandbox, folder: &str) -> PathBuf {
     copy_of(sandbox, folder, &must_wtpool_bin())
@@ -137,7 +171,14 @@ fn install__should_match_the_event_table() {
     expected.sort_unstable();
     assert_eq!(names, expected, "the events of the printed block");
     let mut wrong = Vec::new();
+    if has_policy() {
+        wrong.extend(policy_problems(&run, &events, &paths));
+    }
     for (event, entries) in &events {
+        let entries: Vec<&Value> = entries
+            .iter()
+            .filter(|entry| !(has_policy() && event == "PreToolUse" && is_policy(entry)))
+            .collect();
         let [entry] = entries.as_slice() else {
             wrong.push(format!("{event}: {} entries, not 1", entries.len()));
             continue;
@@ -176,6 +217,63 @@ fn install__should_match_the_event_table() {
     assert!(wrong.is_empty(), "the printed block:\n{}", wrong.join("\n"));
 }
 
+/// From phase 4: one sync `PreToolUse` entry running `wtpool hook policy` with the timeout 2, in a
+/// group of the matcher `Bash|PowerShell|Monitor`, and no other event with it (H1, H29).
+fn policy_problems(
+    run: &Install,
+    events: &BTreeMap<String, Vec<Value>>,
+    paths: &[String],
+) -> Vec<String> {
+    let mut wrong = Vec::new();
+    let policies: Vec<(&String, &Value)> = events
+        .iter()
+        .flat_map(|(event, entries)| entries.iter().map(move |entry| (event, entry)))
+        .filter(|(_, entry)| is_policy(entry))
+        .collect();
+    let [(event, entry)] = policies.as_slice() else {
+        wrong.push(format!(
+            "{} policy entries (args {POLICY_ARGS:?}), not 1 under PreToolUse: {policies:?}",
+            policies.len()
+        ));
+        return wrong;
+    };
+    if event.as_str() != "PreToolUse" {
+        wrong.push(format!("the policy entry is under {event}, not PreToolUse"));
+    }
+    let command = entry["command"].as_str().unwrap_or_default();
+    if !paths.iter().any(|p| p == command) {
+        wrong.push(format!(
+            "the policy entry: command {command:?}, not {paths:?}"
+        ));
+    }
+    if entry.get("async").is_some_and(|a| *a != json!(false)) {
+        wrong.push(format!("the policy entry is async: {}", entry["async"]));
+    }
+    if entry.get("timeout") != Some(&json!(2)) {
+        wrong.push(format!(
+            "the policy entry: timeout {:?}, not 2",
+            entry.get("timeout")
+        ));
+    }
+    if entry["onFailure"] != json!("continue") {
+        wrong.push(format!(
+            "the policy entry: onFailure {}",
+            entry["onFailure"]
+        ));
+    }
+    if entry["type"] != json!("command") {
+        wrong.push(format!("the policy entry: type {}", entry["type"]));
+    }
+    let block = first_object(&run.stdout).unwrap_or_default();
+    let matchers = policy_matchers(&block);
+    if matchers != [json!(POLICY_MATCHER)] {
+        wrong.push(format!(
+            "the policy entry's group matchers are {matchers:?}, not [{POLICY_MATCHER:?}]"
+        ));
+    }
+    wrong
+}
+
 #[test]
 fn budget__b2() {
     // Given
@@ -187,11 +285,19 @@ fn budget__b2() {
 
     // Then
     let events = must_block(&run);
+    // From phase 4 the policy entry of PreToolUse is sync; the five events' own entries stay async.
+    let hook_entries = |entries: &Vec<Value>| -> Vec<Value> {
+        entries
+            .iter()
+            .filter(|entry| !(has_policy() && is_policy(entry)))
+            .cloned()
+            .collect()
+    };
     let not_async: Vec<&str> = ASYNC
         .iter()
         .copied()
         .filter(|event| {
-            events.get(*event).is_none_or(|entries| {
+            events.get(*event).map(hook_entries).is_none_or(|entries| {
                 entries.is_empty() || entries.iter().any(|e| e["async"] != json!(true))
             })
         })
@@ -200,6 +306,21 @@ fn budget__b2() {
         not_async.is_empty(),
         "events of H1 not async in the printed block: {not_async:?}"
     );
+    if has_policy() {
+        let policies: Vec<&Value> = events
+            .get("PreToolUse")
+            .into_iter()
+            .flatten()
+            .filter(|entry| is_policy(entry))
+            .collect();
+        assert!(
+            !policies.is_empty()
+                && policies
+                    .iter()
+                    .all(|e| e.get("async").is_none_or(|a| *a == json!(false))),
+            "the policy entry of PreToolUse is not in the block or not sync (B2, from phase 4): {policies:?}"
+        );
+    }
 }
 
 #[rstest]
@@ -357,7 +478,15 @@ fn install__should_report_presence() {
         "/opt/elsewhere/wtpool",
     ))
     .expect("setup: JSON");
-    let cases: Vec<(&str, Option<Value>, bool)> = vec![
+    let mut without_policy = block.clone();
+    if let Some(groups) = without_policy["hooks"]["PreToolUse"].as_array_mut() {
+        groups.retain(|group| {
+            !group["hooks"]
+                .as_array()
+                .is_some_and(|hooks| hooks.iter().any(is_policy))
+        });
+    }
+    let mut cases: Vec<(&str, Option<Value>, bool)> = vec![
         ("no file", None, false),
         ("other settings", Some(json!({ "permissions": {} })), false),
         ("a block without SessionEnd", Some(partial), false),
@@ -365,6 +494,13 @@ fn install__should_report_presence() {
         ("the block", Some(block.clone()), true),
         ("the block among other settings", Some(merged), true),
     ];
+    if has_policy() {
+        cases.push((
+            "the block without the policy entry",
+            Some(without_policy),
+            false,
+        ));
+    }
 
     // When
     let said: Vec<(&str, bool, String)> = cases
@@ -421,7 +557,35 @@ fn expected_block(command: &str) -> Value {
         }
         hooks.insert(event.to_owned(), json!([{ "hooks": [entry] }]));
     }
+    if has_policy()
+        && let Some(groups) = hooks.get_mut("PreToolUse").and_then(Value::as_array_mut)
+    {
+        groups.push(json!({
+            "matcher": POLICY_MATCHER,
+            "hooks": [{
+                "type": "command",
+                "command": command,
+                "args": POLICY_ARGS,
+                "timeout": 2,
+                "onFailure": "continue",
+            }],
+        }));
+    }
     json!({ "hooks": hooks })
+}
+
+/// `block` with the groups of each event in a fixed order, as the spec fixes no order of the
+/// policy entry's group among `PreToolUse`'s.
+fn groups_sorted(block: &Value) -> Value {
+    let mut sorted = block.clone();
+    if let Some(hooks) = sorted["hooks"].as_object_mut() {
+        for groups in hooks.values_mut() {
+            if let Some(list) = groups.as_array_mut() {
+                list.sort_by_key(Value::to_string);
+            }
+        }
+    }
+    sorted
 }
 
 /// H22: stdout is the block alone, as one JSON value, so `wtpool hook install > hooks.json` is a
@@ -438,7 +602,7 @@ fn install__should_print_only_the_block_on_stdout() {
     ];
     let candidates: Vec<Value> = command
         .iter()
-        .map(|p| expected_block(&p.to_string_lossy()))
+        .map(|p| groups_sorted(&expected_block(&p.to_string_lossy())))
         .collect();
     let absent = install(&sandbox, &binary);
     let block = serde_json::from_str::<Value>(&absent.stdout).unwrap_or(Value::Null);
@@ -468,7 +632,7 @@ fn install__should_print_only_the_block_on_stdout() {
                     .rev()
                     .collect::<String>()
             )),
-            Ok(value) if !candidates.contains(&value) => {
+            Ok(value) if !candidates.contains(&groups_sorted(&value)) => {
                 problems.push(format!("{case}: stdout is not the block of H1: {value}"));
             }
             Ok(_) => {}

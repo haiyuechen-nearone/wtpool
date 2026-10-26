@@ -30,6 +30,7 @@ import {
 } from './flows.mjs';
 import { waitForRows } from './rows.mjs';
 import { git, panelFrame, readClipboard, runCommand, sleep, workbench } from './vscode.mjs';
+import { PHASE, addRepoKeys, focusKey, focusRing, writeMachineToml } from './jobs.mjs';
 
 
 test('flow__copy_path', async () => {
@@ -305,10 +306,47 @@ async function tabTo(window, frame, key) {
   return (await focus(frame))?.key === key;
 }
 
+/**
+ * From phase 4, the machine strip by keys alone (X20, X22): Tab to the machine button, Enter
+ * opens the strip with focus on Limit, then Tab goes the menu, Save, Use defaults, each chip list
+ * as one stop with its input and Add, then the rows; Escape closes it and focus returns to the
+ * button. Every stop shows its ring (X14).
+ */
+async function stripByKeys(window, frame) {
+  const keyOf = () => focusKey(frame);
+  let atButton = null;
+  for (const press of ['Tab', 'Shift+Tab']) {
+    for (let step = 0; step < 60 && atButton !== 'machine-button'; step += 1) {
+      atButton = await keyOf();
+      if (atButton !== 'machine-button') await window.keyboard.press(press);
+    }
+  }
+  const buttonRing = await focusRing(frame);
+  await window.keyboard.press('Enter');
+  await sleep(200);
+  const afterEnter = await keyOf();
+  const stops = [{ key: afterEnter, ring: await focusRing(frame) }];
+  for (let step = 0; step < 14; step += 1) {
+    await window.keyboard.press('Tab');
+    await sleep(60);
+    const key = await keyOf();
+    stops.push({ key, ring: await focusRing(frame) });
+    if (key?.startsWith('row ')) break;
+  }
+  await window.keyboard.press('Shift+Tab');
+  await sleep(60);
+  await window.keyboard.press('Escape');
+  await sleep(200);
+  return { atButton, buttonRing, stops, afterEscape: await keyOf(), open: await frame.locator('tr.machine-detail').count() };
+}
+
 test('flow__keyboard_only', async () => {
-  await withFlow('flow__keyboard_only', { scenario: 'folder_missing' }, async (session) => {
+  // From phase 4 the strip holds a pattern in each list, so each list is a tab stop (X22).
+  const prepare = (poolInfo) => (PHASE >= 4 ? addRepoKeys(poolInfo, { heavy: ['make'] }) : undefined);
+  await withFlow('flow__keyboard_only', { scenario: 'folder_missing', prepare }, async (session) => {
     // Given
     const { app, window, dirs } = session;
+    if (PHASE >= 4) writeMachineToml(dirs, { limit: 4, heavy: ['just'] });
     await window.mouse.move(1, 1);
     const frame = await openStatus(session);
     for (let step = 0; step < 3 && !(await frame.evaluate(() => document.hasFocus())); step += 1) {
@@ -327,6 +365,7 @@ test('flow__keyboard_only', async () => {
       const found = await focus(frame);
       if (found) reached.push(found);
     }
+    const strip = PHASE >= 4 ? await stripByKeys(window, frame) : null;
     const [wt1, wt2] = ['wt1', 'wt2'].map((name) => worktreePath(session, name));
     const atRow = await tabTo(window, frame, `row ${wt1}`);
     await window.keyboard.press('Enter');
@@ -364,6 +403,17 @@ test('flow__keyboard_only', async () => {
     assert.ok(atOpen && second, 'Enter on wt1\'s open action opens no window');
     assert.ok(atTerminal, 'Tab does not reach wt1\'s terminal action');
     assert.equal(folder, realpathSync(wt1), 'Enter on wt1\'s terminal action opens no terminal in wt1');
+    if (strip) {
+      const firstRow = `row ${rowOrder(status.pools[0].worktrees)[0].path}`;
+      const order = ['limit', 'enforce', 'save', 'defaults', 'remove machine just', 'input machine', 'add machine', 'remove repository make', 'input repository', 'add repository', firstRow];
+      assert.equal(strip.atButton, 'machine-button', 'Tab does not reach the machine button (X20)');
+      assert.ok(strip.buttonRing, 'the focused machine button shows no ring (X14)');
+      assert.equal(strip.stops[0].key, 'limit', 'Enter on the machine button does not move focus to the Limit field (X20)');
+      assert.deepEqual(strip.stops.map((stop) => stop.key), order, 'Tab in the strip does not go Limit, Policy, Save, Use defaults, each list and its input and Add, then the rows (X20, X22)');
+      assert.deepEqual(strip.stops.filter((stop) => !stop.ring).map((stop) => stop.key), [], 'strip stops without a visible ring (X14)');
+      assert.equal(strip.open, 0, 'Escape in the strip does not close it (X20)');
+      assert.equal(strip.afterEscape, 'machine-button', 'focus does not return to the machine button after Escape (X20)');
+    }
   });
 });
 

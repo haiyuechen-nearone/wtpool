@@ -13,7 +13,7 @@ import path from 'node:path';
 import { runTests } from '@vscode/test-electron';
 
 import { inBackground } from '../support/background.mjs';
-import { CODE_FLAGS, QUIET_SETTINGS, keychainErrors, removeLink, shortLink } from '../support/code.mjs';
+import { CODE_FLAGS, QUIET_SETTINGS, keychainErrors, removeLink, shortLink, writeEarlierBuilds } from '../support/code.mjs';
 import { FAKE_WTPOOL, TEST, VSCODE, runDir } from '../support/paths.mjs';
 import { resolveVSCode } from '../support/vscode-app.mjs';
 
@@ -38,6 +38,7 @@ const dirs = {
   fakes: path.join(sandbox, 'fakes'),
 };
 for (const dir of Object.values(dirs)) mkdirSync(dir, { recursive: true });
+writeEarlierBuilds(dirs.home);
 mkdirSync(path.join(dirs.userData, 'User'), { recursive: true });
 mkdirSync(path.join(dirs.workspace, '.vscode'), { recursive: true });
 
@@ -125,7 +126,7 @@ try {
       TZ: 'UTC',
       ...(process.env.WTPOOL_VERIFY_HOST_COVERAGE ? { NODE_V8_COVERAGE: process.env.WTPOOL_VERIFY_HOST_COVERAGE } : {}),
       ...Object.fromEntries(
-        ['WTPOOL_VERIFY_HOST_RETRIES', 'WTPOOL_VERIFY_HOST_ORDER']
+        ['WTPOOL_VERIFY_HOST_RETRIES', 'WTPOOL_VERIFY_HOST_ORDER', 'WTPOOL_VERIFY_PHASE']
           .filter((key) => process.env[key] !== undefined)
           .map((key) => [key, process.env[key]]),
       ),

@@ -8,7 +8,10 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use super::install::{EVENTS, Install, events_of, install, installed_copy, pasted, settings};
+use super::install::{
+    EVENTS, Install, POLICY_MATCHER, events_of, has_policy, install, installed_copy, is_policy,
+    pasted, policy_matchers, settings,
+};
 use crate::support::{Sandbox, must_repo};
 
 /// The settings file as the note names it, with the sandbox's `HOME` and no `CLAUDE_CONFIG_DIR`.
@@ -328,7 +331,8 @@ fn install__should_report_the_plugin() {
 }
 
 /// H28: the repository's marketplace `wtpool` lists the one plugin `wtpool` in `plugins/wtpool/`,
-/// whose hook file holds the block `wtpool hook install` prints, with the bare command `wtpool`.
+/// whose hook file holds the block `wtpool hook install` prints, with the bare command `wtpool`;
+/// from phase 4 that block holds the policy entry (H1, H29).
 #[test]
 fn plugin__should_hold_the_printed_block() {
     // Given
@@ -389,6 +393,26 @@ fn plugin__should_hold_the_printed_block() {
             "plugins/wtpool/hooks/hooks.json differs from the printed block for {differ:?}:\n{}\nnot\n{}",
             hooks["hooks"], bare["hooks"]
         ));
+    }
+    if has_policy() {
+        let policies: Vec<Value> = events_of(&hooks)
+            .get("PreToolUse")
+            .into_iter()
+            .flatten()
+            .filter(|entry| is_policy(entry))
+            .cloned()
+            .collect();
+        if policies.len() != 1 || policies.iter().any(|e| e["command"] != json!("wtpool")) {
+            wrong.push(format!(
+                "plugins/wtpool/hooks/hooks.json holds {policies:?}, not one policy entry of the command wtpool (from phase 4)"
+            ));
+        }
+        if policy_matchers(&hooks) != [json!(POLICY_MATCHER)] {
+            wrong.push(format!(
+                "the policy entry's group in hooks.json has the matchers {:?}, not [{POLICY_MATCHER:?}]",
+                policy_matchers(&hooks)
+            ));
+        }
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }

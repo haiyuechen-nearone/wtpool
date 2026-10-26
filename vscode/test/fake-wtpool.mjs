@@ -26,6 +26,11 @@
 //              `alive`, `exit <code>`
 //   actionExit the exit code of `free` and `fg` (phase 3, X12), which only log (default 0)
 //   actionStderr  the line `free` and `fg` write to stderr when actionExit is not 0
+//   jobExit    the exit code of `job limit`, `job enforce` and `job heavy` (phase 4, X21), which
+//              only log and never print a document: a number, or a list taken per `job` call in
+//              order, the last repeating (default 0)
+//   jobStderr  what a `job` call whose code is not 0 writes to stderr, as given (default one line)
+//   jobHangMs  a `job` call waits this long before it answers, so a kill can be seen (default 0)
 import { appendFileSync, existsSync, readFileSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
@@ -186,6 +191,26 @@ async function watch() {
   }
 }
 
+/** The `job` calls of this fake's log before this one, so `jobExit` can give each its own code. */
+function jobCallsBefore() {
+  return readFileSync(config.log, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((text) => JSON.parse(text))
+    .filter((entry) => entry.event === 'start' && entry.argv?.[0] === 'job' && entry.pid !== process.pid).length;
+}
+
+async function answerJob() {
+  // The answer comes after the hang even when the caller closes stdin at once.
+  ignoreEof = true;
+  const codes = [config.jobExit ?? 0].flat();
+  const code = codes[Math.min(jobCallsBefore(), codes.length - 1)];
+  if (config.jobHangMs) await sleep(config.jobHangMs);
+  if (code === 0) process.exit(0);
+  const text = config.jobStderr ?? `wtpool: ${args.join(' ')} failed (fake)\n`;
+  process.stderr.write(text, () => process.exit(code));
+}
+
 if (args[0] === '--version') {
   process.stdout.write('wtpool 0.0.0-fake\ncommit fake\nfeatures: none\n');
   process.exit(0);
@@ -196,6 +221,8 @@ if (args[0] === '--version') {
   if (code === 0) process.exit(0);
   const text = config.actionStderr ?? `wtpool: ${args.join(' ')} failed (fake)`;
   process.stderr.write(`${text}\n`, () => process.exit(code));
+} else if (args[0] === 'job' && ['limit', 'enforce', 'heavy'].includes(args[1])) {
+  answerJob();
 } else if (args[0] === 'status' && args.includes('--json')) {
   process.stdout.write(`${JSON.stringify(documents().at(-1))}\n`, () => process.exit(0));
 } else {

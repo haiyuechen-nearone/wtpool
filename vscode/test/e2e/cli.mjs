@@ -11,6 +11,7 @@ import { test } from '@playwright/test';
 import Ajv2020 from 'ajv/dist/2020.js';
 
 import { scenarioDocuments } from '../support/docs.mjs';
+import { writeEarlierBuilds } from '../support/code.mjs';
 import { REPO, SCHEMA, runDir } from '../support/paths.mjs';
 import { startStub } from './agents.mjs';
 import { env, releaseWtpool } from './vscode.mjs';
@@ -24,6 +25,7 @@ export function cliSandbox(key) {
   rmSync(root, { recursive: true, force: true });
   const dirs = { root, home: path.join(root, 'home'), tmp: path.join(root, 'tmp'), bin: path.join(root, 'bin'), wtpoolPath: releaseWtpool() };
   for (const dir of [dirs.home, dirs.tmp, dirs.bin]) mkdirSync(dir, { recursive: true });
+  writeEarlierBuilds(dirs.home);
   return dirs;
 }
 
@@ -107,9 +109,16 @@ export function secondsAgo(seconds) {
   return new Date(Date.now() - seconds * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
-/** The oracle's schema, open as status-panel.md S12 has it. */
+/** The phase the harness runs (WTPOOL_VERIFY_PHASE), 1 by default. */
+const PHASE = Number(process.env.WTPOOL_VERIFY_PHASE ?? 1);
+
+/**
+ * The oracle's schema of this run's phase, open as status-panel.md S12 has it: from phase 4
+ * `status.phase-4.schema.json`, which adds `machine.jobs` (S14) and `build.queued` (S4).
+ */
 export function oracleSchema() {
-  return JSON.parse(readFileSync(SCHEMA, 'utf8'));
+  const file = PHASE >= 4 ? path.join(path.dirname(SCHEMA), 'status.phase-4.schema.json') : SCHEMA;
+  return JSON.parse(readFileSync(file, 'utf8'));
 }
 
 /** `schema` with every object closed: wtpool itself emits only the listed properties (S12). */

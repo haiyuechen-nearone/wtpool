@@ -67,4 +67,19 @@ impl Wanted<'_> {
     fn grep(&self) -> Option<String> {
         self.ctx.only.as_deref().map(web::title_pattern)
     }
+
+    /// The tests a runner leaves out without `--only`: those of later phases, so that none of
+    /// them, nor an error of its file, reaches a run of this phase.
+    fn grep_invert(&self) -> Option<String> {
+        if self.ctx.only.is_some() || self.ctx.later.is_empty() {
+            return None;
+        }
+        let patterns: Vec<String> = self
+            .ctx
+            .later
+            .iter()
+            .map(|check| web::title_pattern(check))
+            .collect();
+        Some(patterns.join("|"))
+    }
 }

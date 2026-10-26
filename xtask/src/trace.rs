@@ -120,6 +120,41 @@ impl Trace {
         }
     }
 
+    /// The phase each check of the trace list and catalog runs from: for a check an ID names,
+    /// the later of that ID's phase and the check's own in `check_phase`, the earliest over the
+    /// IDs that name it; for a scenario, the later of its phase and its own.
+    pub fn first_phases(&self, scenarios: &[Scenario]) -> BTreeMap<String, u8> {
+        let mut found: BTreeMap<String, u8> = BTreeMap::new();
+        let mut note = |check: &str, phase: u8| {
+            let own = self.check_phase.get(check).copied().unwrap_or(0);
+            let from = phase.max(own);
+            found
+                .entry(check.to_owned())
+                .and_modify(|earliest| *earliest = (*earliest).min(from))
+                .or_insert(from);
+        };
+        for entry in self.ids.values() {
+            for check in &entry.checks {
+                note(check, entry.phase);
+            }
+        }
+        for scenario in scenarios {
+            note(&scenario.name, scenario.phase);
+        }
+        found
+    }
+
+    /// The checks of the trace list and catalog that run only from a phase later than `phase`,
+    /// which a part of `phase` leaves out, so a run of an earlier phase never judges a later
+    /// phase's checks.
+    pub fn later_checks(&self, scenarios: &[Scenario], phase: u8) -> BTreeSet<String> {
+        self.first_phases(scenarios)
+            .into_iter()
+            .filter(|(_, from)| *from > phase)
+            .map(|(check, _)| check)
+            .collect()
+    }
+
     fn has_any_check(&self, id: &str, scenarios: &[Scenario]) -> bool {
         !self.checks_of(id, scenarios, u8::MAX).is_empty()
     }
@@ -185,6 +220,30 @@ pub fn problems(
         }
     }
     problems
+}
+
+/// The checks of `root`'s trace list and catalog that run only from a phase after `phase`; none
+/// when the trace cannot be read, which `trace_complete` reports. A flow check runs from the
+/// phase of its row in the User flows table, also when an ID of a later phase names it.
+pub fn later_in(root: &Path, phase: u8) -> BTreeSet<String> {
+    let mut later = load(root)
+        .and_then(|trace| Ok(trace.later_checks(&load_scenarios(root)?, phase)))
+        .unwrap_or_default();
+    for flow in crate::flows::load(root).unwrap_or_default() {
+        if flow.phase <= phase {
+            later.remove(&format!("{}{}", crate::flows::PREFIX, flow.name));
+        }
+    }
+    later
+}
+
+/// The nextest filter ` and not test(...)` that leaves `later` out, or nothing for none.
+pub fn nextest_exclusion(later: &BTreeSet<String>) -> String {
+    if later.is_empty() {
+        return String::new();
+    }
+    let names: Vec<&str> = later.iter().map(String::as_str).collect();
+    format!(" and not test(/(^|::)({})($|::)/)", names.join("|"))
 }
 
 pub fn check(root: &Path, phase: u8, results: &[CheckResult]) -> CheckResult {
@@ -304,6 +363,30 @@ mod tests {
         // Then
         assert_eq!(
             checks,
+            expected
+                .iter()
+                .map(|s| (*s).to_owned())
+                .collect::<BTreeSet<_>>()
+        );
+    }
+
+    #[rstest]
+    #[case::phase_1(1, &["actions__a", "budget__b1"])]
+    #[case::phase_2(2, &["actions__a"])]
+    #[case::phase_3(3, &[])]
+    fn later_checks__should_leave_out_what_runs_by_then(
+        #[case] phase: u8,
+        #[case] expected: &[&str],
+    ) {
+        // Given
+        let trace = trace();
+
+        // When
+        let later = trace.later_checks(&scenarios(), phase);
+
+        // Then
+        assert_eq!(
+            later,
             expected
                 .iter()
                 .map(|s| (*s).to_owned())
@@ -432,12 +515,23 @@ mod tests {
     ];
 
     /// The phase verification.md gives an ID: 1, except 2 for R4, D5, H1 to H26, A1 to A4, A7,
-    /// S5, S6, W6, X18, and 3 for X12, H27, H28, S13, R12, U9 and X19.
+    /// S5, S6, W6, X18, 3 for X12, H27, H28, S13, R12, U9 and X19, and 4 for the IDs of jobs.md,
+    /// J1 to J24, H29, A8, S14, S15, W10, B12 to B14, U10 to U15 and X20 to X22.
     fn spec_phase(id: &str) -> u8 {
         let later = [
             "R4", "D5", "A1", "A2", "A3", "A4", "A7", "S5", "S6", "W6", "X18",
         ];
-        if ["X12", "H27", "H28", "S13", "R12", "U9", "X19"].contains(&id) {
+        let jobs = [
+            "H29", "A8", "S14", "S15", "W10", "B12", "B13", "B14", "U10", "U11", "U12", "U13",
+            "U14", "U15", "X20", "X21", "X22",
+        ];
+        let job_row = id
+            .strip_prefix('J')
+            .and_then(|n| n.parse::<u8>().ok())
+            .is_some_and(|n| (1..=24).contains(&n));
+        if job_row || jobs.contains(&id) {
+            4
+        } else if ["X12", "H27", "H28", "S13", "R12", "U9", "X19"].contains(&id) {
             3
         } else if id.starts_with('H') || later.contains(&id) {
             2
@@ -455,7 +549,9 @@ mod tests {
         let trace = load(&root).unwrap();
 
         // Then
-        let expected_ids = 11 + 4 + 28 + 7 + 13 + 9 + 19 + 9 + 11;
+        // R, D, H, A, S, W, X, U, B, J, with the phase 4 IDs H29, A8, S14, S15, W10, X20 to X22,
+        // U10 to U15, B12 to B14 and J1 to J24 among them.
+        let expected_ids = 11 + 4 + 29 + 8 + 15 + 10 + 22 + 15 + 14 + 24;
         assert_eq!(trace.ids.len(), expected_ids);
         let ownerless: Vec<&String> = trace
             .ids
@@ -485,5 +581,18 @@ mod tests {
             misphased.is_empty(),
             "IDs with another phase: {misphased:?}"
         );
+    }
+
+    #[test]
+    fn later_in__should_keep_a_flow_from_the_phase_of_its_row() {
+        // Given
+        let root = crate::repo::root();
+
+        // When
+        let later = later_in(&root, 3);
+
+        // Then
+        assert!(!later.contains("flow__keyboard_only"), "{later:?}");
+        assert!(later.contains("flow__jobs_first_open"), "{later:?}");
     }
 }

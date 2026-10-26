@@ -6,9 +6,10 @@ use std::ffi::OsStr;
 
 use serde_json::Value;
 use xtask::pool;
-use xtask::scenario::{HOOK_CLOCK, PROCESS_STARTED, ProcessStep, ScenarioFile, Step};
+use xtask::scenario::{HOOK_CLOCK, JobStep, PROCESS_STARTED, ProcessStep, ScenarioFile, Step};
 
-use crate::support::hook::{CLAUDE, Hooks, RunOptions};
+use super::scenarios_jobs::{ScenarioJobs, job_differences};
+use crate::support::hook::{CLAUDE, Hooks, Proc, RunOptions};
 use crate::support::{must_repo, must_status_json, schema_errors};
 
 fn must_load(name: &str) -> ScenarioFile {
@@ -30,6 +31,7 @@ pub(super) fn must_run_scenario(name: &str) {
     let mut clock_set = hook_steps;
     let mut expected_count = 0;
     let mut problems = Vec::new();
+    let mut jobs = ScenarioJobs::default();
     for (index, step) in scenario.steps.iter().enumerate() {
         match step {
             Step::Git(git) => {
@@ -42,7 +44,30 @@ pub(super) fn must_run_scenario(name: &str) {
             Step::Process(ProcessStep::Start(process)) => {
                 let cwd = hooks.pool.worktree(&process.worktree);
                 let started = process.started.as_deref().unwrap_or(PROCESS_STARTED);
-                hooks.start(process.pid, &process.name, &cwd, started);
+                let ppid = match &process.job {
+                    Some(job) => jobs.pid(job),
+                    None => process.parent.unwrap_or(1),
+                };
+                hooks.start_proc(Proc {
+                    pid: process.pid,
+                    ppid,
+                    name: process.name.clone(),
+                    cwd,
+                    started: started.to_owned(),
+                    cmd: process.cmd.clone(),
+                });
+            }
+            Step::Machine(text) => hooks.sandbox.write_machine(text),
+            Step::WtpoolToml(text) => {
+                let path = hooks.pool.common.join("wtpool.toml");
+                let mut config = std::fs::read_to_string(&path).expect("setup: read wtpool.toml");
+                config.push_str(text);
+                std::fs::write(&path, config).expect("setup: write wtpool.toml");
+            }
+            Step::Job(JobStep::Start(start)) => jobs.start(&mut hooks, start, &mut problems),
+            Step::Job(JobStep::End(name)) => jobs.end(&mut hooks, name, &mut problems),
+            Step::Job(JobStep::Await(wanted)) => {
+                jobs.await_state(&mut hooks, wanted, &mut problems);
             }
             Step::Process(ProcessStep::Stop(pid)) => hooks.stop(*pid),
             Step::Clock(time) => {
@@ -94,18 +119,18 @@ pub(super) fn must_run_scenario(name: &str) {
             }
             Step::Expect(expected) => {
                 expected_count += 1;
-                check(&hooks, expected, expected_count, clock_set, &mut problems);
+                jobs.sync(&mut hooks);
+                let mut expected = expected.clone();
+                jobs.resolve(&mut expected, &hooks);
+                check(&hooks, &expected, expected_count, clock_set, &mut problems);
             }
         }
     }
     expected_count += 1;
-    check(
-        &hooks,
-        &scenario.expect,
-        expected_count,
-        clock_set,
-        &mut problems,
-    );
+    jobs.sync(&mut hooks);
+    let mut last = scenario.expect.clone();
+    jobs.resolve(&mut last, &hooks);
+    check(&hooks, &last, expected_count, clock_set, &mut problems);
     assert!(
         problems.is_empty(),
         "{name}: wtpool status differs from the scenario:\n{}",
@@ -161,12 +186,20 @@ fn actors_by_key(value: &Value) -> Vec<Value> {
     actors
 }
 
-fn builds(value: &Value) -> BTreeSet<(String, String)> {
+/// Each build's pid and name, and with `queued` its `queued` too (S4, from phase 4).
+fn builds(value: &Value, queued: bool) -> BTreeSet<(String, String, String)> {
     value
         .as_array()
         .into_iter()
         .flatten()
-        .map(|build| (build["pid"].to_string(), build["name"].to_string()))
+        .map(|build| {
+            let held = if queued {
+                build["queued"].to_string()
+            } else {
+                String::new()
+            };
+            (build["pid"].to_string(), build["name"].to_string(), held)
+        })
         .collect()
 }
 
@@ -180,6 +213,7 @@ pub fn differences(expected: &Value, actual: &Value) -> Vec<String> {
         .into_iter()
         .map(|error| format!("schema: {error}"))
         .collect();
+    found.extend(job_differences(expected, actual));
     let pools = actual["pools"].as_array().map_or(0, Vec::len);
     if pools != 1 {
         found.push(format!("{pools} pools instead of 1"));
@@ -241,7 +275,10 @@ pub fn differences(expected: &Value, actual: &Value) -> Vec<String> {
                 "{name}.reasons: expected {want_reasons:?}, got {got_reasons:?}"
             ));
         }
-        if builds(&want["builds"]) != builds(&got["builds"]) {
+        let queued = want["builds"]
+            .as_array()
+            .is_some_and(|list| list.iter().any(|build| build.get("queued").is_some()));
+        if builds(&want["builds"], queued) != builds(&got["builds"], queued) {
             found.push(format!(
                 "{name}.builds: expected {}, got {}",
                 want["builds"], got["builds"]
@@ -312,4 +349,14 @@ fn hostile_git_strings() {
 #[test]
 fn agents_off() {
     must_run_scenario("agents_off");
+}
+
+#[test]
+fn jobs_queue() {
+    must_run_scenario("jobs_queue");
+}
+
+#[test]
+fn build_not_queued() {
+    must_run_scenario("build_not_queued");
 }

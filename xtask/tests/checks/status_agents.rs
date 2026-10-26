@@ -175,7 +175,17 @@ fn decay_case(hooks: &mut Hooks, case: &str) -> (i64, &'static str, Option<&'sta
 #[case("done_over_a_minute")]
 #[case("ended")]
 #[case("process_dead")]
+#[case("job_waiting_past_120_s")]
+#[case("job_waiting_with_a_label")]
+#[case("job_waiting_after_stop")]
+#[case("job_waiting_while_waiting")]
+#[case("job_running_past_120_s")]
+#[case("job_left_the_folder")]
 fn decay__should_match_the_table(#[case] case: &str) {
+    if super::jobs_decay::is_job_case(case) {
+        super::jobs_decay::must_decay_with_a_job(case);
+        return;
+    }
     // Given
     let mut hooks = Hooks::must_new("decay");
     let (after, key, expected) = decay_case(&mut hooks, case);

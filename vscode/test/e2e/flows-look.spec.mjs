@@ -7,7 +7,8 @@ import { test } from '@playwright/test';
 import { scenarioDocuments } from '../support/docs.mjs';
 import { GROUP_TOKENS, GROUPS } from '../support/grammar.mjs';
 import { expectedRows, resolved, waitForRows } from './rows.mjs';
-import { openStatus, poll, withFlow } from './flows.mjs';
+import { openStatus, poll, withFlow, worktreePath } from './flows.mjs';
+import { PHASE, agent } from './jobs.mjs';
 import { panelFrame, runCommand, sleep, startProcess, writeSettings } from './vscode.mjs';
 
 /** Each theme with the test of its webview body classes, which VS Code sets per theme kind. */
@@ -104,12 +105,28 @@ test('flow__reduced_motion', async () => {
     const { scenario, documents } = scenarioDocuments(session.scenario);
     const start = scenario.steps.find((step) => step.process?.start).process.start;
     const build = startProcess(dirs, start.name, path.join(poolInfo.dir, start.in));
+    let reader = null;
     try {
       await runCommand(window, 'Worktrees: Open Status');
       const frame = await panelFrame(window);
       assert.ok(frame, 'Worktrees: Open Status showed no tab with rows');
       const building = expectedRows(documents[0], poolInfo);
       const rows = await waitForRows(frame, building, 15_000);
+      // From phase 4 an agent line starts with a state icon, the working robot among them, which
+      // never moves, with or without reduce motion (U13).
+      reader = PHASE >= 4 ? agent(session, { id: 'reader', title: 'Read in wt2', cwd: poolInfo.fg }) : null;
+      let lineIcons = 0;
+      if (reader) {
+        await reader.hook('UserPromptSubmit');
+        await reader.hook('PreToolUse-Read', { tool_input: { file_path: path.join(worktreePath(session, 'wt2'), 'f.txt') }, tool_use_id: 'toolu_reader_read' });
+        lineIcons = (await poll(() => frame.locator('tr[data-row-id] > td:nth-child(5) .line-icon').count(), 5_000)) ?? 0;
+      }
+      const lineMoves = () =>
+        frame.evaluate(() =>
+          document.getAnimations()
+            .filter((a) => a.playState === 'running' && a.effect?.getComputedTiming().duration > 0 && a.effect?.target?.closest?.('tr[data-row-id] > td:nth-child(5)'))
+            .map((a) => `${a.effect.target.getAttribute('class') ?? a.effect.target.tagName} in ${a.effect.target.closest('tr').dataset.rowId}`),
+        );
 
       // When
       await sleep(1000);
@@ -124,6 +141,7 @@ test('flow__reduced_motion', async () => {
       // is not empty by construction. The class goes back at once.
       await frame.evaluate(() => document.body.classList.remove('vscode-reduce-motion'));
       const spinning = await running();
+      const linesMoving = await lineMoves();
       await frame.evaluate(() => document.body.classList.add('vscode-reduce-motion'));
 
       // Then
@@ -131,7 +149,12 @@ test('flow__reduced_motion', async () => {
       assert.deepEqual(rows, building, 'the building row does not show');
       assert.ok(spinning.some((a) => a.endsWith('wt1::before')), `setup: the building dial does not spin without reduce motion: ${JSON.stringify(spinning)}`);
       assert.deepEqual(state.running, [], 'animations run with reduce motion on');
+      if (PHASE >= 4) {
+        assert.ok(lineIcons > 0, 'from phase 4 the agent line in wt2 shows no .line-icon (U13)');
+        assert.deepEqual(linesMoving, [], 'an agent line icon moves without reduce motion (U13)');
+      }
     } finally {
+      await reader?.stop();
       build.kill();
     }
   });

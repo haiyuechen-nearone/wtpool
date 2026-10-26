@@ -2,8 +2,11 @@
 // A stand in for one `claude` process of the e2e layer: it stays alive and runs `wtpool hook` as its
 // child for each request, so the hook's parent is a live process that a step can stop.
 //
-// stdin: one JSON request per line, {id, binary, payload, cwd, env}. stdout: one JSON reply per
-// request, {id, code, signal, stdout, stderr}, after that hook exited.
+// stdin: one JSON request per line, {id, binary, args?, payload, cwd, env, detach?}. stdout: one
+// JSON reply per request, {id, code, signal, stdout, stderr}, after that child exited. `args`
+// defaults to `hook`, as `wtpool hook policy` runs from the same parent (H29). With `detach` the
+// child is a command the agent starts and leaves running, such as `wtpool job -- cargo test` (S15):
+// the reply, {id, pid}, comes at once.
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 
@@ -16,7 +19,15 @@ lines.on('line', (line) => {
   } catch {
     return;
   }
-  const child = spawn(request.binary, ['hook'], {
+  if (request.detach) {
+    const started = spawn(request.binary, request.args, { cwd: request.cwd, env: request.env, stdio: 'ignore' });
+    started.on('error', (error) => {
+      process.stdout.write(`${JSON.stringify({ id: request.id, pid: null, stderr: String(error) })}\n`);
+    });
+    started.on('spawn', () => process.stdout.write(`${JSON.stringify({ id: request.id, pid: started.pid })}\n`));
+    return;
+  }
+  const child = spawn(request.binary, request.args ?? ['hook'], {
     cwd: request.cwd,
     env: request.env,
     stdio: ['pipe', 'pipe', 'pipe'],

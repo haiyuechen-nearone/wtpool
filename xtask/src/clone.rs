@@ -44,6 +44,9 @@ const CLEAN: [&str; 14] = [
     "/vscode/test/node_modules/",
 ];
 
+/// The source's HEAD, as [`ScratchClone::prepare`] fetches it.
+const SOURCE_HEAD: &str = "refs/verify/head";
+
 fn cache_dir() -> Result<PathBuf, String> {
     Ok(crate::dirs::cache_dir()?.join("clones"))
 }
@@ -65,19 +68,13 @@ impl ScratchClone {
                 "--force",
                 "--no-write-fetch-head",
                 &source,
-                "+HEAD:refs/verify/head",
+                &format!("+HEAD:{SOURCE_HEAD}"),
                 "+refs/tags/*:refs/tags/*",
             ],
         )?;
         git(
             &dir,
-            &[
-                "checkout",
-                "--quiet",
-                "--force",
-                "--detach",
-                "refs/verify/head",
-            ],
+            &["checkout", "--quiet", "--force", "--detach", SOURCE_HEAD],
         )?;
         git(&dir, &CLEAN)?;
         let changed = git(root, &["diff", "HEAD", "--name-only", "-z"])?;
@@ -119,6 +116,13 @@ impl ScratchClone {
             ],
         )?;
         Ok(git(&self.dir, &["rev-parse", "HEAD"])?.trim().to_owned())
+    }
+
+    /// The checks the source's HEAD implements, without its uncommitted changes. Leaves the clone
+    /// at that commit.
+    pub fn checks_at_source_head(&self) -> Result<std::collections::BTreeSet<String>, String> {
+        self.reset_to(SOURCE_HEAD)?;
+        implemented_checks(&self.dir)
     }
 
     pub(crate) fn reset_to(&self, commit: &str) -> Result<(), String> {

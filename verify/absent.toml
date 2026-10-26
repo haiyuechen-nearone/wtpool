@@ -40,3 +40,7 @@ absence = "no stdout from wtpool hook in any contract session (H2): a wtpool wit
 [[absent]]
 check = "contract__should_run_in_the_sandbox"
 absence = "no user, project or local settings, MCP server or hook in the contract turn, only the run's settings file; judged from the oracle step's live result, as freeze starts no claude session"
+
+[[absent]]
+check = "job__should_run_on_windows"
+absence = "nothing of J17 exists outside Windows: there the check is skipped, so it cannot fail first on the machine that freezes"

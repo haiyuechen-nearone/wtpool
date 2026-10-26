@@ -350,6 +350,8 @@ pub(super) fn run_config(
         .envs(run.envs.iter().map(|(k, v)| (k.as_str(), v.as_str())));
     if let Some(pattern) = run.grep.clone().or_else(|| wanted.grep()) {
         command.args(["--grep", &pattern]);
+    } else if let Some(pattern) = wanted.grep_invert() {
+        command.args(["--grep-invert", &pattern]);
     }
     let ran = ctx.run_logged(log, &mut command, LAYER_LIMIT);
     remove_short_links(ctx);

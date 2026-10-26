@@ -144,21 +144,34 @@ fn lcov_report(ctx: &Ctx, env: &[(String, String)], name: &str) -> Result<(), St
     if ran.ok() { Ok(()) } else { Err(ran.tail(20)) }
 }
 
+/// How an int check's panic starts when the check's subject does not exist on this machine, such
+/// as a Windows job outside Windows: the check ends `skipped` with the rest as its reason.
+pub const SKIPPED: &str = "skipped on this machine: ";
+
 /// Each check of the nextest JUnit report at `path`, by its first test case that did not pass.
 fn junit_results(path: &Path, layer: &str) -> Vec<CheckResult> {
     let Ok(xml) = fs::read_to_string(path) else {
         return Vec::new();
     };
     let mut by_check: BTreeMap<String, CheckResult> = BTreeMap::new();
-    for test in junit::to_outcomes(&xml) {
+    for case in junit::parse(&xml) {
         let keep_earlier = by_check
-            .get(&test.title)
+            .get(&case.check)
             .is_some_and(|earlier| earlier.outcome != Outcome::Pass);
-        if !keep_earlier {
-            let check = test.title.clone();
-            let result = crate::web::test_result(&check, layer, test);
-            by_check.insert(check, result);
+        if keep_earlier {
+            continue;
         }
+        let check = case.check.clone();
+        let skipped = case
+            .failure
+            .as_ref()
+            .and_then(|failure| failure.message.strip_prefix(SKIPPED))
+            .map(str::to_owned);
+        let result = match skipped {
+            Some(reason) => CheckResult::skipped(&check, layer, reason),
+            None => crate::web::test_result(&check, layer, junit::outcome(case)),
+        };
+        by_check.insert(check, result);
     }
     by_check.into_values().collect()
 }
@@ -314,9 +327,10 @@ fn int_tests(ctx: &Ctx, env: &TestEnv) -> Vec<CheckResult> {
     tests.args(["--profile", "int", "--config-file", NEXTEST_CONFIG]);
     // The Rust budgets share the binary; only the bench part runs them.
     let budgets = format!("test(/^{}/)", crate::layers::BENCH_MODULE);
+    let later = crate::trace::nextest_exclusion(&ctx.later);
     let filter = match &ctx.only {
-        Some(only) => format!("test(/(^|::){only}($|::)/) and not {budgets}"),
-        None => format!("not {budgets}"),
+        Some(only) => format!("test(/(^|::){only}($|::)/) and not {budgets}{later}"),
+        None => format!("not {budgets}{later}"),
     };
     tests.args(["-E", &filter]);
     // `--only cc_replay:<name>` or `--only cc_replay:*` runs only the replay, no int test.

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wtpool.invalid/verify/job-ls.schema.json",
+  "title": "wtpool job ls --json, as the oracle reads jobs.md",
+  "description": "The one JSON object `wtpool job ls --json` prints (J2): the `machine.jobs` object of S14, each job and process with the folder it works in in place of `worktree` and `actor`. Every listed field is required. The oracle's check also closes every object. Times are RFC 3339 UTC.",
+  "type": "object",
+  "required": ["limit", "default", "min", "max", "enforce", "source", "config", "error", "heavy", "suggested", "running", "waiting", "outside"],
+  "properties": {
+    "limit": { "description": "How many jobs run at once, null while error is set (J5).", "type": ["integer", "null"], "minimum": 1, "maximum": 64 },
+    "default": { "description": "The default limit: a quarter of the cores, 1 to 8 (J5).", "type": "integer", "minimum": 1, "maximum": 8 },
+    "min": { "description": "The lowest limit (J5).", "const": 1 },
+    "max": { "description": "The highest limit (J5).", "const": 64 },
+    "enforce": { "description": "The policy for heavy commands outside a job (J21).", "enum": ["off", "warn", "require"] },
+    "source": {
+      "description": "Where the limit and the policy each come from: machine.toml or the defaults (J4).",
+      "type": "object",
+      "required": ["limit", "enforce"],
+      "properties": {
+        "limit": { "description": "The source of the limit.", "enum": ["machine", "default"] },
+        "enforce": { "description": "The source of the policy.", "enum": ["machine", "default"] }
+      }
+    },
+    "config": { "description": "The path of machine.toml, whether it exists or not (J4).", "type": "string", "minLength": 1 },
+    "error": { "description": "Why the machine config or the job folder cannot be read, else null.", "type": ["string", "null"] },
+    "heavy": {
+      "description": "Each heavy pattern with its source (J20).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pattern", "source"],
+        "properties": {
+          "pattern": { "description": "The pattern (J18).", "type": "string", "minLength": 1 },
+          "source": { "description": "The list it comes from (J20).", "enum": ["machine", "repository", "build_processes"] }
+        }
+      }
+    },
+    "suggested": {
+      "description": "This repository's suggestions the heavy list lacks (J23).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pattern", "from"],
+        "properties": {
+          "pattern": { "description": "The suggested pattern (J23, J24).", "type": "string", "minLength": 1 },
+          "from": { "description": "The source it came from, such as the marker Cargo.toml or package.json; an open string.", "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "running": { "description": "The running jobs.", "type": "array", "items": { "$ref": "#/$defs/entry" } },
+    "waiting": { "description": "The waiting jobs in queue order.", "type": "array", "items": { "$ref": "#/$defs/entry" } },
+    "outside": { "description": "The outermost heavy processes no job holds, newest first.", "type": "array", "items": { "$ref": "#/$defs/entry" } }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": ["id", "summary", "label", "folder", "since"],
+      "properties": {
+        "id": { "description": "The job's id, or an id of a heavy process outside any job.", "type": "string", "minLength": 1 },
+        "summary": { "description": "The words of the heavy pattern it matches, else the summary of its arguments (J16).", "type": "string" },
+        "label": { "description": "Its label, else null (J16).", "type": ["string", "null"] },
+        "folder": { "description": "The absolute folder it works in.", "type": "string", "minLength": 1 },
+        "since": {
+          "description": "When it started, or for a waiting job when it queued.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
+        }
+      }
+    }
+  }
+}

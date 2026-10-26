@@ -8,7 +8,7 @@ use std::time::Duration;
 use serde::Serialize;
 
 use super::markdown::{Diffs, Header, html, markdown};
-use super::verdict::{Verdict, required_parts, verdict};
+use super::verdict::{Verdict, counted, required_parts, verdict};
 use crate::cmd::{self, git};
 use crate::cover::{self, Coverage};
 use crate::flaky;
@@ -70,6 +70,9 @@ pub fn report(root: &Path, phase: u8, run: &str, run_dir: &Path) -> Result<Verdi
                 .unwrap_or_else(|| "a live result appeared after the cc part ran".to_owned())
         );
     }
+    // A check that runs only from a later phase decides nothing in this one, should any part
+    // have reported it.
+    let mut results = counted(results, &trace::later_in(root, phase));
     let (cover_result, coverage) = cover::check(root, run_dir);
     results.push(cover_result);
     let sandbox_roots = sandbox_roots(run_dir);

@@ -96,7 +96,8 @@ pub fn test_result(check: &str, layer: &str, test: TestOutcome) -> CheckResult {
 
 /// The results of one layer run: each test under its check, an error for a check the
 /// registry does not give this layer, and for each wanted check of the layer that reported
-/// nothing.
+/// nothing. A test of a check that `wanted` leaves out, such as one of a later phase, which the
+/// runner ran all the same, is not counted.
 pub fn layer_results(
     layer: &str,
     tests: Vec<TestOutcome>,
@@ -118,6 +119,9 @@ pub fn layer_results(
                 layer,
                 message,
             ));
+            continue;
+        }
+        if !wanted(&check) {
             continue;
         }
         results.push(test_result(&check, layer, test));
@@ -188,6 +192,46 @@ mod tests {
                     Some(FailKind::Assertion)
                 ),
             ]
+        );
+    }
+
+    #[test]
+    fn layer_results__should_not_count_a_check_left_out() {
+        // Given: the runner ran a later phase's check, which `wanted` leaves out.
+        let tests = vec![
+            simple("rows__should_follow_the_grammar", Outcome::Pass),
+            failed(
+                "heading__should_count_jobs",
+                FailKind::Assertion,
+                "no jobs".into(),
+            ),
+        ];
+        let registered: BTreeSet<String> = [
+            "rows__should_follow_the_grammar",
+            "heading__should_count_jobs",
+            "machine_strip__should_update_in_place",
+        ]
+        .iter()
+        .map(|s| (*s).to_owned())
+        .collect();
+        let later = [
+            "heading__should_count_jobs",
+            "machine_strip__should_update_in_place",
+        ];
+
+        // When
+        let results = layer_results("render", tests, &registered, |check| {
+            !later.contains(&check)
+        });
+
+        // Then
+        let summary: Vec<(&str, Outcome)> = results
+            .iter()
+            .map(|r| (r.check.as_str(), r.outcome))
+            .collect();
+        assert_eq!(
+            summary,
+            vec![("rows__should_follow_the_grammar", Outcome::Pass)]
         );
     }
 

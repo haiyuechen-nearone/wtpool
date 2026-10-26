@@ -13,6 +13,8 @@ export const VSIX = path.join(VSCODE, 'wtpool.vsix');
 export const SCENARIOS = path.join(REPO, 'verify', 'scenarios');
 export const THEMES = path.join(REPO, 'verify', 'themes');
 export const SCHEMA = path.join(REPO, 'verify', 'schema', 'status.schema.json');
+/** {@link SCHEMA} with the properties phase 4 adds: `machine.jobs` and `build.queued`. */
+export const SCHEMA_PHASE_4 = path.join(REPO, 'verify', 'schema', 'status.phase-4.schema.json');
 export const FAKE_WTPOOL = path.join(TEST, 'fake-wtpool.mjs');
 
 /** The run folder `cargo xtask verify` gives this layer, or a scratch folder outside it. */

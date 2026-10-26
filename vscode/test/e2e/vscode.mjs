@@ -17,7 +17,7 @@ import path from 'node:path';
 import { _electron as electron, test } from '@playwright/test';
 
 import { inBackground } from '../support/background.mjs';
-import { CODE_FLAGS, QUIET_SETTINGS, keychainErrors, removeLink, shortLink } from '../support/code.mjs';
+import { CODE_FLAGS, QUIET_SETTINGS, keychainErrors, removeLink, shortLink, writeEarlierBuilds } from '../support/code.mjs';
 import { VSIX, runDir } from '../support/paths.mjs';
 import { installedVSCode } from '../support/vscode-app.mjs';
 
@@ -75,9 +75,10 @@ export function writeSettings(dirs, extra = {}) {
 
 /**
  * A fresh sandbox with the .vsix installed and `wtpool.path` naming the release wtpool, or `wtpoolPath`.
- * `settings` adds user settings.
+ * `settings` adds user settings. Its home holds {@link writeEarlierBuilds}'s machine config unless
+ * `earlierBuilds` is false.
  */
-export function sandbox(name, { settings = {}, wtpoolPath } = {}) {
+export function sandbox(name, { settings = {}, wtpoolPath, earlierBuilds = true } = {}) {
   assert.ok(existsSync(VSIX), 'npm run package wrote no vscode/wtpool.vsix');
   const root = path.join(runDir(), 'e2e', attemptName(name));
   // A retry starts from nothing, not from the user data an earlier attempt left.
@@ -99,6 +100,7 @@ export function sandbox(name, { settings = {}, wtpoolPath } = {}) {
   for (const key of ['userData', 'tmp', 'extensions', 'home', 'workspace', 'bin']) {
     mkdirSync(dirs[key], { recursive: true });
   }
+  if (earlierBuilds) writeEarlierBuilds(dirs.home);
   mkdirSync(path.join(dirs.userData, 'User'), { recursive: true });
   writeSettings(dirs, settings);
   try {

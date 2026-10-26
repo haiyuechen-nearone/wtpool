@@ -1,5 +1,6 @@
 //! [`Ctx`], the state the checks of one part invocation share, and the commands they start.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -34,6 +35,9 @@ pub struct Ctx {
     /// True when the jobs this context starts yield the processor to the owner's work
     /// (crate::priority): every part's but bench's.
     pub low_priority: bool,
+    /// The checks that run only from a phase after `phase` (crate::trace::later_in): no layer
+    /// runs or counts them, so a run of an earlier phase is never judged by a later phase's checks.
+    pub later: BTreeSet<String>,
 }
 
 impl Ctx {
@@ -49,7 +53,9 @@ impl Ctx {
         if let Some(problem) = runner_variables_problem(|name| std::env::var_os(name)) {
             return Err(problem);
         }
+        let later = crate::trace::later_in(&root, phase);
         Ok(Self {
+            later,
             root,
             phase,
             run_dir,
@@ -76,8 +82,15 @@ impl Ctx {
         limit.min(self.remaining())
     }
 
+    /// Whether this invocation runs and counts `check`: `--only` names it or is absent, and it
+    /// runs from this phase or an earlier one.
     pub(crate) fn wants(&self, check: &str) -> bool {
-        self.only.as_deref().is_none_or(|only| only == check)
+        self.counts(check) && self.only.as_deref().is_none_or(|only| only == check)
+    }
+
+    /// Whether `check` runs from this phase or an earlier one.
+    pub(crate) fn counts(&self, check: &str) -> bool {
+        !self.later.contains(check)
     }
 
     pub fn sandbox(&self) -> PathBuf {
@@ -103,6 +116,9 @@ impl Ctx {
             .env("WTPOOL_FOREGROUND", self.sandbox().join("pool/fg"))
             .env("WTPOOL_SLOT_DIR", self.sandbox().join("pool"))
             .env("WTPOOL_VERIFY_SANDBOX", "1")
+            // Every layer's runner and check reads the phase it verifies from here: a check of
+            // an earlier phase that a later phase rewords gates the new expectation on it.
+            .env("WTPOOL_VERIFY_PHASE", self.phase.to_string())
             .env("TZ", "UTC")
             // Git names a user from `EMAIL` only where no configuration does, as in the real pool,
             // so a commit a run's process makes there names wtpool-verify.
@@ -187,6 +203,40 @@ fn runner_variables_problem(var: impl Fn(&str) -> Option<std::ffi::OsString>) ->
 mod tests {
     use super::*;
     use rstest::rstest;
+
+    fn ctx(only: Option<&str>) -> Ctx {
+        Ctx {
+            root: PathBuf::from("."),
+            phase: 3,
+            run_dir: PathBuf::from("."),
+            commit: String::new(),
+            only: only.map(str::to_owned),
+            deadline: Instant::now(),
+            low_priority: false,
+            later: BTreeSet::from(["job__should_x".to_owned()]),
+        }
+    }
+
+    #[rstest]
+    #[case::earlier_check(None, "rows__a", true)]
+    #[case::later_check(None, "job__should_x", false)]
+    #[case::only_the_earlier_check(Some("rows__a"), "rows__a", true)]
+    #[case::only_another_check(Some("rows__b"), "rows__a", false)]
+    #[case::only_the_later_check(Some("job__should_x"), "job__should_x", false)]
+    fn wants__should_leave_out_later_phases_and_follow_only(
+        #[case] only: Option<&str>,
+        #[case] check: &str,
+        #[case] expected: bool,
+    ) {
+        // Given
+        let ctx = ctx(only);
+
+        // When
+        let wanted = ctx.wants(check);
+
+        // Then
+        assert_eq!(wanted, expected);
+    }
 
     #[rstest]
     #[case::unset(None, None)]

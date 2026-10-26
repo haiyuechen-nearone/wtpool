@@ -117,7 +117,8 @@ fn status__should_match_the_schema(#[case] mut pool_spec: PoolSpec, #[case] agen
     let errors = schema_errors(&document);
     assert!(
         errors.is_empty(),
-        "the document breaks verify/schema/status.schema.json:\n{}",
+        "the document breaks verify/schema/{}:\n{}",
+        crate::support::status_schema_file(),
         errors.join("\n")
     );
 }

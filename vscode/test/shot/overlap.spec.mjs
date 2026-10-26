@@ -47,13 +47,23 @@ function measure(id) {
     return [style.overflowX, style.overflowY].some((v) => v !== 'visible');
   };
   const cells = [...row.querySelectorAll(':scope > td')].filter((td) => !td.classList.contains('actions'));
+  // Text for screen readers only (U12, U13) shows nowhere: a box of at most 1 px, or clipped away.
+  const srOnly = (el, cell) => {
+    for (let e = el; e && e !== cell; e = e.parentElement) {
+      const r = e.getBoundingClientRect();
+      const s = getComputedStyle(e);
+      if (r.width <= 1.5 && r.height <= 1.5 && s.overflowX !== 'visible') return true;
+      if ((s.clip && s.clip !== 'auto') || /inset\(50%/.test(s.clipPath)) return true;
+    }
+    return false;
+  };
   const texts = [];
   cells.forEach((cell, column) => {
     const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       if (!node.textContent.trim()) continue;
       const parent = node.parentElement;
-      if (!parent.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+      if (!parent.checkVisibility({ opacityProperty: true, visibilityProperty: true }) || srOnly(parent, cell)) continue;
       let bound = cell.getBoundingClientRect();
       for (let el = parent; el && el !== cell; el = el.parentElement) {
         if (clips(el)) bound = cut(bound, el.getBoundingClientRect());

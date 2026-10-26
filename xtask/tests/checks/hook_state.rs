@@ -437,6 +437,47 @@ fn in_flight__should_keep_at_most_32() {
     );
 }
 
+/// H14 from phase 4: a Bash call's summary skips `wtpool job` with its options up to `--`.
+fn job_summaries(hooks: &Hooks) -> Vec<String> {
+    let cases = [
+        ("s-job", "wtpool job -- cargo test", "cargo test"),
+        ("s-job-label", "wtpool job --label x -- npm ci", "npm ci"),
+    ];
+    let mut wrong = Vec::new();
+    for (session, command, summary) in cases {
+        hooks.send(&event(
+            &hooks.pool,
+            "UserPromptSubmit",
+            session,
+            &hooks.pool.fg,
+        ));
+        hooks.send(&with(
+            event(&hooks.pool, "PreToolUse-Bash", session, &hooks.pool.fg),
+            &[
+                (
+                    "tool_input",
+                    json!({ "command": command, "description": "Run" }),
+                ),
+                (
+                    "tool_use_id",
+                    json!(format!("toolu_{}", session.replace('-', "_"))),
+                ),
+            ],
+        ));
+        let action = hooks
+            .record(session)
+            .map(|r| r["action"].clone())
+            .unwrap_or_default();
+        let expected = json!({"tool": "Bash", "target": summary});
+        if action != expected {
+            wrong.push(format!(
+                "{command} (from phase 4): {action}, not {expected}"
+            ));
+        }
+    }
+    wrong
+}
+
 #[test]
 fn summary__should_match_the_table() {
     // Given
@@ -478,6 +519,9 @@ fn summary__should_match_the_table() {
     let file_action = file.map(|r| r["action"].clone()).unwrap_or_default();
     if file_action != json!({"tool": "Edit", "target": "sub/dir/f.txt"}) {
         wrong.push(format!("an Edit of wt2/sub/dir/f.txt: {file_action}"));
+    }
+    if crate::support::phase() >= 4 {
+        wrong.extend(job_summaries(&hooks));
     }
     assert!(wrong.is_empty(), "summaries:\n{}", wrong.join("\n"));
     let written = written_text(&hooks);

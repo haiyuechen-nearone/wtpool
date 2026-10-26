@@ -85,7 +85,9 @@ The builder never changes these:
 5. `docs/design/`, with the mockups. Only you change it.
 
 `freeze` checks that each new check fails, a check written for a canary with that canary applied,
-except those in `verify/absent.toml`. A changed check need not fail. `freeze` writes
+except those in `verify/absent.toml`. A check is new when the tree implements it and the commit
+under the author's changes does not, as every check in that commit came in through an accepted
+entry. A changed check need not fail. `freeze` writes
 `verify/oracle.lock` and commits. The lock holds a SHA 256 per file and key, the id of every entry
 of `verify/oracle-changes.toml` at the freeze, which are spent, and a seal: the SHA 256 of the rest
 of the lock. A phase N author may change earlier phases' files. Later an oracle file changes only
@@ -279,9 +281,10 @@ of an oracle lint, except the `#[expect(clippy::panic)]` for `WTPOOL_VERIFY_PANI
 ## Scenario catalog
 
 A scenario `verify/scenarios/<name>.json` has `phase`, `covers`, `layers`, `pool`, `steps`
-(`hook` with a fixture payload, `git`, `process`, `clock`, `expect`) and `expect`. `int` and `e2e`
+(`hook` with a fixture payload, `git`, `process`, `clock`, `expect`, and from phase 4 `machine`,
+`wtpool_toml` and `job`, which runs a real `wtpool job` in a worktree) and `expect`. `int` and `e2e`
 run the steps, `render` and `host` replay the expected documents. `clock` steps limit a scenario to
-`int` and `render`.
+`int` and `render`, and the phase 4 steps to `int`, `render` and `host`.
 
 `catalog__should_match_the_files` fails when a file is missing or extra, its phase or covers
 differ, or a worktree and activity below match no row. Every scenario also covers R3 and U1. Pools
@@ -320,6 +323,9 @@ hold fg, slots wt1 to wt3 and unmanaged x.
 31. `outside_pool` (2: H6): no file written.
 32. `bash_attribution` (2: H9): each command of `verify/fixtures/bash-commands.toml`.
 33. `hostile_agent_strings` (2: H15, X10): bidi, zero width, `command:` links, ANSI, 10 KB, newlines → literal.
+34. `jobs_queue` (4: S14, S15, A8, W10): limit 1, a session's job runs in wt1, a subagent's `cargo test` waits → wt1 `working`, the subagent `queued: cargo test`, then its job runs.
+35. `build_not_queued` (4: S4, A8, U14): `warn`, `make` listed and run in wt2 outside a job → wt2 `building`, `build: make (not queued)`; in a job → `build: make`.
+36. `five_agents_one_worktree` (4: R4, U12, U13): four working and one done in wt2 → wt2 `working` with `×5`, then one session ends and wt2 `working` with `×4`.
 
 `bash-commands.toml` lists commands with their worktree and summary, covering every form H9 and
 H14 name, heredocs and secrets in arguments.
@@ -352,9 +358,9 @@ phase or earlier, or a `flow__` check names no flow below.
 | `open_terminal` | 1 | Click wt1's terminal action: a terminal opens with wt1 as its folder. | U4 |
 | `copy_path` | 1 | Click wt1's copy action: the clipboard holds wt1's path. | U4 |
 | `missing_worktree_actions` | 1 | `folder_missing`: wt3 offers copy path only. | U4, S3 |
-| `keyboard_only` | 1 | Without a mouse: Tab reaches each row and action, Enter runs it, focus stays visible. | X14 |
+| `keyboard_only` | 1 | Without a mouse: Tab reaches each row and action, Enter runs it, focus stays visible. From phase 4 Tab reaches the machine button, Enter opens the strip with focus on the Limit field, Tab goes through the field, the Policy menu, Save, Use defaults and the pattern editor (one tab stop per list of chips, then its input and Add, the suggestions, then Add all) to the rows, and Escape closes the strip and refocuses the button. | X14, X20, X22 |
 | `theme_switch` | 1 | Switch light, dark, high contrast light and dark: colours follow each theme, no reload. | X13, U6 |
-| `reduced_motion` | 1 | With reduce motion on: no animation runs. | X14 |
+| `reduced_motion` | 1 | With reduce motion on: no animation runs. From phase 4 a line icon never moves, with reduce motion or without (U13). | X14, U13 |
 | `wait_appears` | 2 | An agent asks permission in wt2: the row shows `waiting`, the chip counts it, the title reads `Worktrees (1)`, the live region announces it, no popup. | H13, U3, X18, D3 |
 | `waiting_chip_focuses` | 2 | Click the waiting chip: focus moves to the first waiting row. | U3 |
 | `wait_answered` | 2 | Answer the permission: the row returns to `working` and the title to `Worktrees`. | H13, X18 |
@@ -366,6 +372,19 @@ phase or earlier, or a `flow__` check names no flow below.
 | `no_folder_open` | 1 | A window with no folder: the tab says "Open a folder inside a git repository to see its worktrees." | R9 |
 | `wtpool_error_shown` | 1 | VS Code on a folder in no git repository: the tab shows the last stderr line of wtpool next to "updates paused, retrying in N s", wrapped and whole in a tab as narrow as the window allows. | R10, U1 |
 | `live_output` | 3 | An agent's background task writes to its output file in wt2: select wt2, the strip's Output section shows the tail and new lines within 1 s; Follow opens a terminal that shows new lines. | H27, S13, R12, U9, X19 |
+| `jobs_open_from_heading` | 4 | The heading reads `<repository> · <machine> · jobs 4/4 · 2 queued · 1 not queued` with a chevron; click the machine part, or Tab to it and press Enter or Space: the strip opens under the heading, focus moves to the Limit field, the chevron points up; Escape in the strip, or the button again, closes it and focus returns to the button. | U10, U11, X20 |
+| `jobs_running_and_queued` | 4 | Open the strip while 4 jobs run and 2 wait: Running lists 4, Queued 2 with their positions, each with its summary or label, worktree and agent or `outside this pool`, and age; the waiting agent reads `<label> · queued: cargo test` and its worktree `working`; a running job ends: within 1 s queued job 1 moves to Running, its agent line shows its own action, focus stays. | S14, S15, A8, W10, U11, J10 |
+| `jobs_change_settings` | 4 | Type 6 in the Limit field, choose `require`, press Enter or Save: `wtpool job limit 6`, then `wtpool job enforce require`, run once each, the strip says `Saved.` and the live region announces it; within 1 s the heading reads `jobs 6/6` and the 2 queued jobs run; Use defaults runs `wtpool job limit default` and `wtpool job enforce default`: the defaults and `warn` again. | J3, J6, J11, X11, X21, W10 |
+| `jobs_lower_limit` | 4 | 4 jobs run and 2 wait, set 2: no job stops, the strip says `4 running, over the limit of 2: they finish, and queued jobs start once fewer than 2 run.`; two jobs end and none starts; a third ends and queued job 1 starts. | J11, U11 |
+| `jobs_not_queued` | 4 | Under `warn`, with `make` in this repository's list, run `make` in wt2 outside a job: within 1 s wt2 reads `building` with `build: make (not queued)`, ` (not queued)` in the attention colour, the heading adds `· 1 not queued`, the strip lists it under Not queued; run it as `wtpool job -- make`: the line reads `build: make` and the counts drop. | S4, A8, U14, J21 |
+| `jobs_require_refuses` | 4 | Under `require`, with `cargo test` in this repository's list, an agent runs `cd <wt1> && cargo test` through Bash: `wtpool hook policy` denies it with `wtpool: cargo test is heavy on this machine (enforce = require). Run it as: cd <wt1> && wtpool job -- cargo test`, nothing runs; the agent runs that command: no refusal, the job queues, its line reads `queued: cargo test`. | J21, H29 |
+| `jobs_first_open` | 4 | A repository with no list, holding `Makefile`, `package.json` with scripts `build`, `test`, `test:e2e` and `start`, and `pnpm-lock.yaml`: the heading reads `<repository> · <machine> · jobs 0/<limit> · 7 suggested`, the last part muted; both lists read `none`; the suggestions list `make` from `Makefile` and the six pnpm commands from `package.json` scripts, no `start`; under `warn` nothing is flagged; Enter on `make` runs `wtpool job heavy add --repo -- make`, the chip moves to This repository, `· 7 suggested` goes; `Add all` adds the six shown, the live region says `Added 6 suggestions.`, the group goes. | J3, J20, J23, J24, S14, U15, X11, X21, X22 |
+| `jobs_edit_patterns` | 4 | Tab to This repository's chips, arrow to `protoc` (tagged `build_processes`), Delete: `wtpool job heavy rm --repo -- protoc` runs, the chip goes within 1 s, `Removed protoc.` is announced, focus moves to the next chip; type `cargo xtask verify` and Enter: it is added, `.git/wtpool.toml` keeps its other keys and comments; `make *` and a listed pattern say why under the input and send nothing; `just` in This machine's input runs `wtpool job heavy add -- just`. | J3, J6, J18, U15, X11, X21, X22 |
+| `jobs_invalid_value` | 4 | Type 0, 65, 2.5, `four` or nothing and press Enter: the field is marked invalid, `Enter a whole number from 1 to 64.` shows under it and is announced, nothing is sent, focus stays; type 6 and Enter while wtpool refuses (a symlinked `machine.toml`): the strip shows its message and 6 stays in the field. | X20, X21, J6 |
+| `jobs_old_wtpool` | 4 | The tab runs a wtpool without `wtpool job`, so the document has no `machine.jobs`: the heading reads the machine name with the chevron; opening it shows `This wtpool has no heavy job limit. Update wtpool to a version with wtpool job to set one.` | S14, U10, U11 |
+| `jobs_wtpool_missing` | 4 | With the strip open, `wtpool` leaves `PATH`: the header shows R10's error and `updates paused`, the last document stays; Save shows `wtpool did not start: spawn wtpool ENOENT` and nothing else changes. | R10, X21 |
+| `jobs_remote_window` | 4 | A window whose first folder is not local: wtpool runs on this computer and the heading names it; the strip adds `This window's folder is not on this computer: the settings are for this computer, <machine>.` | R9, X3, U11 |
+| `several_agents_in_one_row` | 4 | Five agents in wt2, four working and one done: the row shows `×5` after `working`, on the word's line, in its colour inside a 1 px border, read as `working, 5 agents`; each agent line starts with its state's static icon and a hidden `<state>: `; one agent leaves: `×4`; a row with one agent line shows no count. | R4, U12, U13 |
 
 ## Trace list
 
@@ -387,7 +406,7 @@ H1 `install__should_match_the_event_table`, `install__should_refuse_a_binary_und
 
 A1 `decay__should_match_the_table`, `cc_interrupt`, `builds__should_keep_the_session_that_started_them_working`, `builds__should_keep_no_session_working_through_other_children`, `background__should_keep_a_session_working_until_its_task_ends`, `background__should_keep_a_subagent_working_until_its_task_ends`. A4 `activity__should_follow_the_precedence`. A6 `last__should_use_the_newest_known_time`. A7 `status__should_ignore_a_record_outside_the_pool`.
 
-S1 `status__should_match_the_schema`, `status__should_print_one_pool`. S2 `status__should_leave_every_file_unchanged` (mtime and size snapshot), `status__should_not_start_fsmonitor` (`core.fsmonitor=true` in the sandbox), `status__should_never_create_index_lock`, `lint__no_socket_apis` (clippy `disallowed_types` for `std::net`, no networking crate in `cargo tree`). S4 `builds__should_match_cargo_star_and_rustc`, `builds__should_read_the_setting`. S5 `status__should_skip_fifos_symlinks_locks_and_large_records`, `status__should_keep_the_newest_512_records`. S6 `status__should_skip_an_unknown_record_version`. S7 `schema__generated_files_current`, `validator__should_accept_every_scenario_document`. S9 `free__should_agree_with_wtpool_bg`. S10 `status__should_name_the_repository` (each URL form with and without `.git`, other hosts, `WTPOOL_REMOTE`, from a linked worktree, no remote). S11 `status__should_give_each_actor_its_harness` (from phase 2, also for a record without one). S12 `schema__should_be_published_by_wtpool_status` (`verify/schema/` but for annotations, a one-line description per property, no closed object, the example's schema), `status__should_emit_only_listed_properties` (from phase 2: `verify/schema/` with every object closed). S13 `status__should_list_outputs` (running tasks newest first, then the one that ended last, omitted when empty, a path with `..` left out, against `verify/schema/`).
+S1 `status__should_match_the_schema`, `status__should_print_one_pool`. S2 `status__should_leave_every_file_unchanged` (mtime and size snapshot), `status__should_not_start_fsmonitor` (`core.fsmonitor=true` in the sandbox), `status__should_never_create_index_lock`, `lint__no_socket_apis` (clippy `disallowed_types` for `std::net`, no networking crate in `cargo tree`). S4 `builds__should_match_cargo_star_and_rustc`, `builds__should_read_the_setting`. S5 `status__should_skip_fifos_symlinks_locks_and_large_records`, `status__should_keep_the_newest_512_records`. S6 `status__should_skip_an_unknown_record_version`. S7 `schema__generated_files_current`, `validator__should_accept_every_scenario_document`. S9 `free__should_agree_with_wtpool_bg`. S10 `status__should_name_the_repository` (each URL form with and without `.git`, other hosts, `WTPOOL_REMOTE`, from a linked worktree, no remote), and from phase 3 the `int` checks `bg__should_take_the_pr_head_from_gh`, `bg__should_park_the_head_branch_of_the_pr_gh_names`, `bg__should_name_the_failure_of_gh`, `bg__should_say_gh_is_missing` and `bg__should_refuse_a_pr_without_a_head_to_use` (a pull request through `gh` on the configured remote's repository, and each refusal). S11 `status__should_give_each_actor_its_harness` (from phase 2, also for a record without one). S12 `schema__should_be_published_by_wtpool_status` (`verify/schema/` but for annotations, a one-line description per property, no closed object, the example's schema), `status__should_emit_only_listed_properties` (from phase 2: `verify/schema/` with every object closed). S13 `status__should_list_outputs` (running tasks newest first, then the one that ended last, omitted when empty, a path with `..` left out, against `verify/schema/`).
 
 W1 `watch__should_print_a_document_at_once`, `watch__should_print_alive_lines`. W2 `watch__should_see_head_and_index_after_many_renames` (100 commits), `watch__should_see_nested_branch_refs`, `watch__should_see_packed_refs`, `watch__should_see_a_fetch`. W3 `watch__should_ignore_lock_and_temp_files`. W4 `watch__should_recompute_git_after_a_change`, `watch__should_read_only_the_changed_record`, and from phase 2 `watch__should_refresh_git_after_an_edit_or_bash_call`. W5 `watch__should_merge_a_burst_into_one_document`, `watch__should_print_only_changes`. W6 `watch__should_turn_quiet_on_time`. W7 `watch__should_show_a_missed_change_within_one_heartbeat`, `watch__should_recompute_on_rescan`. W8 `watch__should_exit_on_stdin_eof`, `watch__should_exit_zero_on_a_closed_pipe`. W9 `watch__should_stay_quiet_on_an_idle_pool`.
 

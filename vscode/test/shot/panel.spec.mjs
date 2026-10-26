@@ -356,6 +356,8 @@ test('keyboard__should_reach_every_row_and_action', async ({ page }) => {
 test('motion__should_stop_the_spinner', async ({ browser }) => {
   // Given
   // The building dial spins and the working robot swings both arms (U6), until motion is reduced (X14).
+  // Only the Activity cell is judged: an agent line's icon never moves (U13), and no animation at
+  // all runs under reduce motion.
   const busy = mustValidate(
     document([
       worktree('fg'),
@@ -378,11 +380,14 @@ test('motion__should_stop_the_spinner', async ({ browser }) => {
       document.getAnimations().map((a) => ({
         state: a.playState,
         row: a.effect?.target?.closest?.('tr')?.dataset?.rowId?.split('/').at(-1) ?? null,
+        activity: Boolean(a.effect?.target?.closest?.('tr[data-row-id] > td:first-child')),
         target: `${a.effect?.target?.getAttribute?.('class') ?? a.effect?.target?.tagName}${a.effect?.pseudoElement ?? ''}`,
         duration: a.effect?.getComputedTiming().duration,
       })),
     );
-    const arms = await page.evaluate(() => [...document.querySelectorAll('.robot-arm')].map((arm) => getComputedStyle(arm).rotate));
+    const arms = await page.evaluate(() =>
+      [...document.querySelectorAll('tr[data-row-id] > td:first-child .robot-arm')].map((arm) => getComputedStyle(arm).rotate),
+    );
     await page.close();
     return { running: animations.filter((a) => a.state === 'running' && a.duration > 0), arms };
   };
@@ -392,12 +397,12 @@ test('motion__should_stop_the_spinner', async ({ browser }) => {
   const reduced = await running('vscode-reduce-motion');
 
   // Then
-  const on = (row, target) => normal.running.filter((a) => a.row === row && a.target.includes(target));
+  const on = (row, target) => normal.running.filter((a) => a.activity && a.row === row && a.target.includes(target));
   assert.equal(on('wt2', '::before').length, 1, `no spinner animates for a building row: ${JSON.stringify(normal.running)}`);
   assert.equal(on('wt1', 'robot-arm-left').length, 1, `the working robot's left arm does not swing: ${JSON.stringify(normal.running)}`);
   assert.equal(on('wt1', 'robot-arm-right').length, 1, `the working robot's right arm does not swing: ${JSON.stringify(normal.running)}`);
   assert.deepEqual(reduced.running, [], 'animations run under vscode-reduce-motion');
-  assert.equal(reduced.arms.length, 2, `setup: the working row shows ${reduced.arms.length} robot arms`);
+  assert.equal(reduced.arms.length, 2, `setup: the working row's Activity cell shows ${reduced.arms.length} robot arms`);
   assert.deepEqual(reduced.arms, ['30deg', '-30deg'], 'the robot arms do not rest at 30 degrees out under vscode-reduce-motion');
 });
 

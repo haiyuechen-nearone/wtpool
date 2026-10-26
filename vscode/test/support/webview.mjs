@@ -218,6 +218,17 @@ export function rowById(document, id) {
   return rows(document).find((row) => row.getAttribute('data-row-id') === id);
 }
 
+/**
+ * Whether an element is on screen: in the document, not `hidden`, and not `display: none`, read
+ * by screen readers or not.
+ */
+export function isDisplayed(window, element) {
+  for (let node = element; node && node.nodeType === 1; node = node.parentElement) {
+    if (node.hidden || window.getComputedStyle(node).display === 'none') return false;
+  }
+  return Boolean(element?.isConnected);
+}
+
 /** Whether an element is shown: in the document, not `hidden`, and not `display: none`. */
 export function isShown(window, element) {
   for (let node = element; node && node.nodeType === 1; node = node.parentElement) {
@@ -225,4 +236,92 @@ export function isShown(window, element) {
     if (window.getComputedStyle(node).display === 'none') return false;
   }
   return Boolean(element?.isConnected);
+}
+
+/** The declared value of `property` for `element`: its matching style rules in order, then its style attribute. */
+function declared(window, element, property) {
+  let value = '';
+  const visit = (rules) => {
+    for (const rule of rules) {
+      if (!rule.selectorText || !rule.style) continue;
+      let matches = false;
+      try {
+        matches = element.matches(rule.selectorText);
+      } catch {
+        matches = false;
+      }
+      const found = matches ? rule.style.getPropertyValue(property) : '';
+      if (found) value = found;
+    }
+  };
+  for (const sheet of window.document.styleSheets) {
+    try {
+      visit(sheet.cssRules);
+    } catch {
+      // A sheet whose rules jsdom cannot list declares nothing here.
+    }
+  }
+  return element.style?.getPropertyValue(property) || value;
+}
+
+const px = (value) => (/^-?[\d.]+(px)?$/.test(value.trim()) ? parseFloat(value) : Number.NaN);
+
+/**
+ * Whether the stylesheet hides `element` from sight only, as text for screen readers is hidden
+ * (U12, U13): a box of at most 1×1 px that clips, a zero `clip` or `clip-path`, a place far off
+ * screen, no opacity, or a zero font size.
+ */
+export function isVisuallyHidden(window, element) {
+  const get = (property) => declared(window, element, property).trim();
+  const positioned = ['absolute', 'fixed'].includes(get('position'));
+  const clip = get('clip');
+  const clipValues = [...clip.matchAll(/-?[\d.]+/g)].map((m) => parseFloat(m[0]));
+  if (positioned && /^rect\(/.test(clip) && clipValues.every((v) => v <= 1)) return true;
+  if (/inset\(\s*(50|100)%/.test(get('clip-path')) || /circle\(\s*0/.test(get('clip-path'))) return true;
+  const tiny = px(get('width')) <= 1 && px(get('height')) <= 1;
+  if (tiny && (positioned || get('overflow') === 'hidden')) return true;
+  if (positioned && (px(get('left')) <= -999 || px(get('top')) <= -999)) return true;
+  if (get('opacity') === '0' || px(get('font-size')) === 0) return true;
+  return false;
+}
+
+/**
+ * The text a sighted user reads in `element`, phase neutral: {@link text} without the agent count
+ * `.count` (U12) and without visually hidden text (U12, U13), which phase 4 adds to rows.
+ */
+export function seen(window, element, { keepCount = false } = {}) {
+  const parts = [];
+  const walk = (node) => {
+    if (node.nodeType === 3) {
+      parts.push(node.textContent);
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    if (!keepCount && node.classList.contains('count')) return;
+    if (isVisuallyHidden(window, node)) return;
+    for (const child of node.childNodes) walk(child);
+  };
+  if (element) walk(element);
+  return parts.join('').replace(/\s+/g, ' ').trim();
+}
+
+/** The `.line` texts of a cell as {@link seen} reads them, or its whole such text as one line. */
+export function seenLines(window, cell) {
+  const found = [...cell.querySelectorAll('.line')];
+  return found.length ? found.map((line) => seen(window, line)) : [seen(window, cell)];
+}
+
+/** The text a screen reader reads in `element`: every text but that of `aria-hidden` subtrees. */
+export function spoken(element) {
+  const parts = [];
+  const walk = (node) => {
+    if (node.nodeType === 3) {
+      parts.push(node.textContent);
+      return;
+    }
+    if (node.nodeType !== 1 || node.getAttribute('aria-hidden') === 'true' || node.hidden) return;
+    for (const child of node.childNodes) walk(child);
+  };
+  if (element) walk(element);
+  return parts.join('').replace(/\s+/g, ' ').replace(/\s+([,:])/g, '$1').trim();
 }

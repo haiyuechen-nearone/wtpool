@@ -22,30 +22,31 @@ pub struct TestCase {
 /// Each test case of a nextest JUnit report as an outcome of its check, whose title is the check;
 /// a failure's message starts with the test case's full name.
 pub fn to_outcomes(xml: &str) -> Vec<TestOutcome> {
-    let mut outcomes = Vec::new();
-    for case in parse(xml) {
-        outcomes.push(match case.failure {
-            Some(failure) => TestOutcome {
-                message: format!("{}: {}", case.full_name, failure.message),
-                title: case.check,
-                outcome: Outcome::Fail,
-                kind: Some(failure.kind),
-                flaky: false,
+    parse(xml).into_iter().map(outcome).collect()
+}
+
+/// A test case as an outcome of its check, as [`to_outcomes`] gives it.
+pub fn outcome(case: TestCase) -> TestOutcome {
+    match case.failure {
+        Some(failure) => TestOutcome {
+            message: format!("{}: {}", case.full_name, failure.message),
+            title: case.check,
+            outcome: Outcome::Fail,
+            kind: Some(failure.kind),
+            flaky: false,
+        },
+        None => TestOutcome {
+            title: case.check,
+            outcome: if case.skipped {
+                Outcome::NotRun
+            } else {
+                Outcome::Pass
             },
-            None => TestOutcome {
-                title: case.check,
-                outcome: if case.skipped {
-                    Outcome::NotRun
-                } else {
-                    Outcome::Pass
-                },
-                kind: None,
-                message: String::new(),
-                flaky: false,
-            },
-        });
+            kind: None,
+            message: String::new(),
+            flaky: false,
+        },
     }
-    outcomes
 }
 
 /// Reads the `testcase` elements of a nextest JUnit report.

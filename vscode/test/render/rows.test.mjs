@@ -12,7 +12,7 @@ import {
   worktree,
 } from '../support/docs.mjs';
 import { expectedRow, normalizeEscapes, rowOrder } from '../support/grammar.mjs';
-import { cells, lines, mount, rows, text } from '../support/webview.mjs';
+import { cells, mount, rows, seen, seenLines, text } from '../support/webview.mjs';
 
 let webview;
 afterEach(() => webview?.close());
@@ -20,14 +20,15 @@ afterEach(() => webview?.close());
 /** The text of every cell of `row`, as {@link expectedRow} lists them. */
 function rowText(row) {
   const { data } = cells(row);
+  const window = row.ownerDocument.defaultView;
   assert.equal(data.length, 6, `a row has six data cells before td.actions: ${row.outerHTML}`);
   return {
-    activity: normalizeEscapes(text(data[0])),
-    worktree: normalizeEscapes(text(data[1])),
-    branch: normalizeEscapes(text(data[2])),
-    git: normalizeEscapes(text(data[3])),
-    agent: lines(data[4]).map(normalizeEscapes),
-    last: lines(data[5]),
+    activity: normalizeEscapes(seen(window, data[0])),
+    worktree: normalizeEscapes(seen(window, data[1])),
+    branch: normalizeEscapes(seen(window, data[2])),
+    git: normalizeEscapes(seen(window, data[3])),
+    agent: seenLines(window, data[4]).map(normalizeEscapes),
+    last: seenLines(window, data[5]),
   };
 }
 

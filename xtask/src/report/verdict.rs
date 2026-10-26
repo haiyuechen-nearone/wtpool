@@ -1,5 +1,6 @@
 //! The verdict of a run and the parts each phase needs for one.
 
+use std::collections::BTreeSet;
 use std::fmt;
 
 use serde::Serialize;
@@ -39,6 +40,14 @@ pub fn required_parts(phase: u8) -> &'static [&'static str] {
         1 => &["quick", "int", "ui", "bench"],
         _ => &["quick", "int", "ui", "bench", "cc"],
     }
+}
+
+/// `results` without those of the checks in `later`, which run only from a later phase.
+pub fn counted(results: Vec<CheckResult>, later: &BTreeSet<String>) -> Vec<CheckResult> {
+    results
+        .into_iter()
+        .filter(|result| !later.contains(&result.check))
+        .collect()
 }
 
 pub fn verdict(results: &[CheckResult]) -> Verdict {
@@ -108,5 +117,23 @@ mod tests {
 
         // Then
         assert_eq!(shown, ["PASS", "NEEDS YOU", "FAIL"]);
+    }
+
+    #[test]
+    fn counted__should_leave_a_later_phase_check_out_of_the_verdict() {
+        // Given
+        let results = vec![
+            CheckResult::pass("rows__a", "render", ""),
+            CheckResult::assertion("heading__should_count_jobs", "render", "no jobs"),
+        ];
+        let later = BTreeSet::from(["heading__should_count_jobs".to_owned()]);
+
+        // When
+        let found = counted(results, &later);
+
+        // Then
+        let checks: Vec<&str> = found.iter().map(|r| r.check.as_str()).collect();
+        assert_eq!(checks, ["rows__a"]);
+        assert_eq!(verdict(&found), Verdict::Pass);
     }
 }
