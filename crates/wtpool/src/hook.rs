@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use wtpool_claude_code::ClaudeCode;
-use wtpool_core::hook::{self, Adapter, HookEnv, PolicyEnv};
+use wtpool_core::hook::{self, Adapter, HookEnv};
+use wtpool_core::policy::PolicyEnv;
 
 use crate::verify_files;
 

@@ -34,4 +34,4 @@ pub use input::{CallFacts, Event, HookInput, Spawned, read_input};
 pub use install::{Printed, is_under_target};
 pub use log::append as log_line;
 pub use place::{Shell, ToolPath};
-pub use policy::{PolicyEnv, ShellCall, judge as judge_policy, refusal};
+pub use policy::judge as judge_policy;

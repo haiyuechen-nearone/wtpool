@@ -254,3 +254,7 @@ accept docs-design-sweep 18ae9cc6e2945714acd3c21928558e8e0d3a743ca1b9d572e0e5286
 accept subagent-error-ages 713e7ba2223ecbabca83a9b58da2f0a534ae87b9c5761db1305dc2f37b6ca316
 # The merge of docs-design-sweep and subagent-error-ages holds both edits of verification.md; no check changed.
 accept merge-verification-md 42bb1c37d19ad5f3ea7eef74199731650312d684528c1c6d6f193e01a447a3ad
+# Replay tidy: the judges become a table of named functions with a test per arm, the cc_stop_failure judge fails when no StopFailure was recorded, and the catalog pool is shared from xtask::pool.
+accept hx-replay c7a417f1191710a39ef4012b5437d194e29c51a550733b34ffba898ac9e81563
+# Scenario files load through scenario::load everywhere, the harness document path and short-link folder have one constant each, the hook policy check reuses the shared tree snapshot, and comments no longer cite the design document.
+accept hx-scenarios 51036e1f3d978416b5c30f5e4b0eb1af3b30628b5f123db071c09c28e687fa7c

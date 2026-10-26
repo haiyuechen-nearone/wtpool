@@ -397,7 +397,7 @@ fn remove_short_links(ctx: &Ctx) {
     let Ok(cache) = crate::dirs::cache_dir() else {
         return;
     };
-    let Ok(entries) = fs::read_dir(cache.join("s")) else {
+    let Ok(entries) = fs::read_dir(cache.join(crate::dirs::SHORT_LINKS)) else {
         return;
     };
     for entry in entries.flatten() {

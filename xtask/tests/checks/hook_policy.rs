@@ -15,7 +15,7 @@ use super::hook_io::malformed;
 use crate::support::hook::{HookRun, Hooks, RunOptions, event, wait_output, with};
 use crate::support::jobs::policy::{call, decision, machine, policy};
 use crate::support::jobs::{JobSpec, SETTLE};
-use crate::support::{FileState, file_state};
+use crate::support::{FileState, tree_state};
 
 /// The watchdog's 1 s plus the start and exit of a process.
 const WATCHDOG: Duration = Duration::from_millis(1500);
@@ -27,26 +27,8 @@ pub(super) fn reason(words: &str, command: &str) -> String {
 
 /// Size, mtime, mode and inode of every entry below `dir` but those below `skip`.
 fn tree(dir: &Path, skip: &[PathBuf]) -> BTreeMap<PathBuf, FileState> {
-    let mut found = BTreeMap::new();
-    let mut stack = vec![dir.to_path_buf()];
-    while let Some(current) = stack.pop() {
-        let Ok(entries) = fs::read_dir(&current) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if skip.iter().any(|s| path.starts_with(s)) {
-                continue;
-            }
-            let Ok(meta) = fs::symlink_metadata(&path) else {
-                continue;
-            };
-            if meta.is_dir() {
-                stack.push(path.clone());
-            }
-            found.insert(path, file_state(&meta));
-        }
-    }
+    let mut found = tree_state(dir, None);
+    found.retain(|path, _| !skip.iter().any(|s| path.starts_with(s)));
     found
 }
 

@@ -46,9 +46,6 @@ pub enum LockState {
     Dead,
 }
 
-/// Another name for [`LockState`].
-pub type Liveness = LockState;
-
 /// A file of the job folder, as its name tells.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JobFile {

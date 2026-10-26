@@ -10,6 +10,12 @@ use std::path::PathBuf;
 
 const NAME: &str = "wtpool-verify";
 
+/// The harness document that the catalog, flow and trace checks read.
+pub const DOC: &str = "docs/design/status-panel/verification.md";
+
+/// The folder of [`cache_dir`] that holds the short links, made by vscode/test/support/code.mjs.
+pub const SHORT_LINKS: &str = "s";
+
 /// The home folder: `HOME`, set in every sandbox, else the platform's own.
 pub fn home() -> Option<PathBuf> {
     std::env::var_os("HOME")
@@ -54,7 +60,7 @@ pub fn socket_problem() -> Option<String> {
 
 /// [`socket_problem`] for the cache folder `cache` that `variable` sets.
 fn socket_problem_in(cache: &std::path::Path, variable: &str) -> Option<String> {
-    let folder = cache.join("s").join("01234567").join("user-data");
+    let folder = cache.join(SHORT_LINKS).join("01234567").join("user-data");
     let length = folder.as_os_str().len() + 1 + SOCKET_NAME;
     let over = length.checked_sub(SOCKET_LIMIT).filter(|over| *over > 0)?;
     Some(format!(

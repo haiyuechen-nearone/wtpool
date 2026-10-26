@@ -25,11 +25,6 @@ struct ChecksFile {
     checks: BTreeMap<String, Vec<String>>,
 }
 
-#[derive(Deserialize)]
-struct ScenarioLayers {
-    layers: Vec<String>,
-}
-
 /// The layers that run each check that is not only an int test.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Registry {
@@ -48,10 +43,7 @@ impl Registry {
             .map(|(check, layers)| (check, layers.into_iter().collect()))
             .collect();
         for name in crate::scenario::names(root) {
-            let path = crate::scenario::path(root, &name);
-            let text = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-            let scenario: ScenarioLayers =
-                serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+            let scenario = crate::scenario::load(root, &name)?;
             layers.entry(name).or_default().extend(scenario.layers);
         }
         Ok(Self { layers })

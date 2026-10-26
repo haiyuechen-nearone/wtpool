@@ -22,7 +22,7 @@ pub use config::{
     ConfigSource, Enforce, InvalidEnforce, InvalidLimit, LIMIT_BOUNDS, Limit, MAX_DEFAULT_LIMIT,
     MachineConfig, MachineConfigError, MachineConfigFault, machine_config_path,
 };
-pub use folder::{FolderError, JobFile, JobFolder, Liveness, LockState};
+pub use folder::{FolderError, JobFile, JobFolder, LockState};
 pub use heavy_table::{HeavyName, HeavyTable};
 pub use listing::{JobListing, ListedJob};
 pub use machine::MachineJobs;

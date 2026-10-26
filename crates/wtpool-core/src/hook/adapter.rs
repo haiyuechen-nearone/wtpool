@@ -6,8 +6,8 @@ use std::path::Path;
 
 use super::input::HookInput;
 use super::install::Printed;
-use super::policy::ShellCall;
 use crate::activity::{Harness, TaskId, WaitReason};
+use crate::policy::{Refusal, ShellCall};
 
 /// The adapter of one coding agent harness.
 pub trait Adapter {
@@ -43,8 +43,8 @@ pub trait Adapter {
         None
     }
 
-    /// The text `wtpool hook policy` prints to have the harness refuse the call for `reason`.
-    fn refusal(&self, _reason: &str) -> Option<String> {
+    /// The text `wtpool hook policy` prints to have the harness refuse the call for `refusal`.
+    fn refusal(&self, _refusal: &Refusal) -> Option<String> {
         None
     }
 }

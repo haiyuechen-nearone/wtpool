@@ -533,15 +533,16 @@ mod tests {
         }
         let links = "const LINKS = path.join(cacheRoot(), 's');";
         assert!(code.contains(links), "code.mjs no longer has {links}");
-        for (file, text) in [
-            ("dirs.rs", include_str!("dirs.rs")),
-            ("layers/js.rs", include_str!("layers/js.rs")),
-        ] {
-            assert!(
-                text.contains(r#"cache.join("s")"#),
-                "{file} no longer has cache.join(\"s\")"
-            );
-        }
+        let dirs = include_str!("dirs.rs");
+        assert!(
+            dirs.contains(r#"pub const SHORT_LINKS: &str = "s";"#),
+            "dirs.rs no longer defines SHORT_LINKS as \"s\""
+        );
+        let js = include_str!("layers/js.rs");
+        assert!(
+            js.contains("crate::dirs::SHORT_LINKS"),
+            "layers/js.rs no longer uses SHORT_LINKS"
+        );
     }
 
     #[rstest]

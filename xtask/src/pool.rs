@@ -169,6 +169,37 @@ fn conflicting_commit(fg: &Path) -> Result<String, String> {
     Ok(commit.trim().to_owned())
 }
 
+/// The pool the scenario catalog and the replay of recorded sessions start from.
+pub fn catalog_spec() -> PoolSpec {
+    let detached = WorktreeSpec {
+        detached: true,
+        ..WorktreeSpec::default()
+    };
+    PoolSpec {
+        agents: true,
+        worktrees: BTreeMap::from([
+            (
+                "fg".to_owned(),
+                WorktreeSpec {
+                    branch: Some("main".into()),
+                    upstream: true,
+                    ..WorktreeSpec::default()
+                },
+            ),
+            ("wt1".to_owned(), detached.clone()),
+            ("wt2".to_owned(), detached.clone()),
+            ("wt3".to_owned(), detached),
+            (
+                "x".to_owned(),
+                WorktreeSpec {
+                    branch: Some("side".into()),
+                    ..WorktreeSpec::default()
+                },
+            ),
+        ]),
+    }
+}
+
 /// Builds the pool `spec` describes in `dir`. The folder must be new or empty.
 pub fn build(dir: &Path, spec: &PoolSpec) -> Result<Pool, String> {
     fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;

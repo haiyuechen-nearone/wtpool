@@ -1,6 +1,6 @@
-//! `flows__should_each_have_an_e2e_check`: every flow of the User flows table, read from the
-//! harness's design document, has a passing `flow__<name>` check, and every `flow__` check names a
-//! flow of the table.
+//! `flows__should_each_have_an_e2e_check`: every flow of the User flows table of
+//! [`crate::dirs::DOC`] has a passing `flow__<name>` check, and every `flow__` check names one of
+//! those flows.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -10,7 +10,7 @@ use crate::results::{CheckResult, Outcome};
 
 pub const NAME: &str = "flows__should_each_have_an_e2e_check";
 pub const PREFIX: &str = "flow__";
-const DOC: &str = "docs/design/status-panel/verification.md";
+const DOC: &str = crate::dirs::DOC;
 const HEADING: &str = "## User flows";
 const LAYER: &str = "report";
 
@@ -67,7 +67,7 @@ pub fn load(root: &Path) -> Result<Vec<Flow>, String> {
     Ok(found)
 }
 
-/// The `flow__` check names the oracle knows: one per flow of the table, any phase.
+/// The `flow__` check names the oracle knows: one per flow, any phase.
 pub fn check_names(root: &Path) -> BTreeSet<String> {
     load(root)
         .unwrap_or_default()

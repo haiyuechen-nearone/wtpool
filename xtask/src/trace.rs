@@ -27,9 +27,8 @@ pub struct IdEntry {
     pub ids: Vec<String>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Scenario {
-    #[serde(skip)]
     pub name: String,
     pub phase: u8,
     pub covers: Vec<String>,
@@ -41,27 +40,17 @@ pub fn load(root: &Path) -> Result<Trace, String> {
 }
 
 pub fn load_scenarios(root: &Path) -> Result<Vec<Scenario>, String> {
-    let dir = root.join("verify/scenarios");
-    let Ok(entries) = fs::read_dir(&dir) else {
-        return Ok(Vec::new());
-    };
-    let mut scenarios = Vec::new();
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("json") {
-            continue;
-        }
-        let text = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let mut scenario: Scenario =
-            serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
-        scenario.name = path
-            .file_stem()
-            .map(|s| s.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        scenarios.push(scenario);
-    }
-    scenarios.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(scenarios)
+    crate::scenario::names(root)
+        .into_iter()
+        .map(|name| {
+            let file = crate::scenario::load(root, &name)?;
+            Ok(Scenario {
+                name,
+                phase: file.phase,
+                covers: file.covers,
+            })
+        })
+        .collect()
 }
 
 impl Trace {
@@ -496,8 +485,7 @@ mod tests {
     fn trace_file__should_list_the_harness_checks_of_the_trace_list() {
         // Given
         let root = crate::repo::root();
-        let doc =
-            fs::read_to_string(root.join("docs/design/status-panel/verification.md")).unwrap();
+        let doc = fs::read_to_string(root.join(crate::dirs::DOC)).unwrap();
 
         // When
         let trace = load(&root).unwrap();

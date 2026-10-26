@@ -4,7 +4,6 @@
 //! gives the wtpool asserts for the build under test, so a session recorded once counts for every
 //! later build.
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -13,8 +12,10 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
-use crate::pool::{self, Pool, PoolSpec, WorktreeSpec};
+use crate::pool::{self, Pool};
 use crate::results::CheckResult;
+
+mod judge;
 
 pub const PREFIX: &str = "cc_replay:";
 /// The start of a replay's failure when `wtpool hook` printed. A session fails on that before its
@@ -40,40 +41,10 @@ const NO_EXEC: &str = "the replay names wtpool hook by the pid its shell wrapper
 
 /// One state of the replay: the document of `wtpool status --json` and the records after
 /// `payload`.
-struct Snapshot {
+struct ReplayState {
     payload: Value,
     status: Value,
     records: Vec<Value>,
-}
-
-fn catalog() -> PoolSpec {
-    let detached = WorktreeSpec {
-        detached: true,
-        ..WorktreeSpec::default()
-    };
-    PoolSpec {
-        agents: true,
-        worktrees: BTreeMap::from([
-            (
-                "fg".to_owned(),
-                WorktreeSpec {
-                    branch: Some("main".into()),
-                    upstream: true,
-                    ..WorktreeSpec::default()
-                },
-            ),
-            ("wt1".to_owned(), detached.clone()),
-            ("wt2".to_owned(), detached.clone()),
-            ("wt3".to_owned(), detached),
-            (
-                "x".to_owned(),
-                WorktreeSpec {
-                    branch: Some("side".into()),
-                    ..WorktreeSpec::default()
-                },
-            ),
-        ]),
-    }
 }
 
 /// `2026-10-20T12:00:00Z` plus `seconds`.
@@ -89,7 +60,7 @@ fn clock_text(seconds: i64) -> String {
     )
 }
 
-struct Sandbox {
+struct ReplaySandbox {
     dir: PathBuf,
     pool: Pool,
     wtpool: PathBuf,
@@ -101,13 +72,13 @@ struct Sandbox {
     profile: Option<PathBuf>,
 }
 
-impl Sandbox {
+impl ReplaySandbox {
     fn new(dir: &Path, wtpool: &Path, profile: Option<&Path>) -> Result<Self, String> {
         let _ = fs::remove_dir_all(dir);
         for sub in ["home", "tmp", "state"] {
             fs::create_dir_all(dir.join(sub)).map_err(|e| e.to_string())?;
         }
-        let pool = pool::build(&dir.join("pool"), &catalog())?;
+        let pool = pool::build(&dir.join("pool"), &pool::catalog_spec())?;
         let wrapper = dir.join("wrapper.sh");
         fs::write(&wrapper, WRAPPER).map_err(|e| e.to_string())?;
         let table = dir.join("procs.jsonl");
@@ -217,8 +188,8 @@ impl Sandbox {
             .unwrap_or_default()
     }
 
-    fn snapshot(&self, payload: &Value) -> Snapshot {
-        Snapshot {
+    fn state(&self, payload: &Value) -> ReplayState {
+        ReplayState {
             payload: payload.clone(),
             status: self.status(),
             records: self.records(),
@@ -228,202 +199,6 @@ impl Sandbox {
 
 fn event(payload: &Value) -> &str {
     payload["hook_event_name"].as_str().unwrap_or_default()
-}
-
-fn is_subagent(payload: &Value) -> bool {
-    payload.get("agent_id").is_some_and(|a| !a.is_null())
-}
-
-fn actors(status: &Value) -> Vec<(String, Value)> {
-    status
-        .get("pools")
-        .and_then(|pools| pools.get(0))
-        .and_then(|pool| pool.get("worktrees"))
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .flat_map(|w| {
-            let name = w["name"].as_str().unwrap_or_default().to_owned();
-            w["actors"]
-                .as_array()
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .map(move |a| (name.clone(), a))
-        })
-        .collect()
-}
-
-fn session_actor(status: &Value) -> Option<(String, Value)> {
-    actors(status)
-        .into_iter()
-        .find(|(_, a)| a["kind"] == "session")
-}
-
-fn state_of(snapshot: &Snapshot) -> Option<String> {
-    session_actor(&snapshot.status).and_then(|(_, a)| a.get("state")?.as_str().map(str::to_owned))
-}
-
-/// The last snapshot before SessionEnd whose event is `name`, of the main session.
-fn last_main<'a>(snapshots: &'a [Snapshot], name: &str) -> Option<&'a Snapshot> {
-    snapshots
-        .iter()
-        .take_while(|s| event(&s.payload) != "SessionEnd")
-        .filter(|s| event(&s.payload) == name && !is_subagent(&s.payload))
-        .last()
-}
-
-fn expect(condition: bool, message: impl Into<String>) -> Result<(), String> {
-    if condition {
-        Ok(())
-    } else {
-        Err(message.into())
-    }
-}
-
-/// The wtpool asserts of `session` over its snapshots. `late` is the state 125 s after its last
-/// event before SessionEnd.
-fn judge(session: &str, snapshots: &[Snapshot], late: &Value) -> Result<(), String> {
-    let before_end = || {
-        snapshots
-            .iter()
-            .take_while(|s| event(&s.payload) != "SessionEnd")
-            .last()
-    };
-    match session {
-        "cc_read_edit_bash" | "cc_cd_into_slot" => {
-            let worktree = if session == "cc_read_edit_bash" {
-                "wt1"
-            } else {
-                "wt2"
-            };
-            let at = last_main(snapshots, "Stop").ok_or("no Stop recorded")?;
-            let actor = session_actor(&at.status);
-            expect(
-                actor
-                    .as_ref()
-                    .is_some_and(|(w, a)| w == worktree && a["state"] == "idle"),
-                format!("after Stop the session is {actor:?}, not idle on {worktree}"),
-            )
-        }
-        "cc_subagent_elsewhere" => expect(
-            snapshots.iter().any(|s| {
-                actors(&s.status)
-                    .iter()
-                    .any(|(w, a)| w == "wt2" && a["kind"] == "subagent")
-            }),
-            "the subagent never showed on wt2",
-        ),
-        "cc_subagent_permission" => {
-            let at = snapshots
-                .iter()
-                .find(|s| event(&s.payload) == "PermissionRequest" && is_subagent(&s.payload))
-                .ok_or("no PermissionRequest of the subagent recorded")?;
-            let waiting: Vec<String> = actors(&at.status)
-                .into_iter()
-                .filter(|(_, a)| a["state"] == "waiting")
-                .map(|(_, a)| {
-                    a.get("kind")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .to_owned()
-                })
-                .collect();
-            expect(
-                waiting == ["subagent"],
-                format!("waiting during the request: {waiting:?}"),
-            )
-        }
-        "cc_permission" => {
-            let from = snapshots
-                .iter()
-                .position(|s| event(&s.payload) == "PermissionRequest")
-                .ok_or("no PermissionRequest recorded")?;
-            let held: Vec<Option<String>> = snapshots
-                .iter()
-                .skip(from)
-                .take_while(|s| {
-                    !(event(&s.payload) == "PostToolUse"
-                        && s.payload.get("tool_name").and_then(Value::as_str) == Some("Bash"))
-                })
-                .map(state_of)
-                .collect();
-            expect(
-                held.iter().all(|s| s.as_deref() == Some("waiting")),
-                format!("the session during the hold: {held:?}"),
-            )
-        }
-        "cc_permission_deny" => {
-            let at = last_main(snapshots, "PostToolBatch").ok_or("no PostToolBatch recorded")?;
-            let state = state_of(at);
-            expect(
-                state.is_some() && state.as_deref() != Some("waiting"),
-                format!("after the PostToolBatch the session is {state:?}"),
-            )
-        }
-        "cc_permission_deny_interrupt" => {
-            let idle_prompt = snapshots.iter().any(|s| {
-                s.payload.get("notification_type").and_then(Value::as_str) == Some("idle_prompt")
-            });
-            let state = before_end().and_then(state_of);
-            let wanted = if idle_prompt { "idle" } else { "waiting" };
-            expect(
-                state.as_deref() == Some(wanted),
-                format!("at the end the session is {state:?}, not {wanted}"),
-            )
-        }
-        "cc_interrupt" => {
-            let state =
-                session_actor(late).and_then(|(_, a)| a.get("state")?.as_str().map(str::to_owned));
-            expect(
-                state.as_deref() == Some("quiet"),
-                format!("125 s after the interrupt the session is {state:?}"),
-            )
-        }
-        "cc_idle_prompt" => {
-            let waited = snapshots
-                .iter()
-                .any(|s| state_of(s).as_deref() == Some("waiting"));
-            let at = last_main(snapshots, "Stop").ok_or("no Stop recorded")?;
-            expect(
-                !waited && state_of(at).as_deref() == Some("idle"),
-                format!("waited: {waited}; after Stop: {:?}", state_of(at)),
-            )
-        }
-        "cc_stop_failure" => match last_main(snapshots, "StopFailure") {
-            None => Ok(()),
-            Some(at) => {
-                let actor = session_actor(&at.status);
-                expect(
-                    actor
-                        .as_ref()
-                        .is_some_and(|(_, a)| a["state"] == "idle" && !a["error"].is_null()),
-                    format!("after StopFailure the session is {actor:?}"),
-                )
-            }
-        },
-        "cc_session_end" => {
-            let at = snapshots
-                .iter()
-                .rev()
-                .find(|s| event(&s.payload) == "SessionEnd")
-                .ok_or("no SessionEnd recorded")?;
-            let ended = at
-                .records
-                .iter()
-                .any(|r| r["agent_id"].is_null() && r["state"] == "ended");
-            let subagents = at
-                .records
-                .iter()
-                .filter(|r| !r["agent_id"].is_null())
-                .count();
-            expect(
-                ended && subagents == 0,
-                format!("after SessionEnd: ended {ended}, {subagents} subagent records"),
-            )
-        }
-        other => Err(format!("no wtpool asserts for {other}")),
-    }
 }
 
 /// Every scrubbed recording session: (name, payloads with `{pool}` unresolved).
@@ -476,8 +251,8 @@ fn replay(
     name: &str,
     payloads: &[Value],
 ) -> Result<(Result<(), String>, Vec<Value>), String> {
-    let mut sandbox = Sandbox::new(dir, wtpool, profile)?;
-    let mut snapshots = Vec::new();
+    let mut sandbox = ReplaySandbox::new(dir, wtpool, profile)?;
+    let mut states = Vec::new();
     let mut late = Value::Null;
     let mut seconds = START_SECONDS;
     let mut printed = Vec::new();
@@ -495,11 +270,11 @@ fn replay(
         if !stdout.is_empty() {
             printed.push(format!("{}: {stdout:?}", event(&payload)));
         }
-        snapshots.push(sandbox.snapshot(&payload));
+        states.push(sandbox.state(&payload));
     }
     let records = sandbox.records();
     let verdict = if printed.is_empty() {
-        judge(name, &snapshots, &late)
+        judge::judge(name, &states, &late)
     } else {
         Err(format!("{PRINTED}: {}", printed.join("; ")))
     };

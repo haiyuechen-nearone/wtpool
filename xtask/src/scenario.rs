@@ -6,7 +6,7 @@
 //! `{"clock": <RFC 3339 time>}`, `{"hook": <HookStep>}`, `{"gc": {}}`, `{"files": [..]}` or
 //! `{"expect": <document>}`. Documents use `{pool}` and `{common}` for the sandbox paths.
 //!
-//! Phase 2 steps:
+//! Hook steps:
 //! - `hook` runs `wtpool hook` once with a payload built from a fixture of `verify/fixtures/hooks/`
 //!   ([`crate::hooks::payload`]), from the process `process`, a `claude` that a `process` step
 //!   started. In `int` the clock starts at [`HOOK_CLOCK`] when a scenario has hook steps, and each
@@ -15,7 +15,7 @@
 //! - `gc` runs `wtpool hook gc`.
 //! - `files` lists every file name `<common>/wtpool-activity/` holds then, `.verify-sandbox` left out.
 //!
-//! Phase 4 steps, `int` only:
+//! Job and machine steps, `int` only:
 //! - `machine` writes its text as `<config>/wtpool/machine.toml`.
 //! - `wtpool_toml` appends its text to `<common>/wtpool.toml`.
 //! - `job` starts a real `wtpool job` in a worktree ([`JobStart`]), ends one, or awaits one's state.
@@ -156,13 +156,13 @@ pub struct Process {
     /// pid already listed is that pid reused. `int` only: e2e starts real processes.
     #[serde(default)]
     pub started: Option<String>,
-    /// Phase 4, `int` only: its arguments, the program first.
+    /// `int` only: its arguments, the program first.
     #[serde(default)]
     pub cmd: Option<Vec<String>>,
-    /// Phase 4, `int` only: its parent's pid, 1 when absent.
+    /// `int` only: its parent's pid, 1 when absent.
     #[serde(default)]
     pub parent: Option<u32>,
-    /// Phase 4, `int` only: the job of a `job` step whose process is its parent.
+    /// `int` only: the job of a `job` step whose process is its parent.
     #[serde(default)]
     pub job: Option<String>,
 }

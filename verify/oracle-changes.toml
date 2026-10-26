@@ -1764,3 +1764,25 @@ id = "merge-verification-md"
 reason = "Two branches of the final review (docs-design-sweep and subagent-error-ages) each edited verification.md; the merge holds both edits, and this entry pins that combined text. No check changed."
 [change.files]
 "docs/design/status-panel/verification.md" = "280f857ed55b798cd6de47d40d794bcf826c3a7c8f494adcfe035a533c91c74b"
+
+[[change]]
+id = "hx-replay"
+reason = "Tidy of the replay module. The judge of each recorded session becomes a JUDGES table of named functions in replay/judge.rs, with a test per arm and a test that its names equal the sessions of vscode/test/cc/sessions.mjs. The cc_stop_failure judge now fails with no StopFailure recorded when the recording holds none, where it used to pass, so an empty recording is judged differently and no other conclusion changes. The pool of the scenario catalog moves to xtask::pool::catalog_spec, which the replay uses instead of its own copy. Snapshot and Sandbox of the replay are renamed ReplayState and ReplaySandbox. Comments follow the comment rule. Every judge message is unchanged."
+[change.files]
+"xtask/src/pool.rs" = "d86722fb4d7a49104c57caf83e24293299f058e2df8ffc2f9a7dd5a1712240ad"
+"xtask/src/replay.rs" = "7f9834e96439e526843857606ebffc8ecb207d7cc95b9b6d2e84a51c24b385d9"
+"xtask/src/replay/judge.rs" = "50e4e31efefb6fd6ed3e2b65f348cb9deebe876455f60496ec1e387ffd43d59e"
+
+[[change]]
+id = "hx-scenarios"
+reason = "A scenario file is parsed by scenario::load alone: trace::load_scenarios and the check registry call it instead of parsing the JSON leniently, so a scenario file with an unknown field or a missing field now fails in every check that reads it, not only in the scenario checks. The verify/scenarios files all load. The docs path of the harness document is one constant, dirs::DOC, and the short-link folder name is dirs::SHORT_LINKS, used by dirs.rs and layers/js.rs. The short-link pin in reuse.rs reads SHORT_LINKS instead of the literal. The hook policy check takes its tree snapshot from support::tree_state. Comments no longer refer to the design document. No check changes its name, part, assertion or message."
+[change.files]
+"xtask/src/catalog.rs" = "a48293ac7d543ca1211ae55400e81b0c9fe8dbc948fc4b985df56a2dd1f1342f"
+"xtask/src/dirs.rs" = "aee14be073d3aacaffb6f2f7cdf0741b47eb098a0fbc47d38a464936fe94e18c"
+"xtask/src/flows.rs" = "64804df6a9ae4cf565151ba246db807f824b9e9cb6becffcf3d84b1b8a9f98b8"
+"xtask/src/layers/js.rs" = "82d255aa926e052b723868280528aaed9cb26dc8665aeec4f74f67eb987e6085"
+"xtask/src/reuse.rs" = "9673b47b3602c94c40bfad1e371ba2b0642835930d6cdc848f163f0aeec72f61"
+"xtask/src/scenario.rs" = "13f127a561d05e145c1d879a33f202b00f9e9959afccb64c3fd6fbdd0af45239"
+"xtask/src/trace.rs" = "566325159925ce02db3ba135d64793c579d225120b5b89ff6f17ad7050e15a07"
+"xtask/src/web/registry.rs" = "c73b0da9c514ff1c5838fcee03ee91bf2536d342bc249eb6ce2a0e7d9b62691a"
+"xtask/tests/checks/hook_policy.rs" = "91e1bbffc49193a25f4dbd167a77064ca79d890af57f1f235167f3dacd7e3dca"

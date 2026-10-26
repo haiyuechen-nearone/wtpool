@@ -3,8 +3,9 @@
 use std::path::{Path, PathBuf};
 
 use wtpool_core::activity::{Harness, TaskId};
-use wtpool_core::hook::{Adapter, HookInput, Printed, ShellCall, TranscriptTitles, WaitingTools};
+use wtpool_core::hook::{Adapter, HookInput, Printed, TranscriptTitles, WaitingTools};
 use wtpool_core::platform::dirs;
+use wtpool_core::policy::{Refusal, ShellCall};
 
 use crate::{events, install, policy, tasks, tools, transcript};
 
@@ -66,8 +67,8 @@ impl Adapter for ClaudeCode {
         policy::shell_call(input)
     }
 
-    fn refusal(&self, reason: &str) -> Option<String> {
-        Some(policy::refusal(reason))
+    fn refusal(&self, refusal: &Refusal) -> Option<String> {
+        Some(policy::refusal(refusal))
     }
 }
 

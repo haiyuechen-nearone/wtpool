@@ -1,5 +1,5 @@
-//! `catalog__should_match_the_files`: the scenario files against the scenario catalog, read from
-//! the harness's design document.
+//! `catalog__should_match_the_files`: the scenario files against the scenario catalog of
+//! [`crate::dirs::DOC`].
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -8,7 +8,7 @@ use std::path::Path;
 use crate::results::CheckResult;
 
 pub const NAME: &str = "catalog__should_match_the_files";
-const DOC: &str = "docs/design/status-panel/verification.md";
+const DOC: &str = crate::dirs::DOC;
 const HEADING: &str = "## Scenario catalog";
 /// Every scenario also covers these.
 const ALWAYS_COVERED: [&str; 2] = ["R3", "U1"];
