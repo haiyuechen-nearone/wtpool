@@ -108,15 +108,19 @@ pub fn apply(current: Option<&Record>, event: &Event, change: &Change) -> Record
     record
 }
 
-/// A subagent marked `done` by its session's [`Event::Idle`].
+/// A subagent marked `done` by its session's [`Event::Idle`], or `None` when it is done already
+/// with nothing in flight, so that it is not written again.
 #[must_use]
-pub fn finish_subagent(current: &Record, writer: &Writer) -> Record {
+pub fn finish_subagent(current: &Record, writer: &Writer) -> Option<Record> {
     let mut record = current.clone();
     end_turn(&mut record);
-    record.updated = writer.now;
     set_state(&mut record, State::Done, writer.now);
+    if record == *current {
+        return None;
+    }
+    record.updated = writer.now;
     record.writer_started = writer.started_micros;
-    record
+    Some(record)
 }
 
 /// `result` as `writer` writes it over `current`: whole when it started no earlier than the one

@@ -251,7 +251,7 @@ checks = ["cc_read_edit_bash", "cc_subagent_elsewhere", "cc_cd_into_slot"]
 
 [ids.H11]
 phase = 2
-checks = ["transitions__should_match_the_event_table", "cc_stop_failure"]
+checks = ["transitions__should_match_the_event_table", "cc_stop_failure", "idle_prompt__should_leave_done_subagents_unchanged"]
 
 [ids.H12]
 phase = 2
@@ -342,7 +342,7 @@ checks = ["decay__should_match_the_table", "cc_interrupt", "builds__should_keep_
 # leaves after the minute, and its line reads done with the error.
 [ids.A2]
 phase = 2
-checks = ["stop_failure__should_finish_a_subagent_and_keep_a_session_idle", "agent_line__should_read_done_with_its_api_error"]
+checks = ["stop_failure__should_finish_a_subagent_and_keep_a_session_idle", "agent_line__should_read_done_with_its_api_error", "idle_prompt__should_leave_done_subagents_unchanged"]
 
 [ids.A3]
 phase = 2

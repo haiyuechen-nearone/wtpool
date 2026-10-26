@@ -10,6 +10,7 @@ mod budget_size;
 mod cli_text;
 mod hook_files;
 mod hook_gc;
+mod hook_idle;
 mod hook_io;
 mod hook_place;
 mod hook_policy;

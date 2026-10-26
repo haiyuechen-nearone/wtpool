@@ -1801,3 +1801,11 @@ reason = "The two phase 0 canaries that edit crates/wtpool/src/main.rs carry its
 [change.files]
 "verify/canaries/phase-0/release-reads-verify-clock.patch" = "816265e3859d0dc24e19e8fc14301fea52c91213cc903fa855fe39ae74073c4a"
 "verify/canaries/phase-0/suppress-in-target-module.patch" = "0bb15654c115831e3766530e7072a778511b1cb224e10fdf597941f3b37174e4"
+
+[[change]]
+id = "idle-done-subagents"
+reason = "A session's idle prompt (Notification idle_prompt) finishes its subagents, and it wrote every subagent record of the session each time, bumping updated on the done ones too. A2 shows a done subagent for a minute from updated, so each idle prompt showed every done subagent of the session again: on 2026-10-26 one session with about 1000 done subagent records showed them all as done at once. The hook now writes a subagent record on an idle prompt only when that record changes, so a done subagent keeps its file and its updated. New int check idle_prompt__should_leave_done_subagents_unchanged, in xtask/tests/checks/hook_idle.rs and traced under H11 and A2: 40 done subagents past their minute, then the session's idle prompt; no record's updated or file time changes and the status document shows none of them. No other check changes."
+[change.files]
+"verify/trace.toml" = "974acb2f3f71380e542a3d2554df90305b26d8968e2d77a2abc935c717e72831"
+"xtask/tests/checks/hook_idle.rs" = "ef0c4e4469c1810aa18702de3c9401edf71c9225deea260b17905320c3a1d283"
+"xtask/tests/checks/mod.rs" = "24533b1629e881ef7408f7c8f234cbb3afd126b3bb75b27ae50db2e4e7a05cb6"

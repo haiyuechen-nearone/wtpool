@@ -432,11 +432,12 @@ fn finish_subagent__should_mark_done() {
     let subagent = apply(None, &Event::SubagentStart, &start);
 
     // When
-    let done = finish_subagent(&subagent, &change("2026-10-20T12:00:05Z").writer);
+    let done = finish_subagent(&subagent, &change("2026-10-20T12:00:05Z").writer).unwrap();
 
     // Then
     assert_eq!(done.state, State::Done);
     assert_eq!(done.since, at("2026-10-20T12:00:05Z"));
+    assert_eq!(done.updated, at("2026-10-20T12:00:05Z"));
     assert_eq!(
         (
             done.agent_id.as_ref().map(ActorId::as_str),
@@ -444,4 +445,26 @@ fn finish_subagent__should_mark_done() {
         ),
         (Some("a1"), Some("Explore"))
     );
+}
+
+#[test]
+fn finish_subagent__should_leave_a_done_subagent_unchanged() {
+    // Given
+    let mut start = change("2026-10-20T12:00:00Z");
+    start.fresh.agent = Some(Agent {
+        id: ActorId::try_from("a1").unwrap(),
+        agent_type: Some("Explore".to_owned()),
+    });
+    let subagent = apply(None, &Event::SubagentStart, &start);
+    let done = apply(
+        Some(&subagent),
+        &Event::SubagentEnd,
+        &change("2026-10-20T12:00:05Z"),
+    );
+
+    // When
+    let again = finish_subagent(&done, &change("2026-10-20T12:30:00Z").writer);
+
+    // Then
+    assert_eq!(again, None);
 }

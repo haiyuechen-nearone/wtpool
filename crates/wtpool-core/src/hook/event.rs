@@ -405,14 +405,17 @@ impl<A: Adapter> Context<'_, A> {
         }
     }
 
-    /// Rewrites the record `stem` under its lock, keeping a state a later hook wrote.
-    fn update(&self, stem: &str, change: impl Fn(&Record) -> Record) {
+    /// Rewrites the record `stem` under its lock, keeping a state a later hook wrote. A record
+    /// `change` leaves as it is stays unwritten.
+    fn update(&self, stem: &str, change: impl Fn(&Record) -> Option<Record>) {
         let lock = match self.activity.lock(stem) {
             Ok(lock) => lock,
             Err(error) => return self.dropped(stem, &format!("its lock cannot be taken: {error}")),
         };
-        if let Some(current) = self.activity.read(stem) {
-            let result = apply::settle(&current, change(&current), &self.writer());
+        if let Some(current) = self.activity.read(stem)
+            && let Some(changed) = change(&current)
+        {
+            let result = apply::settle(&current, changed, &self.writer());
             if let Err(error) = self.activity.write(stem, &result) {
                 self.dropped(stem, &format!("it cannot be written: {error}"));
             }
