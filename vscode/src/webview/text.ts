@@ -66,6 +66,22 @@ export function age(time: string | null, nowMs: number): string {
   return `${Math.floor(seconds / 86400)} d`;
 }
 
+/** Gives `count unit`, then ` rest restUnit` unless `rest` is 0. */
+function twoUnits(count: number, unit: string, rest: number, restUnit: string): string {
+  return rest ? `${count} ${unit} ${rest} ${restUnit}` : `${count} ${unit}`;
+}
+
+/** Gives the run time from an RFC 3339 `started` to `nowMs`, `0 s` while `started` is ahead. */
+export function runTime(started: string, nowMs: number): string {
+  const seconds = Math.max(0, Math.floor((nowMs - Date.parse(started)) / 1000));
+  if (seconds < 60) return `${seconds} s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return twoUnits(hours, 'h', minutes % 60, 'm');
+  return twoUnits(Math.floor(hours / 24), 'd', hours % 24, 'h');
+}
+
 function twoDigits(value: number): string {
   return String(value).padStart(2, '0');
 }
@@ -109,6 +125,8 @@ export interface Piece {
   from?: 'document';
   /** The class of a span that holds the text, for a part with a colour of its own. */
   className?: string;
+  /** The `started` of a run time: the piece's owner keeps its text that run time. */
+  since?: string;
 }
 
 /** Makes a piece of the panel's own words. */
@@ -146,6 +164,16 @@ function doing(actor: Actor): Piece[] {
   }
 }
 
+/** The class of a piece that shows a run time. */
+export const RUN_TIME_CLASS = 'run-time';
+
+/** Gives the run time after a `background:` action, of the task it names: the first listed. */
+function runTimePieces(actor: Actor): Piece[] {
+  const [task] = actor.outputs ?? [];
+  if (actor.action?.tool !== 'background:' || !task) return [];
+  return [own(DOT), { text: '', className: RUN_TIME_CLASS, since: task.started }];
+}
+
 /** Gives the actors of a row, newest `updated` first. */
 export function shownActors(worktree: Worktree): Actor[] {
   return [...worktree.actors].sort((a, b) => Date.parse(b.updated) - Date.parse(a.updated));
@@ -163,7 +191,7 @@ export function agentLines(worktree: Worktree, flagUnqueued = false): Piece[][] 
   if (worktree.actors.length) {
     return shownActors(worktree).map((actor) => {
       const building = actor.action?.tool === 'build:' && worktree.builds.some((b) => b.name === actor.action?.target && isUnqueued(b));
-      return [theirs(actor.label), own(DOT), ...doing(actor), ...mark(building)];
+      return [theirs(actor.label), own(DOT), ...doing(actor), ...runTimePieces(actor), ...mark(building)];
     });
   }
   const [build] = worktree.builds;

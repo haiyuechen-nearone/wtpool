@@ -77,14 +77,19 @@ An agent whose turn ended still shows working while work it started runs:
 
 - a session whose build still runs, such as a `cargo build` it started in the background, reads
   `build: <name>`, the outermost build, as in `build: cargo build`;
-- a session or subagent with a background task still running reads `background: <summary>`, for
-  the newest running task, as in `background: cargo test`. A subagent that ends its turn to wait
-  for its own background run shows working, not `done`;
+- a session or subagent with a background task still running reads
+  `background: <summary> · <run time>`, for the newest running task, as in
+  `background: cargo test · 12 m`. A subagent that ends its turn to wait for its own background
+  run shows working, not `done`;
 - a session or subagent whose `wtpool job` waits in the queue reads `queued: <label or summary>`,
   as in `queued: cargo test`. Once the job runs, the line shows the agent's own action, and a
   working agent stays working while the job runs. An agent that waits for you stays `waiting`.
 
 Once the build ends, or the hook records the task's end, the agent shows its own state again.
+
+A run time says how long the task has run: `45 s`, `12 m`, `3 h`, `3 h 12 m` or `2 d 5 h`, rounded
+down, and it ticks with the other ages. Hours on a task that should take minutes usually mean a
+wait that never ends: see [Troubleshooting](troubleshooting.md).
 
 Select a row to see the exact path, upstream, git facts, why `wtpool bg` refuses it, and per agent its
 state, action, how it was placed (`cwd` or `path`) and since when (local time).
@@ -93,11 +98,12 @@ state, action, how it was placed (`cwd` or `path`) and since when (local time).
 
 When an agent runs a command in the background, such as a long `cargo build`, the selected row's
 strip shows an Output section under that agent. For each task still running, and for the one that
-ended last, it shows the command's summary (`cargo build`) with `running` or `ended HH:MM`, then
-the last 15 lines of its output in a monospace block. New lines show within a second. The block
-stays at its end as lines arrive; scroll it up to read, and it stays where you put it. Long lines
-wrap. A tab shows as spaces, and any other control character as `\u{XXXX}`. A command the agent
-runs in the foreground shows only in its agent line, as before.
+ended last, it shows the command's summary (`cargo build`) with `running` and its run time, as in
+`running · 3 h 12 m`, or `ended HH:MM`, then the last 15 lines of its output in a monospace
+block. New lines show within a second. The block stays at its end as lines arrive; scroll it up
+to read, and it stays where you put it. Long lines wrap. A tab shows as spaces, and any other
+control character as `\u{XXXX}`. A command the agent runs in the foreground shows only in its
+agent line, as before.
 
 **Follow** opens a VS Code terminal named after the agent and the task, such as
 `session 20:31 · cargo build`. It shows the last 40 lines of the output, then each new line, with

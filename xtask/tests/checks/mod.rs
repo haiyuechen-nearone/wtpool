@@ -13,6 +13,7 @@ mod hook_gc;
 mod hook_io;
 mod hook_place;
 mod hook_policy;
+mod hook_policy_waits;
 mod hook_state;
 mod hook_strings;
 mod hook_tasks;

@@ -351,7 +351,7 @@ fn ls__should_print_the_error_of_an_invalid_repo_file() {
     assert_eq!(
         outcome,
         Outcome::failed(&format!(
-            "wtpool: invalid {}: line 1: unknown field `slots`, expected one of `foreground`, `slot_dir`, `slot_prefix`, `slot_count`, `remote`, `heavy`, `build_processes`, `copy`, `on_new_slot`\n",
+            "wtpool: invalid {}: line 1: unknown field `slots`, expected one of `foreground`, `slot_dir`, `slot_prefix`, `slot_count`, `remote`, `heavy`, `build_processes`, `copy`, `on_new_slot`, `bounded_waits`\n",
             file.display()
         ))
     );

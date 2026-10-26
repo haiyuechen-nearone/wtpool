@@ -11,7 +11,7 @@ use crate::paths::AbsolutePath;
 use crate::repository::Repository;
 
 use discover::Main;
-pub use patterns::{RepositoryFiles, RepositoryHeavy, RepositoryPatterns};
+pub use patterns::{RepositoryFiles, RepositoryHeavy, RepositoryPatterns, RepositoryPolicy};
 
 mod discover;
 mod env;

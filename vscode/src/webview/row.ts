@@ -2,7 +2,7 @@ import type { Actor, Worktree } from '../generated/status';
 import { visible } from '../shared/invisible';
 import { offeredActions, type ActionType } from '../shared/protocol';
 import { bdi, cell, line, setText, span } from './dom';
-import { GROUPS, WORDS, age, agentLines, gitText, lastTimes, shownActors } from './text';
+import { GROUPS, RUN_TIME_CLASS, WORDS, age, agentLines, gitText, lastTimes, runTime, shownActors } from './text';
 
 interface ActionButton {
   type: ActionType;
@@ -72,6 +72,7 @@ export class RowView {
   private readonly last = cell('last');
   private readonly actions = cell('actions');
   private agentKey = '';
+  private runTimes: HTMLElement[] = [];
   private times: Array<string | null> = [];
   private actionKey = '';
 
@@ -131,9 +132,10 @@ export class RowView {
     this.updateActions(offeredActions(worktree));
   }
 
-  /** Recomputes the ages of the Last cell, nothing else. */
+  /** Recomputes the ages of the Last cell and the run times of the agent lines, nothing else. */
   tick(nowMs: number): void {
     this.times.forEach((time, index) => void setText(this.last.children[index], age(time, nowMs)));
+    this.runTimes.forEach((element) => void setText(element, runTime(element.dataset.since ?? '', nowMs)));
   }
 
   /** Shows the robot while working, else the codicon glyph of the icon's ::before. */
@@ -162,6 +164,7 @@ export class RowView {
         return element;
       }),
     );
+    this.runTimes = [...this.agent.querySelectorAll<HTMLElement>(`.${RUN_TIME_CLASS}`)];
   }
 
   /** Shows the number of agents after the Activity word when there are two or more. */

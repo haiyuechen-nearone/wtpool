@@ -2,13 +2,14 @@ import type { Actor, Output } from '../generated/status';
 import { visible } from '../shared/invisible';
 import type { Tail } from '../shared/protocol';
 import { bdi, div, setText, span } from './dom';
-import { DOT, clock } from './text';
+import { DOT, clock, runTime } from './text';
 
 /** The pixels from the end that a block may be scrolled up and still count as at the end. */
 const AT_END_PX = 4;
 
-function taskState(output: Output): string {
-  return output.running || output.ended === null ? 'running' : `ended ${clock(output.ended)}`;
+function taskState(output: Output, nowMs: number): string {
+  if (output.running || output.ended === null) return `running${DOT}${runTime(output.started, nowMs)}`;
+  return `ended ${clock(output.ended)}`;
 }
 
 function tailText(tail?: Tail): string {
@@ -26,6 +27,7 @@ class TaskView {
   private readonly button = document.createElement('button');
   private readonly block = document.createElement('pre');
   private shown?: string;
+  private output?: Output;
   /** True while the block follows the end: it was at the end when the user last scrolled it. */
   private atEnd = true;
 
@@ -49,15 +51,21 @@ class TaskView {
     this.show();
   }
 
-  /** Shows the summary and state of `output`, listed by the actor `label`. */
-  update(output: Output, label: string): void {
+  /** Shows the summary and state of `output`, listed by the actor `label`, at `nowMs`. */
+  update(output: Output, label: string, nowMs: number): void {
+    this.output = output;
     setText(this.summary, visible(output.summary || 'background task'));
-    setText(this.state, taskState(output));
+    this.tick(nowMs);
     const name = `${visible(output.summary || 'background task')} of ${visible(label)}`;
     if (this.button.getAttribute('aria-label') !== `Follow ${name} in a terminal`) {
       this.button.setAttribute('aria-label', `Follow ${name} in a terminal`);
       this.block.setAttribute('aria-label', `Output of ${name}`);
     }
+  }
+
+  /** Recomputes the run time of a running task, nothing else. */
+  tick(nowMs: number): void {
+    if (this.output) setText(this.state, taskState(this.output, nowMs));
   }
 
   /** Shows `tail`, or that none came yet, and keeps to the end unless the user scrolled up. */
@@ -82,8 +90,11 @@ export class OutputArea {
   private readonly tasks = new Map<string, TaskView>();
   private readonly tails = new Map<string, Tail>();
 
-  /** Shows the outputs of `actors`, in their order. An actor without outputs has no section. */
-  update(actors: Actor[]): void {
+  /**
+   * Shows the outputs of `actors` at `nowMs`, in their order. An actor without outputs has no
+   * section.
+   */
+  update(actors: Actor[], nowMs: number): void {
     const listed = new Set<string>();
     const keep = new Set<string>();
     let previous: Element | null = null;
@@ -102,7 +113,7 @@ export class OutputArea {
         if (listed.has(output.path)) continue;
         listed.add(output.path);
         const task = this.task(output.path);
-        task.update(output, actor.label);
+        task.update(output, actor.label, nowMs);
         task.show(this.tails.get(output.path));
         if (last?.nextElementSibling !== task.element) last?.after(task.element);
         last = task.element;
@@ -120,6 +131,11 @@ export class OutputArea {
       this.sections.delete(key);
     }
     this.element.hidden = listed.size === 0;
+  }
+
+  /** Recomputes the run times of the running tasks. */
+  tick(nowMs: number): void {
+    this.tasks.forEach((task) => void task.tick(nowMs));
   }
 
   /** Shows the tails the extension read for the listed tasks, and ignores any other. */

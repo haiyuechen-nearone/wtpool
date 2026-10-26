@@ -7,6 +7,7 @@ import { appendFileSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path';
 import { test } from '@playwright/test';
 
+import { withoutRunTime } from '../support/grammar.mjs';
 import { startStub } from './agents.mjs';
 import { openStatus, poll, rowOf, withFlow, worktreePath } from './flows.mjs';
 import { env, releaseWtpool } from './vscode.mjs';
@@ -94,7 +95,7 @@ test('flow__live_output', async () => {
       assert.equal(editReply.code, 0, `setup: wtpool hook exited ${editReply.code ?? editReply.signal}`);
       assert.ok(action, `the open strip did not follow the agent's next call: ${await textOf(strip)}`);
       assert.ok(first, `the strip's Output section does not show the tail: ${await textOf(tail)}`);
-      assert.equal(heading, 'cargo build · running', 'the task heading does not read the summary and running');
+      assert.equal(withoutRunTime(heading), 'cargo build · running', 'the task heading does not read the summary and running');
       assert.ok(delays.every((ms) => ms <= 1000), `the tail took ${delays.join(', ')} ms to show a new line, over 1 s`);
       assert.ok(followed, 'the task has no Follow button that can be clicked');
       assert.ok(showsFile, `Follow opened no terminal showing the file: ${await textOf(terminal)} ${tabs}`);

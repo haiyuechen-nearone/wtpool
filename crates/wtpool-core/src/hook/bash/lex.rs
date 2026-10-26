@@ -7,6 +7,8 @@ pub(super) enum Token {
     Word(Word),
     /// `;`, `&&`, `||`, `|`, `&`, a new line, or a `{` or `}` that stands alone.
     Separator,
+    /// `;;`, `;&` or `;;&`, which end an item of a `case`.
+    ItemEnd,
     /// `>`, `>>`, `<`, `2>`, `&>` and the like. The next word is its target.
     Redirect,
     /// The `(` that opens a subshell.
@@ -354,6 +356,13 @@ impl Lexer<'_> {
 
     fn operator(&mut self, c: char) {
         self.end_word();
+        if c == ';' && matches!(self.chars.peek(), Some(';' | '&')) {
+            if self.chars.next() == Some(';') && self.chars.peek() == Some('&') {
+                self.chars.next();
+            }
+            self.tokens.push(Token::ItemEnd);
+            return;
+        }
         if c == '&' && self.chars.peek() == Some('>') {
             self.chars.next();
             if self.chars.peek() == Some('>') {

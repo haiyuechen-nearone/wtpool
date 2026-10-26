@@ -216,3 +216,5 @@ accept p4-oracle-fixes-3 2075c21b048f37abd9795e52fcb85bd140eda4e94dd25888bd615af
 accept watch-process-sample 72e9d570021da56a70cd4e13c34f9a29e629690b88960e0134cc8f576d467c70
 # The owner approved the 16 shot baselines on 2026-10-26: the heading chevron and the agent line padding.
 accept build-machine-strip c5ba12e687fd7d59dc73af2be9c0ccf3cd82ba86d0ebb90d92d57df375e1dc03
+# Revision 30, approved: U17's run time and H31's bounded background waits inside repositories, with their int, render and shot checks from phase 4; U17 moves to phase 4, its rows say so, and three phase 3 checks read a heading with or without the run time.
+accept stale-waits fffe270de133982e5f7d13fb9f01eaeaafd83d3dd4af0457fbe353efce765385

@@ -45,6 +45,11 @@ export function textSpan(className: string, text: string): HTMLSpanElement {
 export function pieceNodes(pieces: Piece[]): Node[] {
   return pieces.map((piece) => {
     if (piece.from) return bdi(piece.text);
+    if (piece.since !== undefined) {
+      const element = textSpan(piece.className ?? '', piece.text);
+      element.dataset.since = piece.since;
+      return element;
+    }
     return piece.className ? textSpan(piece.className, piece.text) : document.createTextNode(piece.text);
   });
 }

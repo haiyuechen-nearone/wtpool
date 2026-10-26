@@ -5,6 +5,7 @@
 //! and `cd` targets join [`Command::paths`], and its words never reach the summary.
 
 mod lex;
+pub(crate) mod waits;
 
 use std::path::{Path, PathBuf};
 
@@ -58,7 +59,7 @@ fn walk(command: &str, dir: &mut PathBuf, home: Option<&Path>, out: &mut Command
                 }
             }
             Token::Redirect => pending_redirect = true,
-            Token::Separator | Token::Open | Token::Close => {
+            Token::Separator | Token::ItemEnd | Token::Open | Token::Close => {
                 pending_redirect = false;
                 simple.run(dir, home, out, depth);
                 if token == Token::Open {
@@ -189,62 +190,71 @@ fn skip_prefixes(words: &[String]) -> usize {
 
 /// The [`ProgramStart`] of the simple command `words`.
 pub(crate) fn program_start(words: &[String]) -> ProgramStart {
-    let mut at = 0;
-    let mut wrapped = false;
-    loop {
-        let start = ProgramStart { at, wrapped };
-        let Some(word) = words.get(at) else {
-            return start;
-        };
-        let next = |from: usize| words.get(from).map(String::as_str);
-        if is_assignment(word) {
-            at = at.saturating_add(1);
-            continue;
-        }
-        match basename(word).as_str() {
-            "env" => {
-                at = at.saturating_add(1);
-                while next(at).is_some_and(|w| w.starts_with('-') || is_assignment(w)) {
-                    at = at.saturating_add(1);
-                }
-            }
-            "time" | "nice" | "timeout" => {
-                let duration = basename(word) == "timeout";
-                at = at.saturating_add(1);
-                while let Some(w) = next(at) {
-                    if w == "-n" || (duration && (w == "-s" || w == "-k")) {
-                        at = at.saturating_add(2);
-                    } else if w.starts_with('-') {
-                        at = at.saturating_add(1);
-                    } else {
-                        break;
-                    }
-                }
-                if duration && next(at).is_some() {
-                    at = at.saturating_add(1);
-                }
-            }
-            "nix" if next(at.saturating_add(1)) == Some("develop") => {
-                let command = (at.saturating_add(2)..words.len())
-                    .find(|&i| matches!(next(i), Some("-c" | "--command")));
-                match command {
-                    Some(flag) => at = flag.saturating_add(1),
-                    None => return start,
-                }
-            }
-            "wtpool" if next(at.saturating_add(1)) == Some("job") => {
-                let dashes = (at.saturating_add(2)..words.len()).find(|&i| next(i) == Some("--"));
-                match dashes {
-                    Some(dashes) => {
-                        at = dashes.saturating_add(1);
-                        wrapped = true;
-                    }
-                    None => return start,
-                }
-            }
-            _ => return start,
-        }
+    let mut start = ProgramStart {
+        at: 0,
+        wrapped: false,
+    };
+    while let Some(prefix) = prefix_at(words, start.at) {
+        start.at = prefix.next;
+        start.wrapped |= prefix.wrapped;
     }
+    start
+}
+
+/// One prefix before the program of a simple command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Prefix {
+    /// The index of the word after it.
+    pub next: usize,
+    /// It is `wtpool job` with its options up to `--`.
+    pub wrapped: bool,
+}
+
+/// The prefix that starts at word `at` of `words`: `VAR=value`, `env`, `timeout N`, `time`,
+/// `nice`, `nix develop … -c` or `wtpool job … --`. `None` when that word is the program, or
+/// there is none.
+pub(crate) fn prefix_at(words: &[String], at: usize) -> Option<Prefix> {
+    let word = words.get(at)?;
+    let next = |from: usize| words.get(from).map(String::as_str);
+    let mut end = at.saturating_add(1);
+    let mut wrapped = false;
+    if is_assignment(word) {
+        return Some(Prefix { next: end, wrapped });
+    }
+    match basename(word).as_str() {
+        "env" => {
+            while next(end).is_some_and(|w| w.starts_with('-') || is_assignment(w)) {
+                end = end.saturating_add(1);
+            }
+        }
+        "time" | "nice" | "timeout" => {
+            let duration = basename(word) == "timeout";
+            while let Some(w) = next(end) {
+                if w == "-n" || (duration && (w == "-s" || w == "-k")) {
+                    end = end.saturating_add(2);
+                } else if w.starts_with('-') {
+                    end = end.saturating_add(1);
+                } else {
+                    break;
+                }
+            }
+            if duration && next(end).is_some() {
+                end = end.saturating_add(1);
+            }
+        }
+        "nix" if next(at.saturating_add(1)) == Some("develop") => {
+            let flag = (at.saturating_add(2)..words.len())
+                .find(|&i| matches!(next(i), Some("-c" | "--command")))?;
+            end = flag.saturating_add(1);
+        }
+        "wtpool" if next(at.saturating_add(1)) == Some("job") => {
+            let dashes = (at.saturating_add(2)..words.len()).find(|&i| next(i) == Some("--"))?;
+            end = dashes.saturating_add(1);
+            wrapped = true;
+        }
+        _ => return None,
+    }
+    Some(Prefix { next: end, wrapped })
 }
 
 /// `NAME=value` or `NAME+=value`.
@@ -296,7 +306,7 @@ pub(crate) fn simple_commands(command: &str) -> Option<Vec<Vec<ShellWord>>> {
                 }
             }
             Token::Redirect => pending_redirect = true,
-            Token::Separator | Token::Open | Token::Close => {
+            Token::Separator | Token::ItemEnd | Token::Open | Token::Close => {
                 pending_redirect = false;
                 if !words.is_empty() {
                     commands.push(std::mem::take(&mut words));

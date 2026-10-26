@@ -52,6 +52,7 @@ struct WtpoolToml {
     #[serde(default)]
     copy: Vec<String>,
     on_new_slot: Option<String>,
+    bounded_waits: Option<bool>,
 }
 
 /// Checks the values of `wtpool.toml`.
@@ -92,11 +93,23 @@ where
     })
 }
 
-/// The `heavy` patterns and `build_processes` names of a repository's `wtpool.toml`, refused as
-/// [`parse`] refuses an unknown key, a wrong type or a bad pattern, the other values unchecked.
-pub(crate) fn patterns(text: &str, file: &Path) -> Result<(Vec<Pattern>, Vec<String>), Error> {
+/// The keys of a repository's `wtpool.toml` that `wtpool hook policy` reads.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct PolicyKeys {
+    pub heavy: Vec<Pattern>,
+    pub build_processes: Vec<String>,
+    pub bounded_waits: Option<bool>,
+}
+
+/// The [`PolicyKeys`] of a repository's `wtpool.toml`, refused as [`parse`] refuses an unknown
+/// key, a wrong type or a bad pattern, the other values unchecked.
+pub(crate) fn policy_keys(text: &str, file: &Path) -> Result<PolicyKeys, Error> {
     let toml: WtpoolToml = from_toml(text, file)?;
-    Ok((toml.heavy, toml.build_processes))
+    Ok(PolicyKeys {
+        heavy: toml.heavy,
+        build_processes: toml.build_processes,
+        bounded_waits: toml.bounded_waits,
+    })
 }
 
 /// The text of the config file at `path`, `None` when there is none. A symlink,
@@ -373,11 +386,11 @@ mod tests {
     #[rstest]
     #[case::unknown_key(
         "slots = 2\n",
-        "invalid /r/.git/wtpool.toml: line 1: unknown field `slots`, expected one of `foreground`, `slot_dir`, `slot_prefix`, `slot_count`, `remote`, `heavy`, `build_processes`, `copy`, `on_new_slot`"
+        "invalid /r/.git/wtpool.toml: line 1: unknown field `slots`, expected one of `foreground`, `slot_dir`, `slot_prefix`, `slot_count`, `remote`, `heavy`, `build_processes`, `copy`, `on_new_slot`, `bounded_waits`"
     )]
     #[case::table(
         "[pool]\nslot_count = 2\n",
-        "invalid /r/.git/wtpool.toml: line 1: unknown field `pool`, expected one of `foreground`, `slot_dir`, `slot_prefix`, `slot_count`, `remote`, `heavy`, `build_processes`, `copy`, `on_new_slot`"
+        "invalid /r/.git/wtpool.toml: line 1: unknown field `pool`, expected one of `foreground`, `slot_dir`, `slot_prefix`, `slot_count`, `remote`, `heavy`, `build_processes`, `copy`, `on_new_slot`, `bounded_waits`"
     )]
     #[case::text_where_a_path_belongs(
         "foreground = 3\n",

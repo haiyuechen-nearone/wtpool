@@ -69,6 +69,8 @@ export class Page {
   private selected: string | null;
   /** The selection the extension last heard of: none at first, as a new tab's host has none. */
   private told: string | null = null;
+  /** The time of the last view or tick, so a strip opened between them agrees with its row. */
+  private nowMs = 0;
 
   constructor(private readonly host: Host) {
     this.selected = savedSelection(host.getState());
@@ -132,6 +134,7 @@ export class Page {
    */
   render(view: ViewMessage, nowMs: number): void {
     this.view = view;
+    this.nowMs = nowMs;
     const noFolder = view.no_folder === true;
     this.noFolder.hidden = !noFolder;
     this.scroller.hidden = noFolder;
@@ -167,9 +170,11 @@ export class Page {
     this.header.count();
   }
 
-  /** Moves the clock: ages and the stale or paused header, nothing else. */
+  /** Moves the clock: ages, run times and the stale or paused header, nothing else. */
   tick(nowMs: number): void {
+    this.nowMs = nowMs;
     this.rows.forEach((row) => void row.tick(nowMs));
+    this.strip.tick(nowMs);
     this.machine.tick(nowMs);
     if (!this.view || this.view.no_folder) return;
     this.header.tick(this.view, nowMs);
@@ -225,7 +230,7 @@ export class Page {
     const row = id === null ? undefined : this.rows.get(id);
     if (row) {
       if (row.element.nextElementSibling !== this.detail) row.element.after(this.detail);
-      this.strip.update(row.worktree);
+      this.strip.update(row.worktree, this.nowMs);
     } else {
       this.detail.remove();
     }

@@ -130,6 +130,11 @@ export function doing(actor) {
   }
 }
 
+/** A task heading with the run time after `running` taken off, for checks that hold either way. */
+export function withoutRunTime(heading) {
+  return heading.replace(/ · running · \d+ [smhd]( \d+ [smh])?$/, ' · running');
+}
+
 /** The actors of a row in the order the panel lists them: newest `updated` first. */
 export function shownActors(worktree) {
   return [...worktree.actors].sort((a, b) => Date.parse(b.updated) - Date.parse(a.updated));

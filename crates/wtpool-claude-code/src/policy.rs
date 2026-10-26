@@ -9,6 +9,8 @@ use crate::payload::Payload;
 
 /// The tools whose `command` runs in a shell.
 const SHELL_TOOLS: [&str; 3] = ["Bash", "PowerShell", "Monitor"];
+/// The one tool that makes a background task of a call.
+const BACKGROUND_TOOL: &str = "Bash";
 
 /// The shell call of a PreToolUse payload of a shell tool, `None` for any other input.
 #[must_use]
@@ -22,9 +24,11 @@ pub fn shell_call(input: &[u8]) -> Option<ShellCall> {
         return None;
     }
     let command = payload.tool_input.string("command")?.to_owned();
+    let background = tool == BACKGROUND_TOOL && payload.tool_input.is_true("run_in_background");
     Some(ShellCall {
         cwd: payload.cwd,
         command,
+        background,
     })
 }
 
@@ -81,8 +85,30 @@ mod tests {
         let expected = read.then(|| ShellCall {
             cwd: "/p/wt1".to_owned(),
             command: "make".to_owned(),
+            background: false,
         });
         assert_eq!(call, expected);
+    }
+
+    #[rstest]
+    #[case::bash("Bash", json!(true), true)]
+    #[case::in_the_foreground("Bash", json!(false), false)]
+    #[case::a_string("Bash", json!("true"), false)]
+    #[case::power_shell("PowerShell", json!(true), false)]
+    #[case::monitor("Monitor", json!(true), false)]
+    fn shell_call__should_run_in_the_background_only_for_a_bash_call_that_says_so(
+        #[case] tool: &str,
+        #[case] run_in_background: Value,
+        #[case] expected: bool,
+    ) {
+        // Given
+        let input = json!({"command": "make", "run_in_background": run_in_background});
+
+        // When
+        let call = shell_call(&payload("PreToolUse", tool, &input));
+
+        // Then
+        assert_eq!(call.map(|call| call.background), Some(expected));
     }
 
     #[test]

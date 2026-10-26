@@ -804,6 +804,16 @@ checks = [
   "flow__jobs_require_refuses",
 ]
 
+# H31 (status-panel.md revision 30): `wtpool hook policy` also refuses a background wait loop
+# without a time limit, or one on `pgrep -f` or `pkill -f`, in a git repository, under every
+# `enforce`, unless the repository's `bounded_waits = false`.
+[ids.H31]
+phase = 4
+checks = [
+  "hook_policy__should_refuse_unbounded_background_waits",
+  "hook_policy__should_read_bounded_waits_from_the_repository",
+]
+
 # A8: a job's actor shows `queued:` while the job waits; the decay table gains its job cases from
 # phase 4, and the scenarios jobs_queue and build_not_queued cover it.
 [ids.A8]
@@ -903,6 +913,20 @@ checks = [
   "heavy_editor__should_show_each_scope",
   "heavy_editor__should_clip_nothing_in_every_theme",
   "flow__jobs_edit_patterns",
+]
+
+# U17 (status-panel.md revision 30): the run time of a background task on its agent line and in
+# the Output section, from phase 4; the Follow terminal's name, which the host check names, leaves
+# it out.
+[ids.U17]
+phase = 4
+checks = [
+  "run_time__should_use_the_format",
+  "run_time__should_tick_each_second",
+  "run_time__should_follow_the_named_task",
+  "run_time__should_leave_names_and_announcements_unchanged",
+  "run_time__should_clip_nothing_in_every_theme",
+  "follow__should_stream_the_file_into_a_terminal",
 ]
 
 [ids.X20]

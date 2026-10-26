@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 
 import { ago, actor, document, mustValidate, worktree } from '../support/docs.mjs';
-import { visible } from '../support/grammar.mjs';
+import { visible, withoutRunTime } from '../support/grammar.mjs';
 import { mount, rowById, text } from '../support/webview.mjs';
 
 let webview;
@@ -98,7 +98,7 @@ test('output__should_show_each_task_tail', async () => {
     'the tasks do not follow the document',
   );
   assert.deepEqual(
-    tasks.map((task) => text(task.querySelector('.output-heading'))),
+    tasks.map((task) => withoutRunTime(text(task.querySelector('.output-heading')))),
     ['cargo nextest · running', 'cargo build · running', `npm run · ended ${clock(ended)}`],
   );
   for (const task of tasks) {

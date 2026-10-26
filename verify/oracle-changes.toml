@@ -1493,3 +1493,22 @@ reason = "The owner approved the 16 baselines on 2026-10-26: the heading chevron
 "verify/shots/approved/light-idle_pool-1100.png" = "cf4efabc211f6f46ad26477f1e6c1ef16511a483d1205edb7cc6da5fb873c512"
 "verify/shots/approved/light-permission_wait_and_answer-1100.png" = "9a95bc47ed7a794e116f6cb3e4517c5214c9a26751a5ffa36fa4924ee56f94cf"
 "verify/shots/approved/light-several_agents_one_worktree-1100.png" = "d5f52efb94a5c9cb7c42e64e9b2a8a539052650b3f1a9c0d44ae6d0bc5512fde"
+
+[[change]]
+id = "stale-waits"
+reason = "Revision 30 of status-panel.md, approved by the owner on 2026-10-26: U17, the run time of a background task on its agent line and in the Output section, and H31, the refusal by wtpool hook policy of a background wait loop without a time limit or on pgrep -f or pkill -f, inside git repositories only, with jobs.md revision 7 naming H31. U17 moves from the Phases row 3 to row 4, so the built phase 3 stays as it is, and the U17, U9 and A1 rows say from phase 4 where they give the run time. New int checks hook_policy__should_refuse_unbounded_background_waits and hook_policy__should_read_bounded_waits_from_the_repository (xtask/tests/checks/hook_policy_waits.rs) cover the 24 cases of the jobs.md verification plan at each enforce, the two fixed reasons, a wait H29 also refuses, bounded_waits, another repository, a cwd outside any repository, and no decision on a command or setting it cannot read or a panic. New render checks run_time__should_use_the_format, run_time__should_tick_each_second, run_time__should_follow_the_named_task and run_time__should_leave_names_and_announcements_unchanged run on the fake clock, and the shot check run_time__should_clip_nothing_in_every_theme measures the agent line's run time, which no shot document held. output__should_show_each_task_tail, detail__should_update_while_open and flow__live_output read a running task's heading without its run time through withoutRunTime in support/grammar.mjs, so they pass with and without U17. verify/trace.toml, verify/checks.toml and the trace list of verification.md name the new checks from phase 4, and the trace self test counts H31 and U17."
+[change.files]
+"docs/design/jobs/jobs.md" = "519583020f1e91dc55c93d3a3a1312f8c975ccef45c312d2820953ff3bff21bd"
+"docs/design/status-panel/status-panel.md" = "a88c92d6b399e260c9e84ea17e47cd1c6aa1ef5757a58111bcb792254a487db6"
+"docs/design/status-panel/verification.md" = "777be6c9e50bebb2191c9acbfea26ea1ed72c9043e3475e4bff5b4dba23d164c"
+"verify/checks.toml" = "3b51111042881445768b75f7c2d283cde808aefa7b6e3c6edb0fe14bbc46454d"
+"verify/trace.toml" = "63d725ba8e182a7b8fa29f6ebc06563bbe36f111776eff59377b760a488caa94"
+"vscode/test/e2e/flows-output.spec.mjs" = "3503566689408a055fef5b97b776206c45a09f1be2b811e193a521f467bbd24b"
+"vscode/test/render/detail.test.mjs" = "e103965adc81c8b160d842ef20d8567a685d16daaa9fa3613e3897865a82d132"
+"vscode/test/render/output.test.mjs" = "cd10c7a7b010bfc86eb1d53ab52207565a011d116e286b833cdb518fbf8a6b90"
+"vscode/test/render/run-time.test.mjs" = "0966bdc808ff978cd5221649567c9a2d1f9807e0182b6f3fe593c309dca7e467"
+"vscode/test/shot/run-time.spec.mjs" = "038cf7d14b421a6105e5363380421d6aab8b6aec7b095b69568f88eaabba979d"
+"vscode/test/support/grammar.mjs" = "33c6a13ff4a7337e62ea43c0d5bd4056fb0dff5087a1a28c79cb18e0db2a6aac"
+"xtask/src/trace.rs" = "9e3a4faac44fba37e7ad6763047b98a834d94371c40d13ae2da67837140b3b14"
+"xtask/tests/checks/hook_policy_waits.rs" = "bd671147ddc84bc77838686a36326dfd7a16b1c64478930038158e7352301f5e"
+"xtask/tests/checks/mod.rs" = "19e1d968dc392c85205c45e34d6adb3579f08e3eacb0fb727d8c052dbc89d02d"

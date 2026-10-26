@@ -140,6 +140,21 @@ fn string__should_read_only_top_level_string_fields(
 }
 
 #[rstest]
+#[case::true_value(r#"{"run_in_background":true}"#, true)]
+#[case::false_value(r#"{"run_in_background":false}"#, false)]
+#[case::a_string(r#"{"run_in_background":"true"}"#, false)]
+#[case::last_of_two(r#"{"run_in_background":true,"run_in_background":1}"#, false)]
+#[case::nested(r#"{"input":{"run_in_background":true}}"#, false)]
+#[case::missing(r#"{"command":"x"}"#, false)]
+fn is_true__should_read_only_a_top_level_true(#[case] text: &str, #[case] expected: bool) {
+    // When
+    let input = must_input(text);
+
+    // Then
+    assert_eq!(input.is_true("run_in_background"), expected);
+}
+
+#[rstest]
 #[case::depth_126(126, true)]
 #[case::depth_127(127, false)]
 fn deserialize__should_refuse_the_depth_a_whole_value_refuses(

@@ -127,6 +127,54 @@ ends runs gc again.
 If you scheduled `wtpool hook gc` with cron or launchd for an earlier wtpool, you can remove that
 job, as [Uninstall](privacy-and-uninstall.md#uninstall) says.
 
+## A worktree shows `working · background: …` long after its agent finished
+
+The agent line reads, for example, `background: until · 3 h 12 m`, though the agent finished long
+ago. `wtpool free` and `wtpool fg` refuse there, as they would for an agent that still works.
+
+The agent started a command in the background that never ends. Most often it is a wait loop:
+
+```sh
+until ! pgrep -f "xtask verify"; do sleep 30; done
+```
+
+`pgrep -f` matches whole command lines, and the loop's own shell has the pattern in its command
+line. So `pgrep` always finds a process, and the loop never ends. A loop that waits for a file or a
+log line that never comes does the same. Claude Code keeps a background task running after the
+agent's turn ends, and the panel shows the agent working while its task runs. The run time after
+the summary says how long it has run.
+
+To stop it:
+
+1. If the session is still open, ask the agent there to stop its background task. Claude Code
+   ends it, and the row shows the agent's own state again.
+2. Else stop the shell yourself. Select the row: the detail strip's Output section names the task
+   and its run time. `wtpool status --json` gives the task's output file, here read with `jq`
+   for the slot `app-wt2`:
+
+   ```sh
+   wtpool status --json | jq -r '.pools[0].worktrees[] | select(.name == "app-wt2")
+     | .actors[]?.outputs[]? | select(.running) | "\(.summary)  \(.path)"'
+   ```
+
+   The shell writes its output to that file, so `lsof <path>` lists the shell. The COMMAND
+   column names it (`zsh`, `bash` or `sh`) and the `sleep` it runs. Stop the shell with
+   `kill <PID>`. Kill only those, never a `claude` or `node` line.
+3. The row shows the agent's own state once the hook records the task's end: at the end of the
+   session's next turn, or when the session ends.
+
+To free the slot at once, `wtpool free <slot> --force` skips the check. The loop keeps running.
+
+To prevent it, have agents run the command they wait for in the background and wait for its
+completion notice. A wait loop they cannot avoid needs a time limit, such as
+`timeout 1800 sh -c 'until <check>; do sleep 10; done'`, and a wait for a process should test its
+PID: `timeout 1800 sh -c 'while kill -0 <pid> 2>/dev/null; do sleep 10; done'`. macOS has no
+`timeout`; Homebrew's `coreutils` installs it as `gtimeout`. A line in your `CLAUDE.md` tells
+every session.
+
+The hooks' policy entry, `wtpool hook policy`, refuses such a wait before it starts and gives the
+agent the bounded form, unless `.git/wtpool.toml` sets `bounded_waits = false`.
+
 ## "no free slot"
 
 `wtpool bg` fails with one line per slot, saying why it is busy, then the error:

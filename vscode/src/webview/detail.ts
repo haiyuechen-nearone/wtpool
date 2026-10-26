@@ -73,8 +73,8 @@ export class DetailStrip {
     this.element.append(facts, this.agents, this.outputs.element);
   }
 
-  /** Shows the facts of `worktree`, changing only the parts that differ from the strip's. */
-  update(worktree: Worktree): void {
+  /** Shows the facts of `worktree` at `nowMs`, changing only the parts that differ from the strip's. */
+  update(worktree: Worktree, nowMs: number): void {
     if (worktree.path !== this.row) {
       this.row = worktree.path;
       this.outputs.clearTails();
@@ -87,7 +87,12 @@ export class DetailStrip {
     } else {
       this.free.set('Not free', worktree.reasons.join(', ') || 'unknown');
     }
-    this.updateActors(shownActors(worktree));
+    this.updateActors(shownActors(worktree), nowMs);
+  }
+
+  /** Recomputes the run times of the strip's tasks. */
+  tick(nowMs: number): void {
+    this.outputs.tick(nowMs);
   }
 
   /** Shows the tails the extension read for row `row`, when that is the strip's row. */
@@ -96,7 +101,7 @@ export class DetailStrip {
   }
 
   /** Shows the lines of `actors`, kept by key and moved into their order, then their outputs. */
-  private updateActors(actors: Actor[]): void {
+  private updateActors(actors: Actor[], nowMs: number): void {
     this.noAgent.hidden = actors.length > 0;
     const keys = new Set(actors.map((actor) => actor.key));
     for (const [key, lines] of this.actors) {
@@ -115,6 +120,6 @@ export class DetailStrip {
       if (previous.nextElementSibling !== lines.element) previous.after(lines.element);
       previous = lines.element;
     }
-    this.outputs.update(actors);
+    this.outputs.update(actors, nowMs);
   }
 }

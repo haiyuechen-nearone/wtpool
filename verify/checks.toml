@@ -43,6 +43,11 @@ restore__should_ignore_hostile_state = ["render"]
 output__should_show_each_task_tail = ["render"]
 output__should_follow_the_end_unless_scrolled_up = ["render"]
 output__should_drop_what_the_document_no_longer_lists = ["render"]
+# render, phase 4 (status-panel.md revision 30): the run time of a background task (U17).
+run_time__should_use_the_format = ["render"]
+run_time__should_tick_each_second = ["render"]
+run_time__should_follow_the_named_task = ["render"]
+run_time__should_leave_names_and_announcements_unchanged = ["render"]
 # render, phase 3: the open detail strip renders again for each new document (X15, U5).
 detail__should_update_while_open = ["render"]
 # render and e2e (status-panel.md revision 16): the heading names the repository, then the
@@ -137,6 +142,8 @@ detail__should_stand_out_from_the_page = ["shot"]
 # in four themes, and the Follow ring shows whole (U9, U1, U6, X14).
 output__should_clip_nothing_in_every_theme = ["shot"]
 output__should_show_the_follow_ring_whole = ["shot"]
+# shot, phase 4 (status-panel.md revision 30): an agent line's run time, whole and at AA (U17).
+run_time__should_clip_nothing_in_every_theme = ["shot"]
 
 # e2e: a real VS Code with the .vsix and the release wtpool.
 e2e_csp_clean = ["e2e"]

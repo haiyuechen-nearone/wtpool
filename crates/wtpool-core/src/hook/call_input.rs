@@ -1,9 +1,9 @@
 //! A call's input as the hook keeps it: the input hash a wait matches calls by, and the top level
-//! strings a harness's adapter reads the call's path from. It is read straight from the payload's
-//! JSON into the text it hashes, as a whole [`Value`] of a large input would take many times its
-//! size.
+//! strings and flags a harness's adapter reads the call's path and mode from. It is read straight
+//! from the payload's JSON into the text it hashes, as a whole [`Value`] of a large input would
+//! take many times its size.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Write as _};
 
 use serde::de::{Deserialize, DeserializeSeed, Deserializer, MapAccess, SeqAccess, Visitor};
@@ -11,11 +11,13 @@ use serde_json::{Number, Value};
 
 use super::sha256;
 
-/// A call's input: its hash and its top level string fields.
+/// A call's input: its hash, its top level string fields and the names of its top level fields
+/// that are `true`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallInput {
     hash: String,
     strings: BTreeMap<String, String>,
+    trues: BTreeSet<String>,
 }
 
 impl CallInput {
@@ -25,6 +27,7 @@ impl CallInput {
         Self {
             hash: sha256::hex(b"null"),
             strings: BTreeMap::new(),
+            trues: BTreeSet::new(),
         }
     }
 
@@ -40,35 +43,50 @@ impl CallInput {
     pub fn string(&self, name: &str) -> Option<&str> {
         self.strings.get(name).map(String::as_str)
     }
+
+    /// `true` when the input is an object and its top level field `name` the boolean `true`.
+    #[must_use]
+    pub fn is_true(&self, name: &str) -> bool {
+        self.trues.contains(name)
+    }
 }
 
 impl<'de> Deserialize<'de> for CallInput {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let mut text = String::new();
-        let mut strings = BTreeMap::new();
+        let mut top = TopLevel::default();
         Sorted {
             out: &mut text,
-            strings: Some(&mut strings),
+            top: Some(&mut top),
         }
         .deserialize(deserializer)?;
         Ok(Self {
             hash: sha256::hex(text.as_bytes()),
-            strings,
+            strings: top.strings,
+            trues: top.trues,
         })
     }
 }
 
 /// Writes the JSON value it reads to `out` with the keys of every object sorted, each scalar as
 /// [`Value`] writes it: of two members with one key the last counts, and a number reads as
-/// serde_json reads it. With `strings`, the string members of a top level object go there too.
+/// serde_json reads it. With `top`, the string and `true` members of a top level object go there
+/// too.
 struct Sorted<'a> {
     out: &'a mut String,
-    strings: Option<&'a mut BTreeMap<String, String>>,
+    top: Option<&'a mut TopLevel>,
+}
+
+/// The members of a top level object that [`CallInput`] keeps besides its hash.
+#[derive(Default)]
+struct TopLevel {
+    strings: BTreeMap<String, String>,
+    trues: BTreeSet<String>,
 }
 
 impl Sorted<'_> {
     fn nested(out: &mut String) -> Sorted<'_> {
-        Sorted { out, strings: None }
+        Sorted { out, top: None }
     }
 
     fn scalar<E>(self, value: &Value) -> Result<(), E> {
@@ -140,13 +158,15 @@ impl<'de> Visitor<'de> for Sorted<'_> {
             map.next_value_seed(Sorted::nested(&mut text))?;
             members.insert(key, text);
         }
-        if let Some(strings) = self.strings {
+        if let Some(top) = self.top {
             let decoded = members.iter().filter(|(_, text)| text.starts_with('"'));
-            strings.extend(
+            top.strings.extend(
                 decoded.filter_map(|(key, text)| {
                     Some((key.clone(), serde_json::from_str(text).ok()?))
                 }),
             );
+            let trues = members.iter().filter(|(_, text)| *text == "true");
+            top.trues.extend(trues.map(|(key, _)| key.clone()));
         }
         self.out.push('{');
         for (index, (key, text)) in members.into_iter().enumerate() {

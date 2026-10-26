@@ -33,6 +33,14 @@ impl Setup {
         ShellCall {
             cwd: self.dir.path().join("repo").to_string_lossy().into_owned(),
             command: command.to_owned(),
+            background: false,
+        }
+    }
+
+    fn background_call(&self, command: &str) -> ShellCall {
+        ShellCall {
+            background: true,
+            ..self.call(command)
         }
     }
 }
@@ -166,6 +174,87 @@ fn refusal__should_allow_a_call_inside_a_live_job() {
     assert_eq!(inside, None);
     let wanted = refused("cargo test", "wtpool job -- cargo test");
     assert_eq!((after_death, unknown), (wanted.clone(), wanted));
+}
+
+const WAIT: &str = "until test -e x; do sleep 1; done";
+
+fn wait_refused(why: &str) -> Option<String> {
+    Some(format!("wtpool: {why} {BOUNDED_FORMS}"))
+}
+
+#[rstest]
+#[case::off("[jobs]\nenforce = \"off\"\n")]
+#[case::warn("[jobs]\nenforce = \"warn\"\n")]
+#[case::require(REQUIRE)]
+fn refusal__should_refuse_an_unbounded_background_wait_under_every_enforce(#[case] machine: &str) {
+    // Given
+    let setup = Setup::new(machine, None);
+    let pgrep = "while pgrep -f x; do sleep 1; done";
+
+    // When
+    let unbounded = refusal(&setup.background_call(WAIT), &setup.env(None));
+    let matching = refusal(&setup.background_call(pgrep), &setup.env(None));
+    let in_the_foreground = refusal(&setup.call(WAIT), &setup.env(None));
+    let bounded = format!("timeout 60 sh -c '{WAIT}'");
+    let bounded = refusal(&setup.background_call(&bounded), &setup.env(None));
+
+    // Then
+    assert_eq!(unbounded, wait_refused(NO_TIME_LIMIT));
+    assert_eq!(matching, wait_refused(MATCHES_ITSELF));
+    assert_eq!((in_the_foreground, bounded), (None, None));
+}
+
+#[test]
+fn refusal__should_give_the_wait_reason_alone_over_a_heavy_command() {
+    // Given
+    let setup = Setup::new(REQUIRE, None);
+    let command = format!("cargo test; {WAIT}");
+
+    // When
+    let background = refusal(&setup.background_call(&command), &setup.env(None));
+    let foreground = refusal(&setup.call(&command), &setup.env(None));
+
+    // Then
+    assert_eq!(background, wait_refused(NO_TIME_LIMIT));
+    let wanted = format!("cargo test; {WAIT}").replacen("cargo", "wtpool job -- cargo", 1);
+    assert_eq!(foreground, refused("cargo test", &wanted));
+}
+
+#[rstest]
+#[case::off(Some("bounded_waits = false\n"), None)]
+#[case::on(Some("bounded_waits = true\n"), wait_refused(NO_TIME_LIMIT))]
+#[case::not_a_boolean(Some("bounded_waits = 0\n"), None)]
+#[case::no_file(None, wait_refused(NO_TIME_LIMIT))]
+fn refusal__should_follow_bounded_waits_of_the_repository(
+    #[case] repository: Option<&str>,
+    #[case] expected: Option<String>,
+) {
+    // Given
+    let setup = Setup::new("", repository);
+
+    // When
+    let reason = refusal(&setup.background_call(WAIT), &setup.env(None));
+
+    // Then
+    assert_eq!(reason, expected);
+}
+
+#[test]
+fn refusal__should_judge_no_wait_outside_a_repository_or_left_open() {
+    // Given
+    let setup = Setup::new("", None);
+    let mut outside = setup.background_call(WAIT);
+    outside.cwd = setup.dir.path().to_string_lossy().into_owned();
+
+    // When
+    let no_repository = refusal(&outside, &setup.env(None));
+    let open = refusal(
+        &setup.background_call(&format!("{WAIT}; echo 'x")),
+        &setup.env(None),
+    );
+
+    // Then
+    assert_eq!((no_repository, open), (None, None));
 }
 
 #[test]

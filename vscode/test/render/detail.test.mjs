@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 
 import { ago, actor, document, git, mustValidate, worktree } from '../support/docs.mjs';
+import { withoutRunTime } from '../support/grammar.mjs';
 import { mount, rowById, text } from '../support/webview.mjs';
 
 let webview;
@@ -80,7 +81,7 @@ test('detail__should_update_while_open', async () => {
     for (const fact of facts) {
       assert.ok(shown.includes(fact), `document ${index}: the open strip does not show "${fact}": ${shown}`);
     }
-    const task = text(detail.querySelector(`.output[data-output-path="${TASK}"] .output-heading`));
+    const task = withoutRunTime(text(detail.querySelector(`.output[data-output-path="${TASK}"] .output-heading`)));
     assert.equal(task, `cargo build · ${step.ended ? `ended ${clock(step.ended)}` : 'running'}`, `document ${index}: the Output section is stale`);
     if (index > 0) {
       const before = steps[index - 1];

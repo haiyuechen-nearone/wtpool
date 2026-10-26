@@ -20,6 +20,14 @@ pub struct RepositoryPatterns {
     pub build_processes: Vec<String>,
 }
 
+/// What a repository's `wtpool.toml` sets for `wtpool hook policy`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepositoryPolicy {
+    pub patterns: RepositoryPatterns,
+    /// `bounded_waits`: background wait loops without a time limit are refused.
+    pub bounded_waits: bool,
+}
+
 /// A repository found from the files git keeps, with no git run: from a folder up to the first
 /// one with a `.git`, a folder for a main worktree, a file linking a worktree to its repository.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,15 +65,7 @@ impl RepositoryPatterns {
     /// Those of the `wtpool.toml` in the common git directory `common`, read without git. Both
     /// lists are empty without the file.
     pub fn read(common: &Path) -> Result<Self, Error> {
-        let file = common.join(CONFIG_FILE);
-        let Some(text) = config_file::read(&file)? else {
-            return Ok(Self::default());
-        };
-        let (heavy, build_processes) = config_file::patterns(&text, &file)?;
-        Ok(Self {
-            heavy,
-            build_processes,
-        })
+        RepositoryPolicy::read(common).map(|policy| policy.patterns)
     }
 
     /// `true` when the repository lists no heavy command of its own, so its suggestions stand
@@ -73,6 +73,28 @@ impl RepositoryPatterns {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.heavy.is_empty() && self.build_processes.is_empty()
+    }
+}
+
+impl RepositoryPolicy {
+    /// That of the `wtpool.toml` in the common git directory `common`, read without git. Without
+    /// the file both lists are empty and `bounded_waits` is `true`.
+    pub fn read(common: &Path) -> Result<Self, Error> {
+        let file = common.join(CONFIG_FILE);
+        let Some(text) = config_file::read(&file)? else {
+            return Ok(Self {
+                patterns: RepositoryPatterns::default(),
+                bounded_waits: true,
+            });
+        };
+        let keys = config_file::policy_keys(&text, &file)?;
+        Ok(Self {
+            patterns: RepositoryPatterns {
+                heavy: keys.heavy,
+                build_processes: keys.build_processes,
+            },
+            bounded_waits: keys.bounded_waits.unwrap_or(true),
+        })
     }
 }
 
@@ -141,6 +163,8 @@ impl RepositoryFiles {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+
+    use rstest::rstest;
 
     use super::*;
 
@@ -264,6 +288,29 @@ mod tests {
             }
         );
         assert!(!read.is_empty());
+    }
+
+    #[rstest]
+    #[case::no_file(None, Some(true))]
+    #[case::no_key(Some("heavy = []\n"), Some(true))]
+    #[case::on(Some("bounded_waits = true\n"), Some(true))]
+    #[case::off(Some("bounded_waits = false\n"), Some(false))]
+    #[case::a_string(Some("bounded_waits = \"false\"\n"), None)]
+    fn repository_policy_read__should_read_bounded_waits(
+        #[case] text: Option<&str>,
+        #[case] expected: Option<bool>,
+    ) {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        if let Some(text) = text {
+            std::fs::write(dir.path().join("wtpool.toml"), text).unwrap();
+        }
+
+        // When
+        let read = RepositoryPolicy::read(dir.path());
+
+        // Then
+        assert_eq!(read.ok().map(|policy| policy.bounded_waits), expected);
     }
 
     #[test]
