@@ -5,6 +5,8 @@
 //! Every property has a description. No object forbids other properties: within version 1 a
 //! document only gains properties, and consumers ignore the ones they do not know.
 
+mod jobs;
+
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 
@@ -63,7 +65,7 @@ pub fn status_schema() -> Value {
 
 /// The definitions the schemas refer to by `#/$defs/<name>`.
 fn definitions() -> Value {
-    json!({
+    let mut definitions = json!({
         "time": {
             "description": "An RFC 3339 time in UTC.",
             "type": "string",
@@ -80,7 +82,13 @@ fn definitions() -> Value {
         "actor": Actor::to_schema(),
         "build": Build::to_schema(),
         "output": Output::to_schema(),
-    })
+    });
+    if let Value::Object(map) = &mut definitions {
+        for (name, schema) in jobs::definitions() {
+            map.insert(name.to_owned(), schema);
+        }
+    }
+    definitions
 }
 
 /// An object that requires these properties, each given with its schema and description, and
@@ -95,7 +103,7 @@ fn object(properties: Vec<(&str, Value, &str)>) -> Value {
 }
 
 /// [`object`] with one more property that it does not require: a property wtpool omits when it
-/// is empty, such as `outputs`.
+/// is empty, such as `outputs`, or one an older wtpool lacks.
 fn with_optional(mut object: Value, name: &str, schema: Value, description: &str) -> Value {
     if let Some(Value::Object(properties)) = object.get_mut("properties") {
         properties.insert(name.to_owned(), described(schema, description));
@@ -152,11 +160,16 @@ impl ToSchema for RecordTime {
 
 impl ToSchema for Document {
     fn to_schema() -> Value {
-        let machine = object(vec![(
-            "name",
-            text(),
-            "The machine's host name, `localhost` when it has none.",
-        )]);
+        let machine = with_optional(
+            object(vec![(
+                "name",
+                text(),
+                "The machine's host name, `localhost` when it has none.",
+            )]),
+            "jobs",
+            reference("jobs"),
+            "This user's heavy jobs on the machine; absent without a folder for their settings.",
+        );
         object(vec![
             ("type", json!({ "const": "status" }), "Always `status`."),
             (
@@ -437,14 +450,24 @@ impl ToSchema for Output {
 
 impl ToSchema for Build {
     fn to_schema() -> Value {
-        object(vec![
+        let build = object(vec![
             (
                 "pid",
                 json!({ "type": "integer", "minimum": 1 }),
                 "The build process's id.",
             ),
-            ("name", text(), "The build process's name."),
-        ])
+            (
+                "name",
+                text(),
+                "The words of the heavy pattern the build process matches.",
+            ),
+        ]);
+        with_optional(
+            build,
+            "queued",
+            json!({ "type": "boolean" }),
+            "Whether a live job's process is the build or one of its ancestors, also true for a build only a suggestion names.",
+        )
     }
 }
 

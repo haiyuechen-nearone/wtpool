@@ -1,7 +1,7 @@
-//! Opens that never follow a symlink, a file's identity, owner and age from its metadata, and the
-//! prefix a path starts with.
+//! Opens that never follow a symlink, a file's identity, owner, age and privacy from its
+//! metadata, and the prefix a path starts with.
 
-use std::fs::{File, Metadata, OpenOptions};
+use std::fs::{DirBuilder, File, Metadata, OpenOptions};
 use std::io;
 use std::path::{Component, Path, Prefix};
 
@@ -34,6 +34,31 @@ fn without_following(options: &mut OpenOptions) -> &mut OpenOptions {
     use std::os::windows::fs::OpenOptionsExt;
     const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
     options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+}
+
+/// Creates the folder `path`, which only its owner may enter, and its missing parents as usual.
+/// A folder already there stays as it is.
+pub fn create_private_dir(path: &Path) -> io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut builder = DirBuilder::new();
+    match private_dir(&mut builder).create(path) {
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+        created => created,
+    }
+}
+
+#[cfg(unix)]
+fn private_dir(builder: &mut DirBuilder) -> &mut DirBuilder {
+    use std::os::unix::fs::DirBuilderExt;
+    builder.mode(0o700)
+}
+
+/// A new folder takes the access list of the folder that holds it.
+#[cfg(not(unix))]
+fn private_dir(builder: &mut DirBuilder) -> &mut DirBuilder {
+    builder
 }
 
 fn refuse_symlink(meta: &Metadata) -> io::Result<()> {
@@ -91,6 +116,42 @@ pub fn owner(meta: &Metadata) -> Option<u32> {
 #[must_use]
 pub fn owner(_: &Metadata) -> Option<u32> {
     None
+}
+
+/// Why a file or folder is not private to this user.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotPrivate {
+    OtherOwner,
+    WritableByOthers,
+}
+
+impl std::fmt::Display for NotPrivate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::OtherOwner => "it belongs to another user",
+            Self::WritableByOthers => "its group or other users may write to it",
+        })
+    }
+}
+
+/// Refuses the file `meta` describes unless this user owns it and no one else may write to it.
+#[cfg(unix)]
+pub fn check_private(meta: &Metadata) -> Result<(), NotPrivate> {
+    use std::os::unix::fs::MetadataExt;
+    if meta.uid() != rustix::process::getuid().as_raw() {
+        return Err(NotPrivate::OtherOwner);
+    }
+    if meta.mode() & 0o022 != 0 {
+        return Err(NotPrivate::WritableByOthers);
+    }
+    Ok(())
+}
+
+/// Windows tells no owner or mode through the standard library: the access list of the user's
+/// profile folder keeps other users out.
+#[cfg(not(unix))]
+pub fn check_private(_: &Metadata) -> Result<(), NotPrivate> {
+    Ok(())
 }
 
 /// The modification time of the file `meta` describes, in seconds and nanoseconds since the Unix
@@ -196,6 +257,63 @@ mod tests {
         // Then
         assert!(through_link.is_err());
         assert!(direct.is_ok());
+    }
+
+    #[cfg(unix)]
+    #[rstest]
+    #[case::private(0o600, Ok(()))]
+    #[case::readable_by_others(0o644, Ok(()))]
+    #[case::writable_by_the_group(0o660, Err(NotPrivate::WritableByOthers))]
+    #[case::writable_by_others(0o602, Err(NotPrivate::WritableByOthers))]
+    fn check_private__should_refuse_a_file_others_may_write(
+        #[case] mode: u32,
+        #[case] expected: Result<(), NotPrivate>,
+    ) {
+        use std::os::unix::fs::PermissionsExt;
+
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("file");
+        std::fs::write(&path, "").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
+
+        // When
+        let checked = check_private(&path.metadata().unwrap());
+
+        // Then
+        assert_eq!(checked, expected);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn create_private_dir__should_make_a_folder_only_its_owner_enters() {
+        use std::os::unix::fs::PermissionsExt;
+
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("state/wtpool/jobs");
+
+        // When
+        create_private_dir(&path).unwrap();
+        let again = create_private_dir(&path);
+
+        // Then
+        let mode = path.metadata().unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o700);
+        assert!(again.is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn check_private__should_refuse_a_file_of_another_user() {
+        // Given
+        let root = Path::new("/");
+
+        // When
+        let checked = check_private(&root.metadata().unwrap());
+
+        // Then
+        assert_eq!(checked, Err(NotPrivate::OtherOwner));
     }
 
     #[cfg(unix)]

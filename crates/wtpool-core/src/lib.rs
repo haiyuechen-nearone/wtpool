@@ -17,7 +17,9 @@ mod config_file;
 mod error;
 mod forge;
 mod git;
+pub mod heavy;
 pub mod hook;
+pub mod jobs;
 mod names;
 mod paths;
 pub mod platform;
@@ -47,5 +49,7 @@ pub use refs::{RefArgs, SyncMode};
 pub use report::Report;
 pub use resolve::Unresolved;
 pub use run::{Ran, run};
-pub use settings::{Setting, Settings, Source};
+pub use settings::{
+    RepositoryFiles, RepositoryHeavy, RepositoryPatterns, Setting, Settings, Source,
+};
 pub use worktree_state::{Operation, Role, Row, State, Uncommitted, Unreferenced, Upstream};

@@ -64,7 +64,7 @@ impl Repository {
     }
 }
 
-const CONFIG_FILE: &str = "wtpool.toml";
+pub(crate) const CONFIG_FILE: &str = "wtpool.toml";
 
 /// git's stderr is dropped: no repository is an answer here, not an error.
 fn common_dir(git: &Git, dir: &AbsolutePath) -> Result<Option<Repository>, Error> {

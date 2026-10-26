@@ -116,13 +116,15 @@ fn live_refresh__should_read_again_only_what_changed(
         clock: FixedClock,
         processes: processes.clone(),
         machine: "machine".to_owned(),
+        jobs: None,
+        cores: 1,
         forge_repository: https_path,
     };
     let state = PoolState::load(
         fixture.config(),
         fixture.common.clone(),
         &processes,
-        "machine".to_owned(),
+        sources.host(),
         https_path,
     )
     .unwrap();
@@ -175,13 +177,15 @@ fn live_refresh_all__should_keep_what_was_known_when_listing_fails() {
         clock: FixedClock,
         processes: processes.clone(),
         machine: "machine".to_owned(),
+        jobs: None,
+        cores: 1,
         forge_repository: https_path,
     };
     let state = PoolState::load(
         fixture.config(),
         fixture.common.clone(),
         &processes,
-        "machine".to_owned(),
+        sources.host(),
         https_path,
     )
     .unwrap();
@@ -227,6 +231,8 @@ fn watch__should_print_a_document_per_change_until_input_closes() {
                 clock: FixedClock,
                 processes: FixedProcesses::default(),
                 machine: "machine".to_owned(),
+                jobs: None,
+                cores: 1,
                 forge_repository: https_path,
             };
             done.send(watch(config, common, &sources, reader, &mut output))
@@ -338,6 +344,8 @@ fn live_refresh__should_refresh_git_after_an_edit_at_most_once_a_second() {
         clock: FixedClock,
         processes: processes.clone(),
         machine: "machine".to_owned(),
+        jobs: None,
+        cores: 1,
         forge_repository: https_path,
     };
     write_call(&fixture, None, "2026-10-20T12:00:00Z");
@@ -345,7 +353,7 @@ fn live_refresh__should_refresh_git_after_an_edit_at_most_once_a_second() {
         fixture.config(),
         fixture.common.clone(),
         &processes,
-        "machine".to_owned(),
+        sources.host(),
         https_path,
     )
     .unwrap();
@@ -388,13 +396,15 @@ fn live_deadline__should_be_the_next_timer_or_waiting_refresh() {
         clock: FixedClock,
         processes: processes.clone(),
         machine: "machine".to_owned(),
+        jobs: None,
+        cores: 1,
         forge_repository: https_path,
     };
     let state = PoolState::load(
         fixture.config(),
         fixture.common.clone(),
         &processes,
-        "machine".to_owned(),
+        sources.host(),
         https_path,
     )
     .unwrap();
@@ -457,6 +467,8 @@ fn watch__should_fire_a_timer_when_the_clock_file_moves() {
                 clock: crate::clock::FileClock::new(clock),
                 processes: FixedProcesses::default(),
                 machine: "machine".to_owned(),
+                jobs: None,
+                cores: 1,
                 forge_repository: https_path,
             };
             done.send(watch(config, common, &sources, reader, &mut output))

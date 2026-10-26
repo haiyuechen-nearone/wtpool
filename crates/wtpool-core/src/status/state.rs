@@ -2,24 +2,27 @@
 //! processes and the activity records, each refreshed on its own, and the document they make.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::thread;
 
 use super::agents::{self, Context};
-use super::builds::{self, builds_below, builds_by_worktree};
+use super::builds::{self, build_processes, builds_below, builds_by_worktree};
 use super::document::{
     Actor, ActorState, Agents, Build, Document, DocumentKind, DocumentVersion, Machine, PoolStatus,
     Repository, WorktreeStatus,
 };
 use super::facts::{self, Busy, Facts, RefFacts};
+use super::jobs::{self, Harnesses, JobsFacts, JobsState, PoolFolders};
 use super::records::{Record, RecordState, Records};
 use super::repository::repository;
+use super::sources::Host;
 use crate::activity::ACTIVITY_DIR;
 use crate::clock::Timestamp;
 use crate::config::Config;
 use crate::error::Error;
 use crate::git::{Git, GitMode, layout};
+use crate::jobs::HeavyTable;
 use crate::paths::comparable;
 use crate::processes::{ListProcesses, Liveness, RunningProcess};
 use crate::report::Discard;
@@ -38,6 +41,7 @@ pub struct PoolState {
     processes: Vec<RunningProcess>,
     records: Records,
     agents: Agents,
+    jobs: JobsState,
 }
 
 /// A listed worktree and its facts.
@@ -55,13 +59,13 @@ struct Tracked {
 
 impl PoolState {
     /// Reads everything about the pool of `config`, whose common git directory is `common`, on
-    /// the machine called `machine`, through read-only git, with the repository named as
+    /// the machine `host`, through read-only git, with the repository named as
     /// `forge_repository` names it.
     pub fn load(
         config: Config,
         common: PathBuf,
         processes: &impl ListProcesses,
-        machine: String,
+        host: Host,
         forge_repository: fn(&str) -> Option<String>,
     ) -> Result<Self, Error> {
         Self::load_with(
@@ -69,7 +73,7 @@ impl PoolState {
             config,
             common,
             processes,
-            machine,
+            host,
             forge_repository,
         )
     }
@@ -80,15 +84,21 @@ impl PoolState {
         config: Config,
         common: PathBuf,
         processes: &impl ListProcesses,
-        machine: String,
+        host: Host,
         forge_repository: fn(&str) -> Option<String>,
     ) -> Result<Self, Error> {
         let records = Records::new(common.join(ACTIVITY_DIR));
+        let markers = config
+            .main_worktree
+            .as_ref()
+            .unwrap_or(&config.foreground)
+            .to_path_buf();
+        let jobs = JobsState::read(host.jobs, host.cores, &common, markers)?;
         let mut state = Self {
             config,
             common,
             git_mode,
-            machine,
+            machine: host.name,
             forge_repository,
             repository: Repository {
                 name: String::new(),
@@ -98,6 +108,7 @@ impl PoolState {
             processes: Vec::new(),
             records,
             agents: Agents::Off,
+            jobs,
         };
         state.refresh_all(processes)?;
         Ok(state)
@@ -130,7 +141,23 @@ impl PoolState {
             self.repository = repository;
         }
         self.rescan_records();
+        self.jobs.refresh_all(&self.common);
         Ok(())
+    }
+
+    pub fn refresh_machine_config(&mut self) {
+        self.jobs.refresh_machine_config();
+    }
+
+    pub fn refresh_repository_config(&mut self) {
+        self.jobs.refresh_repository_config(&self.common);
+    }
+
+    /// Reads again the jobs whose files are called `stems`, and the process table, as a job's
+    /// start or end changes it.
+    pub fn refresh_jobs(&mut self, stems: &BTreeSet<OsString>, processes: &impl ListProcesses) {
+        self.jobs.refresh_jobs(stems);
+        self.processes = processes.list(&builds::query());
     }
 
     /// Reads again the worktree whose git folder is `git_dir`, running git only in that
@@ -246,21 +273,43 @@ impl PoolState {
             .iter()
             .map(|tracked| tracked.comparable.clone())
             .collect();
-        let builds = builds_by_worktree(&self.processes, &paths, &self.config.build_processes);
         let records = self.counted_records();
-        let building = |path: &Path| {
-            self.worktrees
-                .iter()
-                .zip(&builds)
-                .any(|(tracked, builds)| tracked.holds(path) && !builds.is_empty())
-        };
         let in_pool: Vec<&Record> = records
             .iter()
             .filter(|record| self.worktrees.iter().any(|t| t.holds(&record.worktree)))
             .copied()
             .collect();
         let superseded = agents::superseded(&in_pool);
-        let below = builds_below(&self.processes, &self.config.build_processes);
+        let shown: Vec<&Record> = in_pool
+            .iter()
+            .filter(|record| !superseded.contains(record.key.split('.').next().unwrap_or_default()))
+            .copied()
+            .collect();
+        let heavy = self.jobs.heavy();
+        let job_records = self.jobs.records();
+        let table = HeavyTable::new(
+            &self.processes,
+            &heavy,
+            &self.jobs.build_suggestions(&heavy),
+            &job_records,
+        );
+        let harnesses = Harnesses::new(&shown);
+        let owners: Vec<Option<String>> = job_records
+            .iter()
+            .map(|job| harnesses.actor_of(job.pid, &job.summary, &table))
+            .collect();
+        let build_list = build_processes(&table, &owners);
+        let builds = builds_by_worktree(&build_list, &paths);
+        let building = |path: &Path, key: &str| {
+            self.worktrees.iter().zip(&builds).any(|(tracked, builds)| {
+                tracked.holds(path)
+                    && builds
+                        .iter()
+                        .any(|build| build.owner.is_none_or(|owner| owner == key))
+            })
+        };
+        let below = builds_below(&self.processes, &build_list);
+        let actor_jobs = jobs::actor_jobs(&job_records, &owners);
         let context = Context {
             now,
             processes: &self.processes,
@@ -268,6 +317,7 @@ impl PoolState {
             building: &building,
             superseded: &superseded,
             builds_below: &below,
+            jobs: &actor_jobs,
         };
         let worktrees = self
             .worktrees
@@ -279,15 +329,34 @@ impl PoolState {
                     .filter(|record| tracked.holds(&record.worktree))
                     .copied()
                     .collect();
-                tracked.status(&self.config, builds.clone(), &placed, &context)
+                let builds = builds.iter().map(|build| builds::shown(build)).collect();
+                tracked.status(&self.config, builds, &placed, &context)
             })
             .collect();
+        let folders = PoolFolders(
+            self.worktrees
+                .iter()
+                .map(|tracked| {
+                    let path = tracked.worktree.path().to_string_lossy().into_owned();
+                    (path, tracked.comparable.clone())
+                })
+                .collect(),
+        );
+        let facts = JobsFacts {
+            heavy: &heavy,
+            table: &table,
+            owners: &owners,
+            harnesses: &harnesses,
+            folders: &folders,
+            now,
+        };
         Document {
             kind: DocumentKind::Status,
             version: DocumentVersion,
             generated: now,
             machine: Machine {
                 name: self.machine.clone(),
+                jobs: jobs::jobs_document(&self.jobs, &facts),
             },
             pools: vec![PoolStatus {
                 common_dir: self.common.to_string_lossy().into_owned(),

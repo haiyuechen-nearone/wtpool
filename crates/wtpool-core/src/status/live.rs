@@ -2,13 +2,13 @@
 //! git refresh after a call that edits files, and the timers of the actors.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use super::Sources;
 use super::document::Document;
 use super::state::PoolState;
-use super::watch::{Pending, Track};
+use super::watch::{Change, JobFolders, Pending, Track};
 use crate::clock::ReadClock;
 use crate::processes::ListProcesses;
 
@@ -23,6 +23,7 @@ pub struct Live<'a, C, P> {
     edited: BTreeMap<PathBuf, Instant>,
     /// The worktrees whose refresh after an edit waits, each with the time it is due.
     waiting: BTreeMap<PathBuf, Instant>,
+    folders: Option<JobFolders>,
 }
 
 impl<'a, C, P> Live<'a, C, P> {
@@ -32,6 +33,16 @@ impl<'a, C, P> Live<'a, C, P> {
             sources,
             edited: BTreeMap::new(),
             waiting: BTreeMap::new(),
+            folders: None,
+        }
+    }
+
+    /// Follows the job folders too, and each heartbeat watches those made since.
+    #[must_use]
+    pub fn with_folders(self, folders: JobFolders) -> Self {
+        Self {
+            folders: Some(folders),
+            ..self
         }
     }
 
@@ -58,6 +69,9 @@ impl<'a, C, P> Live<'a, C, P> {
 impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
     /// A failed listing keeps the state as it was, and the next heartbeat tries again.
     fn refresh_all(&mut self) {
+        if let Some(folders) = &mut self.folders {
+            folders.watch_new();
+        }
         let _ = self.state.refresh_all(&self.sources.processes);
     }
 
@@ -76,6 +90,24 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
         }
         if pending.refs {
             self.state.refresh_refs();
+        }
+        let maybe_made = pending.machine_config || !pending.jobs.is_empty();
+        if let Some(folders) = self
+            .folders
+            .as_mut()
+            .filter(|folders| maybe_made && folders.waits())
+        {
+            folders.watch_new();
+        }
+        if pending.machine_config {
+            self.state.refresh_machine_config();
+        }
+        if pending.repository_config {
+            self.state.refresh_repository_config();
+        }
+        if !pending.jobs.is_empty() {
+            self.state
+                .refresh_jobs(&pending.jobs, &self.sources.processes);
         }
         if pending.rescan_records {
             self.state.rescan_records();
@@ -101,6 +133,10 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
             .next_change(clock.now())
             .and_then(|at| now.checked_add(clock.until(at)));
         self.waiting.values().copied().chain(timer).min()
+    }
+
+    fn classify(&self, path: &Path) -> Option<Change> {
+        self.folders.as_ref()?.classify(path)
     }
 
     fn tick(&mut self, now: Instant) {

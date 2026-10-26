@@ -49,7 +49,7 @@ fn property_maps<'a>(value: &'a Value, at: &str, found: &mut Vec<(String, &'a Va
 fn must_oracle_schema() -> Value {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../verify/schema/status.schema.json"
+        "/../../verify/schema/status.phase-4.schema.json"
     );
     serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
 }
@@ -79,7 +79,7 @@ fn status_schema__should_describe_every_property_in_one_line() {
     property_maps(&schema, "#", &mut maps);
 
     // Then
-    assert_eq!(maps.len(), 10, "{maps:?}");
+    assert_eq!(maps.len(), 15, "{maps:?}");
     for (at, properties) in maps {
         for (name, property) in properties.as_object().unwrap() {
             let description = property["description"].as_str().unwrap_or_default();

@@ -1,5 +1,5 @@
 {
-  "description": "Runs wtpool hook on each Claude Code event that wtpool status reads.",
+  "description": "Runs wtpool hook on each Claude Code event that wtpool status reads, and wtpool hook policy before each shell call.",
   "hooks": {
     "CwdChanged": [
       {
@@ -119,6 +119,21 @@
             "type": "command"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook",
+              "policy"
+            ],
+            "command": "wtpool",
+            "onFailure": "continue",
+            "timeout": 2,
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash|PowerShell|Monitor"
       }
     ],
     "SessionEnd": [

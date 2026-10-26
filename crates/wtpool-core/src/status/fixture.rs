@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 
+use super::sources::Host;
 use super::state::PoolState;
 use crate::activity::ACTIVITY_DIR;
 use crate::config::{Config, SlotCount};
@@ -56,7 +57,7 @@ impl ListProcesses for FixedProcesses {
 }
 
 /// `main` on a branch with an upstream, a detached slot `wt1`, an unmanaged `x` on `side`,
-/// and a records folder.
+/// a records folder, and `make` as the repository's heavy pattern.
 pub struct Fixture {
     _dir: tempfile::TempDir,
     pub root: PathBuf,
@@ -90,6 +91,7 @@ pub fn must_fixture() -> Fixture {
     );
     let common = main.join(".git");
     std::fs::create_dir(common.join(ACTIVITY_DIR)).unwrap();
+    std::fs::write(common.join("wtpool.toml"), "heavy = [\"make\"]\n").unwrap();
     Fixture {
         _dir: dir,
         root,
@@ -111,7 +113,6 @@ impl Fixture {
             remote: Default::default(),
             main_worktree: None,
             slot_setup: Default::default(),
-            build_processes: vec!["make".to_owned()],
         }
     }
 
@@ -120,7 +121,11 @@ impl Fixture {
             self.config(),
             self.common.clone(),
             &FixedProcesses::new(processes),
-            "machine".to_owned(),
+            Host {
+                name: "machine".to_owned(),
+                jobs: None,
+                cores: 1,
+            },
             https_path,
         )
         .unwrap()
@@ -143,6 +148,7 @@ impl Fixture {
             started: None,
             name: name.to_owned(),
             cwd: self.root.join(folder),
+            cmd: Vec::new(),
         }
     }
 }

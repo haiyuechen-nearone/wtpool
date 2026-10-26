@@ -3,10 +3,10 @@
 use std::path::{Path, PathBuf};
 
 use wtpool_core::activity::{Harness, TaskId};
-use wtpool_core::hook::{Adapter, HookInput, Printed, TranscriptTitles, WaitingTools};
+use wtpool_core::hook::{Adapter, HookInput, Printed, ShellCall, TranscriptTitles, WaitingTools};
 use wtpool_core::platform::dirs;
 
-use crate::{events, install, tasks, tools, transcript};
+use crate::{events, install, policy, tasks, tools, transcript};
 
 /// The Claude Code adapter, with the environment of the process that runs it.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -60,6 +60,14 @@ impl Adapter for ClaudeCode {
             .path
             .and_then(|path| std::fs::read_to_string(path).ok());
         install::text(binary, &file.shown, settings.as_deref())
+    }
+
+    fn shell_call(&self, input: &[u8]) -> Option<ShellCall> {
+        policy::shell_call(input)
+    }
+
+    fn refusal(&self, reason: &str) -> Option<String> {
+        Some(policy::refusal(reason))
     }
 }
 

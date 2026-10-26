@@ -27,6 +27,12 @@ notify = { version = "=8.2.0", default-features = false, features = ["macos_fsev
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true
+# The user's id for the owner checks of the job folder and the machine config, and the signals
+# a job hands on to its command, without unsafe.
+rustix.workspace = true
+# A job's signal handlers, and its end by its command's signal with the default action, without
+# unsafe.
+signal-hook.workspace = true
 
 [dev-dependencies]
 rstest.workspace = true

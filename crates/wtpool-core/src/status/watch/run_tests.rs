@@ -84,6 +84,7 @@ impl Track for FakeTracker {
             )),
             machine: Machine {
                 name: self.content.lock().unwrap().clone(),
+                jobs: None,
             },
             pools: Vec::new(),
         }

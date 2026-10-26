@@ -11,9 +11,11 @@ use crate::paths::AbsolutePath;
 use crate::repository::Repository;
 
 use discover::Main;
+pub use patterns::{RepositoryFiles, RepositoryHeavy, RepositoryPatterns};
 
 mod discover;
 mod env;
+mod patterns;
 
 /// The pool settings in effect and where each came from.
 ///
@@ -160,7 +162,6 @@ impl Settings {
             remote: self.remote.value,
             main_worktree: self.main_worktree,
             slot_setup: self.slot_setup,
-            build_processes: self.build_processes,
         }
     }
 
@@ -392,6 +393,7 @@ fn resolve(
     let RepoOnly {
         build_processes,
         slot_setup,
+        ..
     } = layers
         .repo
         .map(|repo| repo.repo_only.clone())

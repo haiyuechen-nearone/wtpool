@@ -7,6 +7,7 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
+use super::block::POLICY_ARGS;
 use super::plugin::PLUGIN_ID;
 use crate::events::HookEvent;
 
@@ -21,10 +22,12 @@ struct Hooks<'a> {
     others: BTreeMap<&'a str, Vec<&'static str>>,
     /// `true` when an event runs some `wtpool hook`, this one or another.
     any: bool,
+    /// The `wtpool` paths of the policy entries before shell calls.
+    policy: Vec<&'a str>,
 }
 
-/// The `command` of each entry of `event` in `settings` whose `args` are `["hook"]`.
-fn hook_commands<'a>(settings: &'a Value, event: &str) -> Vec<&'a str> {
+/// The `command` of each entry of `event` in `settings` whose `args` are `args`.
+fn commands<'a>(settings: &'a Value, event: &str, args: &Value) -> Vec<&'a str> {
     settings
         .get("hooks")
         .and_then(|hooks| hooks.get(event))
@@ -33,9 +36,14 @@ fn hook_commands<'a>(settings: &'a Value, event: &str) -> Vec<&'a str> {
         .flatten()
         .filter_map(|group| group.get("hooks").and_then(Value::as_array))
         .flatten()
-        .filter(|entry| entry.get("args") == Some(&json!(["hook"])))
+        .filter(|entry| entry.get("args") == Some(args))
         .filter_map(|entry| entry.get("command").and_then(Value::as_str))
         .collect()
+}
+
+/// The `command` of each entry of `event` in `settings` whose `args` are `["hook"]`.
+fn hook_commands<'a>(settings: &'a Value, event: &str) -> Vec<&'a str> {
+    commands(settings, event, &json!(["hook"]))
 }
 
 fn is_wtpool(command: &str) -> bool {
@@ -45,10 +53,15 @@ fn is_wtpool(command: &str) -> bool {
 }
 
 fn hooks<'a>(settings: &'a Value, binary: &str) -> Hooks<'a> {
+    let policy: Vec<&str> = commands(settings, HookEvent::PreToolUse.name(), &json!(POLICY_ARGS))
+        .into_iter()
+        .filter(|command| is_wtpool(command))
+        .collect();
     let mut found = Hooks {
         missing: Vec::new(),
         others: BTreeMap::new(),
-        any: false,
+        any: !policy.is_empty(),
+        policy,
     };
     for event in HookEvent::ALL.map(HookEvent::name) {
         let commands = hook_commands(settings, event);
@@ -103,7 +116,7 @@ pub(super) fn note(
         return format!(
             "hooks present twice: {shown} enables the plugin {PLUGIN_ID} and holds a wtpool hook \
              block, so each event runs wtpool hook twice.\nRemove the block: delete each entry \
-             under \"hooks\" in {shown} whose \"args\" are [\"hook\"].\n"
+             under \"hooks\" in {shown} whose \"args\" are [\"hook\"] or [\"hook\", \"policy\"].\n"
         );
     }
     if plugin == Some(true) {
@@ -115,7 +128,8 @@ pub(super) fn note(
         };
         return format!("hooks present: {shown} enables the plugin {PLUGIN_ID}.\n{path_line}\n");
     }
-    if hooks.missing.is_empty() && hooks.others.is_empty() {
+    let policy_here = hooks.policy.contains(&binary);
+    if hooks.missing.is_empty() && hooks.others.is_empty() && policy_here {
         return format!("hooks present: {shown} holds this block.\n");
     }
     let mut lines = Vec::new();
@@ -137,6 +151,18 @@ pub(super) fn note(
                 "{shown} runs another wtpool, {other}, for {}: replace that path with {binary}.",
                 events(those)
             ));
+        }
+        if !policy_here {
+            lines.push(match hooks.policy.first() {
+                Some(other) => format!(
+                    "{shown} runs another wtpool, {other}, for the policy check of shell calls: \
+                     replace that path with {binary}."
+                ),
+                None => format!(
+                    "{shown} holds no wtpool hook policy entry for Bash, PowerShell and Monitor \
+                     calls."
+                ),
+            });
         }
     }
     missing(shown, &lines)
@@ -185,7 +211,8 @@ mod tests {
         Some(with(block(BIN), |s| s["enabledPlugins"] = json!({ "wtpool@wtpool": true }))),
         "hooks present twice: ~/.claude/settings.json enables the plugin wtpool@wtpool and holds a \
          wtpool hook block, so each event runs wtpool hook twice.\nRemove the block: delete each \
-         entry under \"hooks\" in ~/.claude/settings.json whose \"args\" are [\"hook\"].\n"
+         entry under \"hooks\" in ~/.claude/settings.json whose \"args\" are [\"hook\"] or [\"hook\", \
+         \"policy\"].\n"
     )]
     fn note__should_say_how_the_hooks_run(#[case] settings: Option<String>, #[case] said: &str) {
         // When
@@ -239,7 +266,15 @@ mod tests {
     #[case::another_wtpool(
         Some(block("/old/wtpool").to_string()),
         "~/.claude/settings.json runs another wtpool, /old/wtpool, for every event: replace that \
-         path with /bin/wtpool."
+         path with /bin/wtpool.\n~/.claude/settings.json runs another wtpool, /old/wtpool, for the \
+         policy check of shell calls: replace that path with /bin/wtpool."
+    )]
+    #[case::no_policy_entry(
+        Some(with(block(BIN), |s| {
+            s["hooks"]["PreToolUse"].as_array_mut().unwrap().truncate(1);
+        })),
+        "~/.claude/settings.json holds no wtpool hook policy entry for Bash, PowerShell and \
+         Monitor calls."
     )]
     #[case::another_wtpool_for_one_event(
         Some(with(block(BIN), |s| s["hooks"]["Stop"] = block("/old/wtpool")["hooks"]["Stop"].clone())),

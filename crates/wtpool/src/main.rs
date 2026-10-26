@@ -15,6 +15,7 @@ use text::{visible, visible_lines};
 use version::{BUILD, version_text};
 
 mod hook;
+mod job;
 mod table;
 mod text;
 mod version;
@@ -37,9 +38,25 @@ slots agents park branches in.
   wtpool status --watch      print that JSON again on each change until stdin closes
   wtpool status --schema     print the JSON schema of that document
   wtpool hook                record a Claude Code hook event from stdin (prints nothing)
+  wtpool hook policy         refuse a heavy shell call outside a job, under enforce = require
   wtpool hook gc             delete old activity records
   wtpool hook install        print the hook block for $CLAUDE_CONFIG_DIR/settings.json
                              (default ~/.claude/settings.json)
+  wtpool job [--label <text>] [--quiet] -- <command>
+                             run a heavy command once fewer heavy jobs than this
+                             machine's limit run
+  wtpool job ls [--json]     print the limit, policy, heavy commands and jobs
+  wtpool job limit [<N>|default]
+                             print the limit and its source, or set it
+  wtpool job enforce [off|warn|require|default]
+                             print the policy for heavy commands outside a job,
+                             or set it
+  wtpool job heavy [add|rm [--repo] [--] <pattern>...]
+                             print the heavy commands, or edit this machine's
+                             list, with --repo this repository's
+  wtpool job heavy suggest [--json]
+                             print the patterns this repository's files suggest;
+                             add them with: wtpool job heavy add --repo --suggested
   wtpool --version           print the version, commit and cargo features of this build
 
 <ref> is a PR number, a GitHub PR URL, or a branch name. A PR needs gh and a
@@ -265,7 +282,7 @@ impl Action {
             },
             Command::Hook(rest) => match rest.raw().as_slice() {
                 [sub] if sub == "gc" => PoolAction::HookGc,
-                _ => return Err(Error::Usage("usage: wtpool hook [gc|install]").into()),
+                _ => return Err(Error::Usage("usage: wtpool hook [policy|gc|install]").into()),
             },
             Command::Status(rest) => match rest.raw().as_slice() {
                 [flag] if flag == "--json" => PoolAction::Status(StatusMode::Json),
@@ -339,13 +356,25 @@ impl Report for Terminal {
 
 fn main() -> ExitCode {
     use std::io::IsTerminal;
-    // `wtpool hook` prints nothing and exits 0 on every path, so it skips the argument checks.
-    let mut args = std::env::args_os().skip(1);
-    if let (Some(first), None) = (args.next(), args.next())
-        && first == "hook"
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    // `wtpool hook` and `wtpool hook policy` exit 0 on every path, so they skip the argument
+    // checks.
+    match args.as_slice() {
+        [first] if first == "hook" => {
+            hook::run_hook();
+            return ExitCode::SUCCESS;
+        }
+        [first, second] if first == "hook" && second == "policy" => {
+            hook::run_policy();
+            return ExitCode::SUCCESS;
+        }
+        _ => {}
+    }
+    // `wtpool job` passes its command's arguments on as they are, and needs no repository.
+    if let Some((first, rest)) = args.split_first()
+        && first == "job"
     {
-        hook::run_hook();
-        return ExitCode::SUCCESS;
+        return job::main(rest);
     }
     let mut terminal = Terminal {
         colour: std::io::stdout().is_terminal(),
@@ -419,6 +448,13 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
                 Format::Text => visible_lines(&settings.to_text()),
                 Format::Json => settings.to_json(),
             });
+            if !settings.build_processes.is_empty() {
+                terminal.warn(&format!(
+                    "build_processes is replaced by heavy: each of its names counts as a heavy \
+                     pattern of one word ({}); list them under heavy instead",
+                    settings.build_processes.join(", ")
+                ));
+            }
             return Ok(());
         }
         Action::Pool(action) => action,
@@ -521,10 +557,14 @@ fn agent_guard(force: bool, sources: &Sources) -> AgentGuard<'_> {
 }
 
 /// The clock and process table that `status`, `fg` and `free` judge agents by: the system's,
-/// unless [`verify_files`] names files for them. Repositories get the names [`GitHub`] gives.
+/// unless [`verify_files`] names files for them, and the cores heavy jobs read. Repositories get
+/// the names [`GitHub`] gives.
 fn status_sources() -> Sources {
     let (clock, processes) = verify_files();
-    Sources::from_files(clock, processes, |url| GitHub.repository(url))
+    Sources {
+        cores: job::cores(),
+        ..Sources::from_files(clock, processes, |url| GitHub.repository(url))
+    }
 }
 
 /// The clock file and the process table file that `WTPOOL_VERIFY_CLOCK` and `WTPOOL_VERIFY_PROCS`

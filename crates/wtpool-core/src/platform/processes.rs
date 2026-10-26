@@ -26,11 +26,15 @@ impl ListProcesses for SystemProcesses {
             Some([]) => return Vec::new(),
             Some(_) => ProcessesToUpdate::Some(&pids),
         };
-        // Name, parent and start time come with every refresh, the working folder only when
-        // asked for. Threads are left out: on Linux they would list as processes of their own.
+        // Name, parent and start time come with every refresh, the working folder and the
+        // arguments only when asked for. Threads are left out: on Linux they would list as
+        // processes of their own.
         let mut refresh = ProcessRefreshKind::nothing().without_tasks();
         if query.cwd {
             refresh = refresh.with_cwd(UpdateKind::Always);
+        }
+        if query.cmd {
+            refresh = refresh.with_cmd(UpdateKind::Always);
         }
         let mut system = System::new();
         system.refresh_processes_specifics(update, true, refresh);
@@ -50,6 +54,7 @@ impl ListProcesses for SystemProcesses {
             started: None,
             name: String::new(),
             cwd: PathBuf::new(),
+            cmd: Vec::new(),
         })
     }
 }
@@ -80,6 +85,15 @@ fn running(process: &Process, query: &ProcessQuery<'_>) -> RunningProcess {
             .filter(|_| query.cwd)
             .map(Path::to_path_buf)
             .unwrap_or_default(),
+        cmd: if query.cmd {
+            process
+                .cmd()
+                .iter()
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect()
+        } else {
+            Vec::new()
+        },
     }
 }
 
@@ -123,6 +137,21 @@ mod tests {
         assert!(!me.name.is_empty());
         let started = me.started.unwrap().second();
         assert!(started <= SystemClock.now() && started.seconds() > 1_700_000_000);
+    }
+
+    #[test]
+    fn system_processes__should_read_the_arguments_only_when_asked() {
+        // Given
+        let pids = [std::process::id()];
+
+        // When
+        let with = SystemProcesses.list(&ProcessQuery::only(&pids).with_cmd());
+        let without = SystemProcesses.list(&ProcessQuery::only(&pids));
+
+        // Then
+        let program = std::env::args().next().unwrap();
+        assert_eq!(with.first().unwrap().cmd.first(), Some(&program));
+        assert!(without.first().unwrap().cmd.is_empty());
     }
 
     #[test]

@@ -2,9 +2,6 @@
 //! part of one can stand in the program's place or reach the summary, and the command inside it
 //! is kept for its path words.
 
-use std::iter::Peekable;
-use std::str::Chars;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Token {
     Word(Word),
@@ -24,6 +21,8 @@ pub(super) struct Word {
     /// `$(…)`, `$((…))`, `${…}`, `<(…)` and backquotes keep their text, so a later check can
     /// tell that the value is unknown.
     pub(super) text: String,
+    /// The byte offset in the command line of the word's first character, a quote included.
+    pub(super) start: usize,
     /// The command inside each outermost `$(…)`, `<(…)`, `>(…)` and backquote pair, in order.
     pub(super) substitutions: Vec<String>,
 }
@@ -43,26 +42,74 @@ enum Nest {
 
 /// Splits `command` into tokens, with quotes removed and heredoc bodies dropped.
 pub(super) fn tokenize(command: &str) -> Vec<Token> {
+    lex(command).tokens
+}
+
+/// The tokens of `command`, `None` when a quote, an escape or a substitution is left open at its
+/// end, as in a line a shell would wait to see continued.
+pub(super) fn tokenize_whole(command: &str) -> Option<Vec<Token>> {
+    let lexer = lex(command);
+    (!lexer.left_open).then_some(lexer.tokens)
+}
+
+fn lex(command: &str) -> Lexer<'_> {
     let mut lexer = Lexer {
-        chars: command.chars().peekable(),
+        chars: Cursor {
+            rest: command,
+            at: 0,
+        },
         tokens: Vec::new(),
         word: Word::default(),
         in_word: false,
+        char_start: 0,
+        left_open: false,
         heredocs: Vec::new(),
     };
-    while let Some(c) = lexer.chars.next() {
+    loop {
+        lexer.char_start = lexer.chars.at;
+        let Some(c) = lexer.chars.next() else {
+            break;
+        };
         lexer.top_level(c);
     }
     lexer.end_word();
-    lexer.tokens
+    lexer
+}
+
+/// The characters of a command line still to read, and the byte offset of the next one.
+struct Cursor<'a> {
+    rest: &'a str,
+    at: usize,
+}
+
+impl Iterator for Cursor<'_> {
+    type Item = char;
+
+    fn next(&mut self) -> Option<char> {
+        let c = self.rest.chars().next()?;
+        let width = c.len_utf8();
+        self.rest = self.rest.get(width..).unwrap_or_default();
+        self.at = self.at.saturating_add(width);
+        Some(c)
+    }
+}
+
+impl Cursor<'_> {
+    fn peek(&self) -> Option<char> {
+        self.rest.chars().next()
+    }
 }
 
 struct Lexer<'a> {
-    chars: Peekable<Chars<'a>>,
+    chars: Cursor<'a>,
     tokens: Vec<Token>,
     word: Word,
     /// Set by quotes too, so `''` is an empty word.
     in_word: bool,
+    /// Where the character the top level reads now starts.
+    char_start: usize,
+    /// The line ended inside a quote, an escape or a substitution.
+    left_open: bool,
     /// Delimiters and `<<-` flags of the heredocs whose bodies start after the next new line.
     heredocs: Vec<(String, bool)>,
 }
@@ -92,8 +139,16 @@ impl Lexer<'_> {
     }
 
     fn push(&mut self, c: char) {
-        self.in_word = true;
+        self.begin_word();
         self.word.text.push(c);
+    }
+
+    /// Marks a word as started at the character the top level reads, unless one already is.
+    fn begin_word(&mut self) {
+        if !self.in_word {
+            self.in_word = true;
+            self.word.start = self.char_start;
+        }
     }
 
     fn end_word(&mut self) {
@@ -111,17 +166,18 @@ impl Lexer<'_> {
     }
 
     fn single_quoted(&mut self) {
-        self.in_word = true;
+        self.begin_word();
         for c in self.chars.by_ref() {
             if c == '\'' {
                 return;
             }
             self.word.text.push(c);
         }
+        self.left_open = true;
     }
 
     fn double_quoted(&mut self) {
-        self.in_word = true;
+        self.begin_word();
         while let Some(c) = self.chars.next() {
             match c {
                 '"' => return,
@@ -139,6 +195,7 @@ impl Lexer<'_> {
                 other => self.word.text.push(other),
             }
         }
+        self.left_open = true;
     }
 
     /// `$'…'`. `\n` and the like keep their letter, enough for path words.
@@ -154,24 +211,25 @@ impl Lexer<'_> {
                 other => self.word.text.push(other),
             }
         }
+        self.left_open = true;
     }
 
     fn escaped(&mut self) {
-        if let Some(escaped) = self.chars.next()
-            && escaped != '\n'
-        {
-            self.push(escaped);
+        match self.chars.next() {
+            Some('\n') => {}
+            Some(escaped) => self.push(escaped),
+            None => self.left_open = true,
         }
     }
 
     /// After a `$`: a substitution, an arithmetic or parameter expansion, `$'…'`, or a `$`.
     fn dollar(&mut self, quoted: bool) {
-        self.in_word = true;
+        self.begin_word();
         match self.chars.peek() {
             Some('(') => {
                 self.chars.next();
                 // `$((…))` is arithmetic: no command, so no path words either.
-                let arithmetic = self.chars.peek() == Some(&'(');
+                let arithmetic = self.chars.peek() == Some('(');
                 let inner = self.raw(&[Nest::Paren]);
                 self.keep("$(", &inner, ")");
                 if !arithmetic {
@@ -192,7 +250,7 @@ impl Lexer<'_> {
     }
 
     fn backquoted(&mut self) {
-        self.in_word = true;
+        self.begin_word();
         let inner = self.raw(&[Nest::Back]);
         self.keep("`", &inner, "`");
         self.word.substitutions.push(unescape_backquoted(&inner));
@@ -211,6 +269,7 @@ impl Lexer<'_> {
         let mut text = String::new();
         while let Some(&top) = stack.last() {
             let Some(c) = self.chars.next() else {
+                self.left_open = true;
                 break;
             };
             let closes = matches!(
@@ -268,9 +327,9 @@ impl Lexer<'_> {
         let text = &self.word.text;
         let inside =
             self.in_word && (text.ends_with('=') || text.ends_with(['?', '*', '+', '@', '!']));
-        let arithmetic = !self.in_word && self.chars.peek() == Some(&'(');
+        let arithmetic = !self.in_word && self.chars.peek() == Some('(');
         if inside || arithmetic {
-            self.in_word = true;
+            self.begin_word();
             let inner = self.raw(&[Nest::Paren]);
             self.keep("(", &inner, ")");
             return;
@@ -280,7 +339,7 @@ impl Lexer<'_> {
     }
 
     fn comment(&mut self) {
-        while self.chars.peek().is_some_and(|c| *c != '\n') {
+        while self.chars.peek().is_some_and(|c| c != '\n') {
             self.chars.next();
         }
     }
@@ -295,22 +354,22 @@ impl Lexer<'_> {
 
     fn operator(&mut self, c: char) {
         self.end_word();
-        if c == '&' && self.chars.peek() == Some(&'>') {
+        if c == '&' && self.chars.peek() == Some('>') {
             self.chars.next();
-            if self.chars.peek() == Some(&'>') {
+            if self.chars.peek() == Some('>') {
                 self.chars.next();
             }
             self.tokens.push(Token::Redirect);
             return;
         }
-        if (c == '|' || c == '&') && self.chars.peek() == Some(&c) {
+        if (c == '|' || c == '&') && self.chars.peek() == Some(c) {
             self.chars.next();
         }
         self.tokens.push(Token::Separator);
     }
 
     fn redirect(&mut self, c: char) {
-        if self.chars.peek() == Some(&'(') {
+        if self.chars.peek() == Some('(') {
             self.end_word();
             self.process_substitution(c);
             return;
@@ -322,14 +381,14 @@ impl Lexer<'_> {
         } else {
             self.end_word();
         }
-        if c == '<' && self.chars.peek() == Some(&'<') {
+        if c == '<' && self.chars.peek() == Some('<') {
             self.chars.next();
-            if self.chars.peek() == Some(&'<') {
+            if self.chars.peek() == Some('<') {
                 self.chars.next();
                 self.tokens.push(Token::Redirect);
                 return;
             }
-            let strip_tabs = self.chars.peek() == Some(&'-');
+            let strip_tabs = self.chars.peek() == Some('-');
             if strip_tabs {
                 self.chars.next();
             }
@@ -337,16 +396,16 @@ impl Lexer<'_> {
             self.heredocs.push((delimiter, strip_tabs));
             return;
         }
-        if self.chars.peek() == Some(&c) {
+        if self.chars.peek() == Some(c) {
             self.chars.next();
         }
-        if self.chars.peek() == Some(&'&') {
+        if self.chars.peek() == Some('&') {
             // `2>&1` names a descriptor, not a file.
             self.chars.next();
             while self
                 .chars
                 .peek()
-                .is_some_and(|d| d.is_ascii_digit() || *d == '-')
+                .is_some_and(|d| d.is_ascii_digit() || d == '-')
             {
                 self.chars.next();
             }
@@ -358,7 +417,7 @@ impl Lexer<'_> {
     /// `<(…)` and `>(…)`: a word that names a pipe, with a command inside like `$(…)`.
     fn process_substitution(&mut self, c: char) {
         self.chars.next();
-        self.in_word = true;
+        self.begin_word();
         let inner = self.raw(&[Nest::Paren]);
         self.word.text.push(c);
         self.keep("(", &inner, ")");
@@ -367,11 +426,11 @@ impl Lexer<'_> {
 
     /// The delimiter word after `<<`, quotes removed.
     fn heredoc_delimiter(&mut self) -> String {
-        while self.chars.peek().is_some_and(|c| *c == ' ' || *c == '\t') {
+        while self.chars.peek().is_some_and(|c| c == ' ' || c == '\t') {
             self.chars.next();
         }
         let mut delimiter = String::new();
-        while let Some(&c) = self.chars.peek() {
+        while let Some(c) = self.chars.peek() {
             if c.is_whitespace() || matches!(c, ';' | '|' | '&' | '<' | '>') {
                 break;
             }

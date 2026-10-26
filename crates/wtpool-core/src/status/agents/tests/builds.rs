@@ -8,15 +8,16 @@ use super::*;
 /// claude process.
 fn with_own_build(subject: &Record, after: i64) -> (Option<ActorState>, Option<(String, String)>) {
     let processes = [claude(Some(START - 3600))];
-    let below = BTreeMap::from([(CLAUDE, "cargo-nextest".to_owned())]);
+    let below = BTreeMap::from([(CLAUDE, vec![below("cargo-nextest")])]);
     let records = [subject];
     let context = Context {
         now: Timestamp::from_seconds(START + after),
         processes: &processes,
         records: &records,
-        building: &|_: &Path| false,
+        building: &|_: &Path, _: &str| false,
         superseded: &BTreeSet::new(),
         builds_below: &below,
+        jobs: &BTreeMap::new(),
     };
     let shown = actor(subject, &context);
     (
@@ -96,14 +97,15 @@ fn actor__should_not_work_on_a_build_of_another_process_or_without_one() {
     let mut unplaced = record("s2", RecordState::Idle);
     unplaced.process = None;
     let processes = [claude(Some(START - 3600))];
-    let below = BTreeMap::from([(CLAUDE + 1, "cargo".to_owned())]);
+    let below = BTreeMap::from([(CLAUDE + 1, vec![below("cargo")])]);
     let context = Context {
         now: Timestamp::from_seconds(START),
         processes: &processes,
         records: &[],
-        building: &|_: &Path| true,
+        building: &|_: &Path, _: &str| true,
         superseded: &BTreeSet::new(),
         builds_below: &below,
+        jobs: &BTreeMap::new(),
     };
 
     // When

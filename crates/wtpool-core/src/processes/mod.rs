@@ -40,6 +40,7 @@ pub struct ProcessQuery<'a> {
     pub started: bool,
     pub name: bool,
     pub cwd: bool,
+    pub cmd: bool,
 }
 
 /// A process the table lists.
@@ -53,6 +54,8 @@ pub struct RunningProcess {
     pub name: String,
     /// The working folder, empty when the table does not say.
     pub cwd: PathBuf,
+    /// The arguments, the program first, empty when the table does not say.
+    pub cmd: Vec<String>,
 }
 
 /// When a process started, in microseconds since the Unix epoch: the system's table tells the
@@ -77,6 +80,7 @@ impl<'a> ProcessQuery<'a> {
             started: false,
             name: false,
             cwd: false,
+            cmd: false,
         }
     }
 
@@ -113,6 +117,11 @@ impl<'a> ProcessQuery<'a> {
     #[must_use]
     pub const fn with_cwd(self) -> Self {
         Self { cwd: true, ..self }
+    }
+
+    #[must_use]
+    pub const fn with_cmd(self) -> Self {
+        Self { cmd: true, ..self }
     }
 }
 
@@ -217,7 +226,8 @@ mod tests {
             .with_parent()
             .with_started()
             .with_name()
-            .with_cwd();
+            .with_cwd()
+            .with_cmd();
 
         // Then
         let expected = ProcessQuery {
@@ -226,6 +236,7 @@ mod tests {
             started: true,
             name: true,
             cwd: true,
+            cmd: true,
         };
         assert_eq!(query, expected);
         assert_eq!(ProcessQuery::all().pids, None);

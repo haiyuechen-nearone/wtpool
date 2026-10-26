@@ -6,6 +6,8 @@ use serde::Serialize;
 use super::record_time::RecordTime;
 use crate::activity::{PlacedBy, WaitReason};
 use crate::clock::Timestamp;
+use crate::heavy::PatternSource;
+use crate::jobs::{ConfigSource, Enforce};
 use crate::worktree_state::Role;
 
 /// One `wtpool status` document, `"type": "status"`, version 1.
@@ -34,6 +36,65 @@ pub struct DocumentVersion;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Machine {
     pub name: String,
+    /// `None` without a folder for this user's job settings.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jobs: Option<Jobs>,
+}
+
+/// The heavy jobs of this user and machine.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Jobs {
+    /// `None` while [`error`](Self::error) names a fault of the machine config.
+    pub limit: Option<u32>,
+    pub default: u32,
+    pub min: u32,
+    pub max: u32,
+    pub enforce: Enforce,
+    pub source: JobSources,
+    pub config: String,
+    pub error: Option<String>,
+    pub heavy: Vec<HeavyEntry>,
+    pub suggested: Vec<SuggestionEntry>,
+    pub running: Vec<JobEntry>,
+    /// In queue order.
+    pub waiting: Vec<JobEntry>,
+    /// The outermost heavy processes no job holds, newest first.
+    pub outside: Vec<JobEntry>,
+}
+
+/// Where the limit and the policy each come from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct JobSources {
+    pub limit: ConfigSource,
+    pub enforce: ConfigSource,
+}
+
+/// A heavy pattern and the list it comes from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct HeavyEntry {
+    pub pattern: String,
+    pub source: PatternSource,
+}
+
+/// A pattern suggested for this repository, and the marker or other source it came from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SuggestionEntry {
+    pub pattern: String,
+    pub from: String,
+}
+
+/// A job, or a heavy process outside any job, and whose it is.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct JobEntry {
+    pub id: String,
+    pub summary: String,
+    pub label: Option<String>,
+    /// The path of the worktree of this pool its folder lies in.
+    pub worktree: Option<String>,
+    /// The key of the actor of this pool it belongs to.
+    pub actor: Option<String>,
+    /// When it started, or for a waiting job when it queued.
+    pub since: Timestamp,
 }
 
 /// The worktrees of one repository.
@@ -183,7 +244,10 @@ pub struct Action {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Build {
     pub pid: u32,
+    /// The words of the heavy pattern it matches.
     pub name: String,
+    /// A live job's process is the build or one of its ancestors, or only a suggestion names it.
+    pub queued: bool,
 }
 
 /// A background task of an actor and the file its output goes to. wtpool names the file and
@@ -280,6 +344,7 @@ mod tests {
             generated: Timestamp::from_seconds(generated),
             machine: Machine {
                 name: name.to_owned(),
+                jobs: None,
             },
             pools: Vec::new(),
         }

@@ -225,7 +225,6 @@ impl Fixture {
             remote: RemoteName::default(),
             main_worktree: Some(AbsolutePath::try_new(&self.foreground).unwrap()),
             slot_setup: SlotSetup::default(),
-            build_processes: Vec::new(),
         }
     }
 

@@ -1,10 +1,11 @@
-//! `wtpool hook`, `wtpool hook gc` and `wtpool hook install`.
+//! `wtpool hook`, `wtpool hook policy`, `wtpool hook gc` and `wtpool hook install`.
 
+use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
 
 use wtpool_claude_code::ClaudeCode;
-use wtpool_core::hook::{self, Adapter as _, HookEnv};
+use wtpool_core::hook::{self, Adapter as _, HookEnv, PolicyEnv};
 
 use crate::verify_files;
 
@@ -25,6 +26,12 @@ impl Adapter {
     fn handle(&self, input: &[u8], env: &HookEnv) {
         match self {
             Self::ClaudeCode(claude_code) => hook::handle(claude_code, input, env),
+        }
+    }
+
+    fn judge(&self, input: &[u8], env: &PolicyEnv) -> Option<String> {
+        match self {
+            Self::ClaudeCode(claude_code) => hook::judge_policy(claude_code, input, env),
         }
     }
 
@@ -70,6 +77,30 @@ pub fn run_hook() {
         verify_panic(&adapter, &input);
         adapter.handle(&input, &env);
     });
+}
+
+/// `wtpool hook policy`: reads the payload on stdin and prints the harness's refusal of a heavy
+/// shell call outside a job, or nothing. It writes no file, and every fault, a panic or a hang
+/// included, ends it with nothing printed and exit 0, so the call goes on.
+pub fn run_policy() {
+    std::thread::spawn(|| {
+        std::thread::sleep(WATCHDOG);
+        std::process::exit(0);
+    });
+    std::panic::set_hook(Box::new(|_| {}));
+    let decision = std::panic::catch_unwind(|| {
+        let adapter = Adapter::from_process();
+        let input = hook::read_input(std::io::stdin().lock());
+        verify_panic(&adapter, &input);
+        let env = PolicyEnv::from_env(|name| std::env::var_os(name))?;
+        adapter.judge(&input, &env)
+    });
+    if let Ok(Some(line)) = decision {
+        let mut stdout = std::io::stdout().lock();
+        let _ = stdout
+            .write_all(line.as_bytes())
+            .and_then(|()| stdout.flush());
+    }
 }
 
 /// Runs `wtpool hook gc` on the pool whose common git directory is `common`, and returns the

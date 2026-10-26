@@ -117,7 +117,7 @@
     "build": {
       "properties": {
         "name": {
-          "description": "The build process's name.",
+          "description": "The words of the heavy pattern the build process matches.",
           "minLength": 1,
           "type": "string"
         },
@@ -125,6 +125,10 @@
           "description": "The build process's id.",
           "minimum": 1,
           "type": "integer"
+        },
+        "queued": {
+          "description": "Whether a live job's process is the build or one of its ancestors, also true for a build only a suggestion names.",
+          "type": "boolean"
         }
       },
       "required": [
@@ -183,6 +187,197 @@
         "unreferenced",
         "operation",
         "unknown"
+      ],
+      "type": "object"
+    },
+    "heavy": {
+      "properties": {
+        "pattern": {
+          "description": "The pattern, one to three words.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "source": {
+          "description": "The list it comes from: the machine's, the repository's `heavy` or its `build_processes`.",
+          "enum": [
+            "machine",
+            "repository",
+            "build_processes"
+          ]
+        }
+      },
+      "required": [
+        "pattern",
+        "source"
+      ],
+      "type": "object"
+    },
+    "job": {
+      "properties": {
+        "actor": {
+          "description": "The key of the actor of this pool it belongs to, else null.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "The job's id, or an id of a heavy process outside any job.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "label": {
+          "description": "Its label, else null.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "since": {
+          "$ref": "#/$defs/time",
+          "description": "When it started, or for a waiting job when it queued."
+        },
+        "summary": {
+          "description": "The words of the heavy pattern it matches, else the summary of its arguments.",
+          "type": "string"
+        },
+        "worktree": {
+          "description": "The path of the worktree of this pool its folder lies in, else null.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "summary",
+        "label",
+        "worktree",
+        "actor",
+        "since"
+      ],
+      "type": "object"
+    },
+    "jobs": {
+      "properties": {
+        "config": {
+          "description": "The path of `machine.toml`, whether it exists or not.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "default": {
+          "description": "The limit without a setting: a quarter of the cores, kept from 1 to 8.",
+          "maximum": 8,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "enforce": {
+          "description": "The policy for heavy commands outside a job.",
+          "enum": [
+            "off",
+            "warn",
+            "require"
+          ]
+        },
+        "error": {
+          "description": "Why the machine config or the job folder cannot be read, else null.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "heavy": {
+          "description": "Each heavy pattern with the list it comes from.",
+          "items": {
+            "$ref": "#/$defs/heavy"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "description": "How many jobs run at once, null while error is set.",
+          "maximum": 64,
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "max": {
+          "const": 64,
+          "description": "The highest limit."
+        },
+        "min": {
+          "const": 1,
+          "description": "The lowest limit."
+        },
+        "outside": {
+          "description": "The outermost heavy processes no job holds, newest first.",
+          "items": {
+            "$ref": "#/$defs/job"
+          },
+          "type": "array"
+        },
+        "running": {
+          "description": "The running jobs.",
+          "items": {
+            "$ref": "#/$defs/job"
+          },
+          "type": "array"
+        },
+        "source": {
+          "description": "Where the limit and the policy each come from: `machine.toml` or the defaults.",
+          "properties": {
+            "enforce": {
+              "description": "The source of the policy.",
+              "enum": [
+                "machine",
+                "default"
+              ]
+            },
+            "limit": {
+              "description": "The source of the limit.",
+              "enum": [
+                "machine",
+                "default"
+              ]
+            }
+          },
+          "required": [
+            "limit",
+            "enforce"
+          ],
+          "type": "object"
+        },
+        "suggested": {
+          "description": "This repository's suggested patterns that the heavy list lacks.",
+          "items": {
+            "$ref": "#/$defs/suggestion"
+          },
+          "type": "array"
+        },
+        "waiting": {
+          "description": "The waiting jobs in queue order.",
+          "items": {
+            "$ref": "#/$defs/job"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "limit",
+        "default",
+        "min",
+        "max",
+        "enforce",
+        "source",
+        "config",
+        "error",
+        "heavy",
+        "suggested",
+        "running",
+        "waiting",
+        "outside"
       ],
       "type": "object"
     },
@@ -287,6 +482,25 @@
         "skipped_records",
         "worktrees",
         "repository"
+      ],
+      "type": "object"
+    },
+    "suggestion": {
+      "properties": {
+        "from": {
+          "description": "What suggested it, such as the marker `Cargo.toml` or `package.json`; an open string.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "pattern": {
+          "description": "The suggested pattern.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "pattern",
+        "from"
       ],
       "type": "object"
     },
@@ -440,6 +654,10 @@
     "machine": {
       "description": "The machine wtpool ran on.",
       "properties": {
+        "jobs": {
+          "$ref": "#/$defs/jobs",
+          "description": "This user's heavy jobs on the machine; absent without a folder for their settings."
+        },
         "name": {
           "description": "The machine's host name, `localhost` when it has none.",
           "minLength": 1,

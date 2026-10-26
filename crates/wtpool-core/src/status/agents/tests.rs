@@ -55,6 +55,15 @@ fn claude(started: Option<i64>) -> RunningProcess {
             .and_then(StartTime::from_second),
         name: "claude".to_owned(),
         cwd: PathBuf::from("/p/fg"),
+        cmd: Vec::new(),
+    }
+}
+
+/// A build below a process that no job holds.
+fn below(name: &str) -> BuildBelow {
+    BuildBelow {
+        name: name.to_owned(),
+        owner: None,
     }
 }
 
@@ -70,7 +79,7 @@ fn call(kind: CallKind) -> Call {
 fn state_after(subject: &Record, others: &[Record], after: i64, build: bool) -> Option<ActorState> {
     let processes = [claude(Some(START - 3600))];
     let records: Vec<&Record> = others.iter().chain([subject]).collect();
-    let building = move |path: &Path| build && path == Path::new("/p/wt1");
+    let building = move |path: &Path, _: &str| build && path == Path::new("/p/wt1");
     let context = Context {
         now: Timestamp::from_seconds(START + after),
         processes: &processes,
@@ -78,6 +87,7 @@ fn state_after(subject: &Record, others: &[Record], after: i64, build: bool) -> 
         building: &building,
         superseded: &BTreeSet::new(),
         builds_below: &BTreeMap::new(),
+        jobs: &BTreeMap::new(),
     };
     actor(subject, &context).map(|actor| actor.state)
 }
@@ -165,9 +175,10 @@ fn actor__should_name_the_reason_of_a_wait(
         now: Timestamp::from_seconds(START),
         processes: &processes,
         records: &[],
-        building: &|_: &Path| false,
+        building: &|_: &Path, _: &str| false,
         superseded: &BTreeSet::new(),
         builds_below: &BTreeMap::new(),
+        jobs: &BTreeMap::new(),
     };
 
     // When
@@ -211,9 +222,10 @@ fn actor__should_show_the_call_it_waits_for_else_its_action(
         now: Timestamp::from_seconds(START),
         processes: &processes,
         records: &[],
-        building: &|_: &Path| false,
+        building: &|_: &Path, _: &str| false,
         superseded: &BTreeSet::new(),
         builds_below: &BTreeMap::new(),
+        jobs: &BTreeMap::new(),
     };
 
     // When
@@ -239,9 +251,10 @@ fn actor__should_copy_the_record() {
         now: Timestamp::from_seconds(START),
         processes: &processes,
         records: &[],
-        building: &|_: &Path| false,
+        building: &|_: &Path, _: &str| false,
         superseded: &BTreeSet::new(),
         builds_below: &BTreeMap::new(),
+        jobs: &BTreeMap::new(),
     };
 
     // When
@@ -289,9 +302,10 @@ fn actor__should_list_its_outputs_and_omit_none() {
         now: Timestamp::from_seconds(START),
         processes: &processes,
         records: &[],
-        building: &|_: &Path| false,
+        building: &|_: &Path, _: &str| false,
         superseded: &BTreeSet::new(),
         builds_below: &BTreeMap::new(),
+        jobs: &BTreeMap::new(),
     };
 
     // When
@@ -348,9 +362,10 @@ fn sort__should_put_the_newest_first_then_by_key() {
         now: Timestamp::from_seconds(START),
         processes: &processes,
         records: &[],
-        building: &|_: &Path| false,
+        building: &|_: &Path, _: &str| false,
         superseded: &BTreeSet::new(),
         builds_below: &BTreeMap::new(),
+        jobs: &BTreeMap::new(),
     };
     let make = |key: &str, updated: i64| {
         let mut subject = record(key, RecordState::Idle);
@@ -407,9 +422,10 @@ fn actor__should_label_a_subagent_with_its_title(
         now: Timestamp::from_seconds(START),
         processes: &processes,
         records: &refs,
-        building: &|_: &Path| false,
+        building: &|_: &Path, _: &str| false,
         superseded: &BTreeSet::new(),
         builds_below: &BTreeMap::new(),
+        jobs: &BTreeMap::new(),
     };
 
     // When

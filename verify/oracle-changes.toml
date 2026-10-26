@@ -1239,3 +1239,9 @@ reason = "More host and e2e checks wait for the state their next step needs inst
 "vscode/test/host/tab.test.cjs" = "3272cfb216c73dbf31dbcfcaddbaad5f4e0bc140045c75e051e11e26b564d4f4"
 "xtask/src/layers/e2e.rs" = "5eb1da154c3a63ad5e91cebdae3702f882f6595dd10bb070bc4776fbdb7e2869"
 "xtask/src/web/reporters.rs" = "f37c23e739562b2abf0d68b7c982d55213f2113ec14b9b014cab635e2635d3db"
+
+[[change]]
+id = "p4-oracle-fixes-2"
+reason = "expectedRows of the e2e layer reads a document without machine as one without jobs, as a consumer reads an absent property as none. flow__workspace_folder_pool builds its expected rows from a document of pools alone, whose missing machine made expectedRows throw before any window opened. Every document that holds machine reads as before."
+[change.files]
+"vscode/test/e2e/rows.mjs" = "4c733072ecabfb431fb564062fb09b141a991fc241416dc391f68128021ef659"

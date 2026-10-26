@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// A UTC time in whole seconds since the Unix epoch, read and written as RFC 3339.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -52,6 +52,13 @@ impl Timestamp {
 impl Serialize for Timestamp {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.to_rfc3339())
+    }
+}
+
+impl<'de> Deserialize<'de> for Timestamp {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let text = String::deserialize(deserializer)?;
+        Self::parse(&text).ok_or_else(|| serde::de::Error::custom("not an RFC 3339 time"))
     }
 }
 
@@ -140,5 +147,16 @@ mod tests {
 
         // Then
         assert_eq!(json, "\"2026-10-20T12:00:00Z\"");
+    }
+
+    #[test]
+    fn timestamp__should_deserialize_only_rfc3339() {
+        // When
+        let read: Result<Timestamp, _> = serde_json::from_str("\"2026-10-20T12:00:00Z\"");
+        let refused: Result<Timestamp, _> = serde_json::from_str("\"noon\"");
+
+        // Then
+        assert_eq!(read.unwrap(), Timestamp::from_seconds(1_792_497_600));
+        assert!(refused.is_err());
     }
 }

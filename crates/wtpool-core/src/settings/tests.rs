@@ -35,6 +35,7 @@ fn repo_layer(values: Values) -> RepoLayer {
         file: path("/code/app/.git/wtpool.toml"),
         values,
         repo_only: RepoOnly {
+            heavy: Vec::new(),
             build_processes: vec!["make".to_owned()],
             slot_setup: SlotSetup {
                 copy: vec![CopyPath::try_new(".envrc").unwrap()],
@@ -386,7 +387,6 @@ fn resolve__should_take_build_processes_and_slot_setup_from_the_repository_file(
     assert_eq!(settings.build_processes, expected);
     assert_eq!(settings.slot_setup, setup);
     let config = settings.into_config();
-    assert_eq!(config.build_processes, expected);
     assert_eq!(config.slot_setup, setup);
 }
 

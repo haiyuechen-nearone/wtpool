@@ -172,13 +172,29 @@ fn simple_command(
     }
 }
 
-/// The index of the program after `VAR=value`, `env`, `timeout N`, `time`, `nice` and
-/// `nix develop … -c`.
+/// Where the program of a simple command starts, after its prefixes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ProgramStart {
+    /// The index of the program's word, the length of the words when none follows.
+    pub at: usize,
+    /// One of the prefixes is `wtpool job` with its options up to `--`.
+    pub wrapped: bool,
+}
+
+/// The index of the program after `VAR=value`, `env`, `timeout N`, `time`, `nice`,
+/// `nix develop … -c` and `wtpool job … --`.
 fn skip_prefixes(words: &[String]) -> usize {
+    program_start(words).at
+}
+
+/// The [`ProgramStart`] of the simple command `words`.
+pub(crate) fn program_start(words: &[String]) -> ProgramStart {
     let mut at = 0;
+    let mut wrapped = false;
     loop {
+        let start = ProgramStart { at, wrapped };
         let Some(word) = words.get(at) else {
-            return at;
+            return start;
         };
         let next = |from: usize| words.get(from).map(String::as_str);
         if is_assignment(word) {
@@ -213,16 +229,26 @@ fn skip_prefixes(words: &[String]) -> usize {
                     .find(|&i| matches!(next(i), Some("-c" | "--command")));
                 match command {
                     Some(flag) => at = flag.saturating_add(1),
-                    None => return at,
+                    None => return start,
                 }
             }
-            _ => return at,
+            "wtpool" if next(at.saturating_add(1)) == Some("job") => {
+                let dashes = (at.saturating_add(2)..words.len()).find(|&i| next(i) == Some("--"));
+                match dashes {
+                    Some(dashes) => {
+                        at = dashes.saturating_add(1);
+                        wrapped = true;
+                    }
+                    None => return start,
+                }
+            }
+            _ => return start,
         }
     }
 }
 
 /// `NAME=value` or `NAME+=value`.
-fn is_assignment(word: &str) -> bool {
+pub(crate) fn is_assignment(word: &str) -> bool {
     match word.split_once('=') {
         Some((name, _)) => {
             let name = name.strip_suffix('+').unwrap_or(name);
@@ -232,6 +258,56 @@ fn is_assignment(word: &str) -> bool {
         }
         None => false,
     }
+}
+
+/// The summary of the simple command `words`: its program's basename plus, for a listed program,
+/// its next word. `None` when no program follows the prefixes, or the program word is a piece of
+/// a construct the lexer missed.
+pub(crate) fn summary_of(words: &[String]) -> Option<String> {
+    let start = skip_prefixes(words);
+    let program = words.get(start).filter(|word| is_program(word))?;
+    let next = words.get(start.saturating_add(1)).map(String::as_str);
+    Some(summary(&basename(program), next))
+}
+
+/// A word of a simple command, quotes removed, and the byte offset in its command line where
+/// it starts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ShellWord {
+    pub text: String,
+    pub start: usize,
+}
+
+/// The words of each simple command of `command` outside any substitution, without the
+/// targets of redirects. `None` for a line that leaves a quote, an escape or a substitution
+/// open.
+pub(crate) fn simple_commands(command: &str) -> Option<Vec<Vec<ShellWord>>> {
+    let mut commands = Vec::new();
+    let mut words = Vec::new();
+    let mut pending_redirect = false;
+    for token in lex::tokenize_whole(command)? {
+        match token {
+            Token::Word(word) => {
+                if !std::mem::take(&mut pending_redirect) {
+                    words.push(ShellWord {
+                        text: word.text,
+                        start: word.start,
+                    });
+                }
+            }
+            Token::Redirect => pending_redirect = true,
+            Token::Separator | Token::Open | Token::Close => {
+                pending_redirect = false;
+                if !words.is_empty() {
+                    commands.push(std::mem::take(&mut words));
+                }
+            }
+        }
+    }
+    if !words.is_empty() {
+        commands.push(words);
+    }
+    Some(commands)
 }
 
 /// `program` plus, for a listed program, `next` when it matches `^[a-z][a-z0-9-]{0,23}$`.

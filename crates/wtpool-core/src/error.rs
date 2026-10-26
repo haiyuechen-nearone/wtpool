@@ -103,6 +103,17 @@ pub enum SettingsError {
     },
     #[error("could not read {}: {reason}", path.display())]
     ReadConfig { path: PathBuf, reason: String },
+    /// A setting of this machine's heavy jobs in a repository's `wtpool.toml`.
+    #[error(
+        "invalid {}: {}unknown key `{key}`: heavy jobs read it from this machine's config alone; set it with wtpool job {key}",
+        path.display(),
+        at_line(*line)
+    )]
+    MachineKey {
+        path: PathBuf,
+        line: Option<usize>,
+        key: &'static str,
+    },
     #[error("refusing to read {}: it is a symlink", .0.display())]
     ConfigSymlink(PathBuf),
     /// Neither `WTPOOL_FOREGROUND` nor the current directory names a repository.
@@ -335,7 +346,7 @@ pub fn exit_status(code: Option<i32>) -> String {
     }
 }
 
-fn at_line(line: Option<usize>) -> String {
+pub(crate) fn at_line(line: Option<usize>) -> String {
     line.map(|line| format!("line {line}: "))
         .unwrap_or_default()
 }

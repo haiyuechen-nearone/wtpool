@@ -6,6 +6,7 @@ use std::path::Path;
 
 use super::input::HookInput;
 use super::install::Printed;
+use super::policy::ShellCall;
 use crate::activity::{Harness, TaskId, WaitReason};
 
 /// The adapter of one coding agent harness.
@@ -35,6 +36,17 @@ pub trait Adapter {
     /// The text `wtpool hook install` prints so that the harness runs `binary` on its hook
     /// events.
     fn install(&self, binary: &str) -> Printed;
+
+    /// The shell call that one raw input of the harness says is about to run, `None` for any
+    /// other input. A harness that cannot refuse a call before it runs names none.
+    fn shell_call(&self, _input: &[u8]) -> Option<ShellCall> {
+        None
+    }
+
+    /// The text `wtpool hook policy` prints to have the harness refuse the call for `reason`.
+    fn refusal(&self, _reason: &str) -> Option<String> {
+        None
+    }
 }
 
 /// The tools of a harness whose calls wait for the user, by name, each with the cause of its

@@ -37,6 +37,12 @@ The first version. It is alpha: tested on macOS; Linux and Windows build but are
   present.
 - **Activity rules.** An agent whose turn ended shows working while a build or a background task
   it started runs. A `done` subagent shows for 1 minute.
+- **Heavy jobs.** `wtpool job -- <command>` runs a heavy command once fewer jobs than this
+  machine's limit run, in the order they came, with its arguments, streams and exit status passed
+  through; a job inside a job runs at once. `wtpool job ls` prints the limit, the policy, the heavy
+  patterns and the jobs. The limit, the policy and the machine's patterns live in
+  `<config>/wtpool/machine.toml`, a repository adds patterns through `heavy` in its `wtpool.toml`,
+  and a job records its summary, never its arguments.
 - **The VS Code extension.** The Worktrees tab shows one row per worktree, with its branch, git
   state and what each agent does, and highlights waits. Its detail strip shows the live tail of
   each background task's output, and Follow streams it into a terminal. Row actions open the

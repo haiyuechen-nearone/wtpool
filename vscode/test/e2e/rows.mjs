@@ -65,7 +65,7 @@ export function resolved(status, poolInfo) {
 /** What the rows of `status` must read, Last left out: scenario times are not the pool's. */
 export function expectedRows(status, poolInfo) {
   return rowOrder(resolved(status, poolInfo).pools[0].worktrees).map((w) => {
-    const { last: _, ...row } = expectedRow(w, Date.now(), status.machine.jobs);
+    const { last: _, ...row } = expectedRow(w, Date.now(), status.machine?.jobs);
     return { id: w.path, ...row };
   });
 }

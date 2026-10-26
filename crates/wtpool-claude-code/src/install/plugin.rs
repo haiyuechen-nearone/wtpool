@@ -18,8 +18,8 @@ mod tests {
     /// cannot know where `wtpool` was installed.
     const COMMAND: &str = "wtpool";
 
-    const DESCRIPTION: &str =
-        "Runs wtpool hook on each Claude Code event that wtpool status reads.";
+    const DESCRIPTION: &str = "Runs wtpool hook on each Claude Code event that wtpool status \
+                               reads, and wtpool hook policy before each shell call.";
 
     fn hooks_file() -> String {
         let mut file = block(COMMAND);

@@ -31,6 +31,7 @@ fn claude_at(pid: u32) -> RunningProcess {
         started: StartTime::parse("2026-10-20T11:00:00Z"),
         name: "claude".to_owned(),
         cwd: PathBuf::from("/"),
+        cmd: Vec::new(),
     }
 }
 

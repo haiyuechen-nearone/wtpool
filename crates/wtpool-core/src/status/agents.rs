@@ -4,6 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use super::builds::BuildBelow;
 use super::document::{Action, Actor, ActorKind, ActorState};
 use super::outputs;
 use super::records::{Record, RecordState};
@@ -20,6 +21,18 @@ pub const BUILD_TOOL: &str = "build:";
 /// The action tool of an actor that works on a background task it started, as in
 /// `background: <summary>`.
 pub const BACKGROUND_TOOL: &str = "background:";
+/// The tool of the action of an actor whose job waits for a place, so its line reads
+/// `queued: <label or summary>`.
+pub const QUEUED_TOOL: &str = "queued:";
+
+/// The jobs of one actor.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ActorJob {
+    /// The label, else the summary, of its first job in the queue.
+    pub waiting: Option<String>,
+    /// One of its jobs runs.
+    pub running: bool,
+}
 
 /// The facts besides the record that [`actor`] reads.
 pub struct Context<'a> {
@@ -27,13 +40,16 @@ pub struct Context<'a> {
     pub processes: &'a [RunningProcess],
     /// Every record that counts, for the subagents of a session.
     pub records: &'a [&'a Record],
-    /// True when a build works in the worktree at the path.
-    pub building: &'a dyn Fn(&Path) -> bool,
+    /// `true` when a build works in the worktree and no job of an actor other than the one
+    /// keyed so holds it.
+    pub building: &'a dyn Fn(&Path, &str) -> bool,
     /// The sessions a newer main session of their process replaced, from [`superseded`].
     pub superseded: &'a BTreeSet<String>,
-    /// The outermost build below each process, by pid, from
+    /// The builds below each process, by pid, outermost first, from
     /// [`builds_below`](super::builds::builds_below).
-    pub builds_below: &'a BTreeMap<u32, String>,
+    pub builds_below: &'a BTreeMap<u32, Vec<BuildBelow>>,
+    /// The jobs of each actor, by its key.
+    pub jobs: &'a BTreeMap<String, ActorJob>,
 }
 
 /// The actor `record` shows as, `None` when it is hidden.
@@ -41,7 +57,12 @@ pub struct Context<'a> {
 pub fn actor(record: &Record, context: &Context<'_>) -> Option<Actor> {
     let state = shown_state(record, context)?;
     let outputs = outputs::outputs(&record.tasks);
-    let build = matches!(state, ActorState::Idle | ActorState::Quiet)
+    let queued = context
+        .jobs
+        .get(&record.key)
+        .and_then(|job| job.waiting.as_deref())
+        .filter(|_| state != ActorState::Waiting);
+    let build = (queued.is_none() && matches!(state, ActorState::Idle | ActorState::Quiet))
         .then(|| own_build(record, context))
         .flatten();
     let turn_ended = matches!(
@@ -49,8 +70,9 @@ pub fn actor(record: &Record, context: &Context<'_>) -> Option<Actor> {
         ActorState::Idle | ActorState::Quiet | ActorState::Done
     );
     let newest_running_task = outputs.first().filter(|output| output.running);
-    let background = newest_running_task.filter(|_| turn_ended && build.is_none());
-    let state = if build.is_some() || background.is_some() {
+    let background =
+        newest_running_task.filter(|_| turn_ended && queued.is_none() && build.is_none());
+    let state = if queued.is_some() || build.is_some() || background.is_some() {
         ActorState::Working
     } else {
         state
@@ -59,23 +81,30 @@ pub fn actor(record: &Record, context: &Context<'_>) -> Option<Actor> {
         .waiting
         .as_ref()
         .filter(|_| state == ActorState::Waiting);
-    let action = match (build, background, waiting) {
-        (Some(build), _, _) => Some(Action {
-            tool: BUILD_TOOL.to_owned(),
-            target: build.to_owned(),
-        }),
-        (None, Some(task), _) => Some(Action {
-            tool: BACKGROUND_TOOL.to_owned(),
-            target: task.summary.clone(),
-        }),
-        (None, None, Some(waiting)) => waiting.tool.clone().map(|tool| Action {
-            tool,
-            target: waiting.target.clone().unwrap_or_default(),
-        }),
-        (None, None, None) => record.action.clone().map(|action| Action {
-            tool: action.tool,
-            target: action.target,
-        }),
+    let action = if let Some(queued) = queued {
+        Some(Action {
+            tool: QUEUED_TOOL.to_owned(),
+            target: queued.to_owned(),
+        })
+    } else {
+        match (build, background, waiting) {
+            (Some(build), _, _) => Some(Action {
+                tool: BUILD_TOOL.to_owned(),
+                target: build.to_owned(),
+            }),
+            (None, Some(task), _) => Some(Action {
+                tool: BACKGROUND_TOOL.to_owned(),
+                target: task.summary.clone(),
+            }),
+            (None, None, Some(waiting)) => waiting.tool.clone().map(|tool| Action {
+                tool,
+                target: waiting.target.clone().unwrap_or_default(),
+            }),
+            (None, None, None) => record.action.clone().map(|action| Action {
+                tool: action.tool,
+                target: action.target,
+            }),
+        }
     }
     .filter(|action| !action.tool.is_empty());
     Some(Actor {
@@ -117,7 +146,8 @@ fn shown_state(record: &Record, context: &Context<'_>) -> Option<ActorState> {
         RecordState::Working
             if age < QUIET_AFTER
                 || building_in_a_shell(record, context)
-                || waits_for_a_subagent(record, context) =>
+                || waits_for_a_subagent(record, context)
+                || runs_a_job(record, context) =>
         {
             Some(ActorState::Working)
         }
@@ -125,16 +155,29 @@ fn shown_state(record: &Record, context: &Context<'_>) -> Option<ActorState> {
     }
 }
 
-/// The outermost build below the session's harness process, while it runs. A subagent's record
-/// names the same process, so only its session works on the build.
+/// The outermost build below the session's harness process that no job of another actor holds,
+/// while it runs. A subagent's record names the same process, so only its session works on
+/// the build.
 fn own_build<'a>(record: &Record, context: &Context<'a>) -> Option<&'a str> {
     if record.key.contains('.') {
         return None;
     }
     context
         .builds_below
-        .get(&record.process?.pid)
-        .map(String::as_str)
+        .get(&record.process?.pid)?
+        .iter()
+        .find(|build| {
+            build
+                .owner
+                .as_deref()
+                .is_none_or(|owner| owner == record.key)
+        })
+        .map(|build| build.name.as_str())
+}
+
+/// `true` while a job of the actor's own runs.
+fn runs_a_job(record: &Record, context: &Context<'_>) -> bool {
+    context.jobs.get(&record.key).is_some_and(|job| job.running)
 }
 
 /// A subagent's title from a record of its session, else the record's own label.
@@ -161,7 +204,7 @@ fn runs_a_task(record: &Record) -> bool {
 }
 
 fn building_in_a_shell(record: &Record, context: &Context<'_>) -> bool {
-    has_call(record, CallKind::Shell) && (context.building)(&record.worktree)
+    has_call(record, CallKind::Shell) && (context.building)(&record.worktree, &record.key)
 }
 
 fn waits_for_a_subagent(record: &Record, context: &Context<'_>) -> bool {

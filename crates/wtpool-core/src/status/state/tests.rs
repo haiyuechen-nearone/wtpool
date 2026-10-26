@@ -77,7 +77,8 @@ fn document__should_describe_each_worktree_of_the_pool() {
         x.builds,
         vec![Build {
             pid: 7,
-            name: "make".to_owned()
+            name: "make".to_owned(),
+            queued: false,
         }]
     );
     assert!(

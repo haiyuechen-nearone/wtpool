@@ -1,4 +1,4 @@
-//! The user's home and state folders.
+//! The user's home, config and state folders.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -28,12 +28,24 @@ pub fn home() -> Option<PathBuf> {
 /// in `home`. A relative or empty folder counts as unset, as in [`home_folder`].
 #[must_use]
 pub fn state_folder(state_home: Option<&Path>, home: Option<&Path>) -> Option<PathBuf> {
-    state_home
+    xdg_folder(state_home, home, ".local/state")
+}
+
+/// The folder for config files: `config_home`, the value of `XDG_CONFIG_HOME`, else `.config` in
+/// `home`, as [`state_folder`] reads its own.
+#[must_use]
+pub fn config_folder(config_home: Option<&Path>, home: Option<&Path>) -> Option<PathBuf> {
+    xdg_folder(config_home, home, ".config")
+}
+
+/// `xdg_home` when absolute, else `under_home` in an absolute `home`.
+fn xdg_folder(xdg_home: Option<&Path>, home: Option<&Path>, under_home: &str) -> Option<PathBuf> {
+    xdg_home
         .filter(|path| path.is_absolute())
         .map(Path::to_path_buf)
         .or_else(|| {
             home.filter(|path| path.is_absolute())
-                .map(|home| home.join(".local/state"))
+                .map(|home| home.join(under_home))
         })
 }
 
@@ -100,6 +112,32 @@ mod tests {
     ) {
         // When
         let folder = state_folder(state_home.as_deref(), home.as_deref());
+
+        // Then
+        assert_eq!(folder, expected);
+    }
+
+    #[rstest]
+    #[case::config_home(Some(absolute("c")), Some(absolute("h")), Some(absolute("c")))]
+    #[case::relative_config_home(
+        Some(PathBuf::from("c")),
+        Some(absolute("h")),
+        Some(absolute("h").join(".config"))
+    )]
+    #[case::empty_config_home(
+        Some(PathBuf::new()),
+        Some(absolute("h")),
+        Some(absolute("h").join(".config"))
+    )]
+    #[case::home_only(None, Some(absolute("h")), Some(absolute("h").join(".config")))]
+    #[case::neither(None, Some(PathBuf::from("h")), None)]
+    fn config_folder__should_follow_xdg(
+        #[case] config_home: Option<PathBuf>,
+        #[case] home: Option<PathBuf>,
+        #[case] expected: Option<PathBuf>,
+    ) {
+        // When
+        let folder = config_folder(config_home.as_deref(), home.as_deref());
 
         // Then
         assert_eq!(folder, expected);

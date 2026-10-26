@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 
 use crate::config::{CopyPath, Key, SlotCount, SlotSetup};
 use crate::error::{Error, SettingsError};
+use crate::heavy::Pattern;
 use crate::names::{RemoteName, SlotPrefix};
 use crate::paths::AbsolutePath;
 use crate::platform::fs::open_without_following;
@@ -24,6 +25,7 @@ pub(crate) struct Values {
 /// The settings that only the repository's `wtpool.toml` sets.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct RepoOnly {
+    pub heavy: Vec<Pattern>,
     pub build_processes: Vec<String>,
     pub slot_setup: SlotSetup,
 }
@@ -43,6 +45,8 @@ struct WtpoolToml {
     slot_prefix: Option<String>,
     slot_count: Option<usize>,
     remote: Option<String>,
+    #[serde(default)]
+    heavy: Vec<Pattern>,
     #[serde(default)]
     build_processes: Vec<String>,
     #[serde(default)]
@@ -78,6 +82,7 @@ where
             remote: check.remote(toml.remote)?,
         },
         repo_only: RepoOnly {
+            heavy: toml.heavy,
             build_processes: toml.build_processes,
             slot_setup: SlotSetup {
                 copy: check.copy(toml.copy)?,
@@ -85,6 +90,13 @@ where
             },
         },
     })
+}
+
+/// The `heavy` patterns and `build_processes` names of a repository's `wtpool.toml`, refused as
+/// [`parse`] refuses an unknown key, a wrong type or a bad pattern, the other values unchecked.
+pub(crate) fn patterns(text: &str, file: &Path) -> Result<(Vec<Pattern>, Vec<String>), Error> {
+    let toml: WtpoolToml = from_toml(text, file)?;
+    Ok((toml.heavy, toml.build_processes))
 }
 
 /// The text of the config file at `path`, `None` when there is none. A symlink,
@@ -115,9 +127,20 @@ pub(crate) fn read(path: &Path) -> Result<Option<String>, Error> {
         .map_err(|_| unreadable("not valid UTF-8".to_owned()))
 }
 
+/// The keys of the machine config that a repository's `wtpool.toml` may not set.
+const MACHINE_KEYS: [&str; 2] = ["limit", "enforce"];
+
 fn from_toml<T: DeserializeOwned>(text: &str, file: &Path) -> Result<T, Error> {
     toml::from_str(text).map_err(|error| {
         let line = error.span().map(|span| line_of(text, span.start));
+        if let Some(key) = machine_key(text) {
+            return SettingsError::MachineKey {
+                path: file.to_path_buf(),
+                line,
+                key,
+            }
+            .into();
+        }
         // Without the input, the message is one line plus the key it concerns.
         let mut detail = error;
         detail.set_input(None);
@@ -129,6 +152,14 @@ fn from_toml<T: DeserializeOwned>(text: &str, file: &Path) -> Result<T, Error> {
         }
         .into()
     })
+}
+
+/// The first key of [`MACHINE_KEYS`] at the top level of the TOML `text`.
+fn machine_key(text: &str) -> Option<&'static str> {
+    let table: toml::Table = toml::from_str(text).ok()?;
+    MACHINE_KEYS
+        .into_iter()
+        .find(|key| table.contains_key(*key))
 }
 
 /// The line that byte `offset` of `text` is on, counting from 1.
@@ -259,7 +290,7 @@ mod tests {
     #[test]
     fn parse__should_read_every_key() {
         // Given
-        let text = "foreground = \"/srv/app\"\nslot_dir = \"slots\"\nslot_prefix = \"box\"\nslot_count = 5\nremote = \"upstream\"\nbuild_processes = [\"make\"]\ncopy = [\".envrc\", \"./config/.env\"]\non_new_slot = \"direnv allow\"\n";
+        let text = "foreground = \"/srv/app\"\nslot_dir = \"slots\"\nslot_prefix = \"box\"\nslot_count = 5\nremote = \"upstream\"\nheavy = [\"cargo test\"]\nbuild_processes = [\"make\"]\ncopy = [\".envrc\", \"./config/.env\"]\non_new_slot = \"direnv allow\"\n";
 
         // When
         let contents = parse_ok(text);
@@ -276,6 +307,7 @@ mod tests {
                     remote: Some(RemoteName::try_new("upstream").unwrap()),
                 },
                 repo_only: RepoOnly {
+                    heavy: vec![Pattern::parse("cargo test").unwrap()],
                     build_processes: vec!["make".to_owned()],
                     slot_setup: SlotSetup {
                         copy: vec![
@@ -341,11 +373,11 @@ mod tests {
     #[rstest]
     #[case::unknown_key(
         "slots = 2\n",
-        "invalid /r/.git/wtpool.toml: line 1: unknown field `slots`, expected one of `foreground`, `slot_dir`, `slot_prefix`, `slot_count`, `remote`, `build_processes`, `copy`, `on_new_slot`"
+        "invalid /r/.git/wtpool.toml: line 1: unknown field `slots`, expected one of `foreground`, `slot_dir`, `slot_prefix`, `slot_count`, `remote`, `heavy`, `build_processes`, `copy`, `on_new_slot`"
     )]
     #[case::table(
         "[pool]\nslot_count = 2\n",
-        "invalid /r/.git/wtpool.toml: line 1: unknown field `pool`, expected one of `foreground`, `slot_dir`, `slot_prefix`, `slot_count`, `remote`, `build_processes`, `copy`, `on_new_slot`"
+        "invalid /r/.git/wtpool.toml: line 1: unknown field `pool`, expected one of `foreground`, `slot_dir`, `slot_prefix`, `slot_count`, `remote`, `heavy`, `build_processes`, `copy`, `on_new_slot`"
     )]
     #[case::text_where_a_path_belongs(
         "foreground = 3\n",
@@ -408,6 +440,18 @@ mod tests {
     #[case::command_list(
         "on_new_slot = [\"direnv\", \"allow\"]\n",
         "invalid /r/.git/wtpool.toml: line 1: invalid type: sequence, expected a string in `on_new_slot`"
+    )]
+    #[case::bad_heavy_pattern(
+        "heavy = [\"make *\"]\n",
+        "invalid /r/.git/wtpool.toml: line 1: \"make *\" is not a heavy pattern: only the program's name may end in *, and it needs a name before the * in `heavy`"
+    )]
+    #[case::the_machine_limit(
+        "slot_count = 2\nlimit = 4\n",
+        "invalid /r/.git/wtpool.toml: line 2: unknown key `limit`: heavy jobs read it from this machine's config alone; set it with wtpool job limit"
+    )]
+    #[case::the_machine_policy(
+        "enforce = \"off\"\n",
+        "invalid /r/.git/wtpool.toml: line 1: unknown key `enforce`: heavy jobs read it from this machine's config alone; set it with wtpool job enforce"
     )]
     fn parse__should_refuse_an_invalid_file(#[case] text: &str, #[case] expected: &str) {
         // When

@@ -20,6 +20,11 @@ use crate::error::Error;
 use crate::git::layout;
 use crate::paths::comparable;
 use crate::processes::ListProcesses;
+use crate::repository::CONFIG_FILE;
+
+mod folders;
+
+pub use folders::JobFolders;
 
 /// A message the watch loop hears: changed paths from the folder watch, or the end of its input.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,6 +52,13 @@ pub enum Change {
     Worktrees,
     /// The file the clock reads.
     Clock,
+    /// The files of one job, by their name without extension. Another name stands for every
+    /// job.
+    Job(OsString),
+    /// The machine config of heavy jobs.
+    MachineConfig,
+    /// The repository's `wtpool.toml`.
+    RepositoryConfig,
 }
 
 /// The changes heard since the last refresh, merged.
@@ -61,6 +73,9 @@ pub struct Pending {
     pub records: BTreeSet<OsString>,
     pub rescan_records: bool,
     pub clock: bool,
+    pub jobs: BTreeSet<OsString>,
+    pub machine_config: bool,
+    pub repository_config: bool,
 }
 
 /// Refreshes the changed parts and describes the result.
@@ -74,6 +89,11 @@ pub trait Track {
     fn deadline(&self, now: Instant) -> Option<Instant>;
     /// Does the work due by `now`.
     fn tick(&mut self, now: Instant);
+    /// The change an event at `path` outside the common git directory and the clock's file may
+    /// mean.
+    fn classify(&self, _path: &Path) -> Option<Change> {
+        None
+    }
 }
 
 /// The monotonic time the watch loop schedules by, and its waits.
@@ -131,15 +151,17 @@ pub fn watch<C: ReadClock, P: ListProcesses>(
 ) -> Result<(), Error> {
     let (sender, messages) = std::sync::mpsc::channel();
     let clock = sources.clock.file().map(Path::to_path_buf);
-    let _watcher = start_watcher(&common, clock.as_deref(), sender.clone())?;
+    let watcher = start_watcher(&common, clock.as_deref(), sender.clone())?;
+    let mut folders = JobFolders::new(watcher, sources.jobs.as_ref());
+    folders.watch_new();
     std::thread::spawn(move || read_to_end(input, &sender));
     let watched = Watched {
         roots: vec![comparable(&common), common.clone()],
         clock: clock.as_deref().map(comparable),
     };
-    let (machine, forge) = (sources.machine.clone(), sources.forge_repository);
-    let state = PoolState::load(config, common, &sources.processes, machine, forge)?;
-    let mut live = Live::new(state, sources);
+    let (processes, forge) = (&sources.processes, sources.forge_repository);
+    let state = PoolState::load(config, common, processes, sources.host(), forge)?;
+    let mut live = Live::new(state, sources).with_folders(folders);
     run(&mut live, &messages, output, &watched, TIMING, &SystemTimer);
     Ok(())
 }
@@ -250,7 +272,7 @@ pub fn run(
                     let change = if watched.clock.as_deref() == Some(path.as_path()) {
                         Some(Change::Clock)
                     } else {
-                        classify(&watched.roots, path)
+                        classify(&watched.roots, path).or_else(|| tracker.classify(path))
                     };
                     if let Some(change) = change {
                         pending.add(change, heard);
@@ -307,6 +329,11 @@ impl Pending {
             Change::Records => self.rescan_records = true,
             Change::Worktrees => self.worktrees = true,
             Change::Clock => self.clock = true,
+            Change::Job(name) => {
+                self.jobs.insert(name);
+            }
+            Change::MachineConfig => self.machine_config = true,
+            Change::RepositoryConfig => self.repository_config = true,
         }
     }
 
@@ -363,6 +390,7 @@ pub fn classify(roots: &[PathBuf], path: &Path) -> Option<Change> {
         [name] if state_entry(name) => Some(Change::GitDir(root.clone())),
         [name] if is(name, layout::PACKED_REFS) || is(name, layout::CONFIG) => Some(Change::Refs),
         [name] if is(name, layout::WORKTREES) => Some(Change::Worktrees),
+        [name] if is(name, CONFIG_FILE) => Some(Change::RepositoryConfig),
         [name] if is(name, ACTIVITY_DIR) => Some(Change::Records),
         [first, .., last]
             if is(first, layout::REFS) && !is_lock_or_temp(last) && !path.is_dir() =>

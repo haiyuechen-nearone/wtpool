@@ -9,7 +9,8 @@ use super::{ListProcesses, ProcessQuery, RunningProcess, StartTime};
 
 /// A process table read from a file of JSON lines, read again on every listing. Each line holds
 /// a `pid` and an optional `ppid` and `started`, and needs a `name` and a `cwd` for a query that
-/// asks for them. Lines that do not parse are left out.
+/// asks for them. Its `cmd`, the arguments, is optional even then: a line without one lists with
+/// none readable. Lines that do not parse are left out.
 #[derive(Debug, Clone)]
 pub struct ProcessFile {
     path: PathBuf,
@@ -33,6 +34,8 @@ struct Asked {
     name: Option<String>,
     #[serde(default)]
     cwd: Option<PathBuf>,
+    #[serde(default)]
+    cmd: Option<Vec<String>>,
 }
 
 impl ProcessFile {
@@ -57,7 +60,7 @@ fn process(text: &str, query: &ProcessQuery<'_>) -> Option<RunningProcess> {
     if query.pids.is_some_and(|pids| !pids.contains(&line.pid)) {
         return None;
     }
-    let asked: Asked = if query.name || query.cwd {
+    let asked: Asked = if query.name || query.cwd || query.cmd {
         serde_json::from_str(text).ok()?
     } else {
         Asked::default()
@@ -80,6 +83,7 @@ fn process(text: &str, query: &ProcessQuery<'_>) -> Option<RunningProcess> {
         } else {
             PathBuf::new()
         },
+        cmd: asked.cmd.filter(|_| query.cmd).unwrap_or_default(),
     })
 }
 
@@ -146,6 +150,7 @@ mod tests {
             started: StartTime::parse("2026-10-20T11:00:00.5Z"),
             name: "cargo".to_owned(),
             cwd: PathBuf::from("/p/wt1"),
+            cmd: Vec::new(),
         };
         let nothing = RunningProcess {
             pid: 7,
@@ -153,8 +158,30 @@ mod tests {
             started: None,
             name: String::new(),
             cwd: PathBuf::new(),
+            cmd: Vec::new(),
         };
         assert_eq!((full, bare), (vec![expected], vec![nothing]));
+    }
+
+    #[test]
+    fn process_file__should_read_the_arguments_only_when_asked_and_present() {
+        // Given
+        let (_dir, file) = must_file(
+            "{\"pid\":7,\"cmd\":[\"npm test\"]}\n{\"pid\":8}\n{\"pid\":9,\"cmd\":\"npm\"}\n",
+        );
+
+        // When
+        let asked = file.list(&ProcessQuery::all().with_cmd());
+        let unasked = file.list(&ProcessQuery::all());
+
+        // Then
+        let cmds: Vec<(u32, Vec<String>)> = asked.into_iter().map(|p| (p.pid, p.cmd)).collect();
+        assert_eq!(
+            cmds,
+            vec![(7, vec!["npm test".to_owned()]), (8, Vec::new())]
+        );
+        assert_eq!(pids(&unasked), vec![7, 8, 9]);
+        assert!(unasked.iter().all(|process| process.cmd.is_empty()));
     }
 
     #[test]

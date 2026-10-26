@@ -58,14 +58,13 @@ fn document__should_read_the_url_of_the_configured_remote() {
     let processes = FixedProcesses::new(Vec::new());
 
     // When
-    let state = PoolState::load(
-        config,
-        fixture.common.clone(),
-        &processes,
-        "m".to_owned(),
-        https_path,
-    )
-    .unwrap();
+    let host = Host {
+        name: "m".to_owned(),
+        jobs: None,
+        cores: 1,
+    };
+    let state =
+        PoolState::load(config, fixture.common.clone(), &processes, host, https_path).unwrap();
 
     // Then
     let document = state.document(Timestamp::from_seconds(0));

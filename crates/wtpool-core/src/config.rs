@@ -37,8 +37,6 @@ pub struct Config {
     /// repository is bare or unknown.
     pub main_worktree: Option<AbsolutePath>,
     pub slot_setup: SlotSetup,
-    /// Process names that count as builds besides `cargo`, `cargo-*` and `rustc`.
-    pub build_processes: Vec<String>,
 }
 
 impl Config {

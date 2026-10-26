@@ -5,4 +5,5 @@ pub mod dirs;
 pub mod fs;
 pub(crate) mod processes;
 pub mod shell;
+pub mod signals;
 pub(crate) mod zone;

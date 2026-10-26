@@ -1,25 +1,51 @@
-//! [`Sources`]: where `wtpool status` reads the time, the process table, the machine's name and
-//! the name of the repository on its forge.
+//! [`Sources`]: where `wtpool status` reads the time, the process table, the machine's name,
+//! this user's heavy jobs and the name of the repository on its forge.
 
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
 use crate::clock::{Clock, SystemClock};
+use crate::jobs::JobPaths;
 use crate::processes::{self, ProcessTable, SystemProcesses};
 
-/// Where `wtpool status` reads the time, the process table, the machine's name and the name of
-/// the repository on its forge.
+/// Where `wtpool status` reads the time, the process table, the machine's name, this user's
+/// heavy jobs and the name of the repository on its forge.
 pub struct Sources<C = Clock, P = ProcessTable> {
     pub clock: C,
     pub processes: P,
     /// The host name, `localhost` when the system does not tell it.
     pub machine: String,
+    /// `None` without a folder for this user's job settings.
+    pub jobs: Option<JobPaths>,
+    /// The cores the default limit of heavy jobs is a quarter of.
+    pub cores: usize,
     /// The repository a remote's URL names on the forge, as
     /// [`Forge::repository`](crate::Forge::repository) reads it.
     pub forge_repository: fn(&str) -> Option<String>,
 }
 
+/// The machine a document describes, and where this user's heavy jobs are on it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Host {
+    pub name: String,
+    pub jobs: Option<JobPaths>,
+    pub cores: usize,
+}
+
+impl<C, P> Sources<C, P> {
+    #[must_use]
+    pub fn host(&self) -> Host {
+        Host {
+            name: self.machine.clone(),
+            jobs: self.jobs.clone(),
+            cores: self.cores,
+        }
+    }
+}
+
 impl Sources {
-    /// The system clock, process table and host name, and the forge's names of `forge_repository`.
+    /// The system clock, process table, host name and cores, the job settings of the user this
+    /// process's environment names, and the forge's names of `forge_repository`.
     #[must_use]
     pub fn system(forge_repository: fn(&str) -> Option<String>) -> Self {
         Self {
@@ -28,6 +54,8 @@ impl Sources {
             machine: processes::host_name()
                 .filter(|name| !name.is_empty())
                 .unwrap_or_else(|| "localhost".to_owned()),
+            jobs: JobPaths::from_env(|name| std::env::var_os(name)).ok(),
+            cores: std::thread::available_parallelism().map_or(1, NonZeroUsize::get),
             forge_repository,
         }
     }

@@ -17,6 +17,7 @@ export interface StatusDocument {
    * The machine wtpool ran on.
    */
   machine: {
+    jobs?: Jobs;
     /**
      * The machine's host name, `localhost` when it has none.
      */
@@ -36,6 +37,118 @@ export interface StatusDocument {
    * The document version, bumped only by a removal or a rename.
    */
   version: 1;
+}
+/**
+ * This user's heavy jobs on the machine; absent without a folder for their settings.
+ */
+export interface Jobs {
+  /**
+   * The path of `machine.toml`, whether it exists or not.
+   */
+  config: string;
+  /**
+   * The limit without a setting: a quarter of the cores, kept from 1 to 8.
+   */
+  default: number;
+  /**
+   * The policy for heavy commands outside a job.
+   */
+  enforce: "off" | "warn" | "require";
+  /**
+   * Why the machine config or the job folder cannot be read, else null.
+   */
+  error: string | null;
+  /**
+   * Each heavy pattern with the list it comes from.
+   */
+  heavy: Heavy[];
+  /**
+   * How many jobs run at once, null while error is set.
+   */
+  limit: number | null;
+  /**
+   * The highest limit.
+   */
+  max: 64;
+  /**
+   * The lowest limit.
+   */
+  min: 1;
+  /**
+   * The outermost heavy processes no job holds, newest first.
+   */
+  outside: Job[];
+  /**
+   * The running jobs.
+   */
+  running: Job[];
+  /**
+   * Where the limit and the policy each come from: `machine.toml` or the defaults.
+   */
+  source: {
+    /**
+     * The source of the policy.
+     */
+    enforce: "machine" | "default";
+    /**
+     * The source of the limit.
+     */
+    limit: "machine" | "default";
+  };
+  /**
+   * This repository's suggested patterns that the heavy list lacks.
+   */
+  suggested: Suggestion[];
+  /**
+   * The waiting jobs in queue order.
+   */
+  waiting: Job[];
+}
+export interface Heavy {
+  /**
+   * The pattern, one to three words.
+   */
+  pattern: string;
+  /**
+   * The list it comes from: the machine's, the repository's `heavy` or its `build_processes`.
+   */
+  source: "machine" | "repository" | "build_processes";
+}
+export interface Job {
+  /**
+   * The key of the actor of this pool it belongs to, else null.
+   */
+  actor: string | null;
+  /**
+   * The job's id, or an id of a heavy process outside any job.
+   */
+  id: string;
+  /**
+   * Its label, else null.
+   */
+  label: string | null;
+  /**
+   * An RFC 3339 time in UTC.
+   */
+  since: string;
+  /**
+   * The words of the heavy pattern it matches, else the summary of its arguments.
+   */
+  summary: string;
+  /**
+   * The path of the worktree of this pool its folder lies in, else null.
+   */
+  worktree: string | null;
+}
+export interface Suggestion {
+  /**
+   * What suggested it, such as the marker `Cargo.toml` or `package.json`; an open string.
+   */
+  from: string;
+  /**
+   * The suggested pattern.
+   */
+  pattern: string;
 }
 export interface Pool {
   /**
@@ -220,13 +333,17 @@ export interface Output {
 }
 export interface Build {
   /**
-   * The build process's name.
+   * The words of the heavy pattern the build process matches.
    */
   name: string;
   /**
    * The build process's id.
    */
   pid: number;
+  /**
+   * Whether a live job's process is the build or one of its ancestors, also true for a build only a suggestion names.
+   */
+  queued?: boolean;
 }
 /**
  * What git says of the worktree.

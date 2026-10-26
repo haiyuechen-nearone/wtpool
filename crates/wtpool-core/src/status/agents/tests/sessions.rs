@@ -65,9 +65,10 @@ fn actor__should_hide_a_replaced_session_and_its_subagents() {
         now: Timestamp::from_seconds(START),
         processes: &processes,
         records: &[],
-        building: &|_: &Path| false,
+        building: &|_: &Path, _: &str| false,
         superseded: &hidden,
         builds_below: &BTreeMap::new(),
+        jobs: &BTreeMap::new(),
     };
 
     // When

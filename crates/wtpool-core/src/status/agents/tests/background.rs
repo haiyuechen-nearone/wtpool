@@ -39,7 +39,7 @@ fn shown(
 ) -> (Option<ActorState>, Option<(String, String)>) {
     let processes = [claude(Some(START - 3600))];
     let below = if build {
-        BTreeMap::from([(CLAUDE, "cargo".to_owned())])
+        BTreeMap::from([(CLAUDE, vec![below("cargo")])])
     } else {
         BTreeMap::new()
     };
@@ -48,9 +48,10 @@ fn shown(
         now: Timestamp::from_seconds(START + after),
         processes: &processes,
         records: &records,
-        building: &|_: &Path| false,
+        building: &|_: &Path, _: &str| false,
         superseded: &BTreeSet::new(),
         builds_below: &below,
+        jobs: &BTreeMap::new(),
     };
     let shown = actor(subject, &context);
     (

@@ -7,6 +7,7 @@ mod document;
 mod facts;
 #[cfg(test)]
 mod fixture;
+mod jobs;
 mod live;
 mod outputs;
 mod record_time;
@@ -27,7 +28,7 @@ pub use document::{
 };
 pub use record_time::RecordTime;
 pub use schema::{ToSchema, status_schema, status_schema_text};
-pub use sources::Sources;
+pub use sources::{Host, Sources};
 pub use watch::watch as watch_status;
 
 use crate::clock::ReadClock;
@@ -45,8 +46,13 @@ pub fn status_line<C: ReadClock, P: ListProcesses>(
     common: PathBuf,
     sources: &Sources<C, P>,
 ) -> Result<String, Error> {
-    let (machine, forge) = (sources.machine.clone(), sources.forge_repository);
-    let state = PoolState::load(config, common, &sources.processes, machine, forge)?;
+    let state = PoolState::load(
+        config,
+        common,
+        &sources.processes,
+        sources.host(),
+        sources.forge_repository,
+    )?;
     let document = state.document(sources.clock.now());
     let mut line = serde_json::to_string(&document).unwrap_or_default();
     line.push('\n');
@@ -63,8 +69,7 @@ pub(crate) fn actors_at(
     git_mode: GitMode,
 ) -> Result<Vec<Vec<Actor>>, Error> {
     let (processes, forge) = (&sources.processes, sources.forge_repository);
-    let machine = sources.machine.clone();
-    let state = PoolState::load_with(git_mode, config, common, processes, machine, forge)?;
+    let state = PoolState::load_with(git_mode, config, common, processes, sources.host(), forge)?;
     let document = state.document(sources.clock.now());
     let worktrees: Vec<WorktreeStatus> = document
         .pools

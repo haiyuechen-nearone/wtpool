@@ -1,4 +1,5 @@
-//! Programs found by name on `PATH`, and the system shell.
+//! Programs found by name on `PATH`, program names as the system compares them, and the system
+//! shell.
 
 use std::ffi::OsStr;
 use std::fs::Metadata;
@@ -42,6 +43,23 @@ fn runnable(meta: &Metadata) -> bool {
 #[cfg(not(unix))]
 fn runnable(_: &Metadata) -> bool {
     true
+}
+
+/// `name`, a program's file name, as this system compares program names: as it is, and on Windows
+/// without a final `.exe` and in lower case, as Windows finds files without case.
+#[cfg(not(windows))]
+#[must_use]
+pub fn program_key(name: &str) -> String {
+    name.to_owned()
+}
+
+#[cfg(windows)]
+#[must_use]
+pub fn program_key(name: &str) -> String {
+    let lower = name.to_lowercase();
+    lower
+        .strip_suffix(".exe")
+        .map_or_else(|| lower.clone(), str::to_owned)
 }
 
 /// `line` run by the system shell: `sh -c`, or `cmd /C` on Windows.
@@ -122,6 +140,20 @@ mod tests {
 
         // Then
         assert_eq!(found, Some(runnable.join("tool")));
+    }
+
+    #[test]
+    fn program_key__should_fold_names_as_the_system_finds_files() {
+        // When
+        let keys = ["cargo", "cargo.exe", "CARGO.EXE"].map(program_key);
+
+        // Then
+        let expected = if cfg!(windows) {
+            ["cargo", "cargo", "cargo"]
+        } else {
+            ["cargo", "cargo.exe", "CARGO.EXE"]
+        };
+        assert_eq!(keys, expected);
     }
 
     #[cfg(unix)]

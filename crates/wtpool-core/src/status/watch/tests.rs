@@ -128,6 +128,9 @@ fn pending_add__should_merge_changes_from_the_first_one_on() {
     pending.add(Change::Record(OsString::from("s.json")), first);
     pending.add(Change::Records, first);
     pending.add(Change::Clock, first);
+    pending.add(Change::Job(OsString::from("7-0badc0de")), first);
+    pending.add(Change::MachineConfig, first);
+    pending.add(Change::RepositoryConfig, first);
     pending.add(Change::Worktrees, later);
 
     // Then
@@ -144,6 +147,9 @@ fn pending_add__should_merge_changes_from_the_first_one_on() {
             records: BTreeSet::from([OsString::from("s.json")]),
             rescan_records: true,
             clock: true,
+            jobs: BTreeSet::from([OsString::from("7-0badc0de")]),
+            machine_config: true,
+            repository_config: true,
         }
     );
     pending.add(Change::Refs, first + merge);

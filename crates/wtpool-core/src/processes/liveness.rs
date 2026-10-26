@@ -65,6 +65,7 @@ mod tests {
                 .and_then(StartTime::from_second),
             name: "claude".to_owned(),
             cwd: PathBuf::from("/"),
+            cmd: Vec::new(),
         }
     }
 

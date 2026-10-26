@@ -31,6 +31,8 @@ rstest = { version = "=0.27.0", default-features = false }
 serde = { version = "=1.0.229", default-features = false, features = ["std", "derive"] }
 toml = { version = "=1.1.8", default-features = false, features = ["std", "parse", "serde"] }
 sysinfo = { version = "=0.39.6", default-features = false, features = ["system"] }
+rustix = { version = "=1.1.5", default-features = false, features = ["std", "process"] }
+signal-hook = { version = "=0.3.18", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

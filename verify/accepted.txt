@@ -204,3 +204,5 @@ accept trace-pr f4a15b7f4bc7e379b07d6d603c770b397ebf0485e7de50a1c6663caa4ba93249
 accept p4-oracle-fixes eedf883dd37dc7a2f2aef02d3d9735f6e98c3a206688d613903a19de1865d172
 # More host and e2e checks wait for the state their next step needs: watcher counts, the reload's load event, the paused countdown, settled theme colours, their own tab's view, and 10 s for a fake wtpool to start, print or end; flow__every_activity_shows runs one case per scenario.
 accept flake-fixes-2 244287c0903ea2f472542e1096233c45ca6d7a081df16d047c603a149ad1a9d0
+# expectedRows of the e2e layer reads a document without machine as one without jobs, so flow__workspace_folder_pool no longer throws on its document of pools alone.
+accept p4-oracle-fixes-2 7f0be2b1a85557a60c0fd854e98735687f3812f7c333d9ce2dc6e0e07f3edcdd
