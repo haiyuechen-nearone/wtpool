@@ -4,7 +4,6 @@ mod agents;
 mod background;
 mod copy;
 mod foreground;
-mod git;
 mod lock;
 mod lookups;
 mod maintain;
@@ -13,7 +12,6 @@ mod refusals;
 mod slots;
 
 pub use agents::AgentGuard;
-pub(crate) use git::run_reported;
 
 use crate::config::Config;
 

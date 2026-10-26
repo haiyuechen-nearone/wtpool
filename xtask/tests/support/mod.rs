@@ -1,13 +1,22 @@
 //! Plumbing of the int checks. `cargo xtask verify --part int` sets the variables these read.
 
+mod files;
 pub mod hook;
 pub mod jobs;
+pub mod status;
+mod watch;
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+pub use files::{
+    FileState, file_state, must_make_unreadable, must_symlink, set_executable, tree_state,
+};
+pub use status::{must_status_json, schema_errors, status_schema_file, worktree};
+pub use watch::{Watch, is_alive, is_status};
 
 fn must_env(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| {
@@ -110,14 +119,16 @@ pub fn contains_bytes(haystack: &[u8], needle: &str) -> bool {
         .any(|window| window == needle.as_bytes())
 }
 
-/// The phase the harness verifies, from `WTPOOL_VERIFY_PHASE` as the int and bench parts set it,
-/// and 1 when unset. A check of an earlier phase that phase 4 changes asserts the new behaviour
-/// only from that phase on.
+/// `WTPOOL_VERIFY_PHASE` as the int and bench parts set it, and 1 when unset. A check whose
+/// behaviour a later value changes asserts the new behaviour only from that value on.
 pub fn phase() -> u8 {
-    std::env::var("WTPOOL_VERIFY_PHASE")
-        .ok()
-        .and_then(|text| text.parse().ok())
-        .unwrap_or(1)
+    match std::env::var("WTPOOL_VERIFY_PHASE") {
+        Err(std::env::VarError::NotPresent) => 1,
+        Ok(text) => text
+            .parse()
+            .unwrap_or_else(|_| panic!("setup: WTPOOL_VERIFY_PHASE is {text:?}, not a number")),
+        Err(error) => panic!("setup: WTPOOL_VERIFY_PHASE: {error}"),
+    }
 }
 
 static SANDBOXES: AtomicUsize = AtomicUsize::new(0);
@@ -151,13 +162,21 @@ impl Sandbox {
         sandbox
     }
 
+    /// Runs `binary` from the sandbox's home with the `PATH` of this process.
     pub fn run(&self, binary: &Path, args: &[&str]) -> Output {
+        let path = std::env::var_os("PATH").unwrap_or_default();
+        let mut command = self.base_command(binary, &self.root.join("home"), &path);
+        command.args(args);
+        command.output().expect("setup: start wtpool")
+    }
+
+    /// `binary` from `cwd` with only the sandbox's variables and `path` as its `PATH`.
+    fn base_command(&self, binary: &Path, cwd: &Path, path: &std::ffi::OsStr) -> Command {
         let mut command = Command::new(binary);
         command
-            .args(args)
-            .current_dir(self.root.join("home"))
+            .current_dir(cwd)
             .env_clear()
-            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+            .env("PATH", path)
             .env("HOME", self.root.join("home"))
             .env("TMPDIR", self.root.join("tmp"))
             .env("XDG_CONFIG_HOME", self.root.join("xdg/config"))
@@ -168,13 +187,13 @@ impl Sandbox {
             .env("WTPOOL_SLOT_DIR", self.root.join("pool"))
             .env("WTPOOL_VERIFY_SANDBOX", "1")
             .env("TZ", "UTC")
-            .env("EMAIL", "verify@wtpool.invalid")
+            .env("EMAIL", xtask::isolation::VERIFY_EMAIL)
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
             .env("GIT_CONFIG_NOSYSTEM", "1");
         if let Some(profile) = std::env::var_os("LLVM_PROFILE_FILE") {
             command.env("LLVM_PROFILE_FILE", profile);
         }
-        command.output().expect("setup: start wtpool")
+        command
     }
 }
 
@@ -198,28 +217,7 @@ impl Sandbox {
     /// `binary` from `cwd` in the sandbox's environment, not yet started, with
     /// [`Sandbox::path_variable`] as its `PATH`.
     pub fn command(&self, binary: &Path, cwd: &Path) -> Command {
-        let mut command = Command::new(binary);
-        command
-            .current_dir(cwd)
-            .env_clear()
-            .env("PATH", self.path_variable())
-            .env("HOME", self.root.join("home"))
-            .env("TMPDIR", self.root.join("tmp"))
-            .env("XDG_CONFIG_HOME", self.root.join("xdg/config"))
-            .env("XDG_CACHE_HOME", self.root.join("xdg/cache"))
-            .env("XDG_DATA_HOME", self.root.join("xdg/data"))
-            .env("XDG_STATE_HOME", self.root.join("xdg/state"))
-            .env("WTPOOL_FOREGROUND", self.root.join("pool/fg"))
-            .env("WTPOOL_SLOT_DIR", self.root.join("pool"))
-            .env("WTPOOL_VERIFY_SANDBOX", "1")
-            .env("TZ", "UTC")
-            .env("EMAIL", "verify@wtpool.invalid")
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .env("GIT_CONFIG_NOSYSTEM", "1");
-        if let Some(profile) = std::env::var_os("LLVM_PROFILE_FILE") {
-            command.env("LLVM_PROFILE_FILE", profile);
-        }
-        command
+        self.base_command(binary, cwd, &self.path_variable())
     }
 
     /// `PATH` with the logging git first once [`Sandbox::must_log_git`] installed it, and the
@@ -291,70 +289,7 @@ impl Sandbox {
     }
 }
 
-/// A symbolic link at `link` to `original`. Windows tells links to files and folders apart.
-pub fn must_symlink(original: &Path, link: &Path) {
-    #[cfg(unix)]
-    let made = std::os::unix::fs::symlink(original, link);
-    #[cfg(windows)]
-    let made = if original.is_dir() {
-        std::os::windows::fs::symlink_dir(original, link)
-    } else {
-        std::os::windows::fs::symlink_file(original, link)
-    };
-    made.expect("setup: symlink");
-}
-
-/// Takes every permission from `path`, so no process of the owner reads it. Windows has no such
-/// mode, so a check that needs it stops at its setup there.
-pub fn must_make_unreadable(path: &Path) {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o000)).expect("setup: chmod");
-    }
-    #[cfg(not(unix))]
-    panic!(
-        "setup: {} cannot be made unreadable without Unix permissions",
-        path.display()
-    );
-}
-
-/// The facts that tell an entry unchanged: its size and modification time, and on Unix its mode
-/// and inode, as a rewrite through a new file changes them.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct FileState {
-    pub len: u64,
-    pub modified: Option<std::time::SystemTime>,
-    pub mode_and_inode: Option<(u32, u64)>,
-}
-
-pub fn file_state(meta: &fs::Metadata) -> FileState {
-    #[cfg(unix)]
-    let mode_and_inode = {
-        use std::os::unix::fs::MetadataExt;
-        Some((meta.mode(), meta.ino()))
-    };
-    #[cfg(not(unix))]
-    let mode_and_inode = None;
-    FileState {
-        len: meta.len(),
-        modified: meta.modified().ok(),
-        mode_and_inode,
-    }
-}
-
 const GIT: &str = if cfg!(windows) { "git.exe" } else { "git" };
-
-/// Lets `path` run. Windows has no such mode: every file there may run.
-pub fn set_executable(path: &Path) {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o755)).expect("setup: chmod +x");
-    }
-    #[cfg(not(unix))]
-    let _ = path;
-}
 
 fn find_real_git() -> PathBuf {
     let path = std::env::var_os("PATH").unwrap_or_default();
@@ -417,208 +352,4 @@ impl GitLog {
         }
         &self.seen
     }
-}
-
-/// A running `wtpool status --watch` with stdin kept open, read line by line.
-pub struct Watch {
-    child: std::process::Child,
-    lines: std::sync::mpsc::Receiver<(std::time::Instant, String)>,
-    pub started: std::time::Instant,
-    /// Every line read so far, with when it arrived.
-    pub seen: Vec<(std::time::Instant, String)>,
-}
-
-impl Watch {
-    pub fn must_start(sandbox: &Sandbox, envs: &[(&str, &std::ffi::OsStr)]) -> Self {
-        let mut command = sandbox.command(&must_wtpool_bin(), &sandbox.pool_dir().join("fg"));
-        command
-            .args(["status", "--watch"])
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null());
-        for (key, value) in envs {
-            command.env(key, value);
-        }
-        let started = std::time::Instant::now();
-        let mut child = command.spawn().expect("setup: start wtpool status --watch");
-        let stdout = child.stdout.take().expect("setup: stdout of wtpool");
-        let (sender, lines) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            use std::io::BufRead;
-            for line in std::io::BufReader::new(stdout).lines() {
-                let Ok(line) = line else { return };
-                if sender.send((std::time::Instant::now(), line)).is_err() {
-                    return;
-                }
-            }
-        });
-        Self {
-            child,
-            lines,
-            started,
-            seen: Vec::new(),
-        }
-    }
-
-    /// The next line within `timeout`, if any.
-    pub fn next_line(
-        &mut self,
-        timeout: std::time::Duration,
-    ) -> Option<(std::time::Instant, String)> {
-        let line = self.lines.recv_timeout(timeout).ok()?;
-        self.seen.push(line.clone());
-        Some(line)
-    }
-
-    /// Every line that arrives within `duration`.
-    pub fn lines_for(
-        &mut self,
-        duration: std::time::Duration,
-    ) -> Vec<(std::time::Instant, String)> {
-        let deadline = std::time::Instant::now() + duration;
-        let mut found = Vec::new();
-        while let Some(left) = deadline.checked_duration_since(std::time::Instant::now()) {
-            match self.next_line(left) {
-                Some(line) => found.push(line),
-                None => break,
-            }
-        }
-        found
-    }
-
-    /// The first status document within `timeout` that `wanted` accepts.
-    pub fn status_where(
-        &mut self,
-        timeout: std::time::Duration,
-        wanted: impl Fn(&serde_json::Value) -> bool,
-    ) -> Option<(std::time::Instant, serde_json::Value)> {
-        let deadline = std::time::Instant::now() + timeout;
-        while let Some(left) = deadline.checked_duration_since(std::time::Instant::now()) {
-            let (at, line) = self.next_line(left)?;
-            let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) else {
-                continue;
-            };
-            if value["type"] == "status" && wanted(&value) {
-                return Some((at, value));
-            }
-        }
-        None
-    }
-
-    /// Waits for the first status document and then for the first alive line after it, so a
-    /// heartbeat has just passed.
-    pub fn settle_after_heartbeat(&mut self) -> serde_json::Value {
-        let (_, first) = self
-            .status_where(std::time::Duration::from_secs(5), |_| true)
-            .expect("wtpool status --watch printed no document within 5 s");
-        let alive = self.lines_until_alive(std::time::Duration::from_secs(12));
-        assert!(
-            alive,
-            "wtpool status --watch printed no alive line within 12 s"
-        );
-        first
-    }
-
-    /// Reads lines until an alive line arrives, true when one did within `timeout`.
-    pub fn lines_until_alive(&mut self, timeout: std::time::Duration) -> bool {
-        let deadline = std::time::Instant::now() + timeout;
-        while let Some(left) = deadline.checked_duration_since(std::time::Instant::now()) {
-            match self.next_line(left) {
-                Some((_, line)) if is_alive(&line) => return true,
-                Some(_) => {}
-                None => return false,
-            }
-        }
-        false
-    }
-
-    pub fn close_stdin(&mut self) {
-        drop(self.child.stdin.take());
-    }
-
-    pub fn close_stdout_reader(&mut self) {
-        let (_, closed) = std::sync::mpsc::channel();
-        self.lines = closed;
-    }
-
-    /// The exit status within `timeout`, or `None` while it still runs.
-    pub fn exit_within(
-        &mut self,
-        timeout: std::time::Duration,
-    ) -> Option<std::process::ExitStatus> {
-        let deadline = std::time::Instant::now() + timeout;
-        loop {
-            if let Ok(Some(status)) = self.child.try_wait() {
-                return Some(status);
-            }
-            if std::time::Instant::now() >= deadline {
-                return None;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(20));
-        }
-    }
-}
-
-impl Drop for Watch {
-    fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
-}
-
-pub fn is_alive(line: &str) -> bool {
-    serde_json::from_str::<serde_json::Value>(line).is_ok_and(|value| value["type"] == "alive")
-}
-
-pub fn is_status(line: &str) -> bool {
-    serde_json::from_str::<serde_json::Value>(line).is_ok_and(|value| value["type"] == "status")
-}
-
-/// The worktree called `name` in the only pool of `document`.
-pub fn worktree<'a>(document: &'a serde_json::Value, name: &str) -> &'a serde_json::Value {
-    document["pools"][0]["worktrees"]
-        .as_array()
-        .and_then(|worktrees| worktrees.iter().find(|w| w["name"] == name))
-        .unwrap_or(&serde_json::Value::Null)
-}
-
-/// The oracle's schema of the status document for this run's phase, below `verify/schema/`. The
-/// phase 4 schema adds `machine.jobs` and `build.queued`, and the own schema of a wtpool of an
-/// earlier phase still matches the older one.
-pub fn status_schema_file() -> &'static str {
-    if phase() >= 4 {
-        "status.phase-4.schema.json"
-    } else {
-        "status.schema.json"
-    }
-}
-
-/// Problems of `document` against the oracle's status schema of this run's phase.
-pub fn schema_errors(document: &serde_json::Value) -> Vec<String> {
-    let path = must_repo().join("verify/schema").join(status_schema_file());
-    let text = fs::read_to_string(&path).expect("setup: read the status schema");
-    let schema: serde_json::Value = serde_json::from_str(&text).expect("setup: parse the schema");
-    let validator = jsonschema::validator_for(&schema).expect("setup: compile the schema");
-    validator
-        .iter_errors(document)
-        .map(|error| format!("{}: {error}", error.instance_path()))
-        .collect()
-}
-
-/// Runs `wtpool status --json` in the sandbox from `cwd` and parses its only line.
-pub fn must_status_json(
-    sandbox: &Sandbox,
-    cwd: &Path,
-    envs: &[(&str, &std::ffi::OsStr)],
-) -> serde_json::Value {
-    let output = sandbox.run_in(&must_wtpool_bin(), &["status", "--json"], cwd, envs);
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        output.status.success(),
-        "wtpool status --json exited {:?}: {}",
-        output.status,
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_str(stdout.trim_end())
-        .unwrap_or_else(|e| panic!("wtpool status --json printed no JSON document ({e}): {stdout}"))
 }

@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender};
 use std::time::{Duration, Instant};
@@ -14,10 +14,11 @@ use super::live::Live;
 use super::records::is_record_name;
 use super::state::PoolState;
 use crate::activity::ACTIVITY_DIR;
-use crate::clock::ReadClock;
+use crate::clock::{ClockFile, ReadClock};
 use crate::config::Config;
 use crate::error::Error;
 use crate::git::layout;
+use crate::jobs::JobId;
 use crate::paths::comparable;
 use crate::processes::ListProcesses;
 use crate::repository::CONFIG_FILE;
@@ -39,7 +40,7 @@ pub enum Message {
 
 /// Something a folder event says may have changed.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Change {
+pub enum FolderChange {
     /// The `HEAD`, index or operation state of the worktree with this git folder.
     GitDir(PathBuf),
     /// A ref, `packed-refs` or the repository configuration.
@@ -52,9 +53,10 @@ pub enum Change {
     Worktrees,
     /// The file the clock reads.
     Clock,
-    /// The files of one job, by their name without extension. Another name stands for every
-    /// job.
-    Job(OsString),
+    /// The record or lock of one job.
+    Job(JobId),
+    /// The job folder itself, or a file in it that names no job.
+    AllJobs,
     /// The machine config of heavy jobs.
     MachineConfig,
     /// The repository's `wtpool.toml`.
@@ -73,7 +75,8 @@ pub struct Pending {
     pub records: BTreeSet<OsString>,
     pub rescan_records: bool,
     pub clock: bool,
-    pub jobs: BTreeSet<OsString>,
+    pub jobs: BTreeSet<JobId>,
+    pub all_jobs: bool,
     pub machine_config: bool,
     pub repository_config: bool,
 }
@@ -91,7 +94,7 @@ pub trait Track {
     fn tick(&mut self, now: Instant);
     /// The changes an event at `path` outside the common git directory and the clock's file may
     /// mean.
-    fn classify(&self, _path: &Path) -> Vec<Change> {
+    fn classify(&self, _path: &Path) -> Vec<FolderChange> {
         Vec::new()
     }
 }
@@ -142,7 +145,7 @@ pub const TIMING: Timing = Timing {
 /// Runs `wtpool status --watch` on the pool of `config`, whose common git directory is `common`,
 /// until `input` ends or `output` fails. Both end it cleanly. The folder watch starts before the
 /// first read, so no change slips between them.
-pub fn watch<C: ReadClock, P: ListProcesses>(
+pub fn watch<C: ReadClock + ClockFile, P: ListProcesses>(
     config: Config,
     common: PathBuf,
     sources: &Sources<C, P>,
@@ -214,7 +217,8 @@ fn read_to_end(mut input: impl Read, sender: &Sender<Message>) {
 }
 
 /// The watch loop: prints the first document, then refreshes on merged changes and on each
-/// heartbeat, and prints a document only when it differs from the last one printed.
+/// heartbeat, and prints a document only when it differs from the last one printed. It ends when
+/// the input closes or the output fails.
 pub fn run(
     tracker: &mut impl Track,
     messages: &Receiver<Message>,
@@ -223,65 +227,151 @@ pub fn run(
     timing: Timing,
     timer: &impl Timer,
 ) {
-    let mut shown = tracker.document();
-    if !print_document(output, &shown) {
-        return;
-    }
-    let mut pending = Pending::default();
-    let mut beat = timer.now().checked_add(timing.heartbeat);
-    let mut seq: u64 = 0;
+    let _ = run_until_closed(tracker, messages, output, watched, timing, timer);
+}
+
+/// [`run`], up to the first output error.
+fn run_until_closed(
+    tracker: &mut impl Track,
+    messages: &Receiver<Message>,
+    output: &mut impl Write,
+    watched: &Watched,
+    timing: Timing,
+    timer: &impl Timer,
+) -> io::Result<()> {
+    let shown = tracker.document();
+    print_document(output, &shown)?;
+    let mut rounds = Rounds {
+        shown,
+        pending: Pending::default(),
+        beat: timer.now().checked_add(timing.heartbeat),
+        seq: 0,
+        timing,
+    };
     loop {
-        let now = timer.now();
-        if let Some(due) = beat.filter(|due| now >= *due) {
-            tracker.refresh_all();
-            timer.sleep(timing.settle);
-            pending = Pending::default();
-            seq = seq.saturating_add(1);
-            let alive = format!("{{\"type\":\"alive\",\"seq\":{seq}}}");
-            if !print_changes(tracker, &mut shown, output) || !print_line(output, &alive) {
-                return;
-            }
-            beat = next_beat(due, timing.heartbeat, timer.now());
-        } else if pending.due(timing.merge).is_some_and(|due| now >= due) {
-            tracker.refresh(&pending, now);
-            pending = Pending::default();
-            if !print_changes(tracker, &mut shown, output) {
-                return;
-            }
-        } else if tracker.deadline(now).is_some_and(|due| now >= due) {
-            tracker.tick(now);
-            if !print_changes(tracker, &mut shown, output) {
-                return;
-            }
-        }
-        let now = timer.now();
-        let wake = [beat, pending.due(timing.merge), tracker.deadline(now)]
-            .into_iter()
-            .flatten()
-            .min();
+        rounds.work_due(tracker, output, timer)?;
+        let wake = rounds.wake(tracker, timer.now());
         match timer.receive(messages, wake) {
             Ok(Message::Paths { paths, rescan }) => {
-                let heard = timer.now();
-                if rescan {
-                    pending.all = true;
-                    pending.since.get_or_insert(heard);
-                    pending.last = Some(heard);
-                }
-                for path in &paths {
-                    let changes = if watched.clock.as_deref() == Some(path.as_path()) {
-                        vec![Change::Clock]
-                    } else {
-                        classify(&watched.roots, path)
-                            .map_or_else(|| tracker.classify(path), |change| vec![change])
-                    };
-                    for change in changes {
-                        pending.add(change, heard);
-                    }
-                }
+                rounds.hear(tracker, watched, &paths, rescan, timer.now());
             }
-            Ok(Message::InputClosed) | Err(RecvTimeoutError::Disconnected) => return,
+            Ok(Message::InputClosed) | Err(RecvTimeoutError::Disconnected) => return Ok(()),
             Err(RecvTimeoutError::Timeout) => {}
         }
+    }
+}
+
+/// The state the watch loop keeps between its rounds.
+struct Rounds {
+    shown: Document,
+    pending: Pending,
+    /// `None` past the range of [`Instant`].
+    beat: Option<Instant>,
+    seq: u64,
+    timing: Timing,
+}
+
+impl Rounds {
+    /// Does the one piece of work due by now: the heartbeat, the merged changes, or the
+    /// tracker's own.
+    fn work_due(
+        &mut self,
+        tracker: &mut impl Track,
+        output: &mut impl Write,
+        timer: &impl Timer,
+    ) -> io::Result<()> {
+        let now = timer.now();
+        if let Some(due) = self.beat.filter(|due| now >= *due) {
+            self.heartbeat(due, tracker, output, timer)
+        } else if self
+            .pending
+            .due(self.timing.merge)
+            .is_some_and(|due| now >= due)
+        {
+            tracker.refresh(&self.pending, now);
+            self.pending = Pending::default();
+            self.print_changes(tracker, output)
+        } else if tracker.deadline(now).is_some_and(|due| now >= due) {
+            tracker.tick(now);
+            self.print_changes(tracker, output)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Reads everything again, then prints the document if it changed and an alive line.
+    fn heartbeat(
+        &mut self,
+        due: Instant,
+        tracker: &mut impl Track,
+        output: &mut impl Write,
+        timer: &impl Timer,
+    ) -> io::Result<()> {
+        tracker.refresh_all();
+        timer.sleep(self.timing.settle);
+        self.pending = Pending::default();
+        self.seq = self.seq.saturating_add(1);
+        self.print_changes(tracker, output)?;
+        print_line(
+            output,
+            &format!("{{\"type\":\"alive\",\"seq\":{}}}", self.seq),
+        )?;
+        self.beat = next_beat(due, self.timing.heartbeat, timer.now());
+        Ok(())
+    }
+
+    /// The time the loop next has work: a heartbeat, merged changes or the tracker's own.
+    fn wake(&self, tracker: &impl Track, now: Instant) -> Option<Instant> {
+        [
+            self.beat,
+            self.pending.due(self.timing.merge),
+            tracker.deadline(now),
+        ]
+        .into_iter()
+        .flatten()
+        .min()
+    }
+
+    /// Merges the changes that events at `paths`, heard at `heard`, may mean.
+    fn hear(
+        &mut self,
+        tracker: &impl Track,
+        watched: &Watched,
+        paths: &[PathBuf],
+        rescan: bool,
+        heard: Instant,
+    ) {
+        if rescan {
+            self.pending.all = true;
+            self.pending.since.get_or_insert(heard);
+            self.pending.last = Some(heard);
+        }
+        for path in paths {
+            for change in watched.changes_at(path, tracker) {
+                self.pending.add(change, heard);
+            }
+        }
+    }
+
+    /// Prints the tracker's document when it says something new.
+    fn print_changes(&mut self, tracker: &impl Track, output: &mut impl Write) -> io::Result<()> {
+        let document = tracker.document();
+        if document.same_content(&self.shown) {
+            return Ok(());
+        }
+        self.shown = document;
+        print_document(output, &self.shown)
+    }
+}
+
+impl Watched {
+    /// The changes an event at `path` may mean.
+    fn changes_at(&self, path: &Path, tracker: &impl Track) -> Vec<FolderChange> {
+        if self.clock.as_deref() == Some(path) {
+            return vec![FolderChange::Clock];
+        }
+        classify(&self.roots, path, Path::is_dir)
+            .map_or_else(|| tracker.classify(path), |change| vec![change])
     }
 }
 
@@ -294,47 +384,44 @@ fn next_beat(beat: Instant, heartbeat: Duration, now: Instant) -> Option<Instant
         .or_else(|| now.checked_add(heartbeat))
 }
 
-/// Prints the tracker's document when it says something new. `false` when output failed.
-fn print_changes(tracker: &impl Track, shown: &mut Document, output: &mut impl Write) -> bool {
-    let document = tracker.document();
-    if document.same_content(shown) {
-        return true;
-    }
-    *shown = document;
-    print_document(output, shown)
+fn print_document(output: &mut impl Write, document: &Document) -> io::Result<()> {
+    let line = serde_json::to_string(document)?;
+    print_line(output, &line)
 }
 
-fn print_document(output: &mut impl Write, document: &Document) -> bool {
-    serde_json::to_string(document).is_ok_and(|line| print_line(output, &line))
-}
-
-fn print_line(output: &mut impl Write, line: &str) -> bool {
-    writeln!(output, "{line}")
-        .and_then(|()| output.flush())
-        .is_ok()
+fn print_line(output: &mut impl Write, line: &str) -> io::Result<()> {
+    writeln!(output, "{line}")?;
+    output.flush()
 }
 
 impl Pending {
-    fn add(&mut self, change: Change, now: Instant) {
+    fn add(&mut self, change: FolderChange, now: Instant) {
         self.since.get_or_insert(now);
         self.last = Some(now);
         match change {
-            Change::GitDir(git_dir) => {
+            FolderChange::GitDir(git_dir) => {
                 self.git_dirs.insert(git_dir);
             }
-            Change::Refs => self.refs = true,
-            Change::Record(name) => {
+            FolderChange::Refs => self.refs = true,
+            FolderChange::Record(name) => {
                 self.records.insert(name);
             }
-            Change::Records => self.rescan_records = true,
-            Change::Worktrees => self.worktrees = true,
-            Change::Clock => self.clock = true,
-            Change::Job(name) => {
-                self.jobs.insert(name);
+            FolderChange::Records => self.rescan_records = true,
+            FolderChange::Worktrees => self.worktrees = true,
+            FolderChange::Clock => self.clock = true,
+            FolderChange::Job(id) => {
+                self.jobs.insert(id);
             }
-            Change::MachineConfig => self.machine_config = true,
-            Change::RepositoryConfig => self.repository_config = true,
+            FolderChange::AllJobs => self.all_jobs = true,
+            FolderChange::MachineConfig => self.machine_config = true,
+            FolderChange::RepositoryConfig => self.repository_config = true,
         }
+    }
+
+    /// `true` when a job may have changed.
+    #[must_use]
+    pub fn jobs_changed(&self) -> bool {
+        self.all_jobs || !self.jobs.is_empty()
     }
 
     /// The time the merged changes are due: `merge` after the first, or half of it after the
@@ -371,9 +458,14 @@ impl Timer for SystemTimer {
 }
 
 /// The change the event at `path` may name, `None` for lock, temp and other files. `roots` are
-/// spellings of the common git directory.
+/// spellings of the common git directory. `is_dir` is asked only of a path below `refs`, where a
+/// folder names no ref.
 #[must_use]
-pub fn classify(roots: &[PathBuf], path: &Path) -> Option<Change> {
+pub fn classify(
+    roots: &[PathBuf],
+    path: &Path,
+    is_dir: impl Fn(&Path) -> bool,
+) -> Option<FolderChange> {
     let (root, relative) = roots
         .iter()
         .find_map(|root| Some((root, path.strip_prefix(root).ok()?)))?;
@@ -387,22 +479,22 @@ pub fn classify(roots: &[PathBuf], path: &Path) -> Option<Change> {
     let is = |part: &OsStr, name: &str| part == OsStr::new(name);
     let state_entry = |part: &OsStr| layout::STATE_ENTRIES.iter().any(|name| is(part, name));
     match parts.as_slice() {
-        [name] if state_entry(name) => Some(Change::GitDir(root.clone())),
-        [name] if is(name, layout::PACKED_REFS) || is(name, layout::CONFIG) => Some(Change::Refs),
-        [name] if is(name, layout::WORKTREES) => Some(Change::Worktrees),
-        [name] if is(name, CONFIG_FILE) => Some(Change::RepositoryConfig),
-        [name] if is(name, ACTIVITY_DIR) => Some(Change::Records),
-        [first, .., last]
-            if is(first, layout::REFS) && !is_lock_or_temp(last) && !path.is_dir() =>
-        {
-            Some(Change::Refs)
+        [name] if state_entry(name) => Some(FolderChange::GitDir(root.clone())),
+        [name] if is(name, layout::PACKED_REFS) || is(name, layout::CONFIG) => {
+            Some(FolderChange::Refs)
         }
-        [first, _] if is(first, layout::WORKTREES) => Some(Change::Worktrees),
+        [name] if is(name, layout::WORKTREES) => Some(FolderChange::Worktrees),
+        [name] if is(name, CONFIG_FILE) => Some(FolderChange::RepositoryConfig),
+        [name] if is(name, ACTIVITY_DIR) => Some(FolderChange::Records),
+        [first, .., last] if is(first, layout::REFS) && !is_lock_or_temp(last) && !is_dir(path) => {
+            Some(FolderChange::Refs)
+        }
+        [first, _] if is(first, layout::WORKTREES) => Some(FolderChange::Worktrees),
         [first, id, name] if is(first, layout::WORKTREES) && state_entry(name) => {
-            Some(Change::GitDir(layout::linked_git_dir(root, id)))
+            Some(FolderChange::GitDir(layout::linked_git_dir(root, id)))
         }
         [first, name] if is(first, ACTIVITY_DIR) && is_record_name(name) => {
-            Some(Change::Record(name.to_os_string()))
+            Some(FolderChange::Record(name.to_os_string()))
         }
         _ => None,
     }
@@ -414,6 +506,8 @@ fn is_lock_or_temp(name: &OsStr) -> bool {
 }
 
 #[cfg(test)]
-pub(super) mod run_tests;
+mod run_tests;
+#[cfg(test)]
+pub(super) mod support;
 #[cfg(test)]
 mod tests;

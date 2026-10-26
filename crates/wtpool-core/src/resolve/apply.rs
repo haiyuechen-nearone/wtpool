@@ -1,16 +1,17 @@
 //! Fetching, creating or syncing the branch of a [`CheckedPlan`], and setting its upstream.
 
 use crate::error::{Error, GitError, Refusal};
-use crate::forge::Fetch;
+use crate::forge::{ChangeHead, Fetch};
+use crate::git::left_right;
 use crate::names::{BranchName, ObjectId};
-use crate::pool::{self, Pool};
 use crate::refs::SyncMode;
 use crate::report::Report;
 use crate::worktree::Worktree;
 
-use super::divergence::{self, Holder, Staleness, SyncStep};
+use super::divergence::{self, Holder, Staleness, Stay, SyncStep};
 use super::guard::CheckedPlan;
-use super::plan::{self, Step, Unresolved};
+use super::plan::{Step, Unresolved};
+use super::{Resolver, run_reported};
 
 /// Only `wtpool` writes this ref, and only under the pool lock.
 const FETCHED: &str = "refs/wtpool-fetch/head";
@@ -24,7 +25,7 @@ enum Configured {
     Unknown,
 }
 
-impl<F> Pool<F> {
+impl<F> Resolver<'_, F> {
     /// Fetches, creates or syncs the planned branch. The upstream is set last, so
     /// a refused sync leaves the branch's config as it was.
     pub(crate) fn apply(
@@ -33,87 +34,120 @@ impl<F> Pool<F> {
         report: &mut impl Report,
     ) -> Result<(), Unresolved> {
         let CheckedPlan { plan, sync } = checked;
-        let (branch, sync) = (&plan.branch, *sync);
+        let branch = &plan.branch;
         match &plan.step {
-            Step::Local => {
-                report.note(&format!("{branch}: already local"));
-                let remote = &self.config.remote;
-                if sync != SyncMode::No {
-                    match self.remote_has_branch(branch, report)? {
-                        Some(true) => {
-                            let fetched = self
-                                .fetch(&plan::branch_ref(branch), report)?
-                                .ok_or(Unresolved::Fatal(GitError::Fetch.into()))?;
-                            self.sync_branch(branch, &fetched, sync, report)?;
-                        }
-                        Some(false) => report.warn(&format!(
-                            "{remote} has no branch named '{branch}'; nothing to refresh"
-                        )),
-                        None => report.warn(&format!(
-                            "no remote '{remote}' here; {branch} not refreshed"
-                        )),
-                    }
-                } else if let Some(tip) = self.commit_of(&self.remote_ref(branch))? {
-                    let label = format!("{remote}/{branch} (as of the last fetch)");
-                    self.warn_if_stale(branch, &tip, &label, report)?;
-                }
-                self.adopt_upstream(branch, report)?;
+            Step::Local => self.apply_local(branch, *sync, report),
+            Step::LocalChange(change) => self.apply_local_change(branch, change, *sync, report),
+            Step::FetchBranch => self.fetch_branch(branch, report),
+            Step::FetchChange(change) => self.fetch_change(branch, change, report),
+        }
+    }
+
+    fn apply_local(
+        &self,
+        branch: &BranchName,
+        sync: SyncMode,
+        report: &mut impl Report,
+    ) -> Result<(), Unresolved> {
+        report.note(&format!("{branch}: already local"));
+        let remote = &self.config.remote;
+        if sync == SyncMode::No {
+            if let Some(tip) = self.commit_of(&self.remote_ref(branch))? {
+                let label = format!("{remote}/{branch} (as of the last fetch)");
+                self.warn_if_stale(branch, &tip, &label, report)?;
             }
-            Step::LocalChange(change) => {
-                report.note(&format!("{branch}: already local"));
-                if sync == SyncMode::No {
-                    let label = format!("the head of {}", change.name);
-                    self.warn_if_stale(branch, &change.head, &label, report)?;
-                } else {
-                    let refspec = match change.fetch {
-                        Fetch::ChangeRef => change.change_ref.refspec.clone(),
-                        Fetch::Branch => plan::branch_ref(branch),
-                    };
-                    let fetched = self
-                        .fetch(&refspec, report)?
-                        .ok_or(Unresolved::Fatal(GitError::Fetch.into()))?;
-                    self.sync_branch(branch, &fetched, sync, report)?;
-                }
-                self.adopt_upstream(branch, report)?;
-            }
-            Step::FetchBranch => {
-                let remote = self.config.remote.as_str();
-                report.note(&format!("fetching {branch} from {remote}"));
-                let refspec = plan::branch_ref(branch);
-                let args = ["fetch", "--quiet", remote, refspec.as_str()];
-                let ran = pool::run_reported(&self.git(), args, report)?;
-                if !ran.success {
-                    return Err(Unresolved::Fatal(
-                        GitError::FetchBranch(branch.to_string()).into(),
-                    ));
-                }
-                self.track_remote(branch, report)?;
-            }
-            Step::FetchChange(change) => {
-                let remote = self.config.remote.as_str();
-                report.note(&format!("fetching {} -> {branch}", change.name));
-                // Prefer the real branch, so <remote>/<branch> exists and the local branch can
-                // track it. Without one, the change's own ref gives an untracked branch.
-                let local_ref = plan::branch_ref(branch);
-                let direct = self
-                    .git()
-                    .run(["fetch", "--quiet", remote, local_ref.as_str()])?;
-                if direct.success {
-                    self.track_remote(branch, report)?;
-                } else {
-                    let refspec = format!("{}:{local_ref}", change.change_ref.refspec);
-                    let args = ["fetch", "--quiet", remote, refspec.as_str()];
-                    let ran = pool::run_reported(&self.git(), args, report)?;
-                    if !ran.success {
-                        return Err(Unresolved::Fatal(
-                            GitError::FetchChange(change.name.clone()).into(),
-                        ));
-                    }
-                    report.warn(&change.change_ref.note);
-                }
+        } else {
+            match self.remote_has_branch(branch, report)? {
+                Some(true) => self.fetch_and_sync(branch, &branch.branch_ref(), sync, report)?,
+                Some(false) => report.warn(&format!(
+                    "{remote} has no branch named '{branch}'; nothing to refresh"
+                )),
+                None => report.warn(&format!(
+                    "no remote '{remote}' here; {branch} not refreshed"
+                )),
             }
         }
+        Ok(self.adopt_upstream(branch, report)?)
+    }
+
+    fn apply_local_change(
+        &self,
+        branch: &BranchName,
+        change: &ChangeHead,
+        sync: SyncMode,
+        report: &mut impl Report,
+    ) -> Result<(), Unresolved> {
+        report.note(&format!("{branch}: already local"));
+        if sync == SyncMode::No {
+            let label = format!("the head of {}", change.name);
+            self.warn_if_stale(branch, &change.head, &label, report)?;
+        } else {
+            let refspec = match change.fetch {
+                Fetch::ChangeRef => change.change_ref.refspec.clone(),
+                Fetch::Branch => branch.branch_ref(),
+            };
+            self.fetch_and_sync(branch, &refspec, sync, report)?;
+        }
+        Ok(self.adopt_upstream(branch, report)?)
+    }
+
+    fn fetch_branch(
+        &self,
+        branch: &BranchName,
+        report: &mut impl Report,
+    ) -> Result<(), Unresolved> {
+        let remote = self.config.remote.as_str();
+        report.note(&format!("fetching {branch} from {remote}"));
+        let refspec = branch.branch_ref();
+        let args = ["fetch", "--quiet", remote, refspec.as_str()];
+        if !run_reported(&self.git, args, report)?.success {
+            return Err(Unresolved::Fatal(
+                GitError::FetchBranch(branch.to_string()).into(),
+            ));
+        }
+        self.track_remote(branch, report)
+    }
+
+    fn fetch_change(
+        &self,
+        branch: &BranchName,
+        change: &ChangeHead,
+        report: &mut impl Report,
+    ) -> Result<(), Unresolved> {
+        let remote = self.config.remote.as_str();
+        report.note(&format!("fetching {} -> {branch}", change.name));
+        // Prefer the real branch, so <remote>/<branch> exists and the local branch can
+        // track it. Without one, the change's own ref gives an untracked branch.
+        let local_ref = branch.branch_ref();
+        let direct = self
+            .git
+            .run(["fetch", "--quiet", remote, local_ref.as_str()])?;
+        if direct.success {
+            return self.track_remote(branch, report);
+        }
+        let refspec = format!("{}:{local_ref}", change.change_ref.refspec);
+        let args = ["fetch", "--quiet", remote, refspec.as_str()];
+        if !run_reported(&self.git, args, report)?.success {
+            return Err(Unresolved::Fatal(
+                GitError::FetchChange(change.name.clone()).into(),
+            ));
+        }
+        report.warn(&change.change_ref.note);
         Ok(())
+    }
+
+    /// Fetches `src` and moves `branch` to it, as [`Resolver::sync_branch`] decides.
+    fn fetch_and_sync(
+        &self,
+        branch: &BranchName,
+        src: &str,
+        sync: SyncMode,
+        report: &mut impl Report,
+    ) -> Result<(), Unresolved> {
+        let fetched = self
+            .fetch(src, report)?
+            .ok_or(Unresolved::Fatal(GitError::Fetch.into()))?;
+        self.sync_branch(branch, &fetched, sync, report)
     }
 
     fn track_remote(
@@ -123,7 +157,7 @@ impl<F> Pool<F> {
     ) -> Result<(), Unresolved> {
         let upstream = self.remote_ref(branch);
         let args = ["branch", "--quiet", "--track", branch.as_str(), &upstream];
-        let ran = pool::run_reported(&self.git(), args, report)?;
+        let ran = run_reported(&self.git, args, report)?;
         if ran.success {
             Ok(())
         } else {
@@ -138,18 +172,18 @@ impl<F> Pool<F> {
     fn fetch(&self, src: &str, report: &mut impl Report) -> Result<Option<ObjectId>, Error> {
         let refspec = format!("+{src}:{FETCHED}");
         let args = ["fetch", "--quiet", self.config.remote.as_str(), &refspec];
-        let ran = pool::run_reported(&self.git(), args, report)?;
+        let ran = run_reported(&self.git, args, report)?;
         if !ran.success {
             return Ok(None);
         }
         let fetched = self.commit_of(FETCHED)?;
-        let _deleted = pool::run_reported(&self.git(), ["update-ref", "-d", FETCHED], report)?;
+        let _deleted = run_reported(&self.git, ["update-ref", "-d", FETCHED], report)?;
         Ok(fetched)
     }
 
     /// The commit `rev` names, `None` when there is no such commit.
     fn commit_of(&self, rev: &str) -> Result<Option<ObjectId>, Error> {
-        let ran = self.git().run([
+        let ran = self.git.run([
             "rev-parse",
             "--verify",
             "--quiet",
@@ -178,7 +212,7 @@ impl<F> Pool<F> {
                     Configured::Set(tracked) => Some(tracked),
                     Configured::Unset | Configured::Unknown => None,
                 };
-                if tracked.as_deref() != Some(remote) || merge != plan::branch_ref(branch) {
+                if tracked.as_deref() != Some(remote) || merge != branch.branch_ref() {
                     report.warn(&format!(
                         "{branch} tracks {}, not {remote}/{branch}; upstream left as it is",
                         upstream_label(tracked.as_deref(), &merge)
@@ -188,7 +222,7 @@ impl<F> Pool<F> {
             Configured::Unset => {
                 let upstream = format!("--set-upstream-to={}", self.remote_ref(branch));
                 let args = ["branch", "--quiet", upstream.as_str(), branch.as_str()];
-                let ran = pool::run_reported(&self.git(), args, report)?;
+                let ran = run_reported(&self.git, args, report)?;
                 if ran.success {
                     report.note(&format!("{branch}: upstream set to {remote}/{branch}"));
                 } else {
@@ -210,7 +244,7 @@ impl<F> Pool<F> {
     /// branch is gone.
     fn branch_config(&self, branch: &BranchName, key: &str) -> Result<Configured, Error> {
         let ran = self
-            .git()
+            .git
             .run(["config", "--get", &format!("branch.{branch}.{key}")])?;
         Ok(match (ran.code, ran.line()) {
             (Some(0), Some(value)) if !value.is_empty() => Configured::Set(value.to_owned()),
@@ -227,54 +261,10 @@ impl<F> Pool<F> {
         mode: SyncMode,
         report: &mut impl Report,
     ) -> Result<(), Unresolved> {
-        let range = format!("{}...{target}", plan::branch_ref(branch));
-        let compared = divergence::left_right(&self.git(), &range)?;
-        let holder = match self.holder_of(branch)? {
-            Some(worktree) => Some(Holder {
-                role: self.config.role_of(&worktree),
-                dirty: worktree.uncommitted()?,
-                worktree,
-            }),
-            None => None,
-        };
+        let range = format!("{}...{target}", branch.branch_ref());
+        let compared = left_right(&self.git, &range)?;
+        let holder = self.sync_holder(branch)?;
         match divergence::plan_sync(compared, mode, holder) {
-            SyncStep::Incomparable => {
-                report.warn(&format!(
-                    "could not compare {branch} with the remote head; not refreshed"
-                ));
-                Err(Unresolved::Quiet)
-            }
-            SyncStep::UpToDate => {
-                report.note(&format!("{branch}: already up to date"));
-                Ok(())
-            }
-            SyncStep::Diverged { ahead, behind } => {
-                report.warn(&format!(
-                    "{branch} has diverged from the remote head ({ahead} local only, {behind} remote only commit(s)); not refreshed"
-                ));
-                report.warn(
-                    "if the remote was rebased and the local only commits are old copies, rerun with --reset",
-                );
-                Err(Unresolved::Quiet)
-            }
-            SyncStep::HeldByUnmanaged(holder) => Err(Unresolved::Fatal(
-                Refusal::HeldByUnmanaged {
-                    branch: branch.to_string(),
-                    worktree: holder.name(),
-                    path: holder.path().to_path_buf(),
-                }
-                .into(),
-            )),
-            SyncStep::HolderUnknown(holder) => Err(Unresolved::Fatal(
-                Refusal::StatusUnknown(holder.name()).into(),
-            )),
-            SyncStep::HolderDirty(holder) => {
-                report.warn(&format!(
-                    "{branch} is checked out dirty in {}; not refreshed",
-                    holder.name()
-                ));
-                Err(Unresolved::Quiet)
-            }
             SyncStep::FastForward { behind, holder } => {
                 self.fast_forward(branch, target, holder.as_ref(), report)?;
                 report.note(&format!("{branch}: fast-forwarded {behind} commit(s)"));
@@ -283,7 +273,20 @@ impl<F> Pool<F> {
             SyncStep::ResetWithBackup { ahead, holder } => {
                 self.reset_with_backup(branch, target, ahead, holder.as_ref(), report)
             }
+            SyncStep::Stay(stay) => stay_in_place(branch, stay, report),
         }
+    }
+
+    /// The worktree that has `branch` checked out, as [`divergence::plan_sync`] weighs it.
+    fn sync_holder(&self, branch: &BranchName) -> Result<Option<Holder<Worktree>>, Error> {
+        let Some(worktree) = self.holder_of(branch)? else {
+            return Ok(None);
+        };
+        Ok(Some(Holder {
+            role: self.config.role_of(&worktree),
+            dirty: worktree.uncommitted()?,
+            worktree,
+        }))
     }
 
     fn fast_forward(
@@ -293,15 +296,18 @@ impl<F> Pool<F> {
         holder: Option<&Worktree>,
         report: &mut impl Report,
     ) -> Result<(), Unresolved> {
-        let local_ref = plan::branch_ref(branch);
+        let local_ref = branch.branch_ref();
         let (git, args) = match holder {
             Some(holder) => (
                 holder.git(),
                 vec!["merge", "--ff-only", "--quiet", target.as_str()],
             ),
-            None => (self.git(), vec!["update-ref", &local_ref, target.as_str()]),
+            None => (
+                self.git.clone(),
+                vec!["update-ref", &local_ref, target.as_str()],
+            ),
         };
-        let ran = pool::run_reported(&git, args, report)?;
+        let ran = run_reported(&git, args, report)?;
         if ran.success {
             Ok(())
         } else {
@@ -318,20 +324,20 @@ impl<F> Pool<F> {
         holder: Option<&Worktree>,
         report: &mut impl Report,
     ) -> Result<(), Unresolved> {
-        let local_ref = plan::branch_ref(branch);
-        let old = pool::run_reported(&self.git(), ["rev-parse", local_ref.as_str()], report)?;
+        let local_ref = branch.branch_ref();
+        let old = run_reported(&self.git, ["rev-parse", local_ref.as_str()], report)?;
         let old = old
             .line()
             .and_then(ObjectId::new)
             .ok_or(Unresolved::Quiet)?;
-        let short = self.git().run(["rev-parse", "--short", old.as_str()])?;
+        let short = self.git.run(["rev-parse", "--short", old.as_str()])?;
         let short = short
             .line()
             .filter(|s| !s.is_empty())
             .ok_or(Unresolved::Quiet)?;
         let backup = format!("refs/wtpool-backup/{branch}/{short}");
         let args = ["update-ref", backup.as_str(), old.as_str()];
-        if !pool::run_reported(&self.git(), args, report)?.success {
+        if !run_reported(&self.git, args, report)?.success {
             return Err(Unresolved::Quiet);
         }
         let (git, args) = match holder {
@@ -340,7 +346,7 @@ impl<F> Pool<F> {
                 vec!["reset", "--hard", "--quiet", target.as_str()],
             ),
             None => (
-                self.git(),
+                self.git.clone(),
                 vec![
                     "update-ref",
                     "-m",
@@ -351,7 +357,7 @@ impl<F> Pool<F> {
                 ],
             ),
         };
-        let ran = pool::run_reported(&git, args, report)?;
+        let ran = run_reported(&git, args, report)?;
         if !ran.success {
             return Err(Unresolved::Quiet);
         }
@@ -373,8 +379,8 @@ impl<F> Pool<F> {
         label: &str,
         report: &mut impl Report,
     ) -> Result<(), Error> {
-        let local_ref = plan::branch_ref(branch);
-        let local = pool::run_reported(&self.git(), ["rev-parse", &local_ref], report)?;
+        let local_ref = branch.branch_ref();
+        let local = run_reported(&self.git, ["rev-parse", &local_ref], report)?;
         let local = local.line().and_then(ObjectId::new);
         let Some(local) = local.filter(|local| local != target) else {
             // Nothing to compare: git cannot read the branch, or it is at `target` already.
@@ -382,7 +388,7 @@ impl<F> Pool<F> {
         };
         let fetched = self.commit_of(target.as_str())?.is_some();
         let compared = if fetched {
-            divergence::left_right(&self.git(), &format!("{local}...{target}"))?
+            left_right(&self.git, &format!("{local}...{target}"))?
         } else {
             None
         };
@@ -396,6 +402,53 @@ impl<F> Pool<F> {
             report.warn(&warning);
         }
         Ok(())
+    }
+}
+
+/// Reports the reason `branch` stays where it is, an error unless it is up to date.
+fn stay_in_place(
+    branch: &BranchName,
+    stay: Stay<Worktree>,
+    report: &mut impl Report,
+) -> Result<(), Unresolved> {
+    match stay {
+        Stay::Incomparable => {
+            report.warn(&format!(
+                "could not compare {branch} with the remote head; not refreshed"
+            ));
+            Err(Unresolved::Quiet)
+        }
+        Stay::UpToDate => {
+            report.note(&format!("{branch}: already up to date"));
+            Ok(())
+        }
+        Stay::Diverged { ahead, behind } => {
+            report.warn(&format!(
+                "{branch} has diverged from the remote head ({ahead} local only, {behind} remote only commit(s)); not refreshed"
+            ));
+            report.warn(
+                "if the remote was rebased and the local only commits are old copies, rerun with --reset",
+            );
+            Err(Unresolved::Quiet)
+        }
+        Stay::HeldByUnmanaged(holder) => Err(Unresolved::Fatal(
+            Refusal::HeldByUnmanaged {
+                branch: branch.to_string(),
+                worktree: holder.name(),
+                path: holder.path().to_path_buf(),
+            }
+            .into(),
+        )),
+        Stay::HolderUnknown(holder) => Err(Unresolved::Fatal(
+            Refusal::StatusUnknown(holder.name()).into(),
+        )),
+        Stay::HolderDirty(holder) => {
+            report.warn(&format!(
+                "{branch} is checked out dirty in {}; not refreshed",
+                holder.name()
+            ));
+            Err(Unresolved::Quiet)
+        }
     }
 }
 

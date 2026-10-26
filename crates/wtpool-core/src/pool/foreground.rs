@@ -7,11 +7,11 @@ use crate::forge::Forge;
 use crate::names::BranchName;
 use crate::refs::SyncMode;
 use crate::report::Report;
-use crate::resolve::Unresolved;
+use crate::resolve::{Unresolved, run_reported};
 use crate::worktree::{self, Worktree};
 
 use super::refusals::{self, WorktreeState};
-use super::{AgentGuard, Pool, git};
+use super::{AgentGuard, Pool};
 
 const FOREGROUND_NOT_CHANGED: &str = "foreground not changed";
 
@@ -37,13 +37,13 @@ impl<F> Pool<F> {
     {
         let lock = self.lock(report)?;
         let state = WorktreeState::read(&lock.foreground, &self.git())?;
-        refusals::foreground_refusal(reference, &lock.foreground.name(), &state)
-            .map_or(Ok(()), Err)?;
+        refusals::foreground_refusal(reference, &lock.foreground.name(), &state)?;
         let unresolved = |u: Unresolved| u.into_error(reference, FOREGROUND_NOT_CHANGED);
         let not_changed = |e: Error| unresolved(Unresolved::Fatal(e));
-        let plan = self.plan(reference, report).map_err(unresolved)?;
-        let plan = self
-            .refuse_unsafe_checkout(plan, sync)
+        let resolver = self.resolver();
+        let plan = resolver.plan(reference, report).map_err(unresolved)?;
+        let plan = resolver
+            .refuse_unsafe_checkout(plan, sync, |worktree| self.gone_error(worktree))
             .map_err(not_changed)?;
         let released = self
             .refuse_unreleasable(plan.branch())
@@ -51,7 +51,7 @@ impl<F> Pool<F> {
         let moved: Vec<&Worktree> = std::iter::once(&lock.foreground).chain(&released).collect();
         self.refuse_busy_agents(agents, &lock.common_dir, &moved)
             .map_err(not_changed)?;
-        self.apply(&plan, report).map_err(unresolved)?;
+        resolver.apply(&plan, report).map_err(unresolved)?;
         let branch = plan.branch();
         match self.holder_of(branch)? {
             Some(holder) if self.is_foreground(holder.path()) => {
@@ -62,14 +62,14 @@ impl<F> Pool<F> {
                     // Again, as git run outside `wtpool` may have changed the holder during the fetch.
                     self.refuse_release(branch, &holder).map_err(not_changed)?;
                     report.note(&format!("releasing {branch} from {}", holder.name()));
-                    git::run_reported(&holder.git(), ["switch", "--detach", "--quiet"], report)?
+                    run_reported(&holder.git(), ["switch", "--detach", "--quiet"], report)?
                         .check()?;
                 }
-                git::run_reported(&self.git(), ["switch", "--quiet", branch.as_str()], report)?
+                run_reported(&self.git(), ["switch", "--quiet", branch.as_str()], report)?
                     .check()?;
                 report.note(&format!(
                     "{branch} -> {}",
-                    worktree::basename(&self.config.foreground)
+                    worktree::basename(&self.config.foreground.value)
                 ));
             }
         }
@@ -79,7 +79,7 @@ impl<F> Pool<F> {
             .split_terminator('\n')
             .for_each(|line| report.note(line));
         log.forward_stderr(report).check()?;
-        Ok(self.config.foreground.to_path_buf())
+        Ok(self.config.foreground.value.to_path_buf())
     }
 
     /// Refuses, before `fg` changes anything, a branch whose holder it would have to release but
@@ -99,7 +99,11 @@ impl<F> Pool<F> {
     fn refuse_release(&self, branch: &BranchName, holder: &Worktree) -> Result<(), Error> {
         let state = WorktreeState::read(holder, &self.git())?;
         let role = self.config.role_of(holder);
-        refusals::release_refusal(branch, holder.path(), role, &state)
-            .map_or(Ok(()), |refusal| Err(refusal.into()))
+        Ok(refusals::release_refusal(
+            branch,
+            holder.path(),
+            role,
+            &state,
+        )?)
     }
 }

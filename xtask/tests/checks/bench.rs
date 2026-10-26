@@ -11,7 +11,7 @@ use xtask::budget::{delays_within, p95};
 use xtask::isolation::VERIFY_EMAIL;
 use xtask::pool::git_in;
 
-use crate::support::{Sandbox, Watch, is_alive, is_status, must_status_json, worktree};
+use crate::support::{Sandbox, Watch, is_alive, is_status, must_status_json, phase, worktree};
 
 mod agents;
 mod jobs;
@@ -219,7 +219,7 @@ fn budget__b4() {
         missed <= Duration::from_secs(11),
         "a change no watched folder sees showed after {missed:?}, more than 11 s (B4)"
     );
-    if agents::phase() >= 2 {
+    if phase() >= 2 {
         let delays = agents::record_writes(&pool.sandbox, &pool.dir, &mut watch);
         let unseen = delays.iter().filter(|delay| delay.is_none()).count();
         assert_eq!(

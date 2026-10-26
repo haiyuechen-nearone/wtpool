@@ -103,8 +103,8 @@ pub enum SettingsError {
         line: Option<usize>,
         reason: String,
     },
-    #[error("could not read {}: {reason}", path.display())]
-    ReadConfig { path: PathBuf, reason: String },
+    #[error("could not read {}: {fault}", path.display())]
+    ReadConfig { path: PathBuf, fault: ReadFault },
     /// A setting of this machine's heavy jobs in a repository's `wtpool.toml`.
     #[error(
         "invalid {}: {}unknown key `{key}`: heavy jobs read it from this machine's config alone; set it with wtpool job {key}",
@@ -145,6 +145,17 @@ pub enum SettingsError {
     },
     #[error("foreground worktree {} does not exist", .0.display())]
     ForegroundMissing(PathBuf),
+}
+
+/// The reason a settings file could not be read.
+#[derive(Debug, thiserror::Error)]
+pub enum ReadFault {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error("not a regular file")]
+    NotAFile,
+    #[error("not valid UTF-8")]
+    NotUtf8,
 }
 
 /// git, or another command `wtpool` runs, that could not start, failed, or answered in a way

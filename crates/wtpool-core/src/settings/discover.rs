@@ -3,13 +3,13 @@
 use std::ffi::OsStr;
 
 use crate::config::Key;
-use crate::config_file;
 use crate::error::{Error, SettingsError};
 use crate::git::GitMode;
 use crate::names::SlotPrefix;
 use crate::paths::{self, AbsolutePath};
 use crate::repository::Repository;
 
+use super::files::read_checked;
 use super::{RepoLayer, Source};
 
 /// The repository of the settings and the source of the defaults from its main worktree.
@@ -154,22 +154,18 @@ fn main_of(repository: &Repository) -> Result<Main, Error> {
     })
 }
 
-/// The `wtpool.toml` of `repository`, `None` when it has none. Relative paths in the
-/// file resolve against the directory that holds the main worktree.
+/// The `wtpool.toml` of `repository`, `None` when it has none.
 pub(super) fn repo_layer(
     repository: &Repository,
     main: &Main,
     home: &impl Fn() -> Result<AbsolutePath, Error>,
 ) -> Result<Option<RepoLayer>, Error> {
     let file = repository.config_file();
-    let Some(text) = config_file::read(&file)? else {
-        return Ok(None);
-    };
-    let base = main.listed().parent_dir();
-    let contents = config_file::parse(&text, &file, &base, home)?;
-    Ok(Some(RepoLayer {
-        file,
-        values: contents.values,
-        repo_only: contents.repo_only,
-    }))
+    Ok(
+        read_checked(&file, main.listed(), home)?.map(|contents| RepoLayer {
+            file,
+            values: contents.values,
+            repo_only: contents.repo_only,
+        }),
+    )
 }

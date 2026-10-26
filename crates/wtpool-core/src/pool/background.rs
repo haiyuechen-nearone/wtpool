@@ -8,10 +8,10 @@ use crate::git::Git;
 use crate::names::BranchName;
 use crate::refs::SyncMode;
 use crate::report::{Discard, Report};
-use crate::resolve::Unresolved;
+use crate::resolve::{Unresolved, run_reported};
 use crate::worktree::{self, Worktree};
 
-use super::{Pool, git, parking, refusals, slots};
+use super::{Pool, parking, refusals, slots};
 
 const NO_SLOT_CHANGED: &str = "no slot changed";
 
@@ -46,13 +46,14 @@ impl<F> Pool<F> {
     {
         let _lock = self.lock(report)?;
         let unresolved = |u: Unresolved| u.into_error(reference, NO_SLOT_CHANGED);
-        let plan = self.plan(reference, report).map_err(unresolved)?;
-        let plan = self
-            .refuse_unsafe_checkout(plan, sync)
+        let resolver = self.resolver();
+        let plan = resolver.plan(reference, report).map_err(unresolved)?;
+        let plan = resolver
+            .refuse_unsafe_checkout(plan, sync, |worktree| self.gone_error(worktree))
             .map_err(|e| unresolved(Unresolved::Fatal(e)))?;
         // Checked before the fetch, so a pool without room changes nothing.
         self.parking(plan.branch(), report)?;
-        self.apply(&plan, report).map_err(unresolved)?;
+        resolver.apply(&plan, report).map_err(unresolved)?;
         let branch = plan.branch();
         // Chosen again, as git run outside `wtpool` may have taken the slot during the fetch.
         let parking = self.parking(branch, &mut Discard)?;
@@ -69,7 +70,7 @@ impl<F> Pool<F> {
             }
         };
         let switch = ["switch", "--quiet", branch.as_str()];
-        git::run_reported(&Git::at(&slot), switch, report)?.check()?;
+        run_reported(&Git::at(&slot), switch, report)?.check()?;
         report.note(&format!("{branch} -> {}", worktree::basename(&slot)));
         slots::slot_setup(failures)?;
         Ok(slot.into_path_buf())
@@ -80,12 +81,12 @@ impl<F> Pool<F> {
     fn parking(&self, branch: &BranchName, report: &mut impl Report) -> Result<Parking, Error> {
         if let Some(holder) = self.holder_of(branch)? {
             let role = self.config.role_of(&holder);
-            return refusals::outside_slots_refusal(branch, holder.path(), role)
-                .map_or(Ok(Parking::Held(holder)), |refusal| Err(refusal.into()));
+            refusals::outside_slots_refusal(branch, holder.path(), role)?;
+            return Ok(Parking::Held(holder));
         }
         let facts = self.slot_facts(report)?;
         Ok(
-            match parking::choose_parking(facts, self.config.slot_count)? {
+            match parking::choose_parking(facts, self.config.slot_count.value)? {
                 Some(slot) => Parking::Free(slot),
                 None => Parking::NewSlot,
             },

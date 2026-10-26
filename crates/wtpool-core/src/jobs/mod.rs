@@ -3,7 +3,6 @@
 //! rest), the [`JobFolder`] that holds the jobs, and the [`JobListing`] of `wtpool job ls`.
 
 mod config;
-mod edit;
 mod folder;
 mod heavy_table;
 mod listing;
@@ -15,13 +14,13 @@ mod run;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+pub use crate::settings::edit::{
+    EditError, EditFault, ListChange, RepositoryChange, RepositoryLists, edit_machine_heavy,
+    edit_repository_heavy, set_enforce, set_limit,
+};
 pub use config::{
     ConfigSource, Enforce, InvalidEnforce, InvalidLimit, LIMIT_BOUNDS, Limit, MAX_DEFAULT_LIMIT,
     MachineConfig, MachineConfigError, MachineConfigFault, machine_config_path,
-};
-pub use edit::{
-    EditError, EditFault, ListChange, RepositoryChange, RepositoryLists, edit_machine_heavy,
-    edit_repository_heavy, set_enforce, set_limit,
 };
 pub use folder::{FolderError, JobFile, JobFolder, Liveness, LockState};
 pub use heavy_table::{HeavyName, HeavyTable};
@@ -61,7 +60,7 @@ impl JobPaths {
     /// The paths that `var`'s `XDG_CONFIG_HOME`, `XDG_STATE_HOME` and `HOME` give, the system's
     /// home folder standing in for a `HOME` that is unset or not absolute.
     pub fn from_env(var: impl Fn(&str) -> Option<OsString>) -> Result<Self, JobError> {
-        let home = dirs::home_folder(var("HOME"), std::env::home_dir);
+        let home = dirs::home_from(&var);
         let folder_of = |name: &str| var(name).map(PathBuf::from);
         let config = machine_config_path(folder_of("XDG_CONFIG_HOME").as_deref(), home.as_deref());
         let state = dirs::state_folder(folder_of("XDG_STATE_HOME").as_deref(), home.as_deref());

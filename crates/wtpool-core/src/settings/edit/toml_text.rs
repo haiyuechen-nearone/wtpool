@@ -18,7 +18,7 @@ pub(super) enum TableName {
     Named(&'static str),
 }
 
-/// How the text writes a table: the forms whose keys can be added or removed by lines, and the
+/// The form of a table in the text: those whose keys can be added or removed by lines, and the
 /// rest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Form {

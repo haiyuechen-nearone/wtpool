@@ -67,12 +67,12 @@ impl<F> Pool<F> {
     /// The configured foreground as a listed worktree. Refuses a folder inside one, as every
     /// foreground check would then compare against the wrong directory.
     fn foreground_worktree(&self, report: &mut impl Report) -> Result<Worktree, Error> {
-        let foreground = &self.config.foreground;
+        let foreground = &self.config.foreground.value;
         if !foreground.is_dir() {
             return Err(SettingsError::ForegroundMissing(foreground.to_path_buf()).into());
         }
         let not_a_worktree = || {
-            self.config.foreground_source.invalid(
+            self.config.foreground.source.invalid(
                 "WTPOOL_FOREGROUND",
                 "foreground",
                 foreground.display().to_string(),

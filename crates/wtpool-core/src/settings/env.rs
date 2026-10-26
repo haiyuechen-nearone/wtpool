@@ -14,9 +14,7 @@ const HOME: &str = "HOME";
 
 /// The `WTPOOL_*` variables, each checked on its own.
 pub(super) fn env_values(var: &impl Fn(&str) -> Option<OsString>) -> Result<Values, Error> {
-    let foreground = set(var, Key::Foreground)?
-        .map(|path| absolute(Key::Foreground, &path))
-        .transpose()?;
+    let foreground = foreground(var)?;
     let slot_dir = set(var, Key::SlotDir)?
         .map(|path| absolute(Key::SlotDir, &path))
         .transpose()?;
@@ -49,6 +47,15 @@ pub(super) fn env_values(var: &impl Fn(&str) -> Option<OsString>) -> Result<Valu
     })
 }
 
+/// `WTPOOL_FOREGROUND`, checked as [`env_values`] checks it.
+pub(super) fn foreground(
+    var: &impl Fn(&str) -> Option<OsString>,
+) -> Result<Option<AbsolutePath>, Error> {
+    set(var, Key::Foreground)?
+        .map(|path| absolute(Key::Foreground, &path))
+        .transpose()
+}
+
 /// The variable of `key`, `None` when unset. Set but empty or not Unicode is an error.
 fn set(var: &impl Fn(&str) -> Option<OsString>, key: Key) -> Result<Option<String>, Error> {
     match var(key.var()) {
@@ -64,16 +71,19 @@ fn set(var: &impl Fn(&str) -> Option<OsString>, key: Key) -> Result<Option<Strin
     }
 }
 
-/// The home folder as [`dirs::home_folder`] finds it from `HOME` and `system`, refused when
-/// there is none, so a `~/` path never points somewhere else.
-pub(super) fn home_dir(
-    var: &impl Fn(&str) -> Option<OsString>,
-    system: impl FnOnce() -> Option<PathBuf>,
+/// The home folder as [`dirs::home_from`] finds it through `var`, refused when there is none, so
+/// a `~/` path never points somewhere else.
+pub(super) fn home_dir(var: &impl Fn(&str) -> Option<OsString>) -> Result<AbsolutePath, Error> {
+    checked_home(var(HOME), dirs::home_from(var))
+}
+
+/// `found`, the home folder found for the value `home` of `HOME`, refused naming that value
+/// when there is none.
+pub(super) fn checked_home(
+    home: Option<OsString>,
+    found: Option<PathBuf>,
 ) -> Result<AbsolutePath, Error> {
-    let home = var(HOME);
-    if let Some(folder) = dirs::home_folder(home.clone(), system)
-        .and_then(|folder| AbsolutePath::try_new(folder).ok())
-    {
+    if let Some(folder) = found.and_then(|folder| AbsolutePath::try_new(folder).ok()) {
         return Ok(folder);
     }
     let (value, reason) = match home {

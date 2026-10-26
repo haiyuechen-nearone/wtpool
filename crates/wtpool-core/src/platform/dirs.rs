@@ -18,10 +18,16 @@ pub fn home_folder(
         .or_else(|| system().filter(|folder| folder.is_absolute()))
 }
 
+/// The [`home_folder`] of the `HOME` that `var` reads, such as [`std::env::var_os`].
+#[must_use]
+pub fn home_from(var: impl Fn(&str) -> Option<OsString>) -> Option<PathBuf> {
+    home_folder(var("HOME"), std::env::home_dir)
+}
+
 /// The [`home_folder`] of this process.
 #[must_use]
 pub fn home() -> Option<PathBuf> {
-    home_folder(std::env::var_os("HOME"), std::env::home_dir)
+    home_from(|name| std::env::var_os(name))
 }
 
 /// The folder for state files: `state_home`, the value of `XDG_STATE_HOME`, else `.local/state`

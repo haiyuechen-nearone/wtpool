@@ -40,9 +40,10 @@ mod worktree;
 mod worktree_state;
 
 pub use config::{Config, CopyPath, InvalidCopyPath, InvalidSlotCount, SlotCount, SlotSetup};
-pub use error::{Error, GitError, Refusal, SettingsError, exit_status};
+pub use error::{Error, GitError, ReadFault, Refusal, SettingsError, exit_status};
 pub use forge::{ChangeHead, ChangeRef, Fetch, Forge, Remote};
 pub use git::GitMode;
+pub use heavy::{RepositoryHeavy, RepositoryPatterns};
 pub use names::{
     BranchName, InvalidBranchName, InvalidRemoteName, InvalidSlotName, ObjectId, RemoteName,
     SlotName, SlotPrefix,
@@ -53,7 +54,5 @@ pub use refs::{RefArgs, SyncMode};
 pub use report::Report;
 pub use resolve::Unresolved;
 pub use run::{Ran, run};
-pub use settings::{
-    RepositoryFiles, RepositoryHeavy, RepositoryPatterns, Setting, Settings, Source,
-};
+pub use settings::{RepositoryFiles, Setting, Settings, Source};
 pub use worktree_state::{Operation, Role, Row, State, Uncommitted, Unreferenced, Upstream};

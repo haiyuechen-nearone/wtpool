@@ -6,16 +6,19 @@ use crate::config::{Config, Key, SlotCount, SlotSetup};
 use crate::config_file::{RepoOnly, Values};
 use crate::error::{Error, SettingsError};
 use crate::git::GitMode;
+use crate::heavy::Pattern;
 use crate::names::{RemoteName, SlotPrefix};
 use crate::paths::AbsolutePath;
 use crate::repository::Repository;
 
 use discover::Main;
-pub use patterns::{RepositoryFiles, RepositoryHeavy, RepositoryPatterns, RepositoryPolicy};
+pub use files::{RepositoryFiles, RepositoryPolicy};
 
 mod discover;
+pub(crate) mod edit;
 mod env;
-mod patterns;
+mod files;
+mod main_worktree;
 
 /// The pool settings in effect and where each came from.
 ///
@@ -38,6 +41,8 @@ pub struct Settings {
     /// The remote that pull requests are looked up in, and that branches are
     /// fetched from and track.
     pub remote: Setting<RemoteName>,
+    /// The heavy patterns, from the repository's `wtpool.toml` only.
+    pub heavy: Vec<Pattern>,
     /// Process names that count as builds, from the repository's `wtpool.toml` only.
     pub build_processes: Vec<String>,
     /// `copy` and `on_new_slot`, from the repository's `wtpool.toml` only.
@@ -119,7 +124,7 @@ impl Settings {
         git_mode: GitMode,
     ) -> Result<Self, Error> {
         let env = env::env_values(&var)?;
-        let home = || env::home_dir(&var, std::env::home_dir);
+        let home = || env::home_dir(&var);
         let ceiling = var("GIT_CEILING_DIRECTORIES");
         let found = match &env.foreground {
             Some(foreground) => discover::named(foreground, git_mode)?,
@@ -152,13 +157,10 @@ impl Settings {
     #[must_use]
     pub fn into_config(self) -> Config {
         Config {
-            foreground: self.foreground.value,
-            foreground_source: self.foreground.source,
+            foreground: self.foreground,
             slot_dir: self.slot_dir.value,
-            slot_prefix: self.slot_prefix.value,
-            slot_prefix_source: self.slot_prefix.source,
-            slot_count: self.slot_count.value,
-            slot_count_source: self.slot_count.source,
+            slot_prefix: self.slot_prefix,
+            slot_count: self.slot_count,
             remote: self.remote.value,
             main_worktree: self.main_worktree,
             slot_setup: self.slot_setup,
@@ -351,7 +353,7 @@ impl<'a> Layers<'a> {
 }
 
 impl<T> Setting<T> {
-    fn new(value: T, source: Source) -> Self {
+    pub fn new(value: T, source: Source) -> Self {
         Self { value, source }
     }
 }
@@ -391,6 +393,7 @@ fn resolve(
         .first(Key::Remote, |values| values.remote.as_ref())
         .unwrap_or_else(|| Setting::new(RemoteName::default(), Source::Default));
     let RepoOnly {
+        heavy,
         build_processes,
         slot_setup,
         ..
@@ -408,6 +411,7 @@ fn resolve(
         slot_prefix,
         slot_count,
         remote,
+        heavy,
         build_processes,
         slot_setup,
         main_worktree,

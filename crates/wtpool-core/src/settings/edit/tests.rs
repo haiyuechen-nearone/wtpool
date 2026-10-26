@@ -67,8 +67,8 @@ fn edit_machine_heavy__should_add_and_remove_listed_patterns() {
     let removed = edit_machine_heavy(&path, &ListChange::Remove(patterns(&["make"])));
 
     // Then
-    assert_eq!(added, Ok(names(&["make", "cargo build"])));
-    assert_eq!(removed, Ok(names(&["cargo build"])));
+    assert_eq!(added.unwrap(), names(&["make", "cargo build"]));
+    assert_eq!(removed.unwrap(), names(&["cargo build"]));
     assert_eq!(
         std::fs::read_to_string(&path).unwrap(),
         "[jobs]\nheavy = [\"cargo build\"]\n"
@@ -87,14 +87,8 @@ fn edit_machine_heavy__should_refuse_a_duplicate_or_an_unlisted_pattern() {
     let unlisted = edit_machine_heavy(&path, &ListChange::Remove(patterns(&["just"])));
 
     // Then
-    assert_eq!(
-        twice.unwrap_err().fault,
-        EditFault::Listed("make".to_owned())
-    );
-    assert_eq!(
-        unlisted.unwrap_err().fault,
-        EditFault::NotListed("just".to_owned())
-    );
+    assert!(matches!(twice.unwrap_err().fault, EditFault::Listed(name) if name == "make"));
+    assert!(matches!(unlisted.unwrap_err().fault, EditFault::NotListed(name) if name == "just"));
     assert_eq!(std::fs::read_to_string(&path).unwrap(), text);
 }
 
@@ -114,11 +108,11 @@ fn edit_repository_heavy__should_add_new_patterns_and_the_suggestions_lacking() 
 
     // Then
     assert_eq!(
-        added,
-        Ok(RepositoryLists {
+        added.unwrap(),
+        RepositoryLists {
             heavy: names(&["make", "cargo build"]),
             build_processes: names(&["protoc"]),
-        })
+        }
     );
     assert_eq!(
         std::fs::read_to_string(&path).unwrap(),
@@ -164,11 +158,11 @@ fn edit_repository_heavy__should_remove_from_heavy_and_build_processes() {
 
     // Then
     assert_eq!(
-        removed,
-        Ok(RepositoryLists {
+        removed.unwrap(),
+        RepositoryLists {
             heavy: names(&["make"]),
             build_processes: Vec::new(),
-        })
+        }
     );
     assert_eq!(
         std::fs::read_to_string(&path).unwrap(),
@@ -188,10 +182,7 @@ fn edit_repository_heavy__should_refuse_a_name_listed_nowhere() {
         edit_repository_heavy(dir.path(), &RepositoryChange::Remove(names(&["a b c d"])));
 
     // Then
-    assert_eq!(
-        unlisted.unwrap_err().fault,
-        EditFault::NotListed("just".to_owned())
-    );
+    assert!(matches!(unlisted.unwrap_err().fault, EditFault::NotListed(name) if name == "just"));
     assert!(matches!(
         no_pattern.unwrap_err().fault,
         EditFault::Pattern(_)
@@ -218,13 +209,13 @@ fn edit_repository_heavy__should_refuse_a_comment_only_in_the_list_it_rewrites()
 
     // Then
     assert!(added.is_ok());
-    assert_eq!(
+    assert!(matches!(
         removed.unwrap_err().fault,
         EditFault::CommentInArray {
             key: "build_processes",
             line: 2
         }
-    );
+    ));
     assert_eq!(
         std::fs::read_to_string(&path).unwrap(),
         "build_processes = [\n  \"protoc\", # ours\n]\nheavy = [\"make\"]\n"

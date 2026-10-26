@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use rstest::rstest;
-use wtpool_core::{AbsolutePath, Config, Pool, SlotName, Source, SyncMode};
+use wtpool_core::{AbsolutePath, Config, Pool, Setting, SlotName, Source, SyncMode};
 
 use crate::support::{FakePr, Fixture, PoolCommand, PrAnswer, Recorder};
 
@@ -28,7 +28,10 @@ fn new_slot__should_create_a_detached_slot(
     fixture.must_add_worktree("app-wt3", None);
     let pool = Pool::new(
         Config {
-            slot_count_source: Source::RepoFile(PathBuf::from("/r/.git/wtpool.toml")),
+            slot_count: Setting {
+                source: Source::RepoFile(PathBuf::from("/r/.git/wtpool.toml")),
+                ..fixture.config(slot_count).slot_count
+            },
             ..fixture.config(slot_count)
         },
         FakePr(PrAnswer::NoLookup),
@@ -63,7 +66,10 @@ fn new_slot__should_name_where_the_slot_count_came_from(
     fixture.must_add_worktree("app-wt1", None);
     let pool = Pool::new(
         Config {
-            slot_count_source: source,
+            slot_count: Setting {
+                source,
+                ..fixture.config(1).slot_count
+            },
             ..fixture.config(1)
         },
         FakePr(PrAnswer::NoLookup),
@@ -86,7 +92,10 @@ fn new_slot__should_refuse_a_name_without_the_slot_prefix() {
     let fixture = Fixture::must_new();
     let pool = Pool::new(
         Config {
-            slot_prefix_source: Source::RepoFile(PathBuf::from("/r/.git/wtpool.toml")),
+            slot_prefix: Setting {
+                source: Source::RepoFile(PathBuf::from("/r/.git/wtpool.toml")),
+                ..fixture.config(3).slot_prefix
+            },
             ..fixture.config(3)
         },
         FakePr(PrAnswer::NoLookup),

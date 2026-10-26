@@ -3,14 +3,16 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
+use crate::config::Key;
 use crate::error::{Error, Refusal};
 use crate::names::{BranchName, InvalidSlotName, SlotName};
 use crate::report::{Discard, Report};
+use crate::resolve::run_reported;
 use crate::worktree::{self, Head};
 use crate::worktree_state::Row;
 
 use super::refusals::{self, WorktreeState};
-use super::{AgentGuard, Pool, git, slots};
+use super::{AgentGuard, Pool, slots};
 
 impl<F> Pool<F> {
     /// `wtpool ls`: every worktree that exists on disk, in `git worktree list` order.
@@ -66,9 +68,9 @@ impl<F> Pool<F> {
             return Err(self.gone_error(&worktree).into());
         }
         let state = WorktreeState::read(&worktree, &self.git())?;
-        refusals::detach_refusal(&worktree.name(), &state).map_or(Ok(()), Err)?;
+        refusals::detach_refusal(&worktree.name(), &state)?;
         self.refuse_busy_agents(agents, &lock.common_dir, &[&worktree])?;
-        git::run_reported(&worktree.git(), ["switch", "--detach", "--quiet"], report)?.check()?;
+        run_reported(&worktree.git(), ["switch", "--detach", "--quiet"], report)?.check()?;
         report.info(&format!("{} released", worktree.name()));
         Ok(())
     }
@@ -82,12 +84,12 @@ impl<F> Pool<F> {
         report: &mut impl Report,
     ) -> Result<PathBuf, Error> {
         if let Some(name) = &name
-            && !self.config.slot_prefix.manages(name.as_str())
+            && !self.config.slot_prefix.value.manages(name.as_str())
         {
-            let prefix = self.config.slot_prefix_source.describe(
-                "WTPOOL_SLOT_PREFIX",
-                "slot_prefix",
-                &format!(" '{}'", self.config.slot_prefix.as_str()),
+            let prefix = self.config.slot_prefix.source.describe(
+                Key::SlotPrefix.var(),
+                Key::SlotPrefix.name(),
+                &format!(" '{}'", self.config.slot_prefix.value.as_str()),
             );
             return Err(Error::InvalidSlotName {
                 name: name.to_string(),
@@ -99,11 +101,11 @@ impl<F> Pool<F> {
         let path = self.create_slot(name, &mut failures, report)?;
         report.info(&format!("created {}", path.display()));
         let count = self.managed_slots(report)?.len();
-        let limit = self.config.slot_count;
+        let limit = self.config.slot_count.value;
         if count > limit.get() {
-            let limit = self.config.slot_count_source.describe(
-                "WTPOOL_SLOT_COUNT",
-                "slot_count",
+            let limit = self.config.slot_count.source.describe(
+                Key::SlotCount.var(),
+                Key::SlotCount.name(),
                 &format!("={limit}"),
             );
             report.warn(&format!("the pool now has {count} slots, above {limit}"));
@@ -134,7 +136,7 @@ impl<F> Pool<F> {
         }
         let gone = worktree.is_gone();
         let state = WorktreeState::read(worktree, &self.git())?;
-        refusals::removal_refusal(&worktree.name(), gone, &state).map_or(Ok(()), Err)?;
+        refusals::removal_refusal(&worktree.name(), gone, &state)?;
         let ran = self.git().run([
             OsStr::new("worktree"),
             OsStr::new("remove"),
@@ -165,7 +167,7 @@ impl<F> Pool<F> {
         // `list` below warns about slots whose directory is gone.
         let existing = self.managed_slots(&mut Discard)?;
         let mut failures = Vec::new();
-        for _ in existing.len()..self.config.slot_count.get() {
+        for _ in existing.len()..self.config.slot_count.value.get() {
             let path = self.create_slot(None, &mut failures, report)?;
             report.info(&format!("created {}", worktree::basename(&path)));
         }

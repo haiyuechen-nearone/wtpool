@@ -11,9 +11,8 @@ use super::heavy_table::HeavyTable;
 use super::machine::MachineJobs;
 use super::record::JobRecord;
 use crate::clock::Timestamp;
-use crate::heavy::{HeavyList, Suggestion};
+use crate::heavy::{HeavyList, RepositoryPatterns, Suggestion};
 use crate::processes::{ListProcesses, ProcessQuery};
-use crate::settings::RepositoryPatterns;
 
 /// What `wtpool job ls` shows. The job folder is only read, and a dead job's record skipped.
 #[derive(Debug, Clone, PartialEq, Eq)]

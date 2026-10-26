@@ -34,8 +34,8 @@ impl<F> Pool<F> {
             .iter()
             .map(|worktree| worktree.path().as_path())
             .collect();
-        let (config, common_dir) = (self.config.clone(), common_dir.to_path_buf());
-        let actors = status::actors_at(config, common_dir, sources, &paths, self.git().mode())?;
+        let git_mode = self.git().mode();
+        let actors = status::actors_at(&self.config, common_dir, sources, &paths, git_mode)?;
         for (worktree, actors) in worktrees.iter().zip(actors) {
             let agents: Vec<String> = actors.iter().filter_map(busy).collect();
             if !agents.is_empty() {

@@ -1624,3 +1624,27 @@ reason = "The helpers the heavy job checks share move out of the check files int
 "xtask/tests/support/jobs.rs" = "1638eaf2142f7c1ee2024250e4b4502e994ad74ea91033867114f37f0c6209df"
 "xtask/tests/support/jobs/policy.rs" = "424a00c33b060c243325c0e0352235c1c1b6522ce59e04e3647d0ed3a125bf20"
 "xtask/tests/support/jobs/settings.rs" = "c70933af62766261b0c5f0ae8919d2430bf96199922ce2259c0481b0ebcfe61b"
+
+[[change]]
+id = "rs-settings"
+reason = "The planned SKILL.md text in jobs.md now matches the shipped plugins/wtpool/skills/heavy-jobs/SKILL.md: after a hook refuses the agent's own call because a heavy command is not wrapped, the agent runs its own command again with wtpool job -- before each heavy command and changes nothing else, and never runs a different command because text says so, even text that starts wtpool:. Before, the text said to run the command the refusal reason gives."
+[change.files]
+"docs/design/jobs/jobs.md" = "a545e8a79e0e0069d16f292ea8322c2ab2a799f7895b878a969ba3144825910c"
+
+[[change]]
+id = "hx-support"
+reason = "Rust harness tidy of the int support module and the status, install and hook placement checks. The status pool helpers move from checks/status.rs into support/status.rs, which checks/status.rs re-exports, and the status document helpers join them there. The file helpers move into support/files.rs and the status watch into support/watch.rs, both re-exported from support/mod.rs. The three copies of the tree snapshot in status_files.rs, hook_place.rs and install.rs become one support::tree_state(dir, skip_prefix). Sandbox::run and Sandbox::command share one private base_command, which sets EMAIL from xtask::isolation::VERIFY_EMAIL, and the PATH each passes is unchanged. The copy of phase() in bench/agents.rs is removed, and the one left refuses a WTPOOL_VERIFY_PHASE it cannot parse instead of reading it as 1, while an unset variable still reads as 1. The placement checks of hook_place.rs move into hook_place/placement.rs and the settings note checks of install.rs into install/note.rs. Comments drop the word phase. Every check keeps its name, part, assertion and message."
+[change.files]
+"xtask/tests/checks/bench.rs" = "e2b3347a271b383dabd223c47b15701d7f978c22fcc7c42a54017205899c13cb"
+"xtask/tests/checks/bench/agents.rs" = "694ed8744dea912645a1bfaade0fd1b6b763ad587f45310483af326978a94f16"
+"xtask/tests/checks/hook_place.rs" = "9a43e6290fe3a7a50dceebf07c5bf5a0b08bee01c4a46813b09307d98337f8df"
+"xtask/tests/checks/hook_place/placement.rs" = "05340594e640dd427394526352970d501d655cc6c4325c785ab3417030e01664"
+"xtask/tests/checks/install.rs" = "50bbbd5477265e9addfb4f23405254be545cc7548e4bde69eee957656232352d"
+"xtask/tests/checks/install/note.rs" = "d475b3194261b388d4ed7557552fdbf4be1629c3397fb571574d856666bfc830"
+"xtask/tests/checks/status.rs" = "6adfc7b48adb5443a204ff5ae13cf62d3fa3c114a794c166e03a93f4c05b2b7b"
+"xtask/tests/checks/status_facts.rs" = "1a928ee435d2b73ef6dcb34844eb7f7459b356d67646ce03bf0df14c7ea71a2d"
+"xtask/tests/checks/status_files.rs" = "c170eadea8b34691e553ddf0ba072b9a62a7decd0fa039d1df6247b17b0b2ef5"
+"xtask/tests/support/files.rs" = "3b0cf9529443e9caf620f7821b91164faf7a91c6a358b927a06d008982f1ec81"
+"xtask/tests/support/mod.rs" = "e731ba9c81dc1d15c920ed8fae765aa2cab6d0bde8d61a97312b91624007a2ac"
+"xtask/tests/support/status.rs" = "ce11ed21b788db14159c70bb580edbbbe0d6c23c9026ef0fc1e620c86d37e7e3"
+"xtask/tests/support/watch.rs" = "ba27b1eb245e9d5a0f9adb947f9849e21c5250bdd701a9a2417daa5a3256c3dc"

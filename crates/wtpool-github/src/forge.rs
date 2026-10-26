@@ -44,7 +44,7 @@ impl Forge for GitHub {
         &self,
         pr: PullRequest,
         remote: Remote<'_>,
-        report: &mut dyn Report,
+        report: &mut impl Report,
     ) -> Result<ChangeHead, Unresolved> {
         head_of(&GhCli, &pr, remote).map_err(|refused| match refused {
             Refused::Warning(warning) => {

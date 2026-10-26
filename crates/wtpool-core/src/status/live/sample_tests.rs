@@ -25,7 +25,7 @@ fn job_paths(fixture: &Fixture, enforce: Option<&str>) -> Option<JobPaths> {
     })
 }
 
-/// What a run of the sample shows: the deadlines and whether `x` builds.
+/// The deadlines a run of the sample shows, and the builds of `x` at each step.
 #[derive(Debug, PartialEq, Eq)]
 struct Sampled {
     first_due: Option<Duration>,

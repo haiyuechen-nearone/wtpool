@@ -60,8 +60,8 @@ pub(super) fn choose_parking<T>(
     for SlotFacts { slot, name, head } in slots {
         match head {
             SlotHead::Detached(state) => match refusals::refusal(&name, &state) {
-                None => return Ok(Some(slot)),
-                Some(refusal) => blocked.push(refusal),
+                Ok(()) => return Ok(Some(slot)),
+                Err(refusal) => blocked.push(refusal),
             },
             SlotHead::Branch(branch) => {
                 blocked.push(Refusal::SlotHoldsBranch { slot: name, branch });

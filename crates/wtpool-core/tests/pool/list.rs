@@ -6,7 +6,8 @@ use std::time::{Duration, SystemTime};
 
 use rstest::rstest;
 use wtpool_core::{
-    AbsolutePath, Config, Operation, Pool, Role, State, Uncommitted, Unreferenced, Upstream,
+    AbsolutePath, Config, Operation, Pool, Role, Setting, State, Uncommitted, Unreferenced,
+    Upstream,
 };
 
 use crate::states::{
@@ -275,7 +276,10 @@ fn list_and_path_of__should_fail_when_git_cannot_list_the_worktrees(#[case] fore
         PathBuf::from(foreground.replace("{root}", &fixture.root.display().to_string()));
     let pool = Pool::new(
         Config {
-            foreground: AbsolutePath::try_new(&foreground).unwrap(),
+            foreground: Setting {
+                value: AbsolutePath::try_new(&foreground).unwrap(),
+                ..fixture.config(3).foreground
+            },
             ..fixture.config(3)
         },
         FakePr(PrAnswer::NoLookup),

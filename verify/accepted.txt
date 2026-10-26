@@ -232,3 +232,7 @@ accept flake-fixes-3 a4d885f0bfffe638078ca05ff86d4da173a920da1cf6775fed6334a225e
 accept ready-handshake a88562bd9b1abb1464a435b2c043fe932702450e4ec6b8d7762522f239f58699
 # Heavy job check helpers move into support/jobs.rs, support/jobs/settings.rs and support/jobs/policy.rs; one set_mode, one mode reader and one strict is_time, which tightens the record times of job__should_record_only_its_summary; EARLIER_BUILDS equals and is pinned to the JS copy.
 accept hx-jobs 0b34c3b5e9aab1da809a57a770949ceb5f38a0dbf06987fe4ac4e3543ea6c55e
+# The planned SKILL.md text in jobs.md matches the shipped heavy-jobs skill: rerun only your own refused command with wtpool job -- before each heavy command.
+accept rs-settings f4cb05210a05de5349f80d0975b2731cfdc30f874be8d4721e3b9f81da26b88a
+# Rust harness tidy: int support split into files, watch and status modules, one tree snapshot, one sandbox command builder, one phase reader that refuses an unparsable value, and the placement and settings note checks in their own files; no check judges differently.
+accept hx-support fe0a898cb1e3de653c7acc2dec2139e59efbb6ad6bb12433adec47a65f6de684

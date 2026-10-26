@@ -7,13 +7,15 @@ use std::thread;
 use rstest::rstest;
 
 use super::*;
-use crate::clock::Timestamp;
+use crate::clock::{ClockFile, Timestamp};
 use crate::status::document::GitStatus;
 use crate::status::fixture::{
     FixedClock, FixedProcesses, fixed_sources, https_path, must_fixture, must_git,
 };
-use crate::status::watch::run_tests::{SharedOutput, must_wait};
+use crate::status::watch::support::{SharedOutput, must_wait};
 use crate::status::watch::{Message, message_of, watch};
+
+impl ClockFile for FixedClock {}
 
 #[test]
 fn message_of__should_pass_paths_and_ask_for_a_rescan_when_events_were_lost() {
@@ -245,7 +247,7 @@ fn watch__should_fail_when_the_foreground_is_no_worktree() {
     // Given
     let fixture = must_fixture();
     let mut config = fixture.config();
-    config.foreground = crate::paths::AbsolutePath::try_new(&fixture.root).unwrap();
+    config.foreground.value = crate::paths::AbsolutePath::try_new(&fixture.root).unwrap();
     let mut output = Vec::new();
 
     // When

@@ -15,7 +15,7 @@ impl<F> Pool<F> {
     /// whose directory is gone.
     fn next_slot_name(&self) -> Result<SlotName, Error> {
         let registered = self.worktrees(&mut Discard)?;
-        let prefix = &self.config.slot_prefix;
+        let prefix = &self.config.slot_prefix.value;
         let taken = |name: &SlotName| {
             let path = self.config.slot_dir.join(name.as_str());
             path.exists() || registered.iter().any(|w| paths::same_path(w.path(), &path))
@@ -52,7 +52,7 @@ impl<F> Pool<F> {
         ])?;
         if !ran.success && !self.foreground_has_a_commit()? {
             // git's own `invalid reference: HEAD` names no fix.
-            return Err(Refusal::NoCommits(self.config.foreground.to_path_buf()).into());
+            return Err(Refusal::NoCommits(self.config.foreground.value.to_path_buf()).into());
         }
         ran.forward_stderr(report);
         if !ran.success {

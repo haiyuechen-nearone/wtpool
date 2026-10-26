@@ -44,7 +44,7 @@ fn reason(refused: Refused) -> String {
 
 /// The head of the PR `reference` names, on a remote `origin` at `url`, when gh answers
 /// `answer`, and the lookups gh was asked for.
-fn must_head(
+fn head_and_lookups(
     answer: Result<PrView, ViewPrError>,
     reference: &str,
     url: Option<&str>,
@@ -242,7 +242,7 @@ fn head_of__should_refuse_a_pr_without_a_usable_head(
     #[case] asked: &[&str],
 ) {
     // When
-    let (head, looked_up) = must_head(answer, reference, url);
+    let (head, looked_up) = head_and_lookups(answer, reference, url);
 
     // Then
     assert_eq!(head, Err(reason.to_owned()));
@@ -275,7 +275,7 @@ fn head_of__should_name_the_branch_and_ref_of_the_pr(
     #[case] expected: (&str, &str, Fetch, &str),
 ) {
     // When
-    let (head, looked_up) = must_head(Ok(answer), reference, Some(url));
+    let (head, looked_up) = head_and_lookups(Ok(answer), reference, Some(url));
 
     // Then
     let (name, branch, fetch, refspec) = expected;

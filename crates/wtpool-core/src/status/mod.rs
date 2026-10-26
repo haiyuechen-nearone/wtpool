@@ -55,13 +55,13 @@ pub fn status_line<C: ReadClock, P: ListProcesses>(
 /// The actors of each worktree of `paths`, as the document of the pool of `config` shows them at
 /// the time of `sources`, read without the git facts the document also shows.
 pub(crate) fn actors_at(
-    config: Config,
-    common: PathBuf,
+    config: &Config,
+    common: &Path,
     sources: &Sources,
     paths: &[&Path],
     git_mode: GitMode,
 ) -> Result<Vec<Vec<Actor>>, Error> {
-    let actors = PoolActors::load(git_mode, config, common, sources)?;
+    let actors = PoolActors::load(git_mode, config.clone(), common.to_path_buf(), sources)?;
     Ok(actors.at(paths, sources.clock.now()))
 }
 
@@ -101,7 +101,7 @@ mod tests {
         // Given
         let fixture = must_fixture();
         let mut config = fixture.config();
-        config.foreground = AbsolutePath::try_new(&fixture.root).unwrap();
+        config.foreground.value = AbsolutePath::try_new(&fixture.root).unwrap();
 
         // When
         let line = status_line(

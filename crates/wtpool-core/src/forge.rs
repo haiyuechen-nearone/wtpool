@@ -24,7 +24,7 @@ pub trait Forge {
         &self,
         change: Self::Change,
         remote: Remote<'_>,
-        report: &mut dyn Report,
+        report: &mut impl Report,
     ) -> Result<ChangeHead, Unresolved>;
 
     /// The repository `url` names on this forge, `None` for any other URL.

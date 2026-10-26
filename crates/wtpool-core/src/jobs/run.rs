@@ -14,12 +14,11 @@ use super::queue::{Place, Standing, Turn};
 use super::record::{JobDraft, JobId};
 use super::{JOB_VARIABLE, JobError, JobPaths};
 use crate::clock::ReadClock;
-use crate::heavy::{CommandWords, HeavyList};
+use crate::heavy::{CommandWords, HeavyList, RepositoryPatterns};
 use crate::hook::bash;
 use crate::hook::text::{MAX_LABEL, MAX_TEXT, clean};
 use crate::platform::signals::{Ending, JobSignals, end_by, end_by_number, ending};
 use crate::processes::{ListProcesses, ProcessQuery};
-use crate::settings::RepositoryPatterns;
 
 /// The pause between checks for its turn of the first job in line, and of the others.
 const FIRST_IN_LINE_CHECK: Duration = Duration::from_millis(250);

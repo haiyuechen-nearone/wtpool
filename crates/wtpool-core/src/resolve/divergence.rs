@@ -1,7 +1,7 @@
 //! Comparing a local branch with a remote head, and the decisions the comparison drives: the
 //! move `--refresh` or `--reset` makes, and the warning about a stale branch.
 
-pub(crate) use crate::git::{Divergence, left_right};
+use crate::git::Divergence;
 use crate::names::{BranchName, ObjectId};
 use crate::refs::SyncMode;
 use crate::worktree_state::{Role, Uncommitted};
@@ -18,6 +18,21 @@ pub(super) struct Holder<T> {
 /// The move [`plan_sync`] chooses for a local branch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum SyncStep<T> {
+    FastForward {
+        behind: usize,
+        holder: Option<T>,
+    },
+    /// Moves a diverged branch, after a backup of its tip.
+    ResetWithBackup {
+        ahead: usize,
+        holder: Option<T>,
+    },
+    Stay(Stay<T>),
+}
+
+/// The reason [`plan_sync`] leaves a local branch where it is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum Stay<T> {
     /// git could not count the commits between the branch and the fetched commit.
     Incomparable,
     UpToDate,
@@ -31,15 +46,6 @@ pub(super) enum SyncStep<T> {
     /// `git status` failed in the holder, so it may hold uncommitted work.
     HolderUnknown(T),
     HolderDirty(T),
-    FastForward {
-        behind: usize,
-        holder: Option<T>,
-    },
-    /// Moves a diverged branch, after a backup of its tip.
-    ResetWithBackup {
-        ahead: usize,
-        holder: Option<T>,
-    },
 }
 
 /// Chooses the move to a fetched commit for a local branch that compares with it as
@@ -50,13 +56,13 @@ pub(super) fn plan_sync<T>(
     holder: Option<Holder<T>>,
 ) -> SyncStep<T> {
     let Some(Divergence { ahead, behind }) = divergence else {
-        return SyncStep::Incomparable;
+        return SyncStep::Stay(Stay::Incomparable);
     };
     if behind == 0 {
-        return SyncStep::UpToDate;
+        return SyncStep::Stay(Stay::UpToDate);
     }
     if ahead != 0 && mode != SyncMode::Reset {
-        return SyncStep::Diverged { ahead, behind };
+        return SyncStep::Stay(Stay::Diverged { ahead, behind });
     }
     let holder = match holder {
         None => None,
@@ -64,18 +70,18 @@ pub(super) fn plan_sync<T>(
             worktree,
             role: Role::Unmanaged,
             ..
-        }) => return SyncStep::HeldByUnmanaged(worktree),
+        }) => return SyncStep::Stay(Stay::HeldByUnmanaged(worktree)),
         Some(Holder {
             worktree,
             dirty: Uncommitted::Unknown,
             ..
-        }) => return SyncStep::HolderUnknown(worktree),
+        }) => return SyncStep::Stay(Stay::HolderUnknown(worktree)),
         Some(Holder {
             worktree,
             dirty: Uncommitted::Files(0),
             ..
         }) => Some(worktree),
-        Some(Holder { worktree, .. }) => return SyncStep::HolderDirty(worktree),
+        Some(Holder { worktree, .. }) => return SyncStep::Stay(Stay::HolderDirty(worktree)),
     };
     if ahead == 0 {
         SyncStep::FastForward { behind, holder }
@@ -155,13 +161,13 @@ mod tests {
     const CLEAN: Uncommitted = Uncommitted::Files(0);
 
     #[rstest]
-    #[case::incomparable(None, SyncMode::Reset, None, SyncStep::Incomparable)]
-    #[case::up_to_date(counted(3, 0), SyncMode::Refresh, None, SyncStep::UpToDate)]
+    #[case::incomparable(None, SyncMode::Reset, None, SyncStep::Stay(Stay::Incomparable))]
+    #[case::up_to_date(counted(3, 0), SyncMode::Refresh, None, SyncStep::Stay(Stay::UpToDate))]
     #[case::diverged_on_refresh(
         counted(1, 2),
         SyncMode::Refresh,
         None,
-        SyncStep::Diverged { ahead: 1, behind: 2 }
+        SyncStep::Stay(Stay::Diverged { ahead: 1, behind: 2 })
     )]
     #[case::behind_without_a_holder(
         counted(0, 2),
@@ -185,25 +191,25 @@ mod tests {
         counted(0, 2),
         SyncMode::Refresh,
         holder(Role::Slot, Uncommitted::Files(1)),
-        SyncStep::HolderDirty("app-wt1")
+        SyncStep::Stay(Stay::HolderDirty("app-wt1"))
     )]
     #[case::holder_git_cannot_read(
         counted(1, 2),
         SyncMode::Reset,
         holder(Role::Slot, Uncommitted::Unknown),
-        SyncStep::HolderUnknown("app-wt1")
+        SyncStep::Stay(Stay::HolderUnknown("app-wt1"))
     )]
     #[case::clean_unmanaged_holder(
         counted(1, 2),
         SyncMode::Reset,
         holder(Role::Unmanaged, CLEAN),
-        SyncStep::HeldByUnmanaged("app-wt1")
+        SyncStep::Stay(Stay::HeldByUnmanaged("app-wt1"))
     )]
     #[case::up_to_date_in_an_unmanaged_holder(
         counted(0, 0),
         SyncMode::Reset,
         holder(Role::Unmanaged, CLEAN),
-        SyncStep::UpToDate
+        SyncStep::Stay(Stay::UpToDate)
     )]
     fn plan_sync__should_move_only_a_branch_it_can_move_safely(
         #[case] divergence: Option<Divergence>,

@@ -11,13 +11,12 @@ use super::records::ActorRecord;
 use crate::activity::CallKind;
 use crate::clock::Timestamp;
 use crate::error::Error;
-use crate::heavy::{HeavyList, Pattern, Suggestion, Suggestions};
+use crate::heavy::{HeavyList, Pattern, RepositoryPatterns, Suggestion, Suggestions};
 use crate::jobs::{
     Enforce, HeavyTable, JobId, JobPaths, JobRecord, JobState, LIMIT_BOUNDS, MachineJobs,
 };
 use crate::paths::comparable;
 use crate::processes::{Liveness, RunningProcess};
-use crate::settings::RepositoryPatterns;
 
 /// This user's jobs and the heavy patterns of the repository, as last read.
 #[derive(Debug, Clone)]

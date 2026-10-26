@@ -5,12 +5,9 @@
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
-use super::Change;
-use crate::jobs::JobPaths;
+use super::FolderChange;
+use crate::jobs::{JobFile, JobFolder, JobPaths};
 use crate::paths::comparable;
-
-const RECORD: &str = "json";
-const LOCK: &str = "lock";
 
 /// The folders of this user's heavy jobs that a watch follows besides the common git directory.
 pub struct JobFolders {
@@ -34,10 +31,22 @@ struct Ancestor {
     next: OsString,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Kind {
     Jobs,
-    MachineConfig,
+    /// The folder of the machine config with this file name.
+    MachineConfig(OsString),
+}
+
+/// The existing folder that a watch for a followed folder starts on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Target {
+    Folder,
+    /// The nearest existing ancestor, and the name below it on the way to the folder.
+    Ancestor {
+        path: PathBuf,
+        next: OsString,
+    },
 }
 
 impl JobFolders {
@@ -47,16 +56,20 @@ impl JobFolders {
     pub fn new(watcher: notify::RecommendedWatcher, jobs: Option<&JobPaths>) -> Self {
         let folders = jobs
             .map(|paths| {
-                let config_folder = paths.config.parent().map(Path::to_path_buf);
-                std::iter::once((Kind::Jobs, Some(paths.folder.clone())))
-                    .chain(std::iter::once((Kind::MachineConfig, config_folder)))
-                    .filter_map(|(kind, path)| {
-                        Some(Followed {
-                            kind,
-                            path: path?,
-                            spellings: Vec::new(),
-                            waiting: None,
-                        })
+                let config = paths.config.file_name().zip(paths.config.parent());
+                let config_folder = config.map(|(name, folder)| {
+                    (
+                        Kind::MachineConfig(name.to_os_string()),
+                        folder.to_path_buf(),
+                    )
+                });
+                std::iter::once((Kind::Jobs, paths.folder.clone()))
+                    .chain(config_folder)
+                    .map(|(kind, path)| Followed {
+                        kind,
+                        path,
+                        spellings: Vec::new(),
+                        waiting: None,
                     })
                     .collect()
             })
@@ -75,7 +88,7 @@ impl JobFolders {
     /// The changes an event at `path` in the folders may mean: one per folder, as a folder made
     /// on the way may bring both nearer.
     #[must_use]
-    pub fn classify(&self, path: &Path) -> Vec<Change> {
+    pub fn classify(&self, path: &Path) -> Vec<FolderChange> {
         self.folders
             .iter()
             .filter_map(|folder| folder.classify(path))
@@ -96,43 +109,45 @@ impl Followed {
     fn follow(&mut self, watcher: &mut notify::RecommendedWatcher) {
         use notify::Watcher;
         for _ in self.path.ancestors() {
-            if !self.spellings.is_empty() {
+            if self.watched() {
                 return;
             }
-            if self.path.is_dir() {
-                if let Some(spellings) = watch(watcher, &self.path) {
-                    self.spellings = spellings;
-                    if let Some(before) = self.waiting.take() {
-                        let _ = watcher.unwatch(&before.path);
-                    }
-                }
-                return;
-            }
-            let Some((nearest, next)) = nearest_existing(&self.path) else {
+            let found = nearest_existing(&self.path, Path::is_dir);
+            let Some(target) = self.next_target(found) else {
                 return;
             };
-            if self
-                .waiting
-                .as_ref()
-                .is_some_and(|waiting| waiting.path == nearest)
-            {
-                return;
-            }
-            let Some(spellings) = watch(watcher, &nearest) else {
+            let Some(spellings) = watch(watcher, target.path_for(&self.path)) else {
                 return;
             };
             if let Some(before) = self.waiting.take() {
                 let _ = watcher.unwatch(&before.path);
             }
-            self.waiting = Some(Ancestor {
-                path: nearest,
-                spellings,
-                next,
-            });
+            match target {
+                Target::Folder => {
+                    self.spellings = spellings;
+                    return;
+                }
+                Target::Ancestor { path, next } => {
+                    self.waiting = Some(Ancestor {
+                        path,
+                        spellings,
+                        next,
+                    });
+                }
+            }
         }
     }
 
-    fn classify(&self, path: &Path) -> Option<Change> {
+    /// The target that a watch starts on next, given `found`, the nearest existing folder.
+    /// `None` while the watch waits in that ancestor already.
+    fn next_target(&self, found: Option<Target>) -> Option<Target> {
+        let found = found?;
+        let waits_there = matches!(&found, Target::Ancestor { path, .. }
+            if self.waiting.as_ref().is_some_and(|waiting| &waiting.path == path));
+        (!waits_there).then_some(found)
+    }
+
+    fn classify(&self, path: &Path) -> Option<FolderChange> {
         let parent = path.parent()?;
         let on_the_way = self.waiting.as_ref().is_some_and(|waiting| {
             path.file_name() == Some(waiting.next.as_os_str())
@@ -145,23 +160,39 @@ impl Followed {
             return None;
         }
         let name = path.file_name()?;
-        match self.kind {
-            Kind::Jobs => job_stem(path).map(|stem| Change::Job(stem.to_os_string())),
-            Kind::MachineConfig => is_machine_config(name).then_some(Change::MachineConfig),
+        match &self.kind {
+            Kind::Jobs => job_change(name),
+            Kind::MachineConfig(config) => {
+                is_machine_config(name, config).then_some(FolderChange::MachineConfig)
+            }
         }
     }
 
     /// The change that a folder made or removed means: every job, or the config.
-    fn made(&self) -> Change {
+    fn made(&self) -> FolderChange {
         match self.kind {
-            Kind::Jobs => Change::Job(Default::default()),
-            Kind::MachineConfig => Change::MachineConfig,
+            Kind::Jobs => FolderChange::AllJobs,
+            Kind::MachineConfig(_) => FolderChange::MachineConfig,
         }
+    }
+
+    fn watched(&self) -> bool {
+        !self.spellings.is_empty()
     }
 
     /// `true` while a watch waits for the folder in an ancestor.
     fn waits(&self) -> bool {
         self.waiting.is_some()
+    }
+}
+
+impl Target {
+    /// The path of this target on the way to `folder`.
+    fn path_for<'a>(&'a self, folder: &'a Path) -> &'a Path {
+        match self {
+            Self::Folder => folder,
+            Self::Ancestor { path, .. } => path,
+        }
     }
 }
 
@@ -174,28 +205,39 @@ fn watch(watcher: &mut notify::RecommendedWatcher, path: &Path) -> Option<Vec<Pa
         .then(|| vec![path.to_path_buf(), comparable(path)])
 }
 
-/// The nearest existing ancestor of `path`, and the name below it on the way to `path`.
-fn nearest_existing(path: &Path) -> Option<(PathBuf, OsString)> {
-    let nearest = path
-        .ancestors()
-        .skip(1)
-        .find(|ancestor| ancestor.is_dir())?;
+/// `path` when it is a folder, else its nearest ancestor that is one. `None` when no ancestor
+/// is a folder.
+fn nearest_existing(path: &Path, is_dir: impl Fn(&Path) -> bool) -> Option<Target> {
+    if is_dir(path) {
+        return Some(Target::Folder);
+    }
+    let nearest = path.ancestors().skip(1).find(|ancestor| is_dir(ancestor))?;
     let next = path.strip_prefix(nearest).ok()?.iter().next()?;
-    Some((nearest.to_path_buf(), next.to_os_string()))
+    Some(Target::Ancestor {
+        path: nearest.to_path_buf(),
+        next: next.to_os_string(),
+    })
 }
 
-/// The name without extension of a job's record or lock file.
-fn job_stem(path: &Path) -> Option<&OsStr> {
-    let extension = path.extension()?;
-    let stem = path.file_stem()?;
-    let own_file = extension == RECORD || extension == LOCK;
-    (own_file && !stem.to_string_lossy().starts_with('.') && stem != "queue").then_some(stem)
+/// The change an event at the job folder's file `name` means. A name of no job with a record's
+/// or lock's extension reads every job again.
+fn job_change(name: &OsStr) -> Option<FolderChange> {
+    match JobFolder::file_kind(name) {
+        JobFile::Record(id) | JobFile::Lock(id) => Some(FolderChange::Job(id)),
+        JobFile::Other => {
+            let extension = Path::new(name).extension();
+            let own_extension =
+                extension.is_some_and(|extension| extension == "json" || extension == "lock");
+            own_extension.then_some(FolderChange::AllJobs)
+        }
+        JobFile::Queue | JobFile::Temp => None,
+    }
 }
 
-/// `true` for the machine config or a file a write puts in its place, never for its lock.
-fn is_machine_config(name: &OsStr) -> bool {
-    let name = name.to_string_lossy();
-    name.contains("machine.toml") && !name.ends_with(".lock")
+/// `true` for the machine config `config` or a file a write renames over it, never for its lock.
+fn is_machine_config(name: &OsStr, config: &OsStr) -> bool {
+    let (name, config) = (name.to_string_lossy(), config.to_string_lossy());
+    name.contains(config.as_ref()) && !name.ends_with(".lock")
 }
 
 #[cfg(test)]
@@ -208,6 +250,7 @@ mod tests {
 
     use super::super::{Message, message_of};
     use super::*;
+    use crate::jobs::JobId;
 
     fn followed(kind: Kind) -> Followed {
         Followed {
@@ -218,24 +261,31 @@ mod tests {
         }
     }
 
+    fn job(id: &str) -> Option<FolderChange> {
+        Some(FolderChange::Job(JobId::parse(id).unwrap()))
+    }
+
     #[rstest]
-    #[case::record("/s/jobs/42-0badc0de.json", Some("42-0badc0de"))]
-    #[case::lock("/real/s/jobs/42-0badc0de.lock", Some("42-0badc0de"))]
-    #[case::the_folder("/s/jobs", Some(""))]
+    #[case::record("/s/jobs/42-0badc0de.json", job("42-0badc0de"))]
+    #[case::lock("/real/s/jobs/42-0badc0de.lock", job("42-0badc0de"))]
+    #[case::the_folder("/s/jobs", Some(FolderChange::AllJobs))]
+    #[case::a_record_of_no_job("/s/jobs/notes.json", Some(FolderChange::AllJobs))]
+    #[case::a_lock_of_no_job("/s/jobs/notes.lock", Some(FolderChange::AllJobs))]
     #[case::temp_file("/s/jobs/.42-0badc0de.json.42.tmp", None)]
     #[case::queue_lock("/s/jobs/queue.lock", None)]
     #[case::ticket("/s/jobs/ticket", None)]
+    #[case::another_extension("/s/jobs/notes.txt", None)]
     #[case::below("/s/jobs/x/42-0badc0de.json", None)]
     #[case::elsewhere("/t/jobs/42-0badc0de.json", None)]
     fn followed_classify__should_name_the_job_of_its_files(
         #[case] path: &str,
-        #[case] stem: Option<&str>,
+        #[case] expected: Option<FolderChange>,
     ) {
         // When
         let change = followed(Kind::Jobs).classify(Path::new(path));
 
         // Then
-        assert_eq!(change, stem.map(|stem| Change::Job(stem.into())));
+        assert_eq!(change, expected);
     }
 
     #[rstest]
@@ -245,22 +295,25 @@ mod tests {
     #[case::another_file("/s/jobs/notes.txt", false)]
     #[case::the_folder("/s/jobs", true)]
     fn followed_classify__should_see_the_machine_config(#[case] path: &str, #[case] seen: bool) {
+        // Given
+        let config = followed(Kind::MachineConfig(OsString::from("machine.toml")));
+
         // When
-        let change = followed(Kind::MachineConfig).classify(Path::new(path));
+        let change = config.classify(Path::new(path));
 
         // Then
-        assert_eq!(change, seen.then_some(Change::MachineConfig));
+        assert_eq!(change, seen.then_some(FolderChange::MachineConfig));
     }
 
     #[rstest]
-    #[case::the_name_on_the_way("/s/wtpool", Some(Change::Job(OsString::new())))]
-    #[case::its_other_spelling("/real/s/wtpool", Some(Change::Job(OsString::new())))]
+    #[case::the_name_on_the_way("/s/wtpool", Some(FolderChange::AllJobs))]
+    #[case::its_other_spelling("/real/s/wtpool", Some(FolderChange::AllJobs))]
     #[case::another_name("/s/notes.txt", None)]
     #[case::below_the_name("/s/wtpool/x", None)]
     #[case::elsewhere("/t/wtpool", None)]
     fn followed_classify__should_see_the_folder_on_the_way_where_it_waits(
         #[case] path: &str,
-        #[case] expected: Option<Change>,
+        #[case] expected: Option<FolderChange>,
     ) {
         // Given
         let waiting = Followed {
@@ -282,20 +335,57 @@ mod tests {
         assert!(waiting.waits());
     }
 
-    #[test]
-    fn nearest_existing__should_name_the_step_below_it() {
+    fn ancestor(path: &str, next: &str) -> Option<Target> {
+        Some(Target::Ancestor {
+            path: PathBuf::from(path),
+            next: OsString::from(next),
+        })
+    }
+
+    #[rstest]
+    #[case::the_folder(&["/", "/s", "/s/state", "/s/state/wtpool/jobs"], Some(Target::Folder))]
+    #[case::an_ancestor(&["/", "/s"], ancestor("/s", "state"))]
+    #[case::no_folder(&[], None)]
+    fn nearest_existing__should_name_the_step_below_it(
+        #[case] folders: &[&str],
+        #[case] expected: Option<Target>,
+    ) {
         // Given
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("state/wtpool/jobs");
+        let is_dir = |path: &Path| folders.iter().any(|folder| path == Path::new(folder));
 
         // When
-        let nearest = nearest_existing(&path);
+        let nearest = nearest_existing(Path::new("/s/state/wtpool/jobs"), is_dir);
 
         // Then
-        assert_eq!(
-            nearest,
-            Some((dir.path().to_path_buf(), OsString::from("state")))
-        );
+        assert_eq!(nearest, expected);
+    }
+
+    #[rstest]
+    #[case::the_folder(Some(Target::Folder), Some(Target::Folder))]
+    #[case::the_ancestor_it_waits_in(ancestor("/s", "state"), None)]
+    #[case::a_nearer_ancestor(ancestor("/s/state", "wtpool"), ancestor("/s/state", "wtpool"))]
+    #[case::nothing(None, None)]
+    fn followed_next_target__should_move_only_nearer(
+        #[case] found: Option<Target>,
+        #[case] expected: Option<Target>,
+    ) {
+        // Given
+        let waiting = Followed {
+            kind: Kind::Jobs,
+            path: PathBuf::from("/s/state/wtpool/jobs"),
+            spellings: Vec::new(),
+            waiting: Some(Ancestor {
+                path: PathBuf::from("/s"),
+                spellings: vec![PathBuf::from("/s")],
+                next: OsString::from("state"),
+            }),
+        };
+
+        // When
+        let target = waiting.next_target(found);
+
+        // Then
+        assert_eq!(target, expected);
     }
 
     /// Waits for an event at a path called `name` that `folders` reads as `expected`.
@@ -303,7 +393,7 @@ mod tests {
         folders: &JobFolders,
         events: &Receiver<Message>,
         name: &str,
-        expected: &Change,
+        expected: &FolderChange,
     ) -> bool {
         let deadline = Instant::now() + Duration::from_secs(10);
         while let Some(left) = deadline.checked_duration_since(Instant::now()) {
@@ -324,17 +414,17 @@ mod tests {
     #[case::job_folder(
         "home/.local/state/wtpool/jobs",
         "42-0badc0de.json",
-        Change::Job("42-0badc0de".into())
+        job("42-0badc0de").unwrap()
     )]
     #[case::folder_of_the_machine_config(
         "home/.config/wtpool",
         "machine.toml",
-        Change::MachineConfig
+        FolderChange::MachineConfig
     )]
     fn job_folders_watch_new__should_follow_a_folder_made_after_the_watch_starts(
         #[case] folder: &str,
         #[case] file: &str,
-        #[case] change: Change,
+        #[case] change: FolderChange,
     ) {
         // Given
         let dir = tempfile::tempdir().unwrap();
@@ -350,7 +440,7 @@ mod tests {
         let mut folders = JobFolders::new(watcher, Some(&paths));
         folders.watch_new();
         let made = match change {
-            Change::Job(_) => Change::Job(OsString::new()),
+            FolderChange::Job(_) => FolderChange::AllJobs,
             _ => change.clone(),
         };
 

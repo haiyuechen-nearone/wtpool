@@ -2,11 +2,12 @@
 //! over it, never through a symlink.
 
 use std::fs::{File, OpenOptions, Permissions};
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use super::{EditError, EditFault};
-use crate::platform::fs::{create_private_dir, open_private, open_without_following};
+use crate::platform::fs::{create_private_dir, open_private, open_without_following, replace_file};
+use crate::repository::{CONFIG_FILE, LOCK_FILE};
 
 /// A file the settings commands edit, and the lock its writers take.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,8 +33,8 @@ impl EditedFile {
     /// The `wtpool.toml` of the common git directory `common`, locked by the pool lock.
     pub(super) fn repository(common: &Path) -> Self {
         Self {
-            path: common.join("wtpool.toml"),
-            lock: common.join("wtpool.lock"),
+            path: common.join(CONFIG_FILE),
+            lock: common.join(LOCK_FILE),
             folder: None,
         }
     }
@@ -48,13 +49,13 @@ impl EditedFile {
             path: self.path.clone(),
             fault,
         };
-        let io_fault = |error: io::Error| fail(EditFault::Io(error.to_string()));
+        let io_fault = |error: io::Error| fail(EditFault::Io(error));
         if let Some(folder) = &self.folder {
             create_private_dir(folder).map_err(io_fault)?;
         }
         let _lock = lock(&self.lock).map_err(|error| EditError {
             path: self.lock.clone(),
-            fault: EditFault::Io(error.to_string()),
+            fault: EditFault::Io(error),
         })?;
         let current = read(&self.path).map_err(fail)?;
         let text = current.as_ref().map_or("", |(text, _)| text.as_str());
@@ -81,7 +82,7 @@ fn read(path: &Path) -> Result<Option<(String, Permissions)>, EditFault> {
     let meta = match path.symlink_metadata() {
         Ok(meta) => meta,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(EditFault::Io(error.to_string())),
+        Err(error) => return Err(EditFault::Io(error)),
     };
     if meta.is_symlink() {
         return Err(EditFault::Symlink(link_target(path)));
@@ -89,15 +90,10 @@ fn read(path: &Path) -> Result<Option<(String, Permissions)>, EditFault> {
     if !meta.is_file() {
         return Err(EditFault::NotAFile);
     }
-    let mut file =
-        open_without_following(path).map_err(|error| EditFault::Io(error.to_string()))?;
-    let mode = file
-        .metadata()
-        .map_err(|error| EditFault::Io(error.to_string()))?
-        .permissions();
+    let mut file = open_without_following(path)?;
+    let mode = file.metadata()?.permissions();
     let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)
-        .map_err(|error| EditFault::Io(error.to_string()))?;
+    file.read_to_end(&mut bytes)?;
     let text = String::from_utf8(bytes).map_err(|_| EditFault::NotUtf8)?;
     Ok(Some((text, mode)))
 }
@@ -111,27 +107,14 @@ fn link_target(link: &Path) -> PathBuf {
     })
 }
 
-/// Writes `text` to a temp file beside `path`, created anew without following a symlink, with
-/// `mode` or else private, and renames it over `path`.
+/// Replaces the file `path` with `text` as [`replace_file`] does, then gives it `mode`, the old
+/// file's, through a handle that never follows a symlink. A new file stays private.
 fn replace(path: &Path, text: &str, mode: Option<Permissions>) -> io::Result<()> {
-    let name = path.file_name().unwrap_or_default().to_string_lossy();
-    let temp = path.with_file_name(format!(".{name}.{}.tmp", std::process::id()));
-    let _ = std::fs::remove_file(&temp);
-    let written = write_new(&temp, text, mode).and_then(|()| std::fs::rename(&temp, path));
-    if written.is_err() {
-        let _ = std::fs::remove_file(&temp);
+    replace_file(path, text.as_bytes())?;
+    match mode {
+        Some(mode) => open_private(OpenOptions::new().write(true), path)?.set_permissions(mode),
+        None => Ok(()),
     }
-    written
-}
-
-/// Closes the file before it returns, so the rename that follows works on Windows too.
-fn write_new(path: &Path, text: &str, mode: Option<Permissions>) -> io::Result<()> {
-    let mut file = open_private(OpenOptions::new().write(true).create_new(true), path)?;
-    file.write_all(text.as_bytes())?;
-    if let Some(mode) = mode {
-        file.set_permissions(mode)?;
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -152,7 +135,10 @@ mod tests {
 
         // Then
         assert!(created.is_ok() && unchanged.is_ok());
-        assert_eq!(refused.unwrap_err().fault, EditFault::NotAList("heavy"));
+        assert!(matches!(
+            refused.unwrap_err().fault,
+            EditFault::NotAList("heavy")
+        ));
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "a = 1\n");
         let mut left: Vec<String> = std::fs::read_dir(path.parent().unwrap())
             .unwrap()
@@ -177,10 +163,8 @@ mod tests {
 
         // Then
         let fault = refused.unwrap_err().fault;
-        assert_eq!(
-            fault,
-            EditFault::Symlink(std::fs::canonicalize(&target).unwrap())
-        );
+        let real = std::fs::canonicalize(&target).unwrap();
+        assert!(matches!(fault, EditFault::Symlink(named) if named == real));
         assert_eq!(std::fs::read_to_string(&target).unwrap(), "a = 1\n");
     }
 

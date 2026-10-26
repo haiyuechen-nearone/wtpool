@@ -292,7 +292,7 @@ fn command_failed(code: Option<i32>) -> Error {
     1
 )]
 #[case::read_config(
-    SettingsError::ReadConfig { path: path("/r/.git/wtpool.toml"), reason: "not a regular file".to_owned() }.into(),
+    SettingsError::ReadConfig { path: path("/r/.git/wtpool.toml"), fault: ReadFault::NotAFile }.into(),
     &["could not read /r/.git/wtpool.toml: not a regular file"],
     1
 )]

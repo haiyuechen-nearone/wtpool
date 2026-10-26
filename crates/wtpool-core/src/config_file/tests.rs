@@ -36,7 +36,7 @@ fn parse_error(text: &str) -> String {
 #[test]
 fn parse__should_read_every_key() {
     // Given
-    let text = "foreground = \"/srv/app\"\nslot_dir = \"slots\"\nslot_prefix = \"box\"\nslot_count = 5\nremote = \"upstream\"\nheavy = [\"cargo test\"]\nbuild_processes = [\"make\"]\ncopy = [\".envrc\", \"./config/.env\"]\non_new_slot = \"direnv allow\"\n";
+    let text = "foreground = \"/srv/app\"\nslot_dir = \"slots\"\nslot_prefix = \"box\"\nslot_count = 5\nremote = \"upstream\"\nheavy = [\"cargo test\"]\nbuild_processes = [\"make\"]\ncopy = [\".envrc\", \"./config/.env\"]\non_new_slot = \"direnv allow\"\nbounded_waits = false\n";
 
     // When
     let contents = parse_ok(text);
@@ -62,6 +62,7 @@ fn parse__should_read_every_key() {
                     ],
                     on_new_slot: Some("direnv allow".to_owned()),
                 },
+                bounded_waits: Some(false),
             },
         }
     );

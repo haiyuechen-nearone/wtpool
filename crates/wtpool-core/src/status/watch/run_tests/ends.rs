@@ -102,7 +102,10 @@ fn print_line__should_report_a_failed_flush() {
     let printed = print_line(&mut NoFlush, "x");
 
     // Then
-    assert!(!printed);
+    assert_eq!(
+        printed.map_err(|error| error.kind()),
+        Err(std::io::ErrorKind::BrokenPipe)
+    );
 }
 
 #[test]

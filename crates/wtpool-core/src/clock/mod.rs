@@ -31,8 +31,11 @@ pub trait ReadClock: Send + Sync {
             .duration_since(UNIX_EPOCH)
             .map_or(0, |d| i64::try_from(d.as_micros()).unwrap_or(i64::MAX))
     }
+}
 
-    /// The file the clock reads, whose change moves it, if any.
+/// A clock that a file may move.
+pub trait ClockFile {
+    /// The file the clock reads, `None` for a clock that reads no file.
     fn file(&self) -> Option<&Path> {
         None
     }
@@ -98,7 +101,11 @@ impl ReadClock for FileClock {
             .and_then(|text| Timestamp::parse(text.trim()))
             .unwrap_or_else(|| SystemClock.now())
     }
+}
 
+impl ClockFile for SystemClock {}
+
+impl ClockFile for FileClock {
     fn file(&self) -> Option<&Path> {
         Some(&self.path)
     }
@@ -135,7 +142,9 @@ impl ReadClock for Clock {
             Self::File(clock) => clock.system_micros(),
         }
     }
+}
 
+impl ClockFile for Clock {
     fn file(&self) -> Option<&Path> {
         match self {
             Self::System(clock) => clock.file(),

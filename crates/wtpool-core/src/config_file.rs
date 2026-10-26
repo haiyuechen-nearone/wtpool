@@ -5,7 +5,7 @@ use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
 use crate::config::{CopyPath, Key, SlotCount, SlotSetup};
-use crate::error::{Error, SettingsError};
+use crate::error::{Error, ReadFault, SettingsError};
 use crate::heavy::Pattern;
 use crate::names::{RemoteName, SlotPrefix};
 use crate::paths::AbsolutePath;
@@ -29,6 +29,7 @@ pub(crate) struct RepoOnly {
     pub heavy: Vec<Pattern>,
     pub build_processes: Vec<String>,
     pub slot_setup: SlotSetup,
+    pub bounded_waits: Option<bool>,
 }
 
 /// A repository's `wtpool.toml`, checked.
@@ -90,39 +91,21 @@ where
                 copy: check.copy(toml.copy)?,
                 on_new_slot: check.text("on_new_slot", toml.on_new_slot)?,
             },
+            bounded_waits: toml.bounded_waits,
         },
-    })
-}
-
-/// The keys of a repository's `wtpool.toml` that `wtpool hook policy` reads.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct PolicyKeys {
-    pub heavy: Vec<Pattern>,
-    pub build_processes: Vec<String>,
-    pub bounded_waits: Option<bool>,
-}
-
-/// The [`PolicyKeys`] of a repository's `wtpool.toml`, refused as [`parse`] refuses an unknown
-/// key, a wrong type or a bad pattern, the other values unchecked.
-pub(crate) fn policy_keys(text: &str, file: &Path) -> Result<PolicyKeys, Error> {
-    let toml: WtpoolToml = from_toml(text, file)?;
-    Ok(PolicyKeys {
-        heavy: toml.heavy,
-        build_processes: toml.build_processes,
-        bounded_waits: toml.bounded_waits,
     })
 }
 
 /// The text of the config file at `path`, `None` when there is none. A symlink,
 /// anything but a regular file, and text that is not UTF-8 are refused.
 pub(crate) fn read(path: &Path) -> Result<Option<String>, Error> {
-    let unreadable = |reason: String| {
+    let unreadable = |fault: ReadFault| {
         Error::from(SettingsError::ReadConfig {
             path: path.to_path_buf(),
-            reason,
+            fault,
         })
     };
-    let io_error = |error: io::Error| unreadable(error.to_string());
+    let io_error = |error: io::Error| unreadable(ReadFault::Io(error));
     let mut file = match open_without_following(path) {
         Ok(file) => file,
         Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
@@ -132,13 +115,13 @@ pub(crate) fn read(path: &Path) -> Result<Option<String>, Error> {
         Err(error) => return Err(io_error(error)),
     };
     if !file.metadata().map_err(io_error)?.is_file() {
-        return Err(unreadable("not a regular file".to_owned()));
+        return Err(unreadable(ReadFault::NotAFile));
     }
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes).map_err(io_error)?;
     String::from_utf8(bytes)
         .map(Some)
-        .map_err(|_| unreadable("not valid UTF-8".to_owned()))
+        .map_err(|_| unreadable(ReadFault::NotUtf8))
 }
 
 /// The keys of the machine config that a repository's `wtpool.toml` may not set.

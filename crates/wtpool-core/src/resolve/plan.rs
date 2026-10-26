@@ -3,8 +3,9 @@
 use crate::error::{Error, GitError};
 use crate::forge::{ChangeHead, Forge, Remote};
 use crate::names::BranchName;
-use crate::pool::Pool;
 use crate::report::Report;
+
+use super::Resolver;
 
 const GET_URL_NO_SUCH_REMOTE: i32 = 2;
 const LS_REMOTE_NO_MATCH: i32 = 2;
@@ -56,11 +57,12 @@ impl From<Error> for Unresolved {
     }
 }
 
-impl<F> Pool<F> {
-    pub(crate) fn plan(&self, reference: &str, report: &mut impl Report) -> Result<Plan, Unresolved>
-    where
-        F: Forge,
-    {
+impl<F: Forge> Resolver<'_, F> {
+    pub(crate) fn plan(
+        &self,
+        reference: &str,
+        report: &mut impl Report,
+    ) -> Result<Plan, Unresolved> {
         if let Some(change) = self.forge.change(reference) {
             return self.plan_change(change, report);
         }
@@ -84,15 +86,12 @@ impl<F> Pool<F> {
         Ok(Plan { branch, step })
     }
 
-    fn plan_change(&self, change: F::Change, report: &mut impl Report) -> Result<Plan, Unresolved>
-    where
-        F: Forge,
-    {
+    fn plan_change(&self, change: F::Change, report: &mut impl Report) -> Result<Plan, Unresolved> {
         let url = self.remote_url(report)?;
         let remote = Remote {
             name: &self.config.remote,
             url: url.as_deref(),
-            foreground: &self.config.foreground,
+            foreground: &self.config.foreground.value,
         };
         let head = self.forge.head(change, remote, report)?;
         let branch = head.branch.clone();
@@ -103,15 +102,17 @@ impl<F> Pool<F> {
         };
         Ok(Plan { branch, step })
     }
+}
 
+impl<F> Resolver<'_, F> {
     fn has_local_branch(&self, branch: &BranchName) -> Result<bool, Error> {
         Ok(self
-            .git()
+            .git
             .run([
                 "show-ref",
                 "--verify",
                 "--quiet",
-                branch_ref(branch).as_str(),
+                branch.branch_ref().as_str(),
             ])?
             .success)
     }
@@ -120,7 +121,7 @@ impl<F> Pool<F> {
     /// remote. Fails when git cannot tell.
     pub(super) fn remote_url(&self, report: &mut impl Report) -> Result<Option<String>, Error> {
         let ran = self
-            .git()
+            .git
             .run(["remote", "get-url", self.config.remote.as_str()])?;
         match ran.code {
             Some(0) => Ok(ran.line().map(str::to_owned)),
@@ -145,12 +146,12 @@ impl<F> Pool<F> {
         }
         let remote = &self.config.remote;
         // A full ref, as a short pattern also matches the tail of `refs/heads/<other>/<branch>`.
-        let ran = self.git().run([
+        let ran = self.git.run([
             "ls-remote",
             "--exit-code",
             "--heads",
             remote.as_str(),
-            branch_ref(branch).as_str(),
+            branch.branch_ref().as_str(),
         ])?;
         match ran.code {
             Some(0) => Ok(Some(true)),
@@ -165,10 +166,6 @@ impl<F> Pool<F> {
             }
         }
     }
-}
-
-pub(super) fn branch_ref(branch: &BranchName) -> String {
-    branch.branch_ref()
 }
 
 #[cfg(test)]

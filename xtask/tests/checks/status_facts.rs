@@ -241,9 +241,9 @@ fn builds__should_match_cargo_star_and_rustc(#[case] process: Proc, #[case] owne
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
-/// `build_processes` and, from phase 4, the repository's `heavy`, each name of the first then read
-/// as a one-word pattern. `cargo` stays a build through the machine's list of every sandbox,
-/// [`EARLIER_BUILDS`](crate::support::jobs::EARLIER_BUILDS).
+/// `build_processes` and, once `WTPOOL_VERIFY_PHASE` is 4, the repository's `heavy`, each name of
+/// the first then read as a one-word pattern. `cargo` stays a build through the machine's list of
+/// every sandbox, [`EARLIER_BUILDS`](crate::support::jobs::EARLIER_BUILDS).
 #[rstest]
 #[case::listed_program(&["make"], &[], "make", true, 1)]
 #[case::other_program(&["make"], &[], "ninja", false, 1)]

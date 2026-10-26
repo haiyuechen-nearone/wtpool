@@ -42,7 +42,7 @@ fn set_value__should_change_only_the_value_or_add_its_line(
     let edited = set_value(text, JOBS, key, value);
 
     // Then
-    assert_eq!(edited.as_deref(), Ok(expected));
+    assert_eq!(edited.unwrap(), expected);
 }
 
 #[rstest]
@@ -63,7 +63,7 @@ fn set_value__should_add_a_top_level_key_before_any_table(
     let edited = set_value(text, TableName::Root, "heavy", "[]");
 
     // Then
-    assert_eq!(edited.as_deref(), Ok(expected));
+    assert_eq!(edited.unwrap(), expected);
 }
 
 #[rstest]
@@ -74,7 +74,7 @@ fn set_value__should_refuse_to_add_a_key_to_a_table_without_a_header(#[case] tex
     let edited = set_value(text, JOBS, "heavy", "[]");
 
     // Then
-    assert_eq!(edited, Err(EditFault::NotAHeaderTable("jobs")));
+    assert!(matches!(edited, Err(EditFault::NotAHeaderTable("jobs"))));
 }
 
 #[rstest]
@@ -97,7 +97,7 @@ fn set_value__should_refuse_jobs_that_is_no_table() {
     let edited = set_value("jobs = 3\n", JOBS, "limit", "4");
 
     // Then
-    assert_eq!(edited, Err(EditFault::NotATable("jobs")));
+    assert!(matches!(edited, Err(EditFault::NotATable("jobs"))));
 }
 
 #[rstest]
@@ -117,7 +117,7 @@ fn remove_key__should_remove_the_key_line_alone(
     let edited = remove_key(text, JOBS, "limit");
 
     // Then
-    assert_eq!(edited, Ok(expected.map(str::to_owned)));
+    assert_eq!(edited.unwrap().as_deref(), expected);
 }
 
 #[test]
@@ -126,7 +126,7 @@ fn remove_key__should_refuse_an_inline_table() {
     let edited = remove_key("jobs = { limit = 3 }\n", JOBS, "limit");
 
     // Then
-    assert_eq!(edited, Err(EditFault::NotAHeaderTable("jobs")));
+    assert!(matches!(edited, Err(EditFault::NotAHeaderTable("jobs"))));
 }
 
 #[rstest]
@@ -151,7 +151,7 @@ fn string_list_render__should_keep_each_item_as_written(
     list.push("just");
 
     // Then
-    assert_eq!(list.render().as_deref(), Ok(expected));
+    assert_eq!(list.render().unwrap(), expected);
 }
 
 #[test]
@@ -166,7 +166,7 @@ fn string_list_remove__should_tell_whether_the_value_was_there() {
     // Then
     assert!(removed && !again);
     assert_eq!(list.values(), ["just"]);
-    assert_eq!(list.render().as_deref(), Ok("[\"just\"]"));
+    assert_eq!(list.render().unwrap(), "[\"just\"]");
 }
 
 #[rstest]
@@ -183,10 +183,10 @@ fn string_list_render__should_refuse_an_array_holding_a_comment(
     let rendered = list.render();
 
     // Then
-    assert_eq!(
+    assert!(matches!(
         rendered,
-        Err(EditFault::CommentInArray { key: "heavy", line })
-    );
+        Err(EditFault::CommentInArray { key: "heavy", line: found }) if found == line
+    ));
 }
 
 #[test]
@@ -207,7 +207,7 @@ fn string_list__should_refuse_anything_but_strings(#[case] text: &str) {
     let list = string_list(text, TableName::Root, "heavy");
 
     // Then
-    assert_eq!(list, Err(EditFault::NotAList("heavy")));
+    assert!(matches!(list, Err(EditFault::NotAList("heavy"))));
 }
 
 #[test]

@@ -5,11 +5,12 @@
 mod file;
 mod toml_text;
 
+use std::io;
 use std::path::{Path, PathBuf};
 
-use super::config::{Enforce, Limit};
 use crate::error::at_line;
 use crate::heavy::{InvalidPattern, Pattern};
+use crate::jobs::{Enforce, Limit};
 use file::EditedFile;
 use toml_text::{StringList, TableName, remove_key, set_value, string_list};
 
@@ -17,16 +18,16 @@ const JOBS: TableName = TableName::Named("jobs");
 const HEAVY: &str = "heavy";
 const BUILD_PROCESSES: &str = "build_processes";
 
-/// A file the settings commands left as it was, and why.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+/// A file the settings commands left as it was, and the fault that stopped the edit.
+#[derive(Debug, thiserror::Error)]
 #[error("cannot edit {}: {fault}", path.display())]
 pub struct EditError {
     pub path: PathBuf,
     pub fault: EditFault,
 }
 
-/// Why an edit was refused.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+/// The fault that stopped an edit.
+#[derive(Debug, thiserror::Error)]
 pub enum EditFault {
     #[error("it is a symlink to {}; edit that file by hand", .0.display())]
     Symlink(PathBuf),
@@ -54,8 +55,8 @@ pub enum EditFault {
     Pattern(#[from] InvalidPattern),
     #[error("the TOML parser named bytes outside the file")]
     Span,
-    #[error("{0}")]
-    Io(String),
+    #[error(transparent)]
+    Io(#[from] io::Error),
 }
 
 /// Patterns added to a list, each new to it, or removed from it, each listed.
@@ -68,13 +69,13 @@ pub enum ListChange {
 /// A change to a repository's patterns.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RepositoryChange {
-    /// Adds each of `patterns`, which must be new to `heavy` and `build_processes`, and each of
+    /// Adds each of `patterns`, each new to `heavy` and `build_processes`, and each of
     /// `suggested` they lack.
     Add {
         patterns: Vec<Pattern>,
         suggested: Vec<Pattern>,
     },
-    /// Removes each name from `heavy` and `build_processes`; each must be in one of them.
+    /// Removes each name from `heavy` and `build_processes`, each listed in one of them.
     Remove(Vec<String>),
 }
 
@@ -85,13 +86,13 @@ pub struct RepositoryLists {
     pub build_processes: Vec<String>,
 }
 
-/// Sets the limit in the machine config at `path`; `None` removes it, so the default applies.
+/// Sets the limit in the machine config at `path`. `None` removes it, so the default applies.
 pub fn set_limit(path: &Path, limit: Option<Limit>) -> Result<(), EditError> {
     let value = limit.map(|limit| limit.to_string());
     EditedFile::machine(path).edit(|text| set_or_remove(text, "limit", value.as_deref()))
 }
 
-/// Sets the policy in the machine config at `path`; `None` removes it, so the default applies.
+/// Sets the policy in the machine config at `path`. `None` removes it, so the default applies.
 pub fn set_enforce(path: &Path, enforce: Option<Enforce>) -> Result<(), EditError> {
     let value = enforce.map(|enforce| format!("\"{enforce}\""));
     EditedFile::machine(path).edit(|text| set_or_remove(text, "enforce", value.as_deref()))
@@ -198,8 +199,8 @@ fn add_new(
     Ok(())
 }
 
-/// Removes each of `names` from `heavy` and `build_processes`, and tells which changed. A name
-/// in neither is refused: as no pattern when it is none, else as not listed.
+/// Removes each of `names` from `heavy` and `build_processes`, and tells the lists it changed. A
+/// name in neither is refused: as no pattern when it is none, else as not listed.
 fn remove_listed(
     heavy: &mut StringList,
     build_processes: &mut StringList,

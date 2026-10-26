@@ -13,7 +13,7 @@ use crate::jobs::JobPaths;
 use crate::names::SlotPrefix;
 use crate::paths::AbsolutePath;
 use crate::processes::{ListProcesses, ProcessQuery, RunningProcess};
-use crate::settings::Source;
+use crate::settings::{Setting, Source};
 
 pub fn must_git(dir: &Path, args: &[&str]) -> String {
     let output = Command::new("git")
@@ -133,13 +133,10 @@ pub fn must_fixture() -> Fixture {
 impl Fixture {
     pub fn config(&self) -> Config {
         Config {
-            foreground: AbsolutePath::try_new(&self.main).unwrap(),
-            foreground_source: Source::Default,
+            foreground: Setting::new(AbsolutePath::try_new(&self.main).unwrap(), Source::Default),
             slot_dir: AbsolutePath::try_new(&self.root).unwrap(),
-            slot_prefix: SlotPrefix::try_new("wt").unwrap(),
-            slot_prefix_source: Source::Default,
-            slot_count: SlotCount::default(),
-            slot_count_source: Source::Default,
+            slot_prefix: Setting::new(SlotPrefix::try_new("wt").unwrap(), Source::Default),
+            slot_count: Setting::new(SlotCount::default(), Source::Default),
             remote: Default::default(),
             main_worktree: None,
             slot_setup: Default::default(),

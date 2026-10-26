@@ -8,21 +8,26 @@ use crate::git::Git;
 use crate::names::{BranchName, SlotName};
 use crate::paths;
 use crate::report::{Discard, Report};
+use crate::resolve::Resolver;
 use crate::worktree::{Head, Worktree};
 
 use super::Pool;
 
 impl<F> Pool<F> {
-    pub(crate) fn git(&self) -> Git {
-        Git::at(&self.config.foreground)
+    pub(super) fn git(&self) -> Git {
+        Git::at(&self.config.foreground.value)
+    }
+
+    pub(super) fn resolver(&self) -> Resolver<'_, F> {
+        Resolver::new(&self.config, &self.forge)
     }
 
     pub(super) fn is_foreground(&self, path: &Path) -> bool {
-        paths::same_path(path, &self.config.foreground)
+        paths::same_path(path, &self.config.foreground.value)
     }
 
-    pub(crate) fn worktrees(&self, report: &mut impl Report) -> Result<Vec<Worktree>, Error> {
-        Worktree::list(&self.config.foreground, report)
+    pub(super) fn worktrees(&self, report: &mut impl Report) -> Result<Vec<Worktree>, Error> {
+        Worktree::list(&self.config.foreground.value, report)
     }
 
     /// The listed worktree at path `arg`, or the slot named `arg`. Any other
@@ -45,7 +50,7 @@ impl<F> Pool<F> {
         let mut slots = Vec::new();
         for worktree in self.worktrees(report)? {
             if self.is_foreground(worktree.path())
-                || !self.config.slot_prefix.manages(&worktree.name())
+                || !self.config.slot_prefix.value.manages(&worktree.name())
             {
                 continue;
             }
@@ -58,7 +63,7 @@ impl<F> Pool<F> {
         Ok(slots)
     }
 
-    pub(crate) fn gone_error(&self, worktree: &Worktree) -> Refusal {
+    pub(super) fn gone_error(&self, worktree: &Worktree) -> Refusal {
         let remove = self.remove_arg(worktree);
         match worktree.head() {
             Head::Branch(branch) => Refusal::HolderGone {
@@ -96,10 +101,8 @@ impl<F> Pool<F> {
     }
 
     /// The worktree whose directory exists and whose `HEAD` is `branch`.
-    pub(crate) fn holder_of(&self, branch: &BranchName) -> Result<Option<Worktree>, Error> {
-        Ok(self
-            .any_holder_of(branch)?
-            .filter(|holder| !holder.is_gone()))
+    pub(super) fn holder_of(&self, branch: &BranchName) -> Result<Option<Worktree>, Error> {
+        self.resolver().holder_of(branch)
     }
 
     /// The worktree whose `HEAD` is `branch`, preferring one whose directory exists.

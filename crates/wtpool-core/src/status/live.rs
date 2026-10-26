@@ -1,14 +1,15 @@
 //! The pool state `wtpool status --watch` keeps up to date: the reads each change asks for, the
 //! git refresh after a call that edits files, and the timers of the actors.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use super::Sources;
 use super::document::Document;
 use super::state::PoolState;
-use super::watch::{Change, JobFolders, Pending, Track};
+use super::watch::{FolderChange, JobFolders, Pending, Track};
 use crate::clock::ReadClock;
 use crate::processes::ListProcesses;
 
@@ -108,7 +109,7 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
         if pending.refs {
             self.state.refresh_refs();
         }
-        let maybe_made = pending.machine_config || !pending.jobs.is_empty();
+        let maybe_made = pending.machine_config || pending.jobs_changed();
         if let Some(folders) = self
             .folders
             .as_mut()
@@ -122,9 +123,9 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
         if pending.repository_config {
             self.state.refresh_repository_config();
         }
-        if !pending.jobs.is_empty() {
+        if pending.jobs_changed() {
             self.state
-                .refresh_jobs(&pending.jobs, &self.sources.processes);
+                .refresh_jobs(&job_names(pending), &self.sources.processes);
         }
         if pending.rescan_records {
             self.state.rescan_records();
@@ -158,7 +159,7 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
             .min()
     }
 
-    fn classify(&self, path: &Path) -> Vec<Change> {
+    fn classify(&self, path: &Path) -> Vec<FolderChange> {
         self.folders
             .as_ref()
             .map_or_else(Vec::new, |folders| folders.classify(path))
@@ -179,6 +180,19 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
             self.sampled = Some(now);
         }
     }
+}
+
+/// The names [`PoolState::refresh_jobs`] reads again: the ids of the changed jobs, or else an
+/// empty name, read as every job.
+fn job_names(pending: &Pending) -> BTreeSet<OsString> {
+    if pending.all_jobs {
+        return BTreeSet::from([OsString::new()]);
+    }
+    pending
+        .jobs
+        .iter()
+        .map(|id| OsString::from(id.to_string()))
+        .collect()
 }
 
 #[cfg(test)]

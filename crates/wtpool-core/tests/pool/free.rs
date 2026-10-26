@@ -4,7 +4,7 @@ use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
 
 use rstest::rstest;
-use wtpool_core::{AbsolutePath, AgentGuard, Config, Error, Pool, Refusal};
+use wtpool_core::{AbsolutePath, AgentGuard, Config, Error, Pool, Refusal, Setting};
 
 use crate::states::{must_break_status, must_hide_the_sequencer, must_stop_a_merge};
 use crate::support::{
@@ -274,7 +274,10 @@ fn free__should_refuse_a_pool_it_cannot_lock(
     setup(&fixture);
     let pool = Pool::new(
         Config {
-            foreground: AbsolutePath::try_new(fixture.expand(foreground)).unwrap(),
+            foreground: Setting {
+                value: AbsolutePath::try_new(fixture.expand(foreground)).unwrap(),
+                ..fixture.config(3).foreground
+            },
             ..fixture.config(3)
         },
         FakePr(PrAnswer::NoLookup),

@@ -2,16 +2,15 @@
 
 use crate::error::{Error, Refusal};
 use crate::names::BranchName;
-use crate::pool::Pool;
 use crate::refs::SyncMode;
-use crate::report::Discard;
 use crate::worktree::Worktree;
 use crate::worktree_state::Operation;
 
+use super::Resolver;
 use super::plan::Plan;
 
-/// A [`Plan`] that [`Pool::refuse_unsafe_checkout`] found safe to apply in `sync` mode. Only that
-/// guard makes one, so [`Pool::apply`] cannot run unguarded.
+/// A [`Plan`] that [`Resolver::refuse_unsafe_checkout`] found safe to apply in `sync` mode. Only
+/// that guard makes one, so [`Resolver::apply`] cannot run unguarded.
 #[derive(Debug, Clone)]
 pub(crate) struct CheckedPlan {
     pub(super) plan: Plan,
@@ -46,24 +45,25 @@ enum CheckoutRisk {
     InProgress(&'static str),
 }
 
-impl<F> Pool<F> {
+impl<F> Resolver<'_, F> {
     /// Refuses, before `fg` or `bg` changes anything, a branch that git counts as checked out
     /// where `wtpool` cannot safely take or move it, as [`checkout_risk`] decides for each
-    /// worktree.
+    /// worktree. A holder whose directory is gone is refused as `gone` words it.
     pub(crate) fn refuse_unsafe_checkout(
         &self,
         plan: Plan,
         sync: SyncMode,
+        gone: impl Fn(&Worktree) -> Refusal,
     ) -> Result<CheckedPlan, Error> {
         let branch = &plan.branch;
-        for worktree in self.worktrees(&mut Discard)? {
+        for worktree in self.worktrees()? {
             let facts = checkout_facts(&worktree)?;
             let Some(risk) = checkout_risk(branch, worktree.holds_branch(branch), sync, &facts)
             else {
                 continue;
             };
             return Err(match risk {
-                CheckoutRisk::Gone => self.gone_error(&worktree),
+                CheckoutRisk::Gone => gone(&worktree),
                 CheckoutRisk::OperationUnknown => Refusal::OperationUnknown(worktree.name()),
                 CheckoutRisk::InProgress(operation) => Refusal::OperationInProgress {
                     worktree: worktree.name(),

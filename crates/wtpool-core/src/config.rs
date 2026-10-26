@@ -5,31 +5,25 @@ use std::str::FromStr;
 
 use crate::names::{RemoteName, SlotPrefix};
 use crate::paths::{self, AbsolutePath};
-use crate::settings::Source;
+use crate::settings::Setting;
 use crate::worktree::Worktree;
 use crate::worktree_state::Role;
 
 /// Where the pool lives and the number of slots it may grow to.
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// The worktree kept open in the editor.
-    pub foreground: AbsolutePath,
-    /// Where [`foreground`](Self::foreground) came from, for the error when it is
-    /// not a worktree.
-    pub foreground_source: Source,
+    /// The worktree kept open in the editor. Its source names it in the error when it is not a
+    /// worktree.
+    pub foreground: Setting<AbsolutePath>,
     /// Where new slots are created.
     pub slot_dir: AbsolutePath,
     /// Only worktrees whose directory name starts with it are slots. Any other worktree is
-    /// listed as unmanaged and never picked.
-    pub slot_prefix: SlotPrefix,
-    /// Where [`slot_prefix`](Self::slot_prefix) came from, for the error when a
-    /// slot name lacks it.
-    pub slot_prefix_source: Source,
-    /// `setup` fills the pool up to this many slots and `bg` never grows it past it.
-    pub slot_count: SlotCount,
-    /// Where [`slot_count`](Self::slot_count) came from, for the warning when the
-    /// pool grows past it.
-    pub slot_count_source: Source,
+    /// listed as unmanaged and never picked. Its source names it in the error when a slot name
+    /// lacks it.
+    pub slot_prefix: Setting<SlotPrefix>,
+    /// `setup` fills the pool up to this many slots and `bg` never grows it past it. Its source
+    /// names it in the warning when the pool grows past it.
+    pub slot_count: Setting<SlotCount>,
     /// The remote that pull requests are looked up in, and that branches are
     /// fetched from and track.
     pub remote: RemoteName,
@@ -41,9 +35,9 @@ pub struct Config {
 
 impl Config {
     pub(crate) fn role_of(&self, worktree: &Worktree) -> Role {
-        if paths::same_path(worktree.path(), &self.foreground) {
+        if paths::same_path(worktree.path(), &self.foreground.value) {
             Role::Foreground
-        } else if self.slot_prefix.manages(&worktree.name()) {
+        } else if self.slot_prefix.value.manages(&worktree.name()) {
             Role::Slot
         } else {
             Role::Unmanaged

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -10,29 +10,9 @@ use std::time::Duration;
 use xtask::pool::{Pool, WorktreeSpec, git_in};
 
 use super::status::{detached, no_procs, on_branch, spec};
-use crate::support::{FileState, Sandbox, Watch, file_state, must_status_json, must_wtpool_bin};
-
-/// Size, modification time and mode of every entry below `dir`.
-fn snapshot(dir: &Path) -> BTreeMap<PathBuf, FileState> {
-    let mut found = BTreeMap::new();
-    let mut stack = vec![dir.to_path_buf()];
-    while let Some(current) = stack.pop() {
-        let Ok(entries) = fs::read_dir(&current) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let Ok(meta) = fs::symlink_metadata(&path) else {
-                continue;
-            };
-            if meta.is_dir() {
-                stack.push(path.clone());
-            }
-            found.insert(path, file_state(&meta));
-        }
-    }
-    found
-}
+use crate::support::{
+    FileState, Sandbox, Watch, file_state, must_status_json, must_wtpool_bin, tree_state,
+};
 
 fn changed(
     before: &BTreeMap<PathBuf, FileState>,
@@ -85,7 +65,7 @@ fn status__should_leave_every_file_unchanged() {
         make_index_stale(&pool, name);
     }
     let procs = no_procs(&sandbox);
-    let before = snapshot(&sandbox.root);
+    let before = tree_state(&sandbox.root, None);
 
     // When
     let output = sandbox.run_in(
@@ -99,7 +79,7 @@ fn status__should_leave_every_file_unchanged() {
     watch.lines_for(Duration::from_secs(2));
     watch.close_stdin();
     let exited = watch.exit_within(Duration::from_secs(5));
-    let after = snapshot(&sandbox.root);
+    let after = tree_state(&sandbox.root, None);
 
     // Then
     assert!(

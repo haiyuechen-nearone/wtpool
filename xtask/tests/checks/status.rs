@@ -3,7 +3,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::PathBuf;
 
 use rstest::rstest;
 use serde_json::Value;
@@ -11,62 +10,7 @@ use xtask::pool::{Pool, PoolSpec, WorktreeSpec, git_in};
 
 use crate::support::{Sandbox, must_status_json, must_wtpool_bin, schema_errors, worktree};
 
-pub(super) fn spec(worktrees: &[(&str, WorktreeSpec)]) -> PoolSpec {
-    let mut all: BTreeMap<String, WorktreeSpec> = BTreeMap::from([
-        (
-            "fg".to_owned(),
-            WorktreeSpec {
-                branch: Some("main".into()),
-                upstream: true,
-                ..WorktreeSpec::default()
-            },
-        ),
-        ("wt1".to_owned(), detached()),
-        ("wt2".to_owned(), detached()),
-        ("wt3".to_owned(), detached()),
-        (
-            "x".to_owned(),
-            WorktreeSpec {
-                branch: Some("side".into()),
-                ..WorktreeSpec::default()
-            },
-        ),
-    ]);
-    for (name, worktree) in worktrees {
-        all.insert((*name).to_owned(), worktree.clone());
-    }
-    PoolSpec {
-        agents: true,
-        worktrees: all,
-    }
-}
-
-pub(super) fn detached() -> WorktreeSpec {
-    WorktreeSpec {
-        detached: true,
-        ..WorktreeSpec::default()
-    }
-}
-
-pub(super) fn on_branch(branch: &str) -> WorktreeSpec {
-    WorktreeSpec {
-        branch: Some(branch.into()),
-        ..WorktreeSpec::default()
-    }
-}
-
-pub(super) fn no_procs(sandbox: &Sandbox) -> PathBuf {
-    sandbox.must_write_procs(&[])
-}
-
-pub(super) fn status(sandbox: &Sandbox, pool: &Pool) -> Value {
-    let procs = no_procs(sandbox);
-    must_status_json(
-        sandbox,
-        &pool.fg,
-        &[("WTPOOL_VERIFY_PROCS", procs.as_os_str())],
-    )
-}
+pub(super) use crate::support::status::{detached, no_procs, on_branch, spec, status};
 
 #[rstest]
 #[case::idle(spec(&[

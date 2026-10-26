@@ -98,7 +98,7 @@ impl PoolState {
         let markers = config
             .main_worktree
             .as_ref()
-            .unwrap_or(&config.foreground)
+            .unwrap_or(&config.foreground.value)
             .to_path_buf();
         let host = &sources.host;
         let jobs = JobsState::read(host.jobs.clone(), host.cores, &common, markers)?;
@@ -126,7 +126,7 @@ impl PoolState {
     /// Lists the worktrees again and reads the process table, the records and the jobs, and the
     /// facts and the repository unless only the actors are read.
     pub fn refresh_all(&mut self, processes: &impl ListProcesses) -> Result<(), Error> {
-        let foreground = Git::at(&self.config.foreground).with_mode(self.git_mode);
+        let foreground = Git::at(&self.config.foreground.value).with_mode(self.git_mode);
         let listed = Worktree::list_with(&foreground, &mut Discard)?;
         // git lists the main worktree first.
         let name = listed.first().map(Worktree::name).unwrap_or_default();
