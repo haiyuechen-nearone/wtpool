@@ -1,23 +1,17 @@
 import type { Actor, Worktree } from '../generated/status';
 import { visible } from '../shared/invisible';
 import { offeredActions, type ActionType } from '../shared/protocol';
-import { bdi, cell, line, setText, span } from './dom';
-import { GROUPS, RUN_TIME_CLASS, WORDS, age, agentLines, gitText, lastTimes, runTime, shownActors } from './text';
+import { bdi, button, cell, line, setText, span, type RunTime } from './dom';
+import { GROUPS, WORDS, age, agentLines, gitText, lastTimes, runTime, shownActors } from './text';
 
-interface ActionButton {
-  type: ActionType;
-  label: string;
-  classSuffix: string;
-}
-
-/** The buttons of the row actions, in the order a row shows them. */
-const ACTIONS: readonly ActionButton[] = [
-  { type: 'open', label: 'Open in new window', classSuffix: 'open' },
-  { type: 'terminal', label: 'Open terminal', classSuffix: 'terminal' },
-  { type: 'copyPath', label: 'Copy path', classSuffix: 'copy-path' },
-  { type: 'free', label: 'Free this worktree…', classSuffix: 'free' },
-  { type: 'fg', label: 'Bring its branch to the foreground…', classSuffix: 'fg' },
-];
+/** The label and class suffix of the button of each row action. */
+const ACTIONS: Readonly<Record<ActionType, { label: string; classSuffix: string }>> = {
+  open: { label: 'Open in new window', classSuffix: 'open' },
+  terminal: { label: 'Open terminal', classSuffix: 'terminal' },
+  copyPath: { label: 'Copy path', classSuffix: 'copy-path' },
+  free: { label: 'Free this worktree…', classSuffix: 'free' },
+  fg: { label: 'Bring its branch to the foreground…', classSuffix: 'fg' },
+};
 
 /** The tag after a worktree's name, by its role. */
 const ROLE_TAGS: Readonly<Record<Worktree['role'], string>> = {
@@ -72,7 +66,7 @@ export class RowView {
   private readonly last = cell('last');
   private readonly actions = cell('actions');
   private agentKey = '';
-  private runTimes: HTMLElement[] = [];
+  private runTimes: RunTime[] = [];
   private times: Array<string | null> = [];
   private actionKey = '';
 
@@ -115,7 +109,8 @@ export class RowView {
    */
   update(worktree: Worktree, nowMs: number, flagUnqueued: boolean): void {
     this.current = worktree;
-    const className = `row activity-${worktree.activity.replaceAll('_', '-')} group-${GROUPS[worktree.activity]}`;
+    const activity = worktree.activity;
+    const className = `row activity-${activity.replaceAll('_', '-')} group-${GROUPS[activity]}`;
     if (this.element.className !== className) this.element.className = className;
     this.updateIcon(worktree.activity === 'working');
     setText(this.word, WORDS[worktree.activity]);
@@ -135,7 +130,7 @@ export class RowView {
   /** Recomputes the ages of the Last cell and the run times of the agent lines, nothing else. */
   tick(nowMs: number): void {
     this.times.forEach((time, index) => void setText(this.last.children[index], age(time, nowMs)));
-    this.runTimes.forEach((element) => void setText(element, runTime(element.dataset.since ?? '', nowMs)));
+    this.runTimes.forEach(({ element, since }) => void setText(element, runTime(since, nowMs)));
   }
 
   /** Shows the robot while working, else the codicon glyph of the icon's ::before. */
@@ -157,14 +152,13 @@ export class RowView {
     const key = JSON.stringify([lines, states]);
     if (key === this.agentKey) return;
     this.agentKey = key;
-    this.agent.replaceChildren(
-      ...lines.map((pieces, index) => {
-        const element = line(pieces, `line state-${states[index] ?? 'none'}`);
-        element.prepend(...lineStart(actors.at(index)));
-        return element;
-      }),
-    );
-    this.runTimes = [...this.agent.querySelectorAll<HTMLElement>(`.${RUN_TIME_CLASS}`)];
+    const made = lines.map((pieces, index) => {
+      const { element, runTimes } = line(pieces, `line state-${states[index] ?? 'none'}`);
+      element.prepend(...lineStart(actors.at(index)));
+      return { element, runTimes };
+    });
+    this.agent.replaceChildren(...made.map(({ element }) => element));
+    this.runTimes = made.flatMap(({ runTimes }) => runTimes);
   }
 
   /** Shows the number of agents after the Activity word when there are two or more. */
@@ -184,25 +178,24 @@ export class RowView {
     const times = lastTimes(worktree);
     if (JSON.stringify(times) !== JSON.stringify(this.times)) {
       this.times = times;
-      this.last.replaceChildren(...times.map(() => line([])));
+      this.last.replaceChildren(...times.map(() => line([]).element));
     }
     this.tick(nowMs);
   }
 
-  /** Remakes the action buttons when the offered actions changed. */
+  /** Remakes the action buttons when the offered actions, already in display order, changed. */
   private updateActions(actions: ActionType[]): void {
     const key = actions.join();
     if (key === this.actionKey) return;
     this.actionKey = key;
     this.actions.replaceChildren(
-      ...ACTIONS.filter((action) => actions.includes(action.type)).map(({ type, label, classSuffix }) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = `action action-${classSuffix}`;
-        button.setAttribute('data-action', type);
-        button.setAttribute('aria-label', label);
-        button.setAttribute('title', label);
-        return button;
+      ...actions.map((type) => {
+        const { label, classSuffix } = ACTIONS[type];
+        const element = button(`action action-${classSuffix}`);
+        element.setAttribute('data-action', type);
+        element.setAttribute('aria-label', label);
+        element.setAttribute('title', label);
+        return element;
       }),
     );
   }

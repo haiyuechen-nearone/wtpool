@@ -91,10 +91,13 @@ pull request.
 
 ## Code style
 
+The coding standards are in [verify/standards/engineering-standards.md](verify/standards/engineering-standards.md).
+
 - A source file stays around 500 lines, and never goes over 1000. Split a longer one into
   modules.
-- Match the code around your change in naming, comments and idiom. Comments cite spec IDs, such
-  as `(H6)`, as the code already does.
+- Match the code around your change in naming, comments and idiom. Write a comment only where
+  the code cannot say it, and say why, not what. Comments never cite spec IDs or design
+  documents: traceability lives in `verify/trace.toml` and in test names.
 - Rust test names follow `<sut>__should_<assertion>`, with `// Given`, `// When` and `// Then`.
   The full test standards are in [verification.md](docs/design/status-panel/verification.md#test-standards).
 - Open an issue before you add a crate or an npm package. The product's dependencies are pinned

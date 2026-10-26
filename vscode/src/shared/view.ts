@@ -15,7 +15,9 @@ interface WatchState {
   readonly error?: string;
 }
 
-/** Gives `Worktrees (N)` while N worktrees of the document's first pool wait, else {@link TITLE}. */
+/**
+ * Gives `Worktrees (N)` while N worktrees of the document's first pool wait, else {@link TITLE}.
+ */
 export function titleOf(document: StatusDocument): string {
   const waiting = document.pools[0].worktrees.filter((row) => row.activity === 'waiting');
   return waiting.length ? `${TITLE} (${waiting.length})` : TITLE;

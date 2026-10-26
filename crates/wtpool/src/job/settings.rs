@@ -225,11 +225,7 @@ fn read_config() -> Result<MachineConfig, String> {
 fn show_heavy() -> Result<Vec<String>, String> {
     let config = read_config()?;
     let repository = this_repository()?.unwrap_or_default().patterns;
-    let heavy = HeavyList::new(
-        &config.heavy,
-        &repository.heavy,
-        &repository.build_processes,
-    );
+    let heavy = HeavyList::of(&config, &repository);
     Ok(heavy_lines(
         heavy
             .patterns()
@@ -245,14 +241,16 @@ fn suggestions() -> Result<(Vec<Suggestion>, Option<String>), String> {
     let Some(repository) = this_repository()? else {
         return Ok((Vec::new(), None));
     };
-    let patterns = &repository.patterns;
-    let heavy = HeavyList::new(&config.heavy, &patterns.heavy, &patterns.build_processes);
+    let heavy = HeavyList::of(&config, &repository.patterns);
     let suggestions = repository
         .markers
         .as_deref()
         .map(Suggestions::read)
         .unwrap_or_default();
-    Ok((suggestions.lacking(&heavy), suggestions.fault))
+    Ok((
+        suggestions.lacking(&heavy),
+        suggestions.fault.map(|fault| fault.to_string()),
+    ))
 }
 
 fn edit_repository(change: &RepositoryChange) -> Result<RepositoryLists, String> {

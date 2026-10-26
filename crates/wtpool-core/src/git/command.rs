@@ -2,10 +2,10 @@
 //! through a shell, and without the variables of the repository that spawned `wtpool`.
 
 use std::ffi::{OsStr, OsString};
-use std::process::Command;
 
 use crate::error::Error;
 use crate::paths::{AbsolutePath, comparable};
+use crate::platform::shell;
 use crate::run::{Ran, run};
 
 /// `git rev-parse --local-env-vars` less the two that carry `git -c` settings, the
@@ -97,7 +97,7 @@ impl Git {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        let mut command = Command::new("git");
+        let mut command = shell::program("git");
         for var in REPOSITORY_ENV {
             command.env_remove(var);
         }

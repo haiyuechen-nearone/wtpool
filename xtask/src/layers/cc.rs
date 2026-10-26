@@ -37,12 +37,18 @@ fn build_copy(release: &Path) -> Result<PathBuf, String> {
     Ok(copy)
 }
 
-pub fn claude_version() -> Result<String, String> {
-    let text = crate::cmd::output(
+/// The full `claude --version` text.
+pub fn claude_version_text() -> Result<String, String> {
+    crate::cmd::output(
         std::process::Command::new("claude").arg("--version"),
         Duration::from_secs(30),
-    )?;
-    text.split_whitespace()
+    )
+    .map(|text| text.trim().to_owned())
+}
+
+pub fn claude_version() -> Result<String, String> {
+    claude_version_text()?
+        .split_whitespace()
         .next()
         .map(str::to_owned)
         .ok_or_else(|| "claude --version printed nothing".to_owned())

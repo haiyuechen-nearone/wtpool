@@ -29,7 +29,9 @@ const { values: args } = parseArgs({
 function sizeOrExit(text) {
   const size = Number(text);
   if (!Number.isInteger(size) || size < MIN_SIZE || size > MAX_SIZE) {
-    process.stderr.write(`icon: --size takes a whole number of pixels from ${MIN_SIZE} to ${MAX_SIZE}, not ${text}\n`);
+    process.stderr.write(
+      `icon: --size takes a whole number of pixels from ${MIN_SIZE} to ${MAX_SIZE}, not ${text}\n`,
+    );
     process.exit(2);
   }
   return size;
@@ -40,12 +42,19 @@ async function writeIcon(size, out) {
   const svg = readFileSync(SOURCE, 'utf8');
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
+    const page = await browser.newPage({
+      viewport: { width: size, height: size },
+      deviceScaleFactor: 1,
+    });
     await page.setContent(
       `<!DOCTYPE html><style>html, body { margin: 0; background: transparent; } ` +
         `svg { display: block; width: ${size}px; height: ${size}px; }</style>${svg}`,
     );
-    await page.screenshot({ path: out, omitBackground: true, clip: { x: 0, y: 0, width: size, height: size } });
+    await page.screenshot({
+      path: out,
+      omitBackground: true,
+      clip: { x: 0, y: 0, width: size, height: size },
+    });
     process.stdout.write(`icon: wrote ${out} (${size} x ${size})\n`);
   } finally {
     await browser.close();

@@ -66,10 +66,13 @@ export function setShownText(element: HTMLElement, text: string): void {
 
 /** The attributes {@link setAttr} sets, each by a literal name, as the DOM sink lint reads only those. */
 const SETTERS = {
-  'aria-expanded': (element: Element, value: string) => void element.setAttribute('aria-expanded', value),
-  'aria-invalid': (element: Element, value: string) => void element.setAttribute('aria-invalid', value),
+  'aria-expanded': (element: Element, value: string) =>
+    void element.setAttribute('aria-expanded', value),
+  'aria-invalid': (element: Element, value: string) =>
+    void element.setAttribute('aria-invalid', value),
   'aria-label': (element: Element, value: string) => void element.setAttribute('aria-label', value),
-  'data-machine': (element: Element, value: string) => void element.setAttribute('data-machine', value),
+  'data-machine': (element: Element, value: string) =>
+    void element.setAttribute('data-machine', value),
   'data-pool': (element: Element, value: string) => void element.setAttribute('data-pool', value),
 };
 
@@ -90,20 +93,44 @@ export function textSpan(className: string, text: string): HTMLSpanElement {
  * span of their class when they have one.
  */
 export function pieceNodes(pieces: Piece[]): Node[] {
+  return pieceNodesWithTimes(pieces, []);
+}
+
+/** A span that shows the run time since `since`, kept current by the clock. */
+export interface RunTime {
+  element: HTMLElement;
+  since: string;
+}
+
+function pieceNodesWithTimes(pieces: Piece[], runTimes: RunTime[]): Node[] {
   return pieces.map((piece) => {
-    if (piece.from) return bdi(piece.text);
-    if (piece.since !== undefined) {
-      const element = textSpan(piece.className ?? '', piece.text);
-      element.dataset.since = piece.since;
-      return element;
+    switch (piece.kind) {
+      case 'document':
+        return bdi(piece.text);
+      case 'runTime': {
+        const element = textSpan('run-time', '');
+        element.dataset.since = piece.since;
+        runTimes.push({ element, since: piece.since });
+        return element;
+      }
+      case 'own':
+        return piece.className
+          ? textSpan(piece.className, piece.text)
+          : document.createTextNode(piece.text);
     }
-    return piece.className ? textSpan(piece.className, piece.text) : document.createTextNode(piece.text);
   });
 }
 
-/** Makes a div of the class `className` that holds the nodes of `pieces`. */
-export function line(pieces: Piece[], className = 'line'): HTMLDivElement {
+/** A line of pieces and the run time spans in it. */
+interface Line {
+  element: HTMLDivElement;
+  runTimes: RunTime[];
+}
+
+/** Makes a div of the class `className` that holds the nodes of `pieces`, with its run times. */
+export function line(pieces: Piece[], className = 'line'): Line {
   const element = div(className);
-  element.append(...pieceNodes(pieces));
-  return element;
+  const runTimes: RunTime[] = [];
+  element.append(...pieceNodesWithTimes(pieces, runTimes));
+  return { element, runTimes };
 }

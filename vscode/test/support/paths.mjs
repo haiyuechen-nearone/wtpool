@@ -24,3 +24,6 @@ export function runDir() {
   }
   return dir;
 }
+
+/** WTPOOL_VERIFY_PHASE, 1 by default. */
+export const PHASE = Number(process.env.WTPOOL_VERIFY_PHASE ?? 1);

@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
-import { chmodSync, lstatSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { lstatSync, mkdirSync, rmSync, symlinkSync } from 'node:fs';
 import path from 'node:path';
 
+import { writeMachineConfig } from './machine-config.mjs';
 import { cacheRoot } from './vscode-app.mjs';
 
 /**
@@ -116,12 +117,7 @@ export function keychainErrors(text) {
  */
 export const EARLIER_BUILDS = '# The builds of phases 1 to 3 as heavy patterns.\n[jobs]\nheavy = ["cargo", "cargo-*", "rustc"]\n';
 
-/** Writes {@link EARLIER_BUILDS} as the `machine.toml` of `home`, folder 0700 and file 0600. */
+/** Writes {@link EARLIER_BUILDS} as the `machine.toml` of `home`. */
 export function writeEarlierBuilds(home) {
-  const folder = path.join(home, '.config', 'wtpool');
-  mkdirSync(folder, { recursive: true });
-  chmodSync(folder, 0o700);
-  const file = path.join(folder, 'machine.toml');
-  writeFileSync(file, EARLIER_BUILDS, { mode: 0o600 });
-  chmodSync(file, 0o600);
+  writeMachineConfig(home, { text: EARLIER_BUILDS });
 }

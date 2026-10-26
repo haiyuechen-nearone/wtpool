@@ -72,7 +72,9 @@
     "build": "node scripts/build.mjs",
     "generate": "node scripts/generate.mjs",
     "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/haiyuechen-nearone/wtpool/blob/main/vscode --baseImagesUrl https://github.com/haiyuechen-nearone/wtpool/raw/main/vscode --out wtpool.vsix",
-    "lint": "eslint . && stylelint --allow-empty-input \"src/**/*.css\" \"media/**/*.css\""
+    "format": "prettier --write src scripts",
+    "format:check": "prettier --check src scripts",
+    "lint": "npm run format:check && eslint . && stylelint --allow-empty-input \"src/**/*.css\" \"media/**/*.css\""
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -85,6 +87,7 @@
     "eslint": "10.12.0",
     "globals": "17.13.0",
     "json-schema-to-typescript": "16.0.0",
+    "prettier": "3.9.10",
     "stylelint": "17.16.0",
     "stylelint-config-standard": "40.0.0",
     "typescript": "6.0.3",

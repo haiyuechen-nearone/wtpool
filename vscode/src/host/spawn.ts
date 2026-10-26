@@ -168,10 +168,6 @@ export function startRun(binary: string, args: string[], cwd: string | undefined
 }
 
 /** Runs `binary` with `args` to its end, with no stdin or stdout. */
-export function runToEnd(
-  binary: string,
-  args: string[],
-  cwd: string | undefined,
-): Promise<RunEnd> {
+export function runToEnd(binary: string, args: string[], cwd: string | undefined): Promise<RunEnd> {
   return startRun(binary, args, cwd).ended;
 }

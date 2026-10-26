@@ -12,7 +12,18 @@ import {
   type Policy,
   type PolicyMessage,
 } from '../shared/jobs';
-import { bdi, button, cell, div, label, paragraph, setAttr, setShownText, setText, span } from './dom';
+import {
+  bdi,
+  button,
+  cell,
+  div,
+  label,
+  paragraph,
+  setAttr,
+  setShownText,
+  setText,
+  span,
+} from './dom';
 import { HeavyEditor } from './heavy_editor';
 import { JobList } from './job_list';
 import { DOT } from './text';
@@ -25,7 +36,7 @@ export interface StripHost {
 }
 
 /** The machine as the strip shows it: its name, heavy jobs, the pool's worktrees and its folder. */
-export interface MachineView {
+interface MachineView {
   name: string;
   jobs?: Jobs;
   worktrees: Worktree[];
@@ -51,7 +62,11 @@ function hint(): HTMLParagraphElement {
   const element = paragraph('limit-hint');
   const code = document.createElement('code');
   code.textContent = 'wtpool job -- <command>';
-  element.append(document.createTextNode('Agents and scripts take a place when they run a command as '), code, document.createTextNode('.'));
+  element.append(
+    document.createTextNode('Agents and scripts take a place when they run a command as '),
+    code,
+    document.createTextNode('.'),
+  );
   return element;
 }
 
@@ -60,7 +75,11 @@ function oldWtpool(): HTMLParagraphElement {
   const element = paragraph('limit-note old-wtpool');
   const code = document.createElement('code');
   code.textContent = 'wtpool job';
-  element.append(document.createTextNode('This wtpool has no heavy job limit. Update wtpool to a version with '), code, document.createTextNode(' to set one.'));
+  element.append(
+    document.createTextNode('This wtpool has no heavy job limit. Update wtpool to a version with '),
+    code,
+    document.createTextNode(' to set one.'),
+  );
   return element;
 }
 
@@ -83,7 +102,11 @@ export class MachineStrip {
   private readonly over = paragraph('limit-over');
   private readonly saved = paragraph('limit-note');
   /** The parts of the saved note: its start, the config's path, and its end. */
-  private readonly savedParts = [document.createTextNode(''), bdi(''), document.createTextNode('')] as const;
+  private readonly savedParts = [
+    document.createTextNode(''),
+    bdi(''),
+    document.createTextNode(''),
+  ] as const;
   private readonly remote = paragraph('limit-note');
   private readonly editor: HeavyEditor;
   private readonly left = div('jobs-limit');
@@ -142,14 +165,32 @@ export class MachineStrip {
     const save = button('job-button job-save', 'Save');
     const defaults = button('job-button secondary job-default', 'Use defaults');
     const fields = div('limit-row');
-    fields.append(label('job-limit', 'Limit'), this.limit, label('job-enforce', 'Policy'), this.enforce, this.meaning);
+    fields.append(
+      label('job-limit', 'Limit'),
+      this.limit,
+      label('job-enforce', 'Policy'),
+      this.enforce,
+      this.meaning,
+    );
     const actions = div('limit-row');
     actions.append(save, defaults, this.status);
     this.heading.append(document.createTextNode('Heavy jobs on '), this.machineName);
     this.saved.append(...this.savedParts);
     const heavyHeading = div('agents-heading heavy-heading');
     heavyHeading.textContent = 'Heavy commands';
-    this.left.append(this.heading, this.fault, fields, this.limitError, actions, this.over, this.saved, this.remote, heavyHeading, this.editor.element, hint());
+    this.left.append(
+      this.heading,
+      this.fault,
+      fields,
+      this.limitError,
+      actions,
+      this.over,
+      this.saved,
+      this.remote,
+      heavyHeading,
+      this.editor.element,
+      hint(),
+    );
     this.right.append(this.running.element, this.waiting.element, this.outside.element);
     this.limit.addEventListener('input', () => {
       this.edited.limit = true;
@@ -167,7 +208,10 @@ export class MachineStrip {
     this.limit.addEventListener('keydown', enter);
     this.enforce.addEventListener('keydown', enter);
     save.addEventListener('click', () => void this.save());
-    defaults.addEventListener('click', () => void this.send({ type: 'jobSettings', limit: null, enforce: null }));
+    defaults.addEventListener(
+      'click',
+      () => void this.send({ type: 'jobSettings', limit: null, enforce: null }),
+    );
   }
 
   /** Shows `view`, changing only the parts that differ, and keeps the user's unsaved edits. */
@@ -190,15 +234,34 @@ export class MachineStrip {
     this.showMeaning(jobs);
     const running = jobs.running.length;
     const limit = jobs.limit ?? running;
-    setShownText(this.over, running > limit ? `${running} running, over the limit of ${limit}: they finish, and queued jobs start once fewer than ${limit} run.` : '');
+    setShownText(
+      this.over,
+      running > limit
+        ? `${running} running, over the limit of ${limit}: they finish, and queued jobs start once fewer than ${limit} run.`
+        : '',
+    );
     const fromFile = jobs.source.limit === 'machine' || jobs.source.enforce === 'machine';
     const saved = fromFile
-      ? ['Saved in ', visible(jobs.config), `${DOT}defaults ${jobs.default}, warn${DOT}${jobs.min} to ${jobs.max}`]
+      ? [
+          'Saved in ',
+          visible(jobs.config),
+          `${DOT}defaults ${jobs.default}, warn${DOT}${jobs.min} to ${jobs.max}`,
+        ]
       : ['Not saved: the defaults apply', '', ''];
     this.savedParts.forEach((part, at) => void setText(part, saved[at]));
-    setShownText(this.remote, view.remote ? `This window's folder is not on this computer: the settings are for this computer, ${name}.` : '');
+    setShownText(
+      this.remote,
+      view.remote
+        ? `This window's folder is not on this computer: the settings are for this computer, ${name}.`
+        : '',
+    );
     this.editor.show(jobs, nowMs);
-    this.running.show(jobs.limit === null ? `Running ${running}` : `Running ${running} of ${jobs.limit}`, jobs.running, view.worktrees, nowMs);
+    this.running.show(
+      jobs.limit === null ? `Running ${running}` : `Running ${running} of ${jobs.limit}`,
+      jobs.running,
+      view.worktrees,
+      nowMs,
+    );
     this.waiting.show(`Queued ${jobs.waiting.length}`, jobs.waiting, view.worktrees, nowMs);
     this.outside.show(`Not queued ${jobs.outside.length}`, jobs.outside, view.worktrees, nowMs);
     if (jobs.enforce === 'off') this.outside.element.remove();
@@ -232,15 +295,23 @@ export class MachineStrip {
     setText(this.status, said);
     this.status.classList.toggle('failed', !answer.ok);
     // Edits made while the save was out stay the user's.
-    if (answer.ok && sent) this.edited = { limit: this.limit.value !== sent.limit, enforce: this.enforce.value !== sent.enforce };
+    if (answer.ok && sent)
+      this.edited = {
+        limit: this.limit.value !== sent.limit,
+        enforce: this.enforce.value !== sent.enforce,
+      };
     this.host.announce(said);
   }
 
   /** Gives the field's limit, else marks the field invalid with the reason under it. */
   private checkLimit(jobs: Jobs): number | undefined {
     const value = this.limit.value;
-    const limit = /^\d+$/.test(value) && Number(value) >= jobs.min && Number(value) <= jobs.max ? Number(value) : undefined;
-    const reason = limit === undefined ? `Enter a whole number from ${jobs.min} to ${jobs.max}.` : '';
+    const limit =
+      /^\d+$/.test(value) && Number(value) >= jobs.min && Number(value) <= jobs.max
+        ? Number(value)
+        : undefined;
+    const reason =
+      limit === undefined ? `Enter a whole number from ${jobs.min} to ${jobs.max}.` : '';
     setAttr(this.limit, 'aria-invalid', String(limit === undefined));
     if (reason && this.limitError.textContent !== reason) this.host.announce(reason);
     setShownText(this.limitError, reason);
@@ -262,7 +333,12 @@ export class MachineStrip {
     if (limit === undefined) return;
     const policy = this.policy(this.jobs);
     const enforce = policy === this.jobs.enforce ? undefined : policy;
-    if (limit !== this.jobs.limit) this.send(enforce === undefined ? { type: 'jobSettings', limit } : { type: 'jobSettings', limit, enforce });
+    if (limit !== this.jobs.limit)
+      this.send(
+        enforce === undefined
+          ? { type: 'jobSettings', limit }
+          : { type: 'jobSettings', limit, enforce },
+      );
     else if (enforce !== undefined) this.send({ type: 'jobSettings', enforce });
   }
 
@@ -270,7 +346,12 @@ export class MachineStrip {
   private send(message: LimitMessage | PolicyMessage): void {
     if (this.saving) return;
     setText(this.status, '');
-    this.saving = { limit: this.limit.value, enforce: this.enforce.value, message, due: this.post(message) };
+    this.saving = {
+      limit: this.limit.value,
+      enforce: this.enforce.value,
+      message,
+      due: this.post(message),
+    };
   }
 
   /** Sends `message` and gives the time its answer is due by. */
@@ -282,6 +363,7 @@ export class MachineStrip {
 
   /** Lets Save send again once the answer to the last save is overdue, or `jobs` has shown it a while. */
   private settleSave(jobs: Jobs | undefined): void {
-    if (this.saving && waitEnds(this.saving, this.saving.message, jobs, this.nowMs)) this.saving = undefined;
+    if (this.saving && waitEnds(this.saving, this.saving.message, jobs, this.nowMs))
+      this.saving = undefined;
   }
 }

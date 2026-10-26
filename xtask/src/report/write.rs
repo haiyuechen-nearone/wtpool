@@ -2,14 +2,12 @@
 
 use std::fs;
 use std::path::Path;
-use std::process::Command;
-use std::time::Duration;
 
 use serde::Serialize;
 
 use super::markdown::{Diffs, Header, html, markdown};
 use super::verdict::{Verdict, counted, required_parts, verdict};
-use crate::cmd::{self, git};
+use crate::cmd::git;
 use crate::cover::{self, Coverage};
 use crate::flaky;
 use crate::isolation::{self, Places};
@@ -30,7 +28,36 @@ struct ReportJson<'a> {
     coverage: &'a Option<Coverage>,
 }
 
+/// The results a run's parts stored, with the cc contract line of the report.
+struct Gathered {
+    results: Vec<CheckResult>,
+    streaks: Vec<flaky::Streak>,
+    contract: String,
+}
+
+/// The results the report decides over and the verdict they give.
+struct Judged {
+    results: Vec<CheckResult>,
+    coverage: Option<Coverage>,
+    verdict: Verdict,
+}
+
 pub fn report(root: &Path, phase: u8, run: &str, run_dir: &Path) -> Result<Verdict, String> {
+    let gathered = gather(root, phase, run, run_dir)?;
+    let judged = judge(root, phase, run_dir, gathered.results)?;
+    write(
+        root,
+        phase,
+        run,
+        run_dir,
+        &judged,
+        &gathered.streaks,
+        &gathered.contract,
+    )?;
+    Ok(judged.verdict)
+}
+
+fn gather(root: &Path, phase: u8, run: &str, run_dir: &Path) -> Result<Gathered, String> {
     let mut results = load_all(run_dir)?;
     let earlier = run_dir
         .parent()
@@ -59,10 +86,7 @@ pub fn report(root: &Path, phase: u8, run: &str, run_dir: &Path) -> Result<Verdi
             ));
         }
     }
-    if results
-        .iter()
-        .any(|r| r.layer == "cc" && r.message.starts_with(crate::layers::REPLAY_ONLY))
-    {
+    if results.iter().any(|r| r.layer == "cc" && r.replay_only) {
         contract = format!(
             "{}, each by this run's cc_replay:<name>; no live Claude Code session ({})",
             crate::layers::REPLAY_ONLY,
@@ -70,6 +94,19 @@ pub fn report(root: &Path, phase: u8, run: &str, run_dir: &Path) -> Result<Verdi
                 .unwrap_or_else(|| "a live result appeared after the cc part ran".to_owned())
         );
     }
+    Ok(Gathered {
+        results,
+        streaks,
+        contract,
+    })
+}
+
+fn judge(
+    root: &Path,
+    phase: u8,
+    run_dir: &Path,
+    results: Vec<CheckResult>,
+) -> Result<Judged, String> {
     // A check that runs only from a later phase decides nothing in this one, should any part
     // have reported it.
     let mut results = counted(results, &trace::later_in(root, phase));
@@ -89,7 +126,28 @@ pub fn report(root: &Path, phase: u8, run: &str, run_dir: &Path) -> Result<Verdi
     let complete = trace::check(root, phase, &results);
     results.push(complete);
     let verdict = verdict(&results);
+    Ok(Judged {
+        results,
+        coverage,
+        verdict,
+    })
+}
 
+fn write(
+    root: &Path,
+    phase: u8,
+    run: &str,
+    run_dir: &Path,
+    judged: &Judged,
+    streaks: &[flaky::Streak],
+    contract: &str,
+) -> Result<(), String> {
+    let Judged {
+        results,
+        coverage,
+        verdict,
+    } = judged;
+    let verdict = *verdict;
     let commit = crate::repo::head(root)?;
     let dirty = crate::repo::dirty_fingerprint(root)?.is_some();
     let commit_text = if dirty {
@@ -101,7 +159,8 @@ pub fn report(root: &Path, phase: u8, run: &str, run_dir: &Path) -> Result<Verdi
         Ok(found) => (found.commit, found.source),
         Err(error) => ("missing".to_owned(), error),
     };
-    let claude = claude_version();
+    let claude =
+        crate::layers::claude_version_text().unwrap_or_else(|_| "not installed".to_owned());
 
     let markdown = markdown(
         &Header {
@@ -112,11 +171,11 @@ pub fn report(root: &Path, phase: u8, run: &str, run_dir: &Path) -> Result<Verdi
             base: &base,
             base_source: &base_source,
             claude: &claude,
-            contract: &contract,
+            contract,
         },
-        &results,
-        &streaks,
-        &coverage,
+        results,
+        streaks,
+        coverage,
         &diffs(root, &base, phase),
         &reused_parts(run_dir),
     );
@@ -130,12 +189,11 @@ pub fn report(root: &Path, phase: u8, run: &str, run_dir: &Path) -> Result<Verdi
         base: &base,
         base_source: &base_source,
         claude_code: &claude,
-        results: &results,
-        coverage: &coverage,
+        results,
+        coverage,
     };
     let text = serde_json::to_string_pretty(&json).map_err(|e| e.to_string())?;
-    fs::write(run_dir.join("report.json"), text).map_err(|e| e.to_string())?;
-    Ok(verdict)
+    fs::write(run_dir.join("report.json"), text).map_err(|e| e.to_string())
 }
 
 /// Each part of the run that copied an earlier result: its source and input hash.
@@ -163,15 +221,6 @@ fn sandbox_roots(run_dir: &Path) -> Vec<String> {
         roots.push(dir.to_string_lossy().into_owned());
     }
     roots
-}
-
-fn claude_version() -> String {
-    cmd::output(
-        Command::new("claude").arg("--version"),
-        Duration::from_secs(20),
-    )
-    .map(|text| text.trim().to_owned())
-    .unwrap_or_else(|_| "not installed".to_owned())
 }
 
 /// The files of `listing`, git's `-z` output, that are oracle files at `phase` or hold oracle keys.

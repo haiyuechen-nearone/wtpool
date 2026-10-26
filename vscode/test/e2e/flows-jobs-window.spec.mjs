@@ -6,7 +6,9 @@ import { test } from '@playwright/test';
 
 import { runDir } from '../support/paths.mjs';
 import { openStatus, poll, withFlow } from './flows.mjs';
-import { headingText, machineButton, machineTomlPath, names, openStrip, readText, stripText, writeMachineToml } from './jobs.mjs';
+import { machineTomlPath, readText, writeMachineToml } from './jobs-config.mjs';
+import { headingText, machineButton, openStrip, stripText } from './jobs-dom.mjs';
+import { names } from './jobs-process.mjs';
 import { close, launch, pool, releaseWtpool, sandbox, sleep, watchers } from './vscode.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -24,7 +26,8 @@ function wrapperDir(key) {
 }
 
 test('flow__jobs_old_wtpool', async () => {
-  // Given: wtpool.path names a wtpool whose documents have no machine.jobs (wtpool-old.mjs).
+  // Given
+  // wtpool-old.mjs prints documents without machine.jobs.
   const file = path.join(wrapperDir('flow__jobs_old_wtpool'), 'wtpool');
   writeFileSync(file, ['#!/bin/sh', `exec '${process.execPath}' '${path.join(here, 'wtpool-old.mjs')}' '${releaseWtpool()}' "$@"`, ''].join('\n'));
   chmodSync(file, 0o755);
@@ -48,12 +51,11 @@ test('flow__jobs_old_wtpool', async () => {
 });
 
 test('flow__jobs_wtpool_missing', async () => {
-  // Given: wtpool.path names a link to the release wtpool. Removing the link later stands for
-  // wtpool leaving PATH.
+  // Given
+  // Removing the link later stands for wtpool leaving PATH.
   const link = path.join(wrapperDir('flow__jobs_wtpool_missing'), 'wtpool');
   symlinkSync(releaseWtpool(), link);
-  await withFlow('flow__jobs_wtpool_missing', { wtpoolPath: link }, async (session) => {
-    writeMachineToml(session.dirs, { limit: 4 });
+  await withFlow('flow__jobs_wtpool_missing', { wtpoolPath: link, beforeLaunch: (dirs) => writeMachineToml(dirs, { limit: 4 }) }, async (session) => {
     const frame = await openStatus(session);
     await machineButton(frame);
     const strip = await openStrip(frame);
@@ -90,9 +92,10 @@ test('flow__jobs_wtpool_missing', async () => {
 });
 
 test('flow__jobs_remote_window', async () => {
-  // Given: a workspace whose one folder has a scheme no file system provides here, as a
-  // Remote-SSH, WSL or virtual folder is not a local `file:` folder. wtpool then runs in the
-  // home folder, where WTPOOL_FOREGROUND names the local pool.
+  // Given
+  // The workspace's one folder has a scheme no file system provides here, as a Remote-SSH, WSL
+  // or virtual folder is not a local `file:` folder. wtpool then runs in the home folder, where
+  // WTPOOL_FOREGROUND names the local pool.
   const key = 'flow__jobs_remote_window';
   const poolInfo = pool('idle_pool', key);
   const dirs = sandbox(key);

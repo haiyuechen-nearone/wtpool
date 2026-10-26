@@ -4,7 +4,15 @@
  * VS Code binary.
  */
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -67,10 +75,21 @@ export function createSandbox(name) {
   );
   chmodSync(dirs.wtpoolPath, 0o755);
   const settings = { ...QUIET_SETTINGS, ...RECORDING_SETTINGS, 'wtpool.path': dirs.wtpoolPath };
-  writeFileSync(path.join(dirs.userData, 'User', 'settings.json'), JSON.stringify(settings, null, 2));
+  writeFileSync(
+    path.join(dirs.userData, 'User', 'settings.json'),
+    JSON.stringify(settings, null, 2),
+  );
   execFileSync(
     vscodePaths().cli,
-    ['--install-extension', VSIX, '--force', '--extensions-dir', dirs.extensions, '--user-data-dir', dirs.userData],
+    [
+      '--install-extension',
+      VSIX,
+      '--force',
+      '--extensions-dir',
+      dirs.extensions,
+      '--user-data-dir',
+      dirs.userData,
+    ],
     { env: env(dirs, undefined), stdio: 'pipe', timeout: 120_000 },
   );
   return dirs;

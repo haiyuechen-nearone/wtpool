@@ -5,13 +5,12 @@ import { test } from '@playwright/test';
 
 import { scenarioDocuments } from '../support/docs.mjs';
 import { age, rowOrder, shownActors } from '../support/grammar.mjs';
-import { SCENARIOS, runDir } from '../support/paths.mjs';
+import { PHASE, SCENARIOS, runDir } from '../support/paths.mjs';
 import { AgentSteps } from './agents.mjs';
 import { flowSession } from './flows.mjs';
 import { expectedLineFacts, expectedRows, lineFacts, lineProblems, shownRows, waitForRows } from './rows.mjs';
 import { close, panelFrame, runCommand, statusJson } from './vscode.mjs';
 
-const PHASE = Number(process.env.WTPOOL_VERIFY_PHASE ?? 1);
 /**
  * An agent event shows within 1 s. The wait adds the watch's 200 ms merge and a second of polling
  * and rendering, and fails at that deadline, not the 300 s test timeout.
@@ -61,7 +60,7 @@ for (const name of names) {
         const shown = await shownRows(frame);
         const status = statusJson(session.dirs, session.pool);
         const to = Date.now();
-        // Only a scenario of phase 4 or later checks the agent count and the screen reader text of
+        // Scenarios whose `phase` is 4 or later check the agent count and the screen reader text of
         // the agent lines.
         const lines = scenario.phase >= 4 ? lineProblems(await lineFacts(frame), expectedLineFacts(documents[index], session.pool)) : [];
         seen.push({ index, expected, rows, shown, status, from, to, lines });

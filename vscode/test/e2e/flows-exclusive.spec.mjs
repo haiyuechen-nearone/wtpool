@@ -12,6 +12,7 @@ import { test } from '@playwright/test';
 import { scenarioDocuments } from '../support/docs.mjs';
 import { rowOrder } from '../support/grammar.mjs';
 import { installHelpers } from '../support/measure.mjs';
+import { PHASE } from '../support/paths.mjs';
 import { focusInView, scrollLayout, scrollState, scrollTable } from '../support/scroll.mjs';
 import { AgentSteps } from './agents.mjs';
 import { expectedRows, resolved } from './rows.mjs';
@@ -29,7 +30,8 @@ import {
 } from './flows.mjs';
 import { waitForRows } from './rows.mjs';
 import { git, panelFrame, readClipboard, runCommand, sleep, workbench } from './vscode.mjs';
-import { PHASE, addRepoKeys, focusKey, focusRing, writeMachineToml } from './jobs.mjs';
+import { addRepoKeys, writeMachineToml } from './jobs-config.mjs';
+import { focusKey, focusRing } from './jobs-dom.mjs';
 
 
 test('flow__copy_path', async () => {
@@ -81,7 +83,7 @@ test('flow__missing_worktree_actions', async () => {
     });
 
     // Then
-    // From phase 3 a slot may also offer free and fg, after the three actions of every row.
+    // A slot may also offer free and fg, after the three actions of every row.
     const u4 = present.filter((action) => !['free', 'fg'].includes(action));
     assert.deepEqual(u4, ['open', 'terminal', 'copyPath'], 'wt1 does not offer the three actions');
     assert.deepEqual(missing, ['copyPath'], 'the missing wt3 does not offer copy path only');
@@ -167,7 +169,7 @@ test('flow__narrow_window', async () => {
     assert.equal(layout.text, LONG_BRANCH, `the long branch is not shown whole at 600 px: ${JSON.stringify(layout)}`);
     assert.equal(layout.clipped, null, `the long branch is cut at 600 px: ${JSON.stringify(layout)}`);
     assert.ok(layout.table > layout.width && layout.scrolls, `the ${layout.table} px table does not scroll sideways in the 600 px tab: ${JSON.stringify(layout)}`);
-    // The three actions on each of five rows, plus from phase 3 free and fg on wt2, the slot
+    // The three actions on each of five rows, plus free and fg on wt2, the slot
     // that holds a branch. Free and fg show elsewhere only on the other slots.
     const keys = reach.map((r) => r.key);
     const wanted = ['fg', 'wt1', 'wt2', 'wt3', 'x'].flatMap((name) => ['open', 'terminal', 'copyPath'].map((a) => `${a} ${name}`));
@@ -209,7 +211,7 @@ const WAIT_SCENARIO = 'permission_wait_and_answer';
 
 test('flow__narrow_scroll', async () => {
   await withFlow('flow__narrow_scroll', { scenario: WAIT_SCENARIO }, async (session) => {
-    // Given: a 600 px tab while an agent waits for permission in wt2.
+    // Given
     const { window } = session;
     await window.mouse.move(1, 1);
     const frame = await narrowPanel(session);
@@ -309,7 +311,7 @@ async function tabTo(window, frame, key) {
 }
 
 /**
- * From phase 4, the machine strip by keys alone: Tab to the machine button, Enter opens the strip
+ * With PHASE 4 or more, the machine strip by keys alone: Tab to the machine button, Enter opens the strip
  * with focus on Limit, then Tab goes the menu, Save, Use defaults, each chip list as one stop with
  * its input and Add, then the rows. Escape closes it and focus returns to the button. Every stop
  * shows its ring.
@@ -343,12 +345,12 @@ async function stripByKeys(window, frame) {
 }
 
 test('flow__keyboard_only', async () => {
-  // From phase 4 the strip holds a pattern in each list, so each list is a tab stop.
+  // With PHASE 4 or more the strip holds a pattern in each list, so each list is a tab stop.
   const prepare = (poolInfo) => (PHASE >= 4 ? addRepoKeys(poolInfo, { heavy: ['make'] }) : undefined);
-  await withFlow('flow__keyboard_only', { scenario: 'folder_missing', prepare }, async (session) => {
+  const beforeLaunch = (dirs) => (PHASE >= 4 ? writeMachineToml(dirs, { limit: 4, heavy: ['just'] }) : undefined);
+  await withFlow('flow__keyboard_only', { scenario: 'folder_missing', prepare, beforeLaunch }, async (session) => {
     // Given
     const { app, window, dirs } = session;
-    if (PHASE >= 4) writeMachineToml(dirs, { limit: 4, heavy: ['just'] });
     await window.mouse.move(1, 1);
     const frame = await openStatus(session);
     assert.ok(await focusPage(frame), 'setup: the tab\'s page did not take keyboard focus');

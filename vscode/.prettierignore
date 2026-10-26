@@ -1,0 +1,7 @@
+out/
+media/
+node_modules/
+src/generated/
+**/*.generated.*
+package-lock.json
+*.css

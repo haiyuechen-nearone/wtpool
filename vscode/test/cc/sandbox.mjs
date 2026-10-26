@@ -8,6 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { sandboxEnv } from '../e2e/sandbox.mjs';
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const RECORDER = path.join(here, 'recorder.mjs');
 export const MODEL = 'claude-haiku-5-5';
@@ -125,14 +127,13 @@ export function sessionEnv(dirs, pool, extra = {}) {
     // Claude Code keeps its installed versions in the data folder, their locks in the state
     // folder and its update staging in the cache. Its start-up cleanup prunes the versions it
     // finds unlocked, so with only the state folder here it would prune the owner's versions.
-    XDG_STATE_HOME: dirs.state,
-    XDG_DATA_HOME: dirs.data,
-    XDG_CACHE_HOME: dirs.cache,
-    XDG_CONFIG_HOME: dirs.xdgConfig,
+    ...sandboxEnv({
+      home: env.HOME,
+      tz: 'UTC',
+      xdg: { state: dirs.state, data: dirs.data, cache: dirs.cache, config: dirs.xdgConfig },
+    }),
     WTPOOL_FOREGROUND: pool.fg,
     WTPOOL_SLOT_DIR: pool.dir,
-    WTPOOL_VERIFY_SANDBOX: '1',
-    TZ: 'UTC',
     ...extra,
   };
 }
@@ -142,15 +143,9 @@ export function wtpoolEnv(dirs, pool) {
   const home = path.join(dirs.root, 'wtpool-home');
   mkdirSync(home, { recursive: true });
   return {
-    PATH: process.env.PATH,
-    HOME: home,
-    TMPDIR: os.tmpdir(),
-    XDG_STATE_HOME: dirs.state,
-    XDG_CONFIG_HOME: dirs.xdgConfig,
+    ...sandboxEnv({ home, tmp: os.tmpdir(), tz: 'UTC', xdg: { state: dirs.state, config: dirs.xdgConfig } }),
     WTPOOL_FOREGROUND: pool.fg,
     WTPOOL_SLOT_DIR: pool.dir,
-    WTPOOL_VERIFY_SANDBOX: '1',
-    TZ: 'UTC',
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
   };

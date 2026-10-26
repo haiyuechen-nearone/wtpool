@@ -99,6 +99,58 @@ every VS Code it starts opens its windows behind yours and never takes focus, an
 `e2e` layers fail if one becomes the frontmost app; `verify/out/<run>/<layer>/front.txt` lists the
 frontmost apps a layer saw.
 
+### Module map of `vscode/test/`
+
+Shared helpers in `support/`:
+
+- `grammar.mjs`: the words and rows the panel should show.
+- `docs.mjs`: status documents, each checked against the phase 4 schema.
+- `visual-docs.mjs`: documents with long values and many chips for the visual checks.
+- `jobs.mjs`: heavy job documents and the text their UI should show.
+- `jobs-render.mjs`: the render layer's reach into the heavy jobs UI.
+- `machine-config.mjs`: writes a sandbox's `machine.toml` by hand.
+- `measure.mjs`: in-page layout and colour measurements.
+- `scroll.mjs`: in-page measurements of the tab's sideways scroll.
+- `pixels.mjs`: reads regions of screenshots in a blank Chromium page.
+- `states.mjs`: puts the panel into the states the visual checks measure.
+- `jobs-shot.mjs`: in-page measurements of the heavy jobs UI.
+- `v8-lcov.mjs`: turns V8 coverage of the render and host layers into lcov.
+- `code.mjs`: the launch flags of every VS Code run, with secret storage off the keychain.
+- `vscode-app.mjs`: finds VS Code, from the environment, the default install or a pinned download.
+- `paths.mjs`: the repository, run and fixture paths.
+- `background.mjs`: keeps each VS Code run from taking focus on macOS.
+- `main-hooks.mjs`: hooks VS Code's main process so it never activates and the clipboard stays in memory.
+- `page.mjs`: loads the webview page in Chromium as VS Code shows it.
+- `webview.mjs`: loads the webview in jsdom with a fake clock.
+
+Helpers of the e2e layer in `e2e/`:
+
+- `vscode.mjs`: drives a real VS Code with the packaged extension and the release `wtpool`.
+- `flows.mjs`: shared steps of the flow checks, each in its own VS Code.
+- `cli.mjs`: the release `wtpool` as a command line, for checks that need no window.
+- `rows.mjs`: reads the panel's rows and compares them with the grammar.
+- `folders.mjs`: builds the repository pools the checks open, and reads text and layout in the webview.
+- `jobs-config.mjs`: writes the TOML of the heavy job flows by hand.
+- `jobs-process.mjs`: stand-in commands and stub agents that wait until released.
+- `jobs-dom.mjs`: DOM probes of the heavy job flows.
+- `jobs.mjs`: re-exports the three `jobs-*` files.
+- `agents.mjs`: the `claude` stubs of a scenario.
+- `claude-stub.mjs`: one stub `claude` that runs `wtpool hook` for each request.
+- `sockets.mjs`: lists the listening TCP and bound UDP sockets of some processes.
+- `wtpool-old.mjs`: a wtpool from before `wtpool job`, for the checks of the old CLI.
+- `global-setup.mjs`: finds VS Code once per run, downloading the pinned version if none is installed.
+
+Spec files, by layer:
+
+- `render/`: Vitest `*.test.mjs` checks in jsdom, one file per panel part.
+- `shot/`: Playwright `*.spec.mjs` checks of the panel's pixels, one file per area: focus, jobs, layout, lines, look, output, overlap, panel, run time and scroll.
+- `host/`: `*.test.cjs` checks in the extension host, run by `run.mjs` with `index.cjs`, `support.cjs` and `outputs.cjs`.
+- `e2e/`: Playwright `*.spec.mjs` checks in a real VS Code: flows, panel, headings, CLI and scenarios.
+- `cc/`: `run.mjs` runs the sessions of `sessions.mjs` on sandbox pools, with `sandbox.mjs` and the `recorder.mjs` hook.
+- `lint/`: `rules.mjs` holds the rule groups, and `check.mjs` runs one group over the sources.
+- `bench/`: `heap.spec.mjs`, the heap check.
+- `fake-wtpool.mjs`, at the top: the fake `wtpool` of the host layer, which replays documents.
+
 ## npm advisories
 
 `npm ci` in `vscode/` reports 2 high severity advisories. Both are in `@azure/msal-node`, which
@@ -152,6 +204,7 @@ the code.
 | `WTPOOL_VERIFY_RUN_DIR` | every layer | `xtask/tests`, `vscode/test/support/paths.mjs` | The run folder, below which each layer writes. |
 | `WTPOOL_VERIFY_REPO` | the int and bench parts | `xtask/tests`, the bench layer | The tree under test. |
 | `WTPOOL_VERIFY_PACKAGE`, `WTPOOL_VERIFY_BUILD_DIRTY`, `WTPOOL_VERIFY_REBUILD_STEPS` | the int part | `xtask/tests` | The package with the `wtpool` binary, `1` for a dirty tree, and the rebuild steps of the version check. |
+| `WTPOOL_VERIFY_CORES` | the int part | the `verify` build of `wtpool` | The core count that the default job limit is a quarter of, in place of the system's count. |
 | `WTPOOL_VERIFY_XTASK`, `WTPOOL_VERIFY_RELEASE_BIN`, `WTPOOL_VERIFY_PHASE` | the e2e, cc and bench layers | `e2e/`, `cc/`, `bench/` | The xtask binary that builds pools, the release `wtpool`, and the phase. |
 | `WTPOOL_VERIFY_HOST_COVERAGE`, `WTPOOL_VERIFY_HOST_GREP` | the host layer | `host/run.mjs` | The V8 coverage folder, and the titles an `--only` run selects. |
 | `WTPOOL_VERIFY_HOST_NAME` | a host run by hand | `host/run.mjs` | The layer folder below the run folder, `host` by default. |

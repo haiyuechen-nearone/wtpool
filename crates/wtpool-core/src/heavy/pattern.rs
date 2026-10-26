@@ -17,7 +17,7 @@ const MAX_WORD_CHARS: usize = 32;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Pattern(String);
 
-/// Text that is no [`Pattern`], and why.
+/// Text that is no [`Pattern`], with the fault.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{text:?} is not a heavy pattern: {reason}")]
 pub struct InvalidPattern {
@@ -25,7 +25,7 @@ pub struct InvalidPattern {
     pub reason: PatternFault,
 }
 
-/// What makes text no [`Pattern`].
+/// The fault that makes text no [`Pattern`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum PatternFault {
     #[error("it is empty")]
@@ -63,7 +63,7 @@ impl Pattern {
     }
 
     /// The command's words this pattern matches, as the command names them: its first words,
-    /// one per word of the pattern. `None` when the command has fewer words or another one.
+    /// one per word of the pattern. `None` for a command of fewer words or another one.
     #[must_use]
     pub fn matched(&self, command: &CommandWords) -> Option<String> {
         let words: Vec<&str> = self.0.split(' ').collect();

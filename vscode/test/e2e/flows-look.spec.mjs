@@ -74,8 +74,14 @@ test('flow__theme_switch', async () => {
     // When
     const seen = [];
     for (const [theme, bodyClass, matches] of THEMES) {
-      writeSettings(session.dirs, { 'workbench.colorTheme': theme });
-      const applied = await poll(async () => matches((await colours(frame)).body.split(/\s+/)), 15_000);
+      const write = () => writeSettings(session.dirs, { 'workbench.colorTheme': theme });
+      write();
+      // A change that VS Code's file watcher missed is written again.
+      let waited = 0;
+      const applied = await poll(async () => {
+        if (waited++ % 50 === 49) write();
+        return matches((await colours(frame)).body.split(/\s+/));
+      }, 40_000);
       // The theme's colours settle some time after its body class: two reads in a row agree.
       let last;
       await poll(async () => {

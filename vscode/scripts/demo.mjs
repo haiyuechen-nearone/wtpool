@@ -19,7 +19,14 @@ import { keepAtBack } from '../test/support/background.mjs';
 import { REPO } from '../test/support/paths.mjs';
 import { installedVSCode } from '../test/support/vscode-app.mjs';
 import { close, env, launch, panelFrame, runCommand, sleep } from '../test/e2e/vscode.mjs';
-import { clickPointer, installPointer, movePointer, record, shiftClock, timeline } from './demo/capture.mjs';
+import {
+  clickPointer,
+  installPointer,
+  movePointer,
+  record,
+  shiftClock,
+  timeline,
+} from './demo/capture.mjs';
 import { detectFeatures, parseFeatures } from './demo/features.mjs';
 import { configureFake, createSandbox, emit, fakeStarts, removeSandbox } from './demo/sandbox.mjs';
 import { KEYFRAMES, LENGTH_SECONDS, PLACEHOLDERS, clockOf, story } from './demo/story.mjs';
@@ -48,10 +55,14 @@ function fail(message) {
 function checkTools() {
   const gifski = spawnSync('gifski', ['--version'], { encoding: 'utf8' });
   if (gifski.error) {
-    fail('demo: gifski is not installed. Install it with `cargo install --locked gifski` (https://gif.ski), then run again.');
+    fail(
+      'demo: gifski is not installed. Install it with `cargo install --locked gifski` (https://gif.ski), then run again.',
+    );
   }
   if (!installedVSCode()) {
-    fail('demo: no VS Code found. Install VS Code, or name its binary in WTPOOL_VERIFY_VSCODE (and its CLI in WTPOOL_VERIFY_VSCODE_CLI).');
+    fail(
+      'demo: no VS Code found. Install VS Code, or name its binary in WTPOOL_VERIFY_VSCODE (and its CLI in WTPOOL_VERIFY_VSCODE_CLI).',
+    );
   }
 }
 
@@ -77,7 +88,9 @@ async function pointOf(target, { window, frame, pathOf }) {
   }
   const [kind, name, action] = target.split(':');
   if (kind === 'dialog') {
-    const button = window.locator('.monaco-dialog-box .monaco-button').filter({ hasText: new RegExp(`^${name}$`) });
+    const button = window
+      .locator('.monaco-dialog-box .monaco-button')
+      .filter({ hasText: new RegExp(`^${name}$`) });
     await button.first().waitFor({ state: 'visible', timeout: 5_000 });
     return pointAcross(await button.first().boundingBox(), 0.5);
   }
@@ -182,7 +195,9 @@ async function recordStory(dirs, features, framesDir) {
 function encode(frames) {
   const fps = Number(args.fps);
   const picked = timeline(frames, fps, LENGTH_SECONDS * 1000);
-  process.stdout.write(`demo: ${frames.length} screenshots, ${picked.length} GIF frames at ${fps} fps\n`);
+  process.stdout.write(
+    `demo: ${frames.length} screenshots, ${picked.length} GIF frames at ${fps} fps\n`,
+  );
   if (args.keyframes) {
     mkdirSync(args.keyframes, { recursive: true });
     KEYFRAMES.forEach(({ at, name }, index) => {
@@ -191,9 +206,20 @@ function encode(frames) {
     });
   }
   mkdirSync(path.dirname(args.out), { recursive: true });
-  const options = ['--quiet', '--no-sort', '--fps', String(fps), '--width', args.width, '--quality', args.quality];
+  const options = [
+    '--quiet',
+    '--no-sort',
+    '--fps',
+    String(fps),
+    '--width',
+    args.width,
+    '--quality',
+    args.quality,
+  ];
   const files = picked.map((frame) => frame.file);
-  const encoded = spawnSync('gifski', [...options, '--output', args.out, ...files], { stdio: 'inherit' });
+  const encoded = spawnSync('gifski', [...options, '--output', args.out, ...files], {
+    stdio: 'inherit',
+  });
   if (encoded.status !== 0) {
     throw new Error('demo: gifski failed');
   }

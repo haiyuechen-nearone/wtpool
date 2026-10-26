@@ -53,19 +53,39 @@ export function clockOf(timeZone) {
     second: '2-digit',
   }).formatToParts(new Date(guess));
   const part = (type) => Number(parts.find((p) => p.type === type).value);
-  const shown = Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), part('second'));
+  const shown = Date.UTC(
+    part('year'),
+    part('month') - 1,
+    part('day'),
+    part('hour'),
+    part('minute'),
+    part('second'),
+  );
   const startMs = guess - (shown - guess);
-  const hhmm = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const hhmm = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
   return {
     startMs,
     /** The RFC 3339 time `seconds` after the start, whole seconds, as wtpool prints times. */
-    at: (seconds) => new Date(startMs + Math.round(seconds) * 1000).toISOString().replace('.000Z', 'Z'),
+    at: (seconds) =>
+      new Date(startMs + Math.round(seconds) * 1000).toISOString().replace('.000Z', 'Z'),
     /** The local `HH:MM` `seconds` after the start, as a session without a title shows it. */
     hhmm: (seconds) => hhmm.format(new Date(startMs + seconds * 1000)),
   };
 }
 
-const CLEAN_GIT = { dirty: 0, ahead: 0, behind: 0, unreferenced: 0, operation: null, unknown: false };
+const CLEAN_GIT = {
+  dirty: 0,
+  ahead: 0,
+  behind: 0,
+  unreferenced: 0,
+  operation: null,
+  unknown: false,
+};
 
 /**
  * Returns the story for `features` in `timeZone`, with slot 1's test log at `logPath`, as
@@ -95,7 +115,12 @@ export function story({ features, timeZone, logPath }) {
     ...fields,
   });
 
-  const backgroundTask = (id, summary, started, file = path.join(path.dirname(logPath), `${id}.output`)) => ({
+  const backgroundTask = (
+    id,
+    summary,
+    started,
+    file = path.join(path.dirname(logPath), `${id}.output`),
+  ) => ({
     task: id,
     path: file,
     summary,
@@ -132,40 +157,52 @@ export function story({ features, timeZone, logPath }) {
 
   const rows = new Map();
   const set = (name, fields) => rows.set(name, { ...rows.get(name), ...fields });
-  rows.set(repo, worktree(repo, {
-    role: 'foreground',
-    ...onBranch('main', { reasons: ['foreground'] }),
-    git: CLEAN_GIT,
-    activity: 'foreground',
-    last_change: at(-190),
-  }));
+  rows.set(
+    repo,
+    worktree(repo, {
+      role: 'foreground',
+      ...onBranch('main', { reasons: ['foreground'] }),
+      git: CLEAN_GIT,
+      activity: 'foreground',
+      last_change: at(-190),
+    }),
+  );
   rows.set(slot(1), worktree(slot(1), { last_change: at(-75 * 60) }));
   const oauth = (fields) => session('5c1d8e20-oauth', 'Add OAuth callback route', -14 * 60, fields);
-  rows.set(slot(2), worktree(slot(2), {
-    ...onBranch('feat/oauth-callback'),
-    git: { ...CLEAN_GIT, dirty: 2 },
-    activity: 'idle',
-    actors: [oauth({ state: 'idle', since: at(-380), updated: at(-380) })],
-    last_event: at(-380),
-    last_change: at(-400),
-  }));
+  rows.set(
+    slot(2),
+    worktree(slot(2), {
+      ...onBranch('feat/oauth-callback'),
+      git: { ...CLEAN_GIT, dirty: 2 },
+      activity: 'idle',
+      actors: [oauth({ state: 'idle', since: at(-380), updated: at(-380) })],
+      last_event: at(-380),
+      last_change: at(-400),
+    }),
+  );
   const deps = (fields) => session('9e4b7a31-deps', 'Bump dependencies', -29 * 60, fields);
-  rows.set(slot(3), worktree(slot(3), {
-    ...onBranch('chore/bump-deps'),
-    git: { ...CLEAN_GIT, ahead: 1 },
-    activity: 'idle',
-    actors: [deps({ state: 'idle', since: at(-130), updated: at(-130) })],
-    last_event: at(-130),
-    last_change: at(-150),
-  }));
-  rows.set(slot(4), worktree(slot(4), {
-    ...onBranch('feat/dark-mode'),
-    git: CLEAN_GIT,
-    activity: 'unused',
-    // 25 m 20 s at the start, so its age reads `25 m` from the first frame to the last.
-    last_event: at(-25 * 60 - 20),
-    last_change: at(-24 * 60),
-  }));
+  rows.set(
+    slot(3),
+    worktree(slot(3), {
+      ...onBranch('chore/bump-deps'),
+      git: { ...CLEAN_GIT, ahead: 1 },
+      activity: 'idle',
+      actors: [deps({ state: 'idle', since: at(-130), updated: at(-130) })],
+      last_event: at(-130),
+      last_change: at(-150),
+    }),
+  );
+  rows.set(
+    slot(4),
+    worktree(slot(4), {
+      ...onBranch('feat/dark-mode'),
+      git: CLEAN_GIT,
+      activity: 'unused',
+      // 25 m 20 s at the start, so its age reads `25 m` from the first frame to the last.
+      last_event: at(-25 * 60 - 20),
+      last_change: at(-24 * 60),
+    }),
+  );
 
   const document = (seconds) => ({
     type: 'status',
@@ -225,7 +262,14 @@ export function story({ features, timeZone, logPath }) {
   change(3.6, () =>
     set(slot(2), {
       activity: 'working',
-      actors: [oauth({ state: 'working', action: { tool: 'Edit', target: 'src/routes/oauth.rs' }, since: at(3.6), updated: at(3.6) })],
+      actors: [
+        oauth({
+          state: 'working',
+          action: { tool: 'Edit', target: 'src/routes/oauth.rs' },
+          since: at(3.6),
+          updated: at(3.6),
+        }),
+      ],
       git: { ...CLEAN_GIT, dirty: 3 },
       last_event: at(3.6),
     }),
@@ -234,7 +278,13 @@ export function story({ features, timeZone, logPath }) {
     set(slot(2), {
       activity: 'waiting',
       actors: [
-        oauth({ state: 'waiting', reason: 'permission', action: { tool: 'Bash', target: 'git push' }, since: at(4.5), updated: at(4.5) }),
+        oauth({
+          state: 'waiting',
+          reason: 'permission',
+          action: { tool: 'Bash', target: 'git push' },
+          since: at(4.5),
+          updated: at(4.5),
+        }),
       ],
       last_event: at(4.5),
     }),
@@ -250,7 +300,11 @@ export function story({ features, timeZone, logPath }) {
 
   // 5. The user builds in the foreground: a build with no agent, so the row is `building`.
   change(7.8, () =>
-    set(repo, { activity: 'building', builds: [{ name: 'cargo', pid: 51877 }], last_event: at(7.8) }),
+    set(repo, {
+      activity: 'building',
+      builds: [{ name: 'cargo', pid: 51877 }],
+      last_event: at(7.8),
+    }),
   );
   login(9.4, { tool: 'Edit', target: 'src/auth/session.rs' }, 2, true);
 
@@ -260,7 +314,14 @@ export function story({ features, timeZone, logPath }) {
   change(8.4, () =>
     set(slot(3), {
       activity: 'working',
-      actors: [deps({ state: 'working', action: { tool: 'Bash', target: 'npm test' }, since: at(8.4), updated: at(8.4) })],
+      actors: [
+        deps({
+          state: 'working',
+          action: { tool: 'Bash', target: 'npm test' },
+          since: at(8.4),
+          updated: at(8.4),
+        }),
+      ],
       last_event: at(8.4),
     }),
   );

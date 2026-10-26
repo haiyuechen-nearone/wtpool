@@ -18,7 +18,7 @@ mod statics;
 
 pub use bench::{BENCH_MODULE, bench};
 pub use builds::{release_wtpool, web_build_once};
-pub use cc::{cc, replay_only_reason, report_by_replay};
+pub use cc::{cc, claude_version_text, replay_only_reason, report_by_replay};
 pub use cc_judge::REPLAY_ONLY;
 pub use e2e::build_pool;
 pub use js::{quick, ui};

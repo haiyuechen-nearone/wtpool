@@ -15,7 +15,7 @@ export class LineSplitter {
   /** Adds `chunk` and gives the lines it completed, or 'oversize' once a line is too long. */
   push(chunk: Buffer): string[] | 'oversize' {
     const lines: string[] = [];
-    for (let start = 0; ; ) {
+    for (let start = 0; ;) {
       const end = chunk.indexOf(NEWLINE, start);
       const stop = end < 0 ? chunk.length : end;
       this.pending.push(chunk.subarray(start, stop));

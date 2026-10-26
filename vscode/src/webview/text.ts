@@ -53,7 +53,11 @@ const WAITING_FOR: Readonly<Record<Reason, string>> = {
 export const DOT = ' · ';
 
 /** The order of the row roles. */
-const ROLE_ORDER: Readonly<Record<Worktree['role'], number>> = { foreground: 0, slot: 1, unmanaged: 2 };
+const ROLE_ORDER: Readonly<Record<Worktree['role'], number>> = {
+  foreground: 0,
+  slot: 1,
+  unmanaged: 2,
+};
 
 /** Gives the age of an RFC 3339 time at `nowMs`, or empty for no time. */
 export function age(time: string | null, nowMs: number): string {
@@ -117,26 +121,31 @@ export function gitFacts(git: Git): string {
 }
 
 /**
- * Holds one piece of an agent line: plain text the panel writes, or a string from the document,
- * isolated by the DOM.
+ * Holds one piece of an agent line: the panel's own words, a string from the document, isolated
+ * by the DOM, or a run time that the clock keeps current.
  */
-export interface Piece {
-  text: string;
-  from?: 'document';
-  /** The class of a span that holds the text, for a part with a colour of its own. */
-  className?: string;
-  /** The `started` of a run time: the piece's owner keeps its text that run time. */
-  since?: string;
-}
+export type Piece =
+  | {
+      kind: 'own';
+      text: string;
+      /** The class of a span that holds the text, for a part with a colour of its own. */
+      className?: string;
+    }
+  | { kind: 'document'; text: string }
+  | {
+      kind: 'runTime';
+      /** The `started` of the task whose run time the piece shows. */
+      since: string;
+    };
 
 /** Makes a piece of the panel's own words. */
 function own(text: string): Piece {
-  return { text };
+  return { kind: 'own', text };
 }
 
 /** Makes a piece of a string from the document, its invisible characters made visible. */
 function theirs(text: string): Piece {
-  return { text: visible(text), from: 'document' };
+  return { kind: 'document', text: visible(text) };
 }
 
 function actionPieces(actor: Actor): Piece[] {
@@ -164,14 +173,11 @@ function doing(actor: Actor): Piece[] {
   }
 }
 
-/** The class of a piece that shows a run time. */
-export const RUN_TIME_CLASS = 'run-time';
-
 /** Gives the run time after a `background:` action, of the task it names: the first listed. */
 function runTimePieces(actor: Actor): Piece[] {
   const [task] = actor.outputs ?? [];
   if (actor.action?.tool !== 'background:' || !task) return [];
-  return [own(DOT), { text: '', className: RUN_TIME_CLASS, since: task.started }];
+  return [own(DOT), { kind: 'runTime', since: task.started }];
 }
 
 /** Gives the actors of a row, newest `updated` first. */
@@ -180,18 +186,30 @@ export function shownActors(worktree: Worktree): Actor[] {
 }
 
 /** The mark after a build that no job holds. */
-const NOT_QUEUED: readonly Piece[] = [own(' '), { text: '(not queued)', className: 'not-queued' }];
+const NOT_QUEUED: readonly Piece[] = [
+  own(' '),
+  { kind: 'own', text: '(not queued)', className: 'not-queued' },
+];
 
 /**
  * Gives the lines of the agent column, each a list of pieces. With `flagUnqueued`, a build that no
  * job holds is marked, on an actor's line by the build its action names.
  */
 export function agentLines(worktree: Worktree, flagUnqueued = false): Piece[][] {
-  const mark = (unqueued: boolean): readonly Piece[] => (flagUnqueued && unqueued ? NOT_QUEUED : []);
+  const mark = (unqueued: boolean): readonly Piece[] =>
+    flagUnqueued && unqueued ? NOT_QUEUED : [];
   if (worktree.actors.length) {
     return shownActors(worktree).map((actor) => {
-      const building = actor.action?.tool === 'build:' && worktree.builds.some((b) => b.name === actor.action?.target && isUnqueued(b));
-      return [theirs(actor.label), own(DOT), ...doing(actor), ...runTimePieces(actor), ...mark(building)];
+      const building =
+        actor.action?.tool === 'build:' &&
+        worktree.builds.some((b) => b.name === actor.action?.target && isUnqueued(b));
+      return [
+        theirs(actor.label),
+        own(DOT),
+        ...doing(actor),
+        ...runTimePieces(actor),
+        ...mark(building),
+      ];
     });
   }
   const [build] = worktree.builds;
@@ -207,8 +225,12 @@ export function lastTimes(worktree: Worktree): Array<string | null> {
 
 /** Gives an actor's state in the detail strip. */
 export function stateText(actor: Actor): Piece[] {
-  if (actor.state === 'waiting') return [own(`waiting for ${actor.reason === null ? 'you' : WAITING_FOR[actor.reason]}`)];
-  if (actor.state === 'idle' && actor.error) return [own(`idle${DOT}API error: `), theirs(actor.error)];
+  if (actor.state === 'waiting') {
+    return [own(`waiting for ${actor.reason === null ? 'you' : WAITING_FOR[actor.reason]}`)];
+  }
+  if (actor.state === 'idle' && actor.error) {
+    return [own(`idle${DOT}API error: `), theirs(actor.error)];
+  }
   return [own(actor.state)];
 }
 
@@ -234,5 +256,7 @@ function byName(a: string, b: string): number {
 
 /** Orders rows: foreground, slots, unmanaged, each by name. */
 export function rowOrder(worktrees: Worktree[]): Worktree[] {
-  return [...worktrees].sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || byName(a.name, b.name));
+  return [...worktrees].sort(
+    (a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || byName(a.name, b.name),
+  );
 }

@@ -1,13 +1,6 @@
 import type { Output, StatusDocument, Worktree } from '../generated/status';
 import type { ConfirmedActionType } from '../shared/confirmation';
-import {
-  isPattern,
-  jobsOf,
-  POLICIES,
-  scopePatterns,
-  type Jobs,
-  type Scope,
-} from '../shared/jobs';
+import { isPattern, jobsOf, POLICIES, scopePatterns, type Jobs, type Scope } from '../shared/jobs';
 import {
   holdsBranch,
   isActionType,
@@ -68,12 +61,7 @@ export interface JobSettingsRequest {
 
 /** A request of the webview, by its message's `type`. */
 export type WebviewRequest =
-  | DirectAction
-  | ConfirmedAction
-  | Selection
-  | FollowRequest
-  | JobSettingsRequest
-  | Ready;
+  DirectAction | ConfirmedAction | Selection | FollowRequest | JobSettingsRequest | Ready;
 
 type Fields = Readonly<Record<string, unknown>>;
 

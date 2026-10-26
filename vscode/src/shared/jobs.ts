@@ -1,5 +1,3 @@
-// Both tsconfigs include this file, so it imports only types of the generated schema: no Node,
-// VS Code or DOM API.
 import type { Build, Heavy as HeavyPattern, Jobs, StatusDocument } from '../generated/status';
 
 export type { Heavy as HeavyPattern, Job, Jobs, Suggestion } from '../generated/status';
@@ -52,7 +50,9 @@ const LATER_WORD = /^(?![-+])[A-Za-z0-9._+:-]{1,32}$/;
  */
 export function isPattern(text: string): boolean {
   const [first, ...later] = text.split(' ');
-  return later.length <= 2 && FIRST_WORD.test(first) && later.every((word) => LATER_WORD.test(word));
+  return (
+    later.length <= 2 && FIRST_WORD.test(first) && later.every((word) => LATER_WORD.test(word))
+  );
 }
 
 /** An add or a removal of one pattern of the list `scope`. */
@@ -141,9 +141,14 @@ export function answerDue(message: JobSettingsMessage, nowMs: number, before: nu
 /** Tells `jobs` already showing the settings or the list `message` asks for. */
 function jobsShow(jobs: Jobs, message: JobSettingsMessage): boolean {
   if (message.heavy) return listShows(jobs, message.heavy);
-  const limit = message.limit === undefined || (message.limit === null ? jobs.source.limit === 'default' : jobs.limit === message.limit);
+  const limit =
+    message.limit === undefined ||
+    (message.limit === null ? jobs.source.limit === 'default' : jobs.limit === message.limit);
   const enforce =
-    message.enforce === undefined || (message.enforce === null ? jobs.source.enforce === 'default' : jobs.enforce === message.enforce);
+    message.enforce === undefined ||
+    (message.enforce === null
+      ? jobs.source.enforce === 'default'
+      : jobs.enforce === message.enforce);
   return limit && enforce;
 }
 
@@ -161,7 +166,12 @@ export interface Awaiting {
  * Tells the wait of `awaiting` over at `nowMs`, and once `jobs` shows `message`, shortens it to
  * {@link SHOWN_WAIT_MS}.
  */
-export function waitEnds(awaiting: Awaiting, message: JobSettingsMessage, jobs: Jobs | undefined, nowMs: number): boolean {
+export function waitEnds(
+  awaiting: Awaiting,
+  message: JobSettingsMessage,
+  jobs: Jobs | undefined,
+  nowMs: number,
+): boolean {
   if (jobs && jobsShow(jobs, message)) awaiting.due = Math.min(awaiting.due, nowMs + SHOWN_WAIT_MS);
   return awaiting.due <= nowMs;
 }

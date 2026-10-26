@@ -9,9 +9,10 @@ import path from 'node:path';
 import { runTests } from '@vscode/test-electron';
 
 import { inBackground } from '../support/background.mjs';
-import { CODE_FLAGS, QUIET_SETTINGS, keychainErrors, removeLink, shortLink, writeEarlierBuilds } from '../support/code.mjs';
+import { CODE_FLAGS, QUIET_SETTINGS, keychainErrors, removeLink, shortLink } from '../support/code.mjs';
 import { FAKE_WTPOOL, TEST, VSCODE, runDir } from '../support/paths.mjs';
 import { resolveVSCode } from '../support/vscode-app.mjs';
+import { sandboxEnv } from '../e2e/sandbox.mjs';
 
 // @vscode/test-electron starts VS Code with this process's environment. A run started from a
 // VS Code terminal or extension carries ELECTRON_RUN_AS_NODE, making VS Code a plain Node,
@@ -34,7 +35,6 @@ const dirs = {
   fakes: path.join(sandbox, 'fakes'),
 };
 for (const dir of Object.values(dirs)) mkdirSync(dir, { recursive: true });
-writeEarlierBuilds(dirs.home);
 mkdirSync(path.join(dirs.userData, 'User'), { recursive: true });
 mkdirSync(path.join(dirs.workspace, '.vscode'), { recursive: true });
 
@@ -117,9 +117,7 @@ try {
       WTPOOL_VERIFY_WORKSPACE_FAKE: workspaceFake,
       WTPOOL_VERIFY_OTHER_FOLDER: dirs.other,
       WTPOOL_FAKE_CONFIG: path.join(root, 'fake-config.json'),
-      HOME: dirs.home,
-      TMPDIR: shortTmp,
-      TZ: 'UTC',
+      ...sandboxEnv({ home: dirs.home, tmp: shortTmp, tz: 'UTC' }),
       ...(process.env.WTPOOL_VERIFY_HOST_COVERAGE ? { NODE_V8_COVERAGE: process.env.WTPOOL_VERIFY_HOST_COVERAGE } : {}),
       ...Object.fromEntries(
         ['WTPOOL_VERIFY_HOST_RETRIES', 'WTPOOL_VERIFY_HOST_ORDER', 'WTPOOL_VERIFY_PHASE']

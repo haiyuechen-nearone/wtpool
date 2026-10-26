@@ -34,7 +34,8 @@ export function refusal(type: ConfirmedActionType, worktree: BranchSlot): string
   const name = worktree.name;
   return type === 'free'
     ? `${name} is not freed, an agent there works or waits. Free it once the agent is idle.`
-    : `${worktree.branch} is not brought to the foreground, an agent in ${name} works or waits. Try again once the agent is idle.`;
+    : `${worktree.branch} is not brought to the foreground, an agent in ${name} works or waits. ` +
+        'Try again once the agent is idle.';
 }
 
 /** Gives the question to ask before `type` on `worktree`, naming the worktree and the branch. */
@@ -57,12 +58,16 @@ export function question(type: ConfirmedActionType, worktree: BranchSlot): Quest
     message: warning
       ? `An agent in ${name} is idle. Bring branch ${branch} from ${name} to the foreground anyway?`
       : `Bring branch ${branch} from ${name} to the foreground?`,
-    detail: `wtpool fg ${branch} detaches ${name} and checks out ${branch} in the foreground worktree.`,
+    detail:
+      `wtpool fg ${branch} detaches ${name} and checks out ${branch} ` +
+      'in the foreground worktree.',
     confirm: 'Bring to Foreground',
   };
 }
 
-/** Tells that `now`, the latest state of `asked`, still holds the branch the user was asked about. */
+/**
+ * Tells that `now`, the latest state of `asked`, still holds the branch the user was asked about.
+ */
 export function stillHolds(asked: BranchSlot, now: Worktree | undefined): now is BranchSlot {
   return now !== undefined && holdsBranch(now) && now.branch === asked.branch;
 }

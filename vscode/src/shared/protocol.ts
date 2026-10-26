@@ -1,5 +1,3 @@
-// Both tsconfigs include this file, so it imports only types of the generated schema: no Node,
-// VS Code or DOM API.
 import type { StatusDocument, Worktree } from '../generated/status';
 import type { JobSettingsAnswer, JobSettingsMessage } from './jobs';
 
@@ -65,7 +63,7 @@ export function isActionType(value: unknown): value is ActionType {
  * Holds a message a webview may send: a row action or a `select` names a row by its path, the
  * empty string for none in a `select`, and a `follow` names an output path instead.
  */
-export interface RowMessage {
+interface RowMessage {
   type: ActionType | 'select' | 'follow';
   id: string;
 }

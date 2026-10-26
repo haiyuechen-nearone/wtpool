@@ -35,7 +35,7 @@ enum Manager {
     Bun,
 }
 
-/// Why a `package.json` gives no suggestion.
+/// The reason a `package.json` gives no suggestion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum PackageFault {
     Symlink,
@@ -165,7 +165,7 @@ fn manager(package_manager: Option<&Value>, names: &[String]) -> Manager {
         .unwrap_or(Manager::Npm)
 }
 
-/// Whether the script `name`, lowercased, is a stem of [`SCRIPT_STEMS`] or starts with one and
+/// `true` when the script `name`, lowercased, is a stem of [`SCRIPT_STEMS`] or starts with one and
 /// one of [`STEM_ENDS`].
 fn counts(name: &str) -> bool {
     let name = name.to_lowercase();

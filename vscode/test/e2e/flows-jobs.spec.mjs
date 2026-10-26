@@ -5,44 +5,47 @@ import { test } from '@playwright/test';
 import { GROUP_TOKENS } from '../support/grammar.mjs';
 import { poll, withFlow, worktreePath } from './flows.mjs';
 import {
-  WITHIN_A_SECOND_MS,
   addRepoKeys,
-  agent,
+  machineTomlPath,
+  readText,
+  tomlValue,
+  writeMachineToml,
+} from './jobs-config.mjs';
+import {
   agentLines,
-  assertRunning,
-  defaultLimit,
-  endCommand,
   focusKey,
-  fourRunTwoWait,
-  heavyCommand,
   headingText,
   jobLists,
   listProblems,
   liveText,
-  loggedRuns,
-  loggingWtpool,
   machineButton,
-  machineTomlPath,
   openStrip,
   openTab,
-  readText,
   reads,
-  runningCommands,
-  startJob,
-  startedCount,
-  stopJobs,
   stripText,
   tokenColour,
-  tomlValue,
-  writeMachineToml,
-} from './jobs.mjs';
+} from './jobs-dom.mjs';
+import {
+  agent,
+  assertRunning,
+  defaultLimit,
+  endCommand,
+  fourRunTwoWait,
+  heavyCommand,
+  loggedRuns,
+  loggingWtpool,
+  runningCommands,
+  startedCount,
+  startJob,
+  stopJobs,
+  WITHIN_A_SECOND_MS,
+} from './jobs-process.mjs';
 import { sleep, startProcess } from './vscode.mjs';
 
 test('flow__jobs_running_and_queued', async () => {
-  await withFlow('flow__jobs_running_and_queued', {}, async (session) => {
+  await withFlow('flow__jobs_running_and_queued', { beforeLaunch: (dirs) => writeMachineToml(dirs, { limit: 4, enforce: 'warn' }) }, async (session) => {
     try {
       // Given
-      writeMachineToml(session.dirs, { limit: 4, enforce: 'warn' });
       const frame = await openTab(session);
       await machineButton(frame);
       await fourRunTwoWait(session, { withAgent: true });
@@ -89,10 +92,9 @@ test('flow__jobs_running_and_queued', async () => {
 
 test('flow__jobs_change_settings', async () => {
   const logging = loggingWtpool('flow__jobs_change_settings');
-  await withFlow('flow__jobs_change_settings', { wtpoolPath: logging.file }, async (session) => {
+  await withFlow('flow__jobs_change_settings', { wtpoolPath: logging.file, beforeLaunch: (dirs) => writeMachineToml(dirs, { limit: 4, enforce: 'warn' }) }, async (session) => {
     try {
       // Given
-      writeMachineToml(session.dirs, { limit: 4, enforce: 'warn' });
       const frame = await openTab(session);
       await machineButton(frame);
       await fourRunTwoWait(session);
@@ -140,10 +142,9 @@ test('flow__jobs_change_settings', async () => {
 });
 
 test('flow__jobs_lower_limit', async () => {
-  await withFlow('flow__jobs_lower_limit', {}, async (session) => {
+  await withFlow('flow__jobs_lower_limit', { beforeLaunch: (dirs) => writeMachineToml(dirs, { limit: 4, enforce: 'warn' }) }, async (session) => {
     try {
       // Given
-      writeMachineToml(session.dirs, { limit: 4, enforce: 'warn' });
       const frame = await openTab(session);
       await machineButton(frame);
       await fourRunTwoWait(session);
@@ -181,11 +182,10 @@ test('flow__jobs_lower_limit', async () => {
 });
 
 test('flow__jobs_not_queued', async () => {
-  await withFlow('flow__jobs_not_queued', { scenario: 'building_without_agent', prepare: (poolInfo) => addRepoKeys(poolInfo, { heavy: ['make'] }) }, async (session) => {
+  await withFlow('flow__jobs_not_queued', { scenario: 'building_without_agent', prepare: (poolInfo) => addRepoKeys(poolInfo, { heavy: ['make'] }), beforeLaunch: (dirs) => writeMachineToml(dirs, { enforce: 'warn' }) }, async (session) => {
     let build;
     try {
       // Given
-      writeMachineToml(session.dirs, { enforce: 'warn' });
       const frame = await openTab(session);
       await machineButton(frame);
       const wt2 = worktreePath(session, 'wt2');
@@ -234,10 +234,9 @@ test('flow__jobs_not_queued', async () => {
 });
 
 test('flow__jobs_require_refuses', async () => {
-  await withFlow('flow__jobs_require_refuses', { prepare: (poolInfo) => addRepoKeys(poolInfo, { heavy: ['cargo test'] }) }, async (session) => {
+  await withFlow('flow__jobs_require_refuses', { prepare: (poolInfo) => addRepoKeys(poolInfo, { heavy: ['cargo test'] }), beforeLaunch: (dirs) => writeMachineToml(dirs, { limit: 1, enforce: 'require' }) }, async (session) => {
     try {
       // Given
-      writeMachineToml(session.dirs, { limit: 1, enforce: 'require' });
       heavyCommand(session.dirs, 'cargo');
       const frame = await openTab(session);
       const wt1 = worktreePath(session, 'wt1');

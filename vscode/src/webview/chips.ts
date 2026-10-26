@@ -41,7 +41,9 @@ export class Chips {
     this.element.hidden = true;
     this.element.addEventListener('focusin', (event) => void this.rove(this.indexOf(event.target)));
     this.element.addEventListener('click', (event) => {
-      const at = this.indexOf(event.target instanceof Element ? event.target.closest('button') : null);
+      const at = this.indexOf(
+        event.target instanceof Element ? event.target.closest('button') : null,
+      );
       if (at >= 0) this.act(at);
     });
     this.element.addEventListener('keydown', (event) => void this.keydown(event));
@@ -56,7 +58,10 @@ export class Chips {
     if (JSON.stringify(keys) === JSON.stringify(this.keys)) return;
     const before = this.buttons();
     const focused = before.findIndex((b) => b === document.activeElement);
-    const roving = Math.max(0, before.findIndex((b) => b.tabIndex === 0));
+    const roving = Math.max(
+      0,
+      before.findIndex((b) => b.tabIndex === 0),
+    );
     const stay = (at: number): number => {
       if (keys.includes(this.keys[at])) return keys.indexOf(this.keys[at]);
       return keys.length ? Math.min(at, keys.length - 1) : NONE_LEFT;

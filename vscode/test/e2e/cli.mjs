@@ -9,7 +9,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 
 import { scenarioDocuments } from '../support/docs.mjs';
 import { writeEarlierBuilds } from '../support/code.mjs';
-import { REPO, SCHEMA, runDir } from '../support/paths.mjs';
+import { PHASE, REPO, SCHEMA, runDir } from '../support/paths.mjs';
 import { startStub } from './agents.mjs';
 import { env, releaseWtpool } from './vscode.mjs';
 
@@ -106,11 +106,9 @@ export function secondsAgo(seconds) {
   return new Date(Date.now() - seconds * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
-const PHASE = Number(process.env.WTPOOL_VERIFY_PHASE ?? 1);
-
 /**
- * The schema of this run's phase, its objects open as the product's are. From phase 4 it is
- * `status.phase-4.schema.json`, with `machine.jobs` and `build.queued` added.
+ * The status schema of this run's PHASE, its objects open as the product's are. With PHASE 4 or
+ * more it is `status.phase-4.schema.json`, with `machine.jobs` and `build.queued` added.
  */
 export function oracleSchema() {
   const file = PHASE >= 4 ? path.join(path.dirname(SCHEMA), 'status.phase-4.schema.json') : SCHEMA;

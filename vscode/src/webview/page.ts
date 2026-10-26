@@ -8,19 +8,31 @@ import {
   type WebviewMessage,
 } from '../shared/protocol';
 import { DetailStrip } from './detail';
-import { cell, div, span } from './dom';
+import { cell, div, paragraph, textSpan } from './dom';
 import { Header } from './header';
 import { PoolHeading } from './heading';
 import { MachineStrip } from './machine_strip';
+import { KeyedCache, placeInOrder } from './order';
 import { RowView } from './row';
 import { rowOrder, waitAnnouncement } from './text';
 
-const COLUMNS = ['Activity', 'Worktree', 'Branch', 'Git', 'Agent · doing', 'Last'];
+/** The columns of the table: the header text and the key of the `col-` class. */
+const COLUMNS = [
+  { label: 'Activity', key: 'activity' },
+  { label: 'Worktree', key: 'worktree' },
+  { label: 'Branch', key: 'branch' },
+  { label: 'Git', key: 'git' },
+  { label: 'Agent · doing', key: 'agent' },
+  { label: 'Last', key: 'last' },
+  { label: '', key: 'actions' },
+] as const;
 const NO_FOLDER = 'Open a folder inside a git repository to see its worktrees.';
 const AGENTS_OFF =
-  'No agents shown: agent activity is off for this pool. To turn it on, run wtpool setup in the pool, ' +
+  'No agents shown: agent activity is off for this pool. ' +
+  'To turn it on, run wtpool setup in the pool, ' +
   'then add the hooks: in Claude Code, run /plugin marketplace add haiyuechen-nearone/wtpool and ' +
-  '/plugin install wtpool@wtpool, or add the block that wtpool hook install prints to your Claude Code settings.';
+  '/plugin install wtpool@wtpool, ' +
+  'or add the block that wtpool hook install prints to your Claude Code settings.';
 /** The longest selected row id a saved state may hold. Anything longer is not a path. */
 const MAX_ID = 4096;
 
@@ -39,8 +51,7 @@ function savedSelection(state: unknown): string | null {
 }
 
 function hiddenNote(className: string, text: string): HTMLParagraphElement {
-  const note = document.createElement('p');
-  note.className = className;
+  const note = paragraph(className);
   note.textContent = text;
   note.hidden = true;
   return note;
@@ -54,14 +65,14 @@ export class Page {
   private readonly scroller = div('scroller');
   private readonly tbody = document.createElement('tbody');
   /** The pool's heading row, hidden until the first document. */
-  private readonly heading = new PoolHeading(COLUMNS.length + 1, () => void this.toggleMachine());
+  private readonly heading = new PoolHeading(COLUMNS.length, () => void this.toggleMachine());
   /** The machine strip under the heading, in the table only while it is open. */
   private readonly machine: MachineStrip;
   private readonly detail = document.createElement('tr');
   private readonly detailCell = cell('detail-cell');
   private readonly strip = new DetailStrip();
   private readonly announcer = div('visually-hidden');
-  private readonly rows = new Map<string, RowView>();
+  private readonly rows = new KeyedCache<RowView>();
   /** The rows in their shown order. */
   private order: RowView[] = [];
   private view: ViewMessage | null = null;
@@ -75,12 +86,12 @@ export class Page {
   constructor(private readonly host: Host) {
     this.selected = savedSelection(host.getState());
     this.detail.className = 'detail';
-    this.detailCell.colSpan = COLUMNS.length + 1;
+    this.detailCell.colSpan = COLUMNS.length;
     this.detailCell.append(this.strip.element);
     this.detail.append(this.detailCell);
     this.announcer.setAttribute('role', 'status');
     this.announcer.setAttribute('aria-live', 'polite');
-    this.machine = new MachineStrip(COLUMNS.length + 1, {
+    this.machine = new MachineStrip(COLUMNS.length, {
       send: (message) => void host.postMessage(message),
       announce: (text) => {
         this.announcer.textContent = text;
@@ -90,7 +101,13 @@ export class Page {
         this.heading.button.focus();
       },
     });
-    document.body.append(this.header.element, this.noFolder, this.agentsOff, this.table(), this.announcer);
+    document.body.append(
+      this.header.element,
+      this.noFolder,
+      this.agentsOff,
+      this.table(),
+      this.announcer,
+    );
   }
 
   /** Makes the table with its columns, header row and the pool's heading row, in its scroller. */
@@ -99,20 +116,16 @@ export class Page {
     table.className = 'grid';
     const colgroup = document.createElement('colgroup');
     const head = document.createElement('tr');
-    for (const name of [...COLUMNS.map((column) => column.toLowerCase().split(' ')[0]), 'actions']) {
+    for (const { label, key } of COLUMNS) {
       const col = document.createElement('col');
-      col.className = `col-${name}`;
+      col.className = `col-${key}`;
       colgroup.append(col);
-    }
-    for (const label of [...COLUMNS, '']) {
       const th = document.createElement('th');
       th.setAttribute('scope', 'col');
       th.textContent = label;
       head.append(th);
     }
-    const actionsLabel = span('visually-hidden');
-    actionsLabel.textContent = 'Actions';
-    head.lastElementChild?.append(actionsLabel);
+    head.lastElementChild?.append(textSpan('visually-hidden', 'Actions'));
     const thead = document.createElement('thead');
     thead.append(head);
     this.heading.element.hidden = true;
@@ -150,7 +163,10 @@ export class Page {
     const jobs = jobsOf(status);
     this.heading.update(pool, status.machine.name, jobs);
     this.heading.element.hidden = false;
-    this.machine.show({ name: status.machine.name, jobs, worktrees: pool.worktrees, remote }, nowMs);
+    this.machine.show(
+      { name: status.machine.name, jobs, worktrees: pool.worktrees, remote },
+      nowMs,
+    );
     this.agentsOff.hidden = pool.agents !== 'off';
     this.header.count(pool);
     this.renderRows(rowOrder(pool.worktrees), flagsUnqueued(jobs), nowMs);
@@ -185,31 +201,24 @@ export class Page {
    * focus survives.
    */
   private renderRows(ordered: Worktree[], flagUnqueued: boolean, nowMs: number): void {
-    const ids = new Set(ordered.map((w) => w.path));
-    for (const [id, row] of this.rows) {
-      if (!ids.has(id)) {
-        row.element.remove();
-        this.rows.delete(id);
-      }
-    }
-    let previous: Element = this.machine.element.isConnected ? this.machine.element : this.heading.element;
-    this.order = [];
-    for (const worktree of ordered) {
-      let row = this.rows.get(worktree.path);
+    this.rows.retain(new Set(ordered.map((w) => w.path)), (row) => void row.element.remove());
+    this.order = ordered.map((worktree) => {
+      const row = this.rows.get(worktree.path);
       if (row) {
         row.update(worktree, nowMs, flagUnqueued);
-      } else {
-        row = new RowView(worktree, nowMs, flagUnqueued);
-        this.rows.set(worktree.path, row);
+        return row;
       }
-      this.order.push(row);
-      if (previous.nextElementSibling !== row.element) previous.after(row.element);
-      previous = row.element;
-      if (worktree.path === this.selected) {
-        if (previous.nextElementSibling !== this.detail) previous.after(this.detail);
-        previous = this.detail;
-      }
-    }
+      const made = new RowView(worktree, nowMs, flagUnqueued);
+      this.rows.set(worktree.path, made);
+      return made;
+    });
+    const anchor = this.machine.element.isConnected ? this.machine.element : this.heading.element;
+    placeInOrder(
+      anchor,
+      this.order.flatMap((row) =>
+        row.id === this.selected ? [row.element, this.detail] : [row.element],
+      ),
+    );
     this.select(this.selected !== null && this.rows.has(this.selected) ? this.selected : null);
   }
 
@@ -225,7 +234,9 @@ export class Page {
   private select(id: string | null): void {
     for (const row of this.rows.values()) {
       const value = String(row.id === id);
-      if (row.element.getAttribute('aria-selected') !== value) row.element.setAttribute('aria-selected', value);
+      if (row.element.getAttribute('aria-selected') !== value) {
+        row.element.setAttribute('aria-selected', value);
+      }
     }
     const row = id === null ? undefined : this.rows.get(id);
     if (row) {
@@ -283,11 +294,15 @@ export class Page {
     const follow = target.closest('button[data-follow]');
     if (follow) {
       const output = follow.getAttribute('data-follow');
-      if (event.type === 'click' && output !== null) this.host.postMessage({ type: 'follow', id: output });
+      if (event.type === 'click' && output !== null) {
+        this.host.postMessage({ type: 'follow', id: output });
+      }
       return;
     }
     const key = event instanceof KeyboardEvent ? event.key : undefined;
-    if (key !== undefined && !(target.matches('tr[data-row-id]') && ['Enter', ' '].includes(key))) return;
+    if (key !== undefined && !(target.matches('tr[data-row-id]') && ['Enter', ' '].includes(key))) {
+      return;
+    }
     if (key !== undefined) event.preventDefault();
     const button = target.closest('button[data-action]');
     const row = target.closest('tr[data-row-id]');
@@ -307,8 +322,12 @@ export class Page {
    */
   private reveal(target: Element): void {
     if (!target.matches(':focus-visible')) return;
-    if (target.matches('tr[data-row-id]')) target.scrollIntoView({ block: 'nearest', inline: 'start' });
-    if (target.matches('button[data-action]')) target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (target.matches('tr[data-row-id]')) {
+      target.scrollIntoView({ block: 'nearest', inline: 'start' });
+    }
+    if (target.matches('button[data-action]')) {
+      target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
   }
 
   private focusFirstWaiting(): void {

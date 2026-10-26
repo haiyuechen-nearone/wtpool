@@ -7,9 +7,14 @@ const FEATURE_NAMES = ['labels', 'outputs', 'background'];
 
 /** Detects the later features of this checkout that the story can show. */
 export function detectFeatures() {
-  const spec = readFileSync(path.join(REPO, 'docs', 'design', 'status-panel', 'status-panel.md'), 'utf8');
+  const spec = readFileSync(
+    path.join(REPO, 'docs', 'design', 'status-panel', 'status-panel.md'),
+    'utf8',
+  );
   const specRow = (id) => spec.split('\n').find((line) => line.startsWith(`| ${id} |`)) ?? '';
-  const schema = JSON.parse(readFileSync(path.join(VSCODE, 'src', 'generated', 'status.schema.json'), 'utf8'));
+  const schema = JSON.parse(
+    readFileSync(path.join(VSCODE, 'src', 'generated', 'status.schema.json'), 'utf8'),
+  );
   return {
     labels: /the session's title/.test(specRow('H16')),
     outputs: Boolean(schema.$defs?.actor?.properties?.outputs),
@@ -28,7 +33,9 @@ export function parseFeatures(value, detected) {
   const named = value === 'none' ? [] : value.split(',').filter(Boolean);
   const unknown = named.filter((name) => !FEATURE_NAMES.includes(name));
   if (unknown.length > 0) {
-    throw new Error(`demo: unknown feature ${unknown.join(', ')}; known: ${FEATURE_NAMES.join(', ')}, all, none`);
+    throw new Error(
+      `demo: unknown feature ${unknown.join(', ')}; known: ${FEATURE_NAMES.join(', ')}, all, none`,
+    );
   }
   return Object.fromEntries(FEATURE_NAMES.map((name) => [name, named.includes(name)]));
 }

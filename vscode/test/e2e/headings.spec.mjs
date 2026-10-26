@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
 import { buttonText } from '../support/jobs.mjs';
-import { PHASE, writeMachineToml } from './jobs.mjs';
+import { PHASE } from '../support/paths.mjs';
+import { writeMachineToml } from './jobs-config.mjs';
 import { panelFrame, close, git, launch, pool, runCommand, sandbox, statusJson } from './vscode.mjs';
 
 const GITHUB = 'https://github.com/acme/app.git';
@@ -38,8 +39,9 @@ test.afterEach(() => {
 });
 
 test('heading__should_name_the_repository_then_the_machine e2e', async () => {
-  // Given: the pool's origin on GitHub. isolation__left_no_trace fails on a remote outside the
-  // run folder, so the local one comes back after.
+  // Given
+  // isolation__left_no_trace fails on a remote outside the run folder, so the local one comes
+  // back after.
   const poolInfo = pool('idle_pool', 'headings');
   const local = git(poolInfo.fg, ['remote', 'get-url', 'origin']).trim();
   restore.push(() => git(poolInfo.fg, ['remote', 'set-url', 'origin', local]));
@@ -53,7 +55,7 @@ test('heading__should_name_the_repository_then_the_machine e2e', async () => {
   let onGithub;
   let onLocal;
   try {
-    // When: the tab on the GitHub remote, then, closed and opened again, on the local one.
+    // When
     await runCommand(session.window, 'Worktrees: Open Status');
     const first = await panelFrame(session.window);
     assert.ok(first, 'the Worktrees tab shows no rows');

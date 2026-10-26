@@ -11,7 +11,7 @@ use super::heavy_table::HeavyTable;
 use super::machine::MachineJobs;
 use super::record::JobRecord;
 use crate::clock::Timestamp;
-use crate::heavy::{HeavyList, RepositoryPatterns, Suggestion};
+use crate::heavy::{HeavyList, RepositoryPatterns, Suggestion, SuggestionJson, Suggestions};
 use crate::processes::{ListProcesses, ProcessQuery};
 
 /// What `wtpool job ls` shows. The job folder is only read, and a dead job's record skipped.
@@ -56,17 +56,12 @@ impl JobListing {
     ) -> Self {
         let jobs = MachineJobs::read(paths.clone(), cores);
         let config = jobs.config().clone();
-        let heavy = HeavyList::new(
-            &config.heavy,
-            &repository.heavy,
-            &repository.build_processes,
-        );
+        let heavy = HeavyList::of(&config, repository);
         let records = jobs.records();
         let outside = outside_jobs(&heavy, &records, processes, now);
         let (running, waiting) = jobs.queue();
-        let suggested = suggested
-            .into_iter()
-            .filter(|suggestion| !heavy.contains(&suggestion.pattern))
+        let suggested = Suggestions::lacking_in(&suggested, &heavy)
+            .cloned()
             .collect();
         Self {
             config,
@@ -121,14 +116,7 @@ impl JobListing {
                     source: listed.source.as_str(),
                 })
                 .collect(),
-            suggested: self
-                .suggested
-                .iter()
-                .map(|suggestion| SuggestionJson {
-                    pattern: suggestion.pattern.as_str(),
-                    from: &suggestion.from,
-                })
-                .collect(),
+            suggested: self.suggested.iter().map(SuggestionJson::from).collect(),
             running: entries(&self.running),
             waiting: entries(&self.waiting),
             outside: entries(&self.outside),
@@ -165,12 +153,6 @@ struct SourceJson {
 struct HeavyJson<'a> {
     pattern: &'a str,
     source: &'static str,
-}
-
-#[derive(Serialize)]
-struct SuggestionJson<'a> {
-    pattern: &'a str,
-    from: &'a str,
 }
 
 #[derive(Serialize)]

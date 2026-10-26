@@ -12,7 +12,7 @@ const CHIPS = ['free', 'working', 'waiting'] as const;
 type ChipWord = (typeof CHIPS)[number];
 
 /** Gives the header's words for the connection of `view` at `nowMs`. */
-export function connectionText(view: ViewMessage, nowMs: number): string {
+function connectionText(view: ViewMessage, nowMs: number): string {
   const since = Math.max(0, Math.floor((nowMs - Date.parse(view.last_line)) / 1000));
   const retry = Math.max(0, Math.ceil((Date.parse(view.retry_at ?? '') - nowMs) / 1000) || 0);
   const text: Readonly<Record<ViewMessage['connection'], string>> = {
@@ -25,8 +25,9 @@ export function connectionText(view: ViewMessage, nowMs: number): string {
 }
 
 /** Counts the worktrees of `pool` that each chip counts. */
-export function chipCounts(pool: Pool): Readonly<Record<ChipWord, number>> {
-  const count = (word: ChipWord): number => pool.worktrees.filter((w) => w.activity === word).length;
+function chipCounts(pool: Pool): Readonly<Record<ChipWord, number>> {
+  const count = (word: ChipWord): number =>
+    pool.worktrees.filter((w) => w.activity === word).length;
   return { free: count('free'), working: count('working'), waiting: count('waiting') };
 }
 
@@ -66,7 +67,10 @@ export class Header {
   show(view: ViewMessage): void {
     const noFolder = view.no_folder === true;
     this.connection.hidden = noFolder;
-    const error = view.connection === 'paused' && typeof view.error === 'string' && !noFolder ? visible(view.error) : '';
+    const error =
+      view.connection === 'paused' && typeof view.error === 'string' && !noFolder
+        ? visible(view.error)
+        : '';
     setText(this.errorText, error);
     this.error.hidden = error === '';
   }

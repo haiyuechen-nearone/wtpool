@@ -109,7 +109,8 @@ const LIVE_ONLY: [&str; 2] = [SANDBOX_CHECK, NO_OUTPUT_CHECK];
 const SANDBOX_CHECK: &str = "contract__should_run_in_the_sandbox";
 const NO_OUTPUT_CHECK: &str = "cc_no_hook_output";
 
-/// The start of the message of every cc result counted by replay alone.
+/// The start of the message of every cc result counted by replay alone, and the start of the
+/// report's contract line.
 pub const REPLAY_ONLY: &str = "replay only";
 
 /// A session's check by its replay `cc_replay:<check>` alone: `passed` gives its message when the
@@ -191,7 +192,7 @@ pub(super) fn by_replay(
             }),
         };
         result.message = format!("{note}: {}", result.message);
-        found.push(result);
+        found.push(result.replay_only());
     }
     found
 }

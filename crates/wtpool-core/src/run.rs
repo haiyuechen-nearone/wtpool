@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 use crate::error::{Error, GitError};
@@ -51,7 +52,7 @@ impl Ran {
 ///
 /// [`GitError::Spawn`] when the command cannot start.
 pub fn run(command: &mut Command) -> Result<Ran, Error> {
-    let program = command.get_program().to_string_lossy().into_owned();
+    let program = program_name(command);
     let output = command
         .stdin(Stdio::null())
         .output()
@@ -66,6 +67,19 @@ pub fn run(command: &mut Command) -> Result<Ran, Error> {
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
     })
+}
+
+/// The bare name of the program `command` starts, as the user knows it: the file name of a
+/// program found on `PATH`, less the platform's executable suffix.
+fn program_name(command: &Command) -> String {
+    let program = command.get_program();
+    let file = Path::new(program)
+        .file_name()
+        .unwrap_or(program)
+        .to_string_lossy();
+    file.strip_suffix(std::env::consts::EXE_SUFFIX)
+        .unwrap_or(&file)
+        .to_owned()
 }
 
 /// `line` run by the [system shell](platform::shell::command), without the variables that would
@@ -83,6 +97,21 @@ mod tests {
     use std::ffi::OsStr;
 
     use super::*;
+
+    #[test]
+    fn run__should_name_a_program_started_by_its_path_by_its_bare_name() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir
+            .path()
+            .join(format!("git{}", std::env::consts::EXE_SUFFIX));
+
+        // When
+        let error = run(&mut Command::new(&file)).unwrap_err();
+
+        // Then
+        assert_eq!(error.to_string(), "could not run git");
+    }
 
     #[test]
     fn shell__should_clear_the_variables_that_name_a_repository() {

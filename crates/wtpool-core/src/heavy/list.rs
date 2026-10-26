@@ -4,7 +4,8 @@ use std::fmt;
 
 use serde::Serialize;
 
-use super::{CommandWords, Pattern};
+use super::{CommandWords, Pattern, RepositoryPatterns};
+use crate::jobs::MachineConfig;
 
 /// The list a heavy pattern comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -23,14 +24,6 @@ pub enum PatternSource {
 pub struct HeavyPattern {
     pub pattern: Pattern,
     pub source: PatternSource,
-}
-
-/// A pattern suggested for a repository, and the source it came from, such as the marker file
-/// `Cargo.toml`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Suggestion {
-    pub pattern: Pattern,
-    pub from: String,
 }
 
 /// The heavy patterns in effect, the machine's first. Nothing is heavy that no list names.
@@ -79,6 +72,16 @@ impl HeavyList {
         Self(list)
     }
 
+    /// The list of `machine` and `repository`.
+    #[must_use]
+    pub fn of(machine: &MachineConfig, repository: &RepositoryPatterns) -> Self {
+        Self::new(
+            &machine.heavy,
+            &repository.heavy,
+            &repository.build_processes,
+        )
+    }
+
     #[must_use]
     pub fn patterns(&self) -> &[HeavyPattern] {
         &self.0
@@ -89,8 +92,8 @@ impl HeavyList {
         self.0.iter().any(|listed| listed.pattern == *pattern)
     }
 
-    /// The name of `command` by the pattern of the most words that matches it, the first such
-    /// one of the list; `None` when no pattern matches.
+    /// The name of `command` by the matching pattern of the most words, the first of equals,
+    /// and `None` when none matches.
     #[must_use]
     pub fn name_of(&self, command: &CommandWords) -> Option<String> {
         self.0

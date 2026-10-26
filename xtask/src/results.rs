@@ -42,6 +42,9 @@ pub struct CheckResult {
     /// when it was flaky in [`IN_A_ROW`](crate::flaky::IN_A_ROW) runs in a row.
     #[serde(default)]
     pub flaky: bool,
+    /// A cc check counted by this run's replays alone, as no live session ran.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub replay_only: bool,
 }
 
 impl CheckResult {
@@ -76,6 +79,12 @@ impl CheckResult {
     }
 
     #[must_use]
+    pub fn replay_only(mut self) -> Self {
+        self.replay_only = true;
+        self
+    }
+
+    #[must_use]
     pub fn with_seconds(mut self, seconds: f64) -> Self {
         self.seconds = seconds;
         self
@@ -97,6 +106,7 @@ impl CheckResult {
             message: message.into(),
             seconds: 0.0,
             flaky: false,
+            replay_only: false,
         }
     }
 }

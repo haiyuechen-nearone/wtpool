@@ -1,16 +1,9 @@
 #!/usr/bin/env node
 // The Claude Code hook of the cc layer: it records each payload and its own parent process, prints
 // nothing and exits 0.
-import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 
-function parentName(pid) {
-  try {
-    return execFileSync('ps', ['-o', 'comm=', '-p', String(pid)], { encoding: 'utf8' }).trim();
-  } catch {
-    return '';
-  }
-}
+import { commandName } from '../support/processes.mjs';
 
 try {
   const text = readFileSync(0, 'utf8');
@@ -23,7 +16,7 @@ try {
       event: payload.hook_event_name,
       session_id: payload.session_id,
       ppid: process.ppid,
-      parent: parentName(process.ppid),
+      parent: commandName(process.ppid),
       at: Date.now(),
     };
     appendFileSync(process.env.WTPOOL_VERIFY_CC_PARENTS, `${JSON.stringify(line)}\n`);

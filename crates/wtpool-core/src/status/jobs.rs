@@ -116,10 +116,7 @@ impl JobsState {
         if !self.repository.is_empty() {
             return HeavyList::default();
         }
-        let patterns: Vec<Pattern> = self
-            .suggested
-            .iter()
-            .filter(|suggestion| !heavy.contains(&suggestion.pattern))
+        let patterns: Vec<Pattern> = Suggestions::lacking_in(&self.suggested, heavy)
             .map(|suggestion| suggestion.pattern.clone())
             .collect();
         HeavyList::new(&patterns, &[], &[])
@@ -305,10 +302,7 @@ pub fn jobs_document(state: &JobsState, facts: &JobsFacts<'_>) -> Option<Jobs> {
                 source: listed.source,
             })
             .collect(),
-        suggested: state
-            .suggested
-            .iter()
-            .filter(|suggestion| !facts.heavy.contains(&suggestion.pattern))
+        suggested: Suggestions::lacking_in(&state.suggested, facts.heavy)
             .map(|suggestion| SuggestionEntry {
                 pattern: suggestion.pattern.as_str().to_owned(),
                 from: suggestion.from.clone(),

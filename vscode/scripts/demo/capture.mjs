@@ -18,7 +18,8 @@ export async function installPointer(window, start) {
       'position:absolute;left:-18px;top:-18px;width:36px;height:36px;border-radius:50%;' +
       'border:3px solid gold;box-sizing:border-box;opacity:0';
     const rim = document.createElement('div');
-    rim.style.cssText = 'position:absolute;left:0;top:0;filter:drop-shadow(0 0 1px black) drop-shadow(0 1px 1.5px black)';
+    rim.style.cssText =
+      'position:absolute;left:0;top:0;filter:drop-shadow(0 0 1px black) drop-shadow(0 1px 1.5px black)';
     const arrow = document.createElement('div');
     arrow.style.cssText =
       'width:15px;height:23px;background:white;' +

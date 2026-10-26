@@ -35,7 +35,12 @@ export class JobList {
 
   show(title: string, jobs: Job[], worktrees: Worktree[], nowMs: number): void {
     setText(this.heading, title);
-    const lines = jobs.map((job) => ({ id: job.id, name: visible(job.label ?? job.summary), place: place(job, worktrees), since: job.since }));
+    const lines = jobs.map((job) => ({
+      id: job.id,
+      name: visible(job.label ?? job.summary),
+      place: place(job, worktrees),
+      since: job.since,
+    }));
     const key = JSON.stringify(lines);
     if (key !== this.key) {
       this.key = key;
@@ -44,10 +49,16 @@ export class JobList {
         ...lines.map((line, index) => {
           const item = document.createElement('li');
           item.setAttribute('data-job-id', line.id);
-          const cells: HTMLElement[] = [bdi(line.name, 'job-summary'), bdi(line.place, 'job-where'), span('job-age')];
+          const cells: HTMLElement[] = [
+            bdi(line.name, 'job-summary'),
+            bdi(line.place, 'job-where'),
+            span('job-age'),
+          ];
           if (this.numbered) cells.unshift(textSpan('job-position', String(index + 1)));
           // Spaces between the cells keep the line's words apart when it is read as text.
-          item.append(...cells.flatMap((cell, at) => (at ? [document.createTextNode(' '), cell] : [cell])));
+          item.append(
+            ...cells.flatMap((cell, at) => (at ? [document.createTextNode(' '), cell] : [cell])),
+          );
           this.ages.push([cells[cells.length - 1], line.since]);
           return item;
         }),

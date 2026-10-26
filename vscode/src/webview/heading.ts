@@ -26,7 +26,8 @@ function counts(jobs: Jobs | undefined): Count[] {
   const shown: Count[] = [{ text: `jobs ${jobs.running.length}/${jobs.limit}` }];
   const outside = jobs.enforce === 'off' ? 0 : jobs.outside.length;
   const suggested = shownSuggestions(jobs);
-  if (jobs.waiting.length) shown.push({ text: `${jobs.waiting.length} queued`, className: 'jobs-attention' });
+  if (jobs.waiting.length)
+    shown.push({ text: `${jobs.waiting.length} queued`, className: 'jobs-attention' });
   if (outside) shown.push({ text: `${outside} not queued`, className: 'jobs-attention' });
   if (suggested) shown.push({ text: `${suggested} suggested`, className: 'jobs-muted' });
   return shown;

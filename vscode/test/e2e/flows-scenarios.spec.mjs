@@ -1,4 +1,4 @@
-// Every phase 1 scenario that runs in e2e, each a case of its own,
+// Every scenario with `phase` 1 that runs in e2e, each a case of its own,
 // `flow__every_activity_shows <scenario>`, in its own VS Code on its own pool. A pool is VS Code's
 // environment, WTPOOL_FOREGROUND and WTPOOL_SLOT_DIR, so one session cannot show two. Each case
 // also writes its scenario check's e2e result to <run>/e2e/scenarios/<scenario>.json for
@@ -10,14 +10,11 @@ import { test } from '@playwright/test';
 
 import { scenarioDocuments } from '../support/docs.mjs';
 import { WORDS, rowOrder } from '../support/grammar.mjs';
-import { SCENARIOS, runDir } from '../support/paths.mjs';
+import { PHASE, SCENARIOS, runDir } from '../support/paths.mjs';
 import { expectedLast, expectedRows, lastMatches, resolved, shownRows, waitForRows } from './rows.mjs';
 import { flowSession } from './flows.mjs';
-import { unflaggedCargo } from './jobs.mjs';
+import { unflaggedCargo } from './jobs-config.mjs';
 import { close, git, panelFrame, runCommand, startProcess, statusJson } from './vscode.mjs';
-
-/** The phase the harness runs (WTPOOL_VERIFY_PHASE), 1 by default. */
-const PHASE = Number(process.env.WTPOOL_VERIFY_PHASE ?? 1);
 
 /**
  * Each row's activity icon: the ::before of the activity cell or an element in it, or an inline
@@ -143,8 +140,8 @@ function result(name, error) {
 }
 
 /**
- * The phase 1 scenarios that run in e2e. scenarios-agents.spec.mjs runs the later ones, with their
- * hook steps.
+ * The scenarios with `phase` 1 that run in e2e. scenarios-agents.spec.mjs runs the later ones, with
+ * their hook steps.
  */
 const NAMES = readdirSync(SCENARIOS)
   .filter((file) => file.endsWith('.json'))

@@ -101,7 +101,7 @@ pub fn refusal(call: &ShellCall, env: &PolicyEnv) -> Option<String> {
         return None;
     }
     let patterns = &repository.patterns;
-    let heavy = HeavyList::new(&config.heavy, &patterns.heavy, &patterns.build_processes);
+    let heavy = HeavyList::of(&config, patterns);
     if heavy.patterns().is_empty() {
         return None;
     }

@@ -236,3 +236,13 @@ accept hx-jobs 0b34c3b5e9aab1da809a57a770949ceb5f38a0dbf06987fe4ac4e3543ea6c55e
 accept rs-settings f4cb05210a05de5349f80d0975b2731cfdc30f874be8d4721e3b9f81da26b88a
 # Rust harness tidy: int support split into files, watch and status modules, one tree snapshot, one sandbox command builder, one phase reader that refuses an unparsable value, and the placement and settings note checks in their own files; no check judges differently.
 accept hx-support fe0a898cb1e3de653c7acc2dec2139e59efbb6ad6bb12433adec47a65f6de684
+# machine.toml has one writer, jobs.mjs is split into config, process and DOM helpers, PHASE and the pattern text have one home, and the ten job flows write machine.toml before VS Code starts.
+accept js-machine-config 2d0453218bbee0c3da933baf7f036f49963944439935061b9a83a724640fb5de
+# flow__theme_switch waits 40 seconds for the webview body class after a colour theme change instead of 15, and writes the theme setting again every 10 seconds while it has not changed.
+accept flake-fixes-5 2489505b09243d25c9ee1051fed5911e199d17b3a528eada2cc35d2b074a1d41
+# JS sandbox environments start from one sandboxEnv(), so the host layer's VS Code gets its XDG folders inside the sandbox and no unread machine.toml; the process table, descendants and sleep exist once in support/processes.mjs.
+accept js-launch 31a5358c90ad86895bdc5f8e9655b9e1da9d6dba6e8b46ad4284b623ecb84227
+# The report writer is split into gather, judge and write steps, and a replay-counted cc result carries a typed flag instead of a message prefix.
+accept hx-report 769d03942f66064b7e224ed1834aa038ad5f50adef23efdf07cad1578dc31ec0
+# Prettier is a dev dependency with a format script and a format check in npm run lint; the curly rule is off because Prettier moves long if bodies; two header comments are dropped.
+accept ts-prettier 2bca526e2ea7c3d1f46c1d38232dd6d3929f334ecd9e1beffa69886c113e7359

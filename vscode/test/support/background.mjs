@@ -9,10 +9,10 @@
 // An app that is never active still orders a window it shows in front of every other app's
 // windows. `keepAtBack`, for the demo recording, keeps each window at the back of the window
 // order, where it still paints. Without it each window is transparent and lets the mouse through.
-import { execFileSync } from 'node:child_process';
 import net from 'node:net';
 
 import { mainHooks } from './main-hooks.mjs';
+import { psTable } from './processes.mjs';
 
 /** The time VS Code may take to open its inspector and stop at its first line. */
 const LIMIT_MS = 60_000;
@@ -90,12 +90,10 @@ async function session(url) {
 
 /** Kills the VS Code that `flag` started, so one that cannot be kept behind never opens a window. */
 function kill(flag) {
-  const listing = execFileSync('ps', ['-axo', 'pid=,args='], { encoding: 'utf8' });
-  for (const line of listing.split('\n')) {
-    const match = line.trim().match(/^(\d+)\s+(.*)$/);
-    if (!match || !match[2].split(' ').includes(flag)) continue;
+  for (const { pid, args } of psTable()) {
+    if (!args.split(' ').includes(flag)) continue;
     try {
-      process.kill(Number(match[1]), 'SIGKILL');
+      process.kill(pid, 'SIGKILL');
     } catch {
       // Already gone.
     }

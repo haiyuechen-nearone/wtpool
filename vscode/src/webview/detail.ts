@@ -2,7 +2,8 @@ import type { Actor, Worktree } from '../generated/status';
 import { visible } from '../shared/invisible';
 import type { Tail } from '../shared/protocol';
 import { bdi, div, line, pieceNodes, setText, span } from './dom';
-import { OutputArea } from './tasks';
+import { KeyedCache, placeInOrder } from './order';
+import { OutputArea } from './output_area';
 import { DOT, actorFacts, gitFacts, shownActors, stateText } from './text';
 
 /** Shows one fact of the grid: a label and a value, isolated when it comes from the document. */
@@ -40,7 +41,11 @@ class ActorLines {
     const key = JSON.stringify([actor.label, state, facts]);
     if (key === this.key) return;
     this.key = key;
-    this.first.replaceChildren(bdi(visible(actor.label), 'actor-label'), document.createTextNode(DOT), ...pieceNodes(state));
+    this.first.replaceChildren(
+      bdi(visible(actor.label), 'actor-label'),
+      document.createTextNode(DOT),
+      ...pieceNodes(state),
+    );
     this.facts.replaceChildren(...pieceNodes(facts));
   }
 }
@@ -56,8 +61,8 @@ export class DetailStrip {
   private readonly git = new Fact(false);
   private readonly free = new Fact(false);
   private readonly agents = div('agents');
-  private readonly noAgent = line([{ text: 'no agent' }], 'actor-state');
-  private readonly actors = new Map<string, ActorLines>();
+  private readonly noAgent = line([{ kind: 'own', text: 'no agent' }], 'actor-state').element;
+  private readonly actors = new KeyedCache<ActorLines>();
   private readonly outputs = new OutputArea();
   /** The row the strip shows. A strip moved to another row forgets its tails. */
   private row: string | null = null;
@@ -73,7 +78,7 @@ export class DetailStrip {
     this.element.append(facts, this.agents, this.outputs.element);
   }
 
-  /** Shows the facts of `worktree` at `nowMs`, changing only the parts that differ from the strip's. */
+  /** Shows the facts of `worktree` at `nowMs`, changing only the parts that differ. */
   update(worktree: Worktree, nowMs: number): void {
     if (worktree.path !== this.row) {
       this.row = worktree.path;
@@ -103,23 +108,16 @@ export class DetailStrip {
   /** Shows the lines of `actors`, kept by key and moved into their order, then their outputs. */
   private updateActors(actors: Actor[], nowMs: number): void {
     this.noAgent.hidden = actors.length > 0;
-    const keys = new Set(actors.map((actor) => actor.key));
-    for (const [key, lines] of this.actors) {
-      if (keys.has(key)) continue;
-      lines.element.remove();
-      this.actors.delete(key);
-    }
-    let previous: Element = this.noAgent;
-    for (const actor of actors) {
-      let lines = this.actors.get(actor.key);
-      if (!lines) {
-        lines = new ActorLines();
-        this.actors.set(actor.key, lines);
-      }
+    this.actors.retain(
+      new Set(actors.map((actor) => actor.key)),
+      (lines) => void lines.element.remove(),
+    );
+    const shown = actors.map((actor) => {
+      const lines = this.actors.obtain(actor.key, () => new ActorLines());
       lines.update(actor);
-      if (previous.nextElementSibling !== lines.element) previous.after(lines.element);
-      previous = lines.element;
-    }
+      return lines.element;
+    });
+    placeInOrder(this.noAgent, shown);
     this.outputs.update(actors, nowMs);
   }
 }

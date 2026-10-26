@@ -1,5 +1,4 @@
-// ESLint for the extension (verification.md, "Layers", static). An oracle file: the builder
-// never changes it. It applies the recommended rules and every group of the oracle's rules in
+// It applies the recommended rules and every group of the oracle's rules in
 // vscode/test/lint/rules.mjs. Generated files (`*.generated.*` or a `generated/` folder) are
 // left to the named lint checks, which lint every source file.
 //
@@ -30,7 +29,8 @@ const googleSyntax = [
   },
   { selector: 'PrivateIdentifier', message: `${GOOGLE}: the private modifier, not a #private field` },
   { selector: 'TSEnumDeclaration[const=true]', message: `${GOOGLE}: an enum, not a const enum` },
-  // curly is multi-line for the guide's one-line `if`; a loop body still takes a block.
+  // curly is off: Prettier puts a long `if` body on its own line, which `multi-line` rejects. A loop
+  // body still takes a block.
   {
     selector:
       ':matches(ForStatement, ForInStatement, ForOfStatement, WhileStatement, DoWhileStatement)[body.type!="BlockStatement"]',
@@ -65,8 +65,9 @@ export default defineConfig(
       '@typescript-eslint/ban-ts-comment': ['error', { 'ts-expect-error': true, 'ts-ignore': true, 'ts-nocheck': true }],
       // A rule set twice keeps only its last options, so the guide's entries join the oracle's.
       'no-restricted-syntax': [...lintRules['no-restricted-syntax'], ...googleSyntax],
-      // The guide lets an `if` that fits on one line elide its block.
-      curly: ['error', 'multi-line'],
+      // The guide lets an `if` elide its block, and Prettier moves a long body to its own line,
+      // which `multi-line` rejects.
+      curly: 'off',
       eqeqeq: ['error', 'always', { null: 'ignore' }],
       'no-duplicate-imports': ['error', { allowSeparateTypeImports: true }],
       'prefer-const': 'error',

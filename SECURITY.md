@@ -65,6 +65,12 @@ entry, which resolve against the folder the hook starts in, so a repository coul
 Windows, a program started by name may be found in the working folder before the `PATH`, so use
 the block there.
 
+wtpool itself runs `git`, `gh` and the shell (`sh`, or `cmd` on Windows) only from absolute
+`PATH` entries: it looks each up once, skipping relative and empty entries, and starts the file it
+found. So a repository that the extension or a hook runs wtpool in cannot supply any of them.
+`wtpool job -- <program>` still runs the program you name as a shell would. The plugin's bare
+`wtpool` on Unix still follows the hook's `PATH` as you set it, as the paragraph above says.
+
 ### The heavy job policy fails open
 
 The hooks also run `wtpool hook policy` before each Bash, PowerShell and Monitor call. It is the

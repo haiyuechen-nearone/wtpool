@@ -19,7 +19,10 @@ import { DOT } from './text';
 
 const DUPLICATE = 'Already in this list.';
 const SCOPES: readonly Scope[] = ['machine', 'repository'];
-const SCOPE_WORDS: Readonly<Record<Scope, string>> = { machine: 'this machine', repository: 'this repository' };
+const SCOPE_WORDS: Readonly<Record<Scope, string>> = {
+  machine: 'this machine',
+  repository: 'this repository',
+};
 
 /** Sends the editor's edits and speaks its answers. */
 export interface EditorHost {
@@ -100,7 +103,11 @@ class ScopeEditor {
         entries.map((e) => {
           const remove = button('chip-button chip-remove');
           remove.setAttribute('aria-label', `Remove ${visible(e.pattern)} from ${words}`);
-          return chip(e.pattern, remove, e.source === 'build_processes' ? 'build_processes' : undefined);
+          return chip(
+            e.pattern,
+            remove,
+            e.source === 'build_processes' ? 'build_processes' : undefined,
+          );
         }),
       () => this.input,
     );
@@ -152,7 +159,10 @@ class Suggestions {
     const all = button('job-button secondary small suggest-all', 'Add all');
     all.addEventListener('click', () => {
       const count = this.suggested.filter((s) => isPattern(s.pattern)).length;
-      this.send({ op: 'add-suggested', scope: 'repository', pattern: null }, `Added ${count} suggestions.`);
+      this.send(
+        { op: 'add-suggested', scope: 'repository', pattern: null },
+        `Added ${count} suggestions.`,
+      );
     });
     const row = div('heavy-add-row');
     row.append(all, textSpan('heavy-note', 'Nothing is heavy until you add it.'));
@@ -215,7 +225,11 @@ export class HeavyEditor {
     };
     this.scopes = {
       machine: new ScopeEditor('machine', [document.createTextNode('This machine')], send),
-      repository: new ScopeEditor('repository', [document.createTextNode(`This repository${DOT}`), bdi('.git/wtpool.toml')], send),
+      repository: new ScopeEditor(
+        'repository',
+        [document.createTextNode(`This repository${DOT}`), bdi('.git/wtpool.toml')],
+        send,
+      ),
     };
     this.suggestions = new Suggestions(send, () => this.scopes.repository.input);
     this.element.append(this.scopes.machine.element, this.scopes.repository.element);
@@ -228,7 +242,8 @@ export class HeavyEditor {
     if (jobs.suggested.length) {
       if (!this.suggestions.element.isConnected) this.element.append(this.suggestions.element);
     } else {
-      if (this.suggestions.element.contains(document.activeElement)) this.scopes.repository.input.focus();
+      if (this.suggestions.element.contains(document.activeElement))
+        this.scopes.repository.input.focus();
       this.suggestions.element.remove();
     }
     this.settle(jobs, nowMs);
@@ -242,7 +257,9 @@ export class HeavyEditor {
   /** Stops waiting for the answers of edits that are overdue, or that `jobs` has shown a while. */
   private settle(jobs: Jobs | undefined, nowMs: number): void {
     for (const scope of SCOPES) {
-      this.asked[scope] = this.asked[scope].filter((asked) => !waitEnds(asked, asked.message, jobs, nowMs));
+      this.asked[scope] = this.asked[scope].filter(
+        (asked) => !waitEnds(asked, asked.message, jobs, nowMs),
+      );
     }
   }
 

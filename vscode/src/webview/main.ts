@@ -24,7 +24,12 @@ function isView(data: unknown): data is ViewMessage {
 
 /** Tells one tail of an output message: a path and lines of text. */
 function isTail(tail: unknown): boolean {
-  return isRecord(tail) && typeof tail.path === 'string' && Array.isArray(tail.lines) && tail.lines.every((line) => typeof line === 'string');
+  return (
+    isRecord(tail) &&
+    typeof tail.path === 'string' &&
+    Array.isArray(tail.lines) &&
+    tail.lines.every((line) => typeof line === 'string')
+  );
 }
 
 /** Tells an output message of version 1: the selected row's tails. */
@@ -41,9 +46,19 @@ function isOutput(data: unknown): data is OutputMessage {
 
 /** Tells the extension's answer to settings the page sent: ok, or an error, and maybe its list. */
 function isJobSettings(data: unknown): data is JobSettingsAnswer {
-  if (!isRecord(data) || data.type !== 'jobSettings' || data.version !== 1 || typeof data.ok !== 'boolean') return false;
+  if (
+    !isRecord(data) ||
+    data.type !== 'jobSettings' ||
+    data.version !== 1 ||
+    typeof data.ok !== 'boolean'
+  ) {
+    return false;
+  }
   const { error, scope } = data;
-  return (error === undefined || typeof error === 'string') && (scope === undefined || scope === 'machine' || scope === 'repository');
+  return (
+    (error === undefined || typeof error === 'string') &&
+    (scope === undefined || scope === 'machine' || scope === 'repository')
+  );
 }
 
 const host = acquireVsCodeApi();

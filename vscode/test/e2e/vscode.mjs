@@ -18,7 +18,11 @@ import { _electron as electron, test } from '@playwright/test';
 import { inBackground } from '../support/background.mjs';
 import { CODE_FLAGS, QUIET_SETTINGS, keychainErrors, removeLink, shortLink, writeEarlierBuilds } from '../support/code.mjs';
 import { VSIX, runDir } from '../support/paths.mjs';
+import { descendants, psTable, sleep } from '../support/processes.mjs';
 import { installedVSCode } from '../support/vscode-app.mjs';
+import { sandboxEnv } from './sandbox.mjs';
+
+export { descendants, sleep };
 
 /** The VS Code binary and CLI that global-setup.mjs found or downloaded: {app, cli}. */
 export function vscodePaths() {
@@ -26,8 +30,6 @@ export function vscodePaths() {
   if (!found) throw new Error('setup: no VS Code found; run the e2e layer through its playwright config, whose global setup downloads one');
   return found;
 }
-
-export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** A folder name for `key` in this test run: `--repeat-each` copies of a test run at once. */
 function attemptName(key) {
@@ -133,15 +135,7 @@ export function ceiling() {
  */
 export function env(dirs, poolInfo) {
   const variables = {
-    PATH: process.env.PATH,
-    HOME: dirs.home,
-    TMPDIR: dirs.tmp,
-    XDG_CONFIG_HOME: path.join(dirs.home, '.config'),
-    XDG_CACHE_HOME: path.join(dirs.home, '.cache'),
-    XDG_DATA_HOME: path.join(dirs.home, '.local', 'share'),
-    XDG_STATE_HOME: path.join(dirs.home, '.local', 'state'),
-    TZ: 'Asia/Kolkata',
-    WTPOOL_VERIFY_SANDBOX: '1',
+    ...sandboxEnv({ home: dirs.home, tmp: dirs.tmp, tz: 'Asia/Kolkata' }),
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CEILING_DIRECTORIES: ceiling(),
@@ -357,7 +351,7 @@ export async function editorGroups(window) {
   );
 }
 
-/** Tells the Worktrees tab's label: `Worktrees`, or from phase 2 `Worktrees (N)`. */
+/** Tells the Worktrees tab's label: `Worktrees`, or `Worktrees (N)` once it counts rows. */
 export const isStatusTab = (label) => /^Worktrees( \(\d+\))?$/.test(label);
 
 /** Opens a file of the workspace in the active group with Quick Open (Cmd+P), as a user does. */
@@ -374,43 +368,14 @@ export async function openTextFile(window, dirs, name) {
 /** Every `wtpool` process of the release wtpool below `main`: {pid, ppid, args}. */
 export function wtpoolProcesses(main, binary = releaseWtpool()) {
   const below = new Set(descendants(main));
-  const listing = execFileSync('ps', ['-axo', 'pid=,ppid=,args='], { encoding: 'utf8' });
-  return listing
-    .split('\n')
-    .map((line) => line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/))
-    .filter((match) => match && match[3].startsWith(binary) && below.has(Number(match[1])))
-    .map((match) => ({ pid: Number(match[1]), ppid: Number(match[2]), args: match[3] }));
+  return psTable().filter(({ pid, args }) => args.startsWith(binary) && below.has(pid));
 }
 
 /** Every `wtpool status --watch` process of the release wtpool: {pid, ppid}. */
 export function watchers(binary = releaseWtpool()) {
-  const listing = execFileSync('ps', ['-axo', 'pid=,ppid=,args='], { encoding: 'utf8' });
-  return listing
-    .split('\n')
-    .map((line) => line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/))
-    .filter((match) => match && match[3].startsWith(binary) && match[3].includes('status') && match[3].includes('--watch'))
-    .map((match) => ({ pid: Number(match[1]), ppid: Number(match[2]) }));
-}
-
-export function descendants(pid) {
-  const listing = execFileSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' });
-  const children = new Map();
-  for (const line of listing.split('\n')) {
-    const [child, parent] = line.trim().split(/\s+/).map(Number);
-    if (!child) continue;
-    if (!children.has(parent)) children.set(parent, []);
-    children.get(parent).push(child);
-  }
-  const found = [];
-  const stack = [pid];
-  while (stack.length) {
-    const next = stack.pop();
-    for (const child of children.get(next) ?? []) {
-      found.push(child);
-      stack.push(child);
-    }
-  }
-  return found;
+  return psTable()
+    .filter(({ args }) => args.startsWith(binary) && args.includes('status') && args.includes('--watch'))
+    .map(({ pid, ppid }) => ({ pid, ppid }));
 }
 
 /**

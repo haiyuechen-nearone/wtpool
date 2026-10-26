@@ -1648,3 +1648,61 @@ reason = "Rust harness tidy of the int support module and the status, install an
 "xtask/tests/support/mod.rs" = "e731ba9c81dc1d15c920ed8fae765aa2cab6d0bde8d61a97312b91624007a2ac"
 "xtask/tests/support/status.rs" = "ce11ed21b788db14159c70bb580edbbbe0d6c23c9026ef0fc1e620c86d37e7e3"
 "xtask/tests/support/watch.rs" = "ba27b1eb245e9d5a0f9adb947f9849e21c5250bdd701a9a2417daa5a3256c3dc"
+
+[[change]]
+id = "js-machine-config"
+reason = "The machine.toml of a sandbox home has one writer, vscode/test/support/machine-config.mjs, which writeEarlierBuilds in support/code.mjs and writeMachineToml in e2e/jobs-config.mjs both call. vscode/test/e2e/jobs.mjs is split by concern into jobs-config.mjs (TOML), jobs-process.mjs (processes) and jobs-dom.mjs (DOM probes), and jobs.mjs re-exports all three with the same export names. PHASE moves to support/paths.mjs, where the e2e helpers and specs read it instead of four copies, and flows-exclusive-jobs.spec.mjs reads the not-a-pattern text from TEXT.patternError. The ten job flows that wrote machine.toml after VS Code started now write it in beforeLaunch, so the file exists before the window opens. Comments in these files follow the comment rule. No check changes its name, part, assertion or message."
+[change.files]
+"vscode/test/e2e/cli.mjs" = "62eae71b7213bd96563525af90be3c6806bbb426452c1321d7b5a56ff57016f6"
+"vscode/test/e2e/flows-exclusive-jobs.spec.mjs" = "5377cb575fc97b1a0e08f4b6d0fdb4a76df510e4b8197151acc8be2436ff84cd"
+"vscode/test/e2e/flows-exclusive.spec.mjs" = "5d76f449df742c6175957c5a25cf016b71fbee1e4149079b10aaedf15e0d4b13"
+"vscode/test/e2e/flows-jobs-window.spec.mjs" = "fb3af444c21999c3bf62ed718f8a46b8c00c45b6d1e5e028e75c6fb16aa52072"
+"vscode/test/e2e/flows-jobs.spec.mjs" = "94f5fd45eac989f8ec974a1c29d41b9e3e527051da3f5401c1c8120e8246cae1"
+"vscode/test/e2e/flows-scenarios.spec.mjs" = "2f35d59f0e7f4855f7a122b45a489b0ccf73b51178c342176300222c1c647b1a"
+"vscode/test/e2e/headings.spec.mjs" = "7358367c80ddb868d323456fd3919d4f4839531c3622ebd7abebe37bacf9397d"
+"vscode/test/e2e/jobs-config.mjs" = "95f2e131a695063d9fb85fbd9bd60532dacb4bf8351773fc47221b147561c478"
+"vscode/test/e2e/jobs-dom.mjs" = "dabea5392d108205e69ab3ebec3ba08f3fa9629711b71e5825fd65cbf971d279"
+"vscode/test/e2e/jobs-process.mjs" = "1e683ae91ca9598fc9776293aa1a1f8958b82c0b185d40769a2b37c228747899"
+"vscode/test/e2e/jobs.mjs" = "327826bd58d1848d4ed875b613ec3bc9319d8cb968771c355a43edc8fe010af1"
+"vscode/test/e2e/scenarios-agents.spec.mjs" = "2e0ec8f0bf1e27da453f3849a9c650f2438b211c7c2d3e7a159a7c20b9fa421b"
+"vscode/test/support/code.mjs" = "69b3ed3df3185c541cc8cf77501fcc3b6e9b3c716bf80dfa0494918d8c0aa976"
+"vscode/test/support/machine-config.mjs" = "be5e3ba13675270ad5d558eaa627409c2c78b0c01f78fb87c51c57eca5298afb"
+"vscode/test/support/paths.mjs" = "04fb4db6fec8ff3fadef1cbb992cce144d4a5ccd64cee35eadb8646f12efda95"
+
+[[change]]
+id = "flake-fixes-5"
+reason = "flow__theme_switch waits up to 40 seconds for the webview body class after each colour theme change, the deadline the other flows use for VS Code work under load, instead of 15 seconds, and writes the theme setting again every 10 seconds while the class has not changed, because a settings write that the file watcher misses is never applied. The assertions are unchanged."
+[change.files]
+"vscode/test/e2e/flows-look.spec.mjs" = "2bc4d2869a813aa74b7c14a5c7b72b2bbbef6e104741a4895943270b4985e425"
+
+[[change]]
+id = "js-launch"
+reason = "The environment of every JS sandbox process starts from one sandboxEnv() in vscode/test/e2e/sandbox.mjs, which e2e/vscode.mjs, cc/sandbox.mjs and host/run.mjs extend. The host layer's VS Code now gets XDG_CONFIG_HOME, XDG_STATE_HOME, XDG_CACHE_HOME and XDG_DATA_HOME inside its sandbox home, where it got only HOME, TMPDIR and TZ, and its home no longer holds the machine.toml that the fake wtpool never reads. The process table parser, descendants and sleep exist once in the new vscode/test/support/processes.mjs, with the command name lookup, and e2e/vscode.mjs re-exports descendants and sleep for the files that import them from there. Two comments of e2e/vscode.mjs lose design-doc terms. Every check keeps its name, layer, assertions and messages."
+[change.files]
+"vscode/test/cc/recorder.mjs" = "17d33abd40086db835969e09055872592e586722c4e61e0f15c6119121de2202"
+"vscode/test/cc/sandbox.mjs" = "a1bf5e88be924a2d1178f51d004fcb113c0b36e786daff8262d963da09d85314"
+"vscode/test/e2e/sandbox.mjs" = "eac62b655ebfbb4aad844b87ecc43e1c5a59ea6a663ae119a1e78495cce157ba"
+"vscode/test/e2e/vscode.mjs" = "af232b071567d88ccbf77e5a065aaaec92fbbdcef83228cc26b7974a6851e1d2"
+"vscode/test/host/run.mjs" = "1f4c4ce987fd9db4447d631805cc4c7f7e795ca1904bbe6c99f9e3e56563ae61"
+"vscode/test/support/background.mjs" = "476dc07bf351f561e48db2e4d82a82cfa4caabf62108c6992e926ed7fdd0f176"
+"vscode/test/support/processes.mjs" = "7ff9823f29fcbcf98f20b4f6d8e6828b93934967b46a7c25d417ee4e4bf16f16"
+
+[[change]]
+id = "hx-report"
+reason = "claude --version is read once, by claude_version_text in layers/cc.rs, for the report header and the cc layer. The report writer splits report() in report/write.rs into gather, judge and write steps. A cc result counted by replays alone carries a typed replay_only flag, set where cc_judge makes it, and the report reads that flag instead of the text prefix of the message. The flag is written to a part file and to report.json only when set. Report text is unchanged."
+[change.files]
+"xtask/src/layers.rs" = "50119c8b3fa4be6d1eec7eecea407e5589d0cf96f9e42c1e36116d921b642619"
+"xtask/src/layers/cc.rs" = "2f52510093b6378de0fac02b65e1bb36dce4331fd51d7d2ca89d3d576eacbfa8"
+"xtask/src/layers/cc_judge.rs" = "1be3a4344f2b70f544fbcbedb8c0c7592d0e6920337584bafb9e47dce20b8032"
+"xtask/src/report/write.rs" = "3f931f7c73f368bfa423f682efc51eb6360cfe3d6ab2366de92dbda42e71d785"
+"xtask/src/results.rs" = "00131e5ff52643b841819f39e5e3dc40da4fce85311747d007e4bfe93f495f35"
+
+[[change]]
+id = "ts-prettier"
+reason = "Prettier is a dev dependency with a format script and a format check in npm run lint, the curly rule is off because Prettier moves the long if bodies it governs, and two header comments are dropped; no check judges differently."
+
+[change.files]
+"vscode/.gitignore" = "786e02d3887048d6ee98e82da790403c8aee961ccc065b2c7d06622e30361cfe"
+"vscode/eslint.config.mjs" = "c0ef8786df56aab7a349a2615d0634fc232d2c4c9d90483a6961bcf84b232521"
+"vscode/package-lock.json" = "aedf201c245fe6e86472c76f1b5cd1f7f1a355d23cd0519831719bb30d953187"
+"vscode/package.json" = "56eaced8b30bf754448959f52e6ed9d49ca79d7abe99a471426a5a1913ec7627"

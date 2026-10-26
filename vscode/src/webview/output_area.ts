@@ -1,14 +1,17 @@
 import type { Actor, Output } from '../generated/status';
 import { visible } from '../shared/invisible';
 import type { Tail } from '../shared/protocol';
-import { bdi, div, setText, span } from './dom';
+import { bdi, button, div, setText, span } from './dom';
+import { KeyedCache, placeInOrder } from './order';
 import { DOT, clock, runTime } from './text';
 
 /** The pixels from the end that a block may be scrolled up and still count as at the end. */
 const AT_END_PX = 4;
 
 function taskState(output: Output, nowMs: number): string {
-  if (output.running || output.ended === null) return `running${DOT}${runTime(output.started, nowMs)}`;
+  if (output.running || output.ended === null) {
+    return `running${DOT}${runTime(output.started, nowMs)}`;
+  }
   return `ended ${clock(output.ended)}`;
 }
 
@@ -24,7 +27,7 @@ class TaskView {
   readonly element = div('output');
   private readonly summary = bdi('', 'output-summary');
   private readonly state = span('output-state');
-  private readonly button = document.createElement('button');
+  private readonly button = button('follow', 'Follow');
   private readonly block = document.createElement('pre');
   private shown?: string;
   private output?: Output;
@@ -35,15 +38,13 @@ class TaskView {
     this.element.setAttribute('data-output-path', path);
     const heading = div('output-heading');
     heading.append(this.summary, document.createTextNode(DOT), this.state);
-    this.button.type = 'button';
-    this.button.className = 'follow';
     this.button.setAttribute('data-follow', path);
-    this.button.textContent = 'Follow';
     this.block.className = 'output-tail';
     // A block that scrolls takes keyboard focus, so the keyboard can scroll it too.
     this.block.tabIndex = 0;
     this.block.addEventListener('scroll', () => {
-      this.atEnd = this.block.scrollTop + this.block.clientHeight >= this.block.scrollHeight - AT_END_PX;
+      this.atEnd =
+        this.block.scrollTop + this.block.clientHeight >= this.block.scrollHeight - AT_END_PX;
     });
     const top = div('output-top');
     top.append(heading, this.button);
@@ -86,8 +87,8 @@ class TaskView {
  */
 export class OutputArea {
   readonly element = div('output-area');
-  private readonly sections = new Map<string, HTMLElement>();
-  private readonly tasks = new Map<string, TaskView>();
+  private readonly sections = new KeyedCache<HTMLElement>();
+  private readonly tasks = new KeyedCache<TaskView>();
   private readonly tails = new Map<string, Tail>();
 
   /**
@@ -96,40 +97,30 @@ export class OutputArea {
    */
   update(actors: Actor[], nowMs: number): void {
     const listed = new Set<string>();
-    const keep = new Set<string>();
-    let previous: Element | null = null;
-    for (const actor of actors) {
-      const outputs = actor.outputs ?? [];
-      if (!outputs.length) continue;
-      keep.add(actor.key);
+    const withOutputs = actors.filter((actor) => (actor.outputs ?? []).length > 0);
+    const sections = withOutputs.map((actor) => {
       const section = this.section(actor);
-      const after: Element | null = previous;
-      const misplaced = after ? after.nextElementSibling !== section : this.element.firstElementChild !== section;
-      if (misplaced && after) after.after(section);
-      if (misplaced && !after) this.element.prepend(section);
-      previous = section;
-      let last: Element | null = section.firstElementChild;
-      for (const output of outputs) {
+      const tasks: HTMLElement[] = [];
+      for (const output of actor.outputs ?? []) {
         if (listed.has(output.path)) continue;
         listed.add(output.path);
-        const task = this.task(output.path);
+        const task = this.tasks.obtain(output.path, () => new TaskView(output.path));
         task.update(output, actor.label, nowMs);
         task.show(this.tails.get(output.path));
-        if (last?.nextElementSibling !== task.element) last?.after(task.element);
-        last = task.element;
+        tasks.push(task.element);
       }
-    }
-    for (const [path, task] of this.tasks) {
-      if (listed.has(path)) continue;
+      if (section.firstElementChild) placeInOrder(section.firstElementChild, tasks);
+      return section;
+    });
+    placeInOrder({ firstIn: this.element }, sections);
+    this.tasks.retain(listed, (task) => {
       task.element.remove();
-      this.tasks.delete(path);
-      this.tails.delete(path);
-    }
-    for (const [key, section] of this.sections) {
-      if (keep.has(key)) continue;
-      section.remove();
-      this.sections.delete(key);
-    }
+      this.tails.delete(task.path);
+    });
+    this.sections.retain(
+      new Set(withOutputs.map((actor) => actor.key)),
+      (section) => void section.remove(),
+    );
     this.element.hidden = listed.size === 0;
   }
 
@@ -156,27 +147,16 @@ export class OutputArea {
 
   /** Gives the Output section of `actor`, made on first use, with its label current. */
   private section(actor: Actor): HTMLElement {
-    let section = this.sections.get(actor.key);
-    if (!section) {
-      section = document.createElement('section');
-      section.className = 'outputs';
+    const section = this.sections.obtain(actor.key, () => {
+      const made = document.createElement('section');
+      made.className = 'outputs';
       const heading = div('outputs-heading');
       heading.append(document.createTextNode(`Output${DOT}`), bdi('', 'outputs-label'));
-      section.append(heading);
-      this.sections.set(actor.key, section);
-    }
+      made.append(heading);
+      return made;
+    });
     const label = section.querySelector('.outputs-label');
     if (label) setText(label, visible(actor.label));
     return section;
-  }
-
-  /** Gives the view of the task at `path`, made on first use. */
-  private task(path: string): TaskView {
-    let task = this.tasks.get(path);
-    if (!task) {
-      task = new TaskView(path);
-      this.tasks.set(path, task);
-    }
-    return task;
   }
 }

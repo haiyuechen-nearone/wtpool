@@ -1,12 +1,13 @@
 //! [`Suggestions`]: the heavy patterns a repository's stack markers suggest, from the names of
 //! the top-level entries of its main worktree and the scripts of its `package.json`.
 
-use std::path::Path;
+use std::fmt;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use super::scripts::{self, PACKAGE_JSON};
-use super::{HeavyList, Pattern, Suggestion};
+use super::scripts::{self, PACKAGE_JSON, PackageFault};
+use super::{HeavyList, Pattern};
 
 /// Entries past this many are never listed, so a crowded folder stays quick.
 const MAX_ENTRIES: usize = 10_000;
@@ -58,13 +59,38 @@ const MARKERS: &[Marker] = &[
     Marker::ending(".xcodeproj", &["xcodebuild"]),
 ];
 
-/// The patterns suggested for a repository, which apply only once the user adds them.
+/// A pattern suggested for a repository, and the source it came from, such as the marker file
+/// `Cargo.toml`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Suggestion {
+    pub pattern: Pattern,
+    pub from: String,
+}
+
+/// A `package.json` that is there and gives no suggestion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SuggestionFault {
+    path: PathBuf,
+    fault: PackageFault,
+}
+
+impl fmt::Display for SuggestionFault {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: {}, so its scripts suggest nothing",
+            self.path.display(),
+            self.fault
+        )
+    }
+}
+
+/// The patterns suggested for a repository. They apply only once the user adds them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Suggestions {
-    /// In the order of the marker table, then `package.json`'s scripts by name; one per pattern.
+    /// In the order of the marker table, then `package.json`'s scripts by name, one per pattern.
     pub found: Vec<Suggestion>,
-    /// Why `package.json` gave no suggestion, when it is there and cannot be read.
-    pub fault: Option<String>,
+    pub fault: Option<SuggestionFault>,
 }
 
 impl Marker {
@@ -117,10 +143,7 @@ impl Suggestions {
             match scripts::read(&path).and_then(|text| scripts::suggestions(&text, &names)) {
                 Ok(patterns) => suggestions.add_all(patterns, PACKAGE_JSON),
                 Err(fault) => {
-                    suggestions.fault = Some(format!(
-                        "{}: {fault}, so its scripts suggest nothing",
-                        path.display()
-                    ));
+                    suggestions.fault = Some(SuggestionFault { path, fault });
                 }
             }
         }
@@ -143,11 +166,17 @@ impl Suggestions {
     /// Those [`found`](Self::found) that `heavy` does not hold.
     #[must_use]
     pub fn lacking(&self, heavy: &HeavyList) -> Vec<Suggestion> {
-        self.found
+        Self::lacking_in(&self.found, heavy).cloned().collect()
+    }
+
+    /// Those of `found` that `heavy` does not hold.
+    pub fn lacking_in<'a>(
+        found: &'a [Suggestion],
+        heavy: &'a HeavyList,
+    ) -> impl Iterator<Item = &'a Suggestion> {
+        found
             .iter()
             .filter(|suggestion| !heavy.contains(&suggestion.pattern))
-            .cloned()
-            .collect()
     }
 
     fn add_all(&mut self, patterns: impl IntoIterator<Item = Pattern>, from: &str) {
@@ -167,29 +196,33 @@ struct SuggestedJson<'a> {
     suggested: Vec<SuggestionJson<'a>>,
 }
 
+/// One suggestion in the JSON of `job heavy suggest` and `job ls`.
 #[derive(Serialize)]
-struct SuggestionJson<'a> {
+pub(crate) struct SuggestionJson<'a> {
     pattern: &'a str,
     from: &'a str,
+}
+
+impl<'a> From<&'a Suggestion> for SuggestionJson<'a> {
+    fn from(suggestion: &'a Suggestion) -> Self {
+        Self {
+            pattern: suggestion.pattern.as_str(),
+            from: &suggestion.from,
+        }
+    }
 }
 
 /// `suggestions` as one line of JSON, `{"suggested": [{"pattern": …, "from": …}, …]}`.
 #[must_use]
 pub fn suggested_json(suggestions: &[Suggestion]) -> String {
     let document = SuggestedJson {
-        suggested: suggestions
-            .iter()
-            .map(|suggestion| SuggestionJson {
-                pattern: suggestion.pattern.as_str(),
-                from: &suggestion.from,
-            })
-            .collect(),
+        suggested: suggestions.iter().map(SuggestionJson::from).collect(),
     };
-    // A document of strings always serializes; `{}` keeps the line JSON.
+    // A document of strings always serializes. `{}` keeps the line JSON.
     serde_json::to_string(&document).unwrap_or_else(|_| "{}".to_owned()) + "\n"
 }
 
-/// The names of the first [`MAX_ENTRIES`] entries of `folder`, sorted; none when it cannot be
+/// The sorted names of the first [`MAX_ENTRIES`] entries of `folder`, none when it cannot be
 /// listed. A name that is not Unicode is no marker.
 fn top_names(folder: &Path) -> Vec<String> {
     let Ok(entries) = std::fs::read_dir(folder) else {
@@ -203,7 +236,7 @@ fn top_names(folder: &Path) -> Vec<String> {
     names
 }
 
-/// Whether the sorted `names` hold `name`.
+/// `true` when the sorted `names` hold `name`.
 fn has(names: &[String], name: &str) -> bool {
     names
         .binary_search_by(|probe| probe.as_str().cmp(name))
@@ -319,7 +352,10 @@ mod tests {
 
         // Then
         assert!(suggestions.found.is_empty());
-        let fault = suggestions.fault.unwrap_or_default();
+        let fault = suggestions
+            .fault
+            .map(|fault| fault.to_string())
+            .unwrap_or_default();
         assert!(fault.contains("package.json"), "{fault}");
     }
 

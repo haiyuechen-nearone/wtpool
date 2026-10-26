@@ -6,36 +6,39 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
 import { GROUP_TOKENS } from '../support/grammar.mjs';
+import { TEXT } from '../support/jobs.mjs';
 import { poll, withFlow, worktreePath } from './flows.mjs';
 import {
-  WITHIN_A_SECOND_MS,
   addRepoKeys,
-  defaultLimit,
+  machineTomlPath,
+  readText,
+  repoTomlPath,
+  tomlList,
+  writeMachineToml,
+} from './jobs-config.mjs';
+import {
   focusKey,
   focusRing,
   focusWebview,
-  fourRunTwoWait,
   headingText,
   liveText,
-  loggedRuns,
-  loggingWtpool,
   machineButton,
-  machineTomlPath,
-  names,
   openStrip,
   openTab,
-  readText,
-  repoTomlPath,
-  stopJobs,
   stripText,
   tokenColour,
-  tomlList,
-  writeMachineToml,
+} from './jobs-dom.mjs';
+import {
+  defaultLimit,
+  fourRunTwoWait,
+  loggedRuns,
+  loggingWtpool,
+  names,
+  stopJobs,
+  WITHIN_A_SECOND_MS,
   wtpoolRun,
-} from './jobs.mjs';
+} from './jobs-process.mjs';
 import { sleep, startProcess } from './vscode.mjs';
-
-const NOT_A_PATTERN = 'Not a pattern: 1 to 3 words of letters, digits and . _ + -, and : after the first, none starting with - or +; only the first may end in *.';
 
 /** The content of the codicon glyph the machine button shows, its chevron. */
 async function chevron(frame) {
@@ -68,11 +71,10 @@ async function pressUntil(session, frame, matches, limit = 30) {
 }
 
 test('flow__jobs_open_from_heading', async () => {
-  await withFlow('flow__jobs_open_from_heading', { prepare: (poolInfo) => addRepoKeys(poolInfo, { heavy: ['make'] }) }, async (session) => {
+  await withFlow('flow__jobs_open_from_heading', { prepare: (poolInfo) => addRepoKeys(poolInfo, { heavy: ['make'] }), beforeLaunch: (dirs) => writeMachineToml(dirs, { limit: 4, enforce: 'warn' }) }, async (session) => {
     let build;
     try {
       // Given
-      writeMachineToml(session.dirs, { limit: 4, enforce: 'warn' });
       const frame = await openTab(session);
       const button = await machineButton(frame);
       await fourRunTwoWait(session);
@@ -146,9 +148,8 @@ async function describedText(input) {
 test('flow__jobs_edit_patterns', async () => {
   const logging = loggingWtpool('flow__jobs_edit_patterns');
   const prepare = (poolInfo) => addRepoKeys(poolInfo, { comment: 'wtpool-verify: kept by every edit (J6)', heavy: ['cargo build', 'cargo test'], buildProcesses: ['protoc'] });
-  await withFlow('flow__jobs_edit_patterns', { prepare, wtpoolPath: logging.file }, async (session) => {
+  await withFlow('flow__jobs_edit_patterns', { prepare, wtpoolPath: logging.file, beforeLaunch: (dirs) => writeMachineToml(dirs, { limit: 4 }) }, async (session) => {
     // Given
-    writeMachineToml(session.dirs, { limit: 4 });
     const repoToml = repoTomlPath(session.pool);
     const before = readText(repoToml);
     const frame = await openTab(session);
@@ -209,7 +210,7 @@ test('flow__jobs_edit_patterns', async () => {
       assert.ok(afterAdd.toml.includes(line), `.git/wtpool.toml lost ${JSON.stringify(line)} (J6)`);
     }
     assert.ok(tomlList(afterAdd.toml, 'heavy')?.includes('cargo xtask verify'), `.git/wtpool.toml does not list cargo xtask verify: ${afterAdd.toml} (J6)`);
-    assert.equal(notPattern.text, NOT_A_PATTERN, `make * does not show why it is not a pattern under the input: ${JSON.stringify(notPattern)} (U15, J18)`);
+    assert.equal(notPattern.text, TEXT.patternError, `make * does not show why it is not a pattern under the input: ${JSON.stringify(notPattern)} (U15, J18)`);
     assert.equal(notPattern.colour, problem, `the error under the input is not in ${GROUP_TOKENS.problem} (U15)`);
     assert.equal(already.text, 'Already in this list.', `cargo build does not show Already in this list.: ${JSON.stringify(already)} (U15)`);
     assert.deepEqual(afterRefused.runs, afterAdd.runs, 'a refused pattern ran wtpool (U15)');
@@ -222,9 +223,8 @@ test('flow__jobs_edit_patterns', async () => {
 
 test('flow__jobs_invalid_value', async () => {
   const logging = loggingWtpool('flow__jobs_invalid_value');
-  await withFlow('flow__jobs_invalid_value', { wtpoolPath: logging.file }, async (session) => {
+  await withFlow('flow__jobs_invalid_value', { wtpoolPath: logging.file, beforeLaunch: (dirs) => writeMachineToml(dirs, { limit: 4 }) }, async (session) => {
     // Given
-    writeMachineToml(session.dirs, { limit: 4 });
     const frame = await openTab(session);
     await machineButton(frame);
     const strip = await openStrip(frame);

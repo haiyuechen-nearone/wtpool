@@ -60,11 +60,9 @@ pub(crate) struct GhCli;
 
 impl ViewPr for GhCli {
     fn view_pr(&self, repo: &RepoSlug, number: &PrNumber) -> Result<PrView, ViewPrError> {
-        if find_on_path("gh").is_none() {
-            return Err(ViewPrError::Unavailable);
-        }
+        let gh = find_on_path("gh").ok_or(ViewPrError::Unavailable)?;
         let repo = repo.to_string();
-        let ran = wtpool_core::run(Command::new("gh").args([
+        let ran = wtpool_core::run(Command::new(gh).args([
             "pr",
             "view",
             number.as_str(),

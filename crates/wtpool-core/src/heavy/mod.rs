@@ -9,8 +9,9 @@ mod scripts;
 mod suggest;
 mod words;
 
-pub use list::{HeavyList, HeavyPattern, PatternSource, Suggestion};
+pub use list::{HeavyList, HeavyPattern, PatternSource};
 pub use pattern::{InvalidPattern, Pattern, PatternFault};
 pub use repository::{RepositoryHeavy, RepositoryPatterns};
-pub use suggest::{Suggestions, suggested_json};
+pub(crate) use suggest::SuggestionJson;
+pub use suggest::{Suggestion, SuggestionFault, Suggestions, suggested_json};
 pub use words::{CommandWords, ShellCommand, shell_commands};

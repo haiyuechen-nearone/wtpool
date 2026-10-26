@@ -236,14 +236,7 @@ fn draft<C, P: ListProcesses>(
         id: JobId::new(pid),
         pid,
         started,
-        summary: summary(
-            command,
-            &HeavyList::new(
-                &config.heavy,
-                &context.repository.heavy,
-                &context.repository.build_processes,
-            ),
-        ),
+        summary: summary(command, &HeavyList::of(config, context.repository)),
         label: command
             .label
             .as_deref()
