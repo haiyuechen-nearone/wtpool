@@ -1,30 +1,14 @@
-// The demo's story, all its scripted data in one place: the placeholders, the status documents
-// the fake wtpool prints, the test log that grows in the sandbox, and the pointer's moves. Times
-// are seconds from the start of the recording; every time a document holds comes from them, so
-// ages and clock times are the same on every run.
-//
-// The story, at 1000 x 600: a quiet pool; an agent starts in slot 1 and runs its tests in the
-// background while it works on; the agent in slot 2 stops at a permission prompt; the user opens
-// slot 1's detail strip and watches the test log stream in; the user's own build in the
-// foreground spins the building dial; slot 3's agent ends its turn with its tests still running;
-// the user closes the strip, so the whole table fits again, and frees slot 4 through VS Code's
-// confirm dialog.
-//
-// Three parts follow features of later product versions, and `features` (features.mjs) picks how
-// they read, so one story serves all:
-// - `labels` (status-panel.md H16): a session's label is its title. Without it a session reads
-//   `session HH:MM`.
-// - `outputs` (the live-output work): an agent's background task is listed in `outputs`, and the
-//   tab tails that file in the detail strip. The documents always carry `outputs`; an extension
-//   without the feature ignores the property (R11), so the strip shows no output.
-// - `background` (A1, revision 23): an agent whose turn ended works while its own background task
-//   runs, its action `background: <summary>`. Without it that agent reads `idle`.
-
+/**
+ * @fileoverview The demo's story: the placeholders, the status documents the fake wtpool prints,
+ * the test log that grows in the sandbox, and the pointer's moves. Times are seconds from the
+ * start of the recording. Every time a document holds derives from them, so ages and clock times
+ * are the same on every run.
+ */
 import path from 'node:path';
 
-/** The names the demo shows. Change them here; nothing else names a repository or machine. */
+/** The names the demo shows, and the only place that names a repository or a machine. */
 export const PLACEHOLDERS = {
-  /** The GitHub repository, `<owner>/<repo>`; its repo part names the main worktree's folder. */
+  /** The GitHub repository, `<owner>/<repo>`. Its repo part names the main worktree's folder. */
   repository: 'acme/app',
   machine: 'my-mac',
   /** The folder the worktrees sit in, as their paths show it. */
@@ -32,15 +16,14 @@ export const PLACEHOLDERS = {
 };
 
 /** The local wall time the recording starts at, in the time zone VS Code runs in. */
-export const START = { date: '2026-03-10', time: '09:41:00' };
+const START = { date: '2026-03-10', time: '09:41:00' };
 
-/** How long the recording runs, in seconds; the last steps leave a pause before the loop. */
-export const LENGTH = 18;
+export const LENGTH_SECONDS = 18;
 
 /**
- * The lines the background `cargo test` of slot 1 prints, one every `LOG_GAP` seconds from
- * `LOG_AT`. They are few enough that the strip's output block, under slot 1's row, keeps its
- * newest line inside the 600 px window.
+ * The lines the background `cargo test` of slot 1 prints, one every {@link LOG_GAP} seconds from
+ * {@link LOG_AT}. They are few enough that the strip's output block, under slot 1's row, keeps its
+ * newest line inside the window.
  */
 const TEST_LINES = [
   '   Compiling tower-http v0.6.6',
@@ -56,7 +39,7 @@ const TEST_LINES = [
 const LOG_AT = 7.2;
 const LOG_GAP = 0.45;
 
-/** Seconds and the time zone to RFC 3339 times and local `HH:MM`, from START. */
+/** Returns the story's clock in `timeZone`: {@link START} in epoch ms, and story seconds as times. */
 export function clockOf(timeZone) {
   const guess = Date.parse(`${START.date}T${START.time}Z`);
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -77,19 +60,22 @@ export function clockOf(timeZone) {
     startMs,
     /** The RFC 3339 time `seconds` after the start, whole seconds, as wtpool prints times. */
     at: (seconds) => new Date(startMs + Math.round(seconds) * 1000).toISOString().replace('.000Z', 'Z'),
-    /** The local `HH:MM` `seconds` after the start, as `session HH:MM` reads (H16). */
+    /** The local `HH:MM` `seconds` after the start, as a session without a title shows it. */
     hhmm: (seconds) => hhmm.format(new Date(startMs + seconds * 1000)),
   };
 }
 
-const GIT = { dirty: 0, ahead: 0, behind: 0, unreferenced: 0, operation: null, unknown: false };
+const CLEAN_GIT = { dirty: 0, ahead: 0, behind: 0, unreferenced: 0, operation: null, unknown: false };
 
 /**
- * The story for `features` in `timeZone`, with slot 1's test log at `logPath`:
- * {first: the document the fake prints at start, steps: [{at, ...}], pathOf}. A step does one of:
- * `emit` a document, `log` a line, move the pointer `to` a target (`row:<name>`,
- * `action:<name>:<action>`, `dialog:<button>`, or `rest`) over `ms` and maybe `click`, or
- * `waitFor` the fake's start with that argv before the next step.
+ * Returns the story for `features` in `timeZone`, with slot 1's test log at `logPath`, as
+ * `{first, steps, pathOf}`. `first` is the document the fake prints at start. A step at `at`
+ * seconds does one of these: `emit` a document, `log` a line, move the pointer `to` a target
+ * (`row:<name>`, `action:<name>:<action>`, `dialog:<button>` or `rest`) over `ms` and maybe
+ * `click`, or `waitFor` the fake's start with that argv before the next step.
+ *
+ * The documents list `outputs` whatever `features.outputs` says: an extension without that
+ * feature ignores the property.
  */
 export function story({ features, timeZone, logPath }) {
   const { at, hhmm } = clockOf(timeZone);
@@ -97,11 +83,10 @@ export function story({ features, timeZone, logPath }) {
   const slot = (n) => `${repo}-wt${n}`;
   const pathOf = (name) => `${PLACEHOLDERS.parent}/${name}`;
 
-  /** A session actor; `first` is its first event, which names it without a title (H16). */
-  const session = (key, title, first, fields) => ({
+  const session = (key, title, firstEventAt, fields) => ({
     key,
     kind: 'session',
-    label: features.labels ? title : `session ${hhmm(first)}`,
+    label: features.labels ? title : `session ${hhmm(firstEventAt)}`,
     harness: 'claude-code',
     placed_by: 'cwd',
     error: null,
@@ -110,8 +95,7 @@ export function story({ features, timeZone, logPath }) {
     ...fields,
   });
 
-  /** A background task (S13), its output file in the sandbox, beside slot 1's log. */
-  const task = (id, summary, started, file = path.join(path.dirname(logPath), `${id}.output`)) => ({
+  const backgroundTask = (id, summary, started, file = path.join(path.dirname(logPath), `${id}.output`)) => ({
     task: id,
     path: file,
     summary,
@@ -127,7 +111,7 @@ export function story({ features, timeZone, logPath }) {
     missing: false,
     branch: null,
     upstream: null,
-    git: { ...GIT, ahead: null, behind: null },
+    git: { ...CLEAN_GIT, ahead: null, behind: null },
     free: true,
     reasons: [],
     activity: 'free',
@@ -151,7 +135,7 @@ export function story({ features, timeZone, logPath }) {
   rows.set(repo, worktree(repo, {
     role: 'foreground',
     ...onBranch('main', { reasons: ['foreground'] }),
-    git: GIT,
+    git: CLEAN_GIT,
     activity: 'foreground',
     last_change: at(-190),
   }));
@@ -159,7 +143,7 @@ export function story({ features, timeZone, logPath }) {
   const oauth = (fields) => session('5c1d8e20-oauth', 'Add OAuth callback route', -14 * 60, fields);
   rows.set(slot(2), worktree(slot(2), {
     ...onBranch('feat/oauth-callback'),
-    git: { ...GIT, dirty: 2 },
+    git: { ...CLEAN_GIT, dirty: 2 },
     activity: 'idle',
     actors: [oauth({ state: 'idle', since: at(-380), updated: at(-380) })],
     last_event: at(-380),
@@ -168,7 +152,7 @@ export function story({ features, timeZone, logPath }) {
   const deps = (fields) => session('9e4b7a31-deps', 'Bump dependencies', -29 * 60, fields);
   rows.set(slot(3), worktree(slot(3), {
     ...onBranch('chore/bump-deps'),
-    git: { ...GIT, ahead: 1 },
+    git: { ...CLEAN_GIT, ahead: 1 },
     activity: 'idle',
     actors: [deps({ state: 'idle', since: at(-130), updated: at(-130) })],
     last_event: at(-130),
@@ -176,7 +160,7 @@ export function story({ features, timeZone, logPath }) {
   }));
   rows.set(slot(4), worktree(slot(4), {
     ...onBranch('feat/dark-mode'),
-    git: GIT,
+    git: CLEAN_GIT,
     activity: 'unused',
     // 25 m 20 s at the start, so its age reads `25 m` from the first frame to the last.
     last_event: at(-25 * 60 - 20),
@@ -200,23 +184,23 @@ export function story({ features, timeZone, logPath }) {
   });
 
   const steps = [];
-  /** Changes rows at `seconds`, then emits the document; the changes apply in time order below. */
+  // Row edits by story time. They apply in time order at the end, each followed by its document.
   const changes = [];
   const change = (seconds, edit) => changes.push({ seconds, edit });
   const first = document(0);
 
-  // 1. A quiet pool; the pointer rests.
+  // 1. A quiet pool. The pointer rests.
   steps.push({ at: 0, to: 'rest', ms: 0 });
 
   // 2. An agent starts in slot 1: it takes a branch and works, its action changing. At 5.3 s it
-  // runs `cargo test` in the background and works on; the task's cargo builds in slot 1 (S4).
-  const tests = task('b7k2q9', 'cargo test', 5.3, logPath);
+  // runs `cargo test` in the background and works on, while the task's cargo builds in slot 1.
+  const tests = backgroundTask('b7k2q9', 'cargo test', 5.3, logPath);
   const login = (seconds, action, dirty, running = false) => {
     change(seconds, () =>
       set(slot(1), {
         ...onBranch('fix/flaky-login'),
         upstream: null,
-        git: { ...GIT, ahead: null, behind: null, dirty },
+        git: { ...CLEAN_GIT, ahead: null, behind: null, dirty },
         activity: 'working',
         builds: running ? [{ name: 'cargo', pid: 48213 }] : [],
         actors: [
@@ -242,7 +226,7 @@ export function story({ features, timeZone, logPath }) {
     set(slot(2), {
       activity: 'working',
       actors: [oauth({ state: 'working', action: { tool: 'Edit', target: 'src/routes/oauth.rs' }, since: at(3.6), updated: at(3.6) })],
-      git: { ...GIT, dirty: 3 },
+      git: { ...CLEAN_GIT, dirty: 3 },
       last_event: at(3.6),
     }),
   );
@@ -271,8 +255,8 @@ export function story({ features, timeZone, logPath }) {
   login(9.4, { tool: 'Edit', target: 'src/auth/session.rs' }, 2, true);
 
   // 6. Below the strip, slot 3's agent runs its tests in the background and ends its turn: it
-  // still works, `background: npm test`, while they run (A1).
-  const npmTest = task('n4w8r2', 'npm test', 8.4);
+  // still works, `background: npm test`, while they run.
+  const npmTest = backgroundTask('n4w8r2', 'npm test', 8.4);
   change(8.4, () =>
     set(slot(3), {
       activity: 'working',
@@ -296,7 +280,7 @@ export function story({ features, timeZone, logPath }) {
     }),
   );
 
-  // 7. The user clicks slot 1's row again, which closes the strip, so slot 4 is in view; then
+  // 7. The user clicks slot 1's row again to close the strip, so slot 4 is in view. Then the user
   // hovers slot 4, the finished slot, clicks free, and confirms in VS Code's dialog.
   steps.push({ at: 11.8, to: `row:${slot(1)}`, ms: 200, click: true });
   steps.push({ at: 12.5, to: `row:${slot(4)}`, ms: 700 });
@@ -307,7 +291,7 @@ export function story({ features, timeZone, logPath }) {
     set(slot(4), {
       branch: null,
       upstream: null,
-      git: { ...GIT, ahead: null, behind: null },
+      git: { ...CLEAN_GIT, ahead: null, behind: null },
       free: true,
       reasons: [],
       activity: 'free',
@@ -316,7 +300,7 @@ export function story({ features, timeZone, logPath }) {
   );
   steps.push({ at: 16.1, to: 'rest', ms: 900 });
 
-  // 8. A pause until LENGTH, then the GIF loops.
+  // 8. A pause until LENGTH_SECONDS, then the GIF loops.
   changes.sort((a, b) => a.seconds - b.seconds);
   for (const { seconds, edit } of changes) {
     edit();
@@ -326,7 +310,7 @@ export function story({ features, timeZone, logPath }) {
   return { first, steps, pathOf };
 }
 
-/** Frames worth a look, by story time: the review copies `--keyframes` writes. */
+/** The frames `--keyframes` copies for review, by story time. */
 export const KEYFRAMES = [
   { at: 1.2, name: 'quiet-pool' },
   { at: 3.4, name: 'agent-working' },

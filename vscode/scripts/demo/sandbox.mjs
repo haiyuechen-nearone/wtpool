@@ -1,21 +1,18 @@
-// The demo's sandbox: a temporary folder that holds everything the recorded VS Code and its fake
-// `wtpool` read or write: user data, extensions, HOME, TMPDIR, the workspace folder, the fake's
-// config, control file and log, and the live build log. Nothing outside it is read but the
-// .vsix, the harness's fake wtpool and the VS Code binary, and `remove` deletes it all.
+/**
+ * @fileoverview The demo's sandbox: one temporary folder for everything the recorded VS Code and
+ * the fake wtpool read or write. Outside it they read only the .vsix, the fake wtpool and the
+ * VS Code binary.
+ */
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { QUIET_SETTINGS, removeLink, shortLink } from '../../test/support/code.mjs';
 import { FAKE_WTPOOL, VSIX } from '../../test/support/paths.mjs';
 import { env, vscodePaths } from '../../test/e2e/vscode.mjs';
 
-export const SCRIPTS = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-
-/** The look of the recording: Dark Modern, no side bar clutter, no minimap, no breadcrumbs. */
-const LOOK = {
+const RECORDING_SETTINGS = {
   'workbench.colorTheme': 'Default Dark Modern',
   'workbench.layoutControl.enabled': false,
   'workbench.editor.empty.hint': 'hidden',
@@ -23,27 +20,29 @@ const LOOK = {
   'editor.minimap.enabled': false,
   'window.restoreWindows': 'none',
   'window.newWindowDimensions': 'default',
-  // The working spinner turns (icons.css), whatever the system's reduce motion setting says.
+  // Keeps the working spinner turning, whatever the system's reduce motion setting.
   'workbench.reduceMotion': 'off',
   'terminal.integrated.profiles.osx': { 'wtpool-demo sh': { path: '/bin/sh', args: [] } },
   'terminal.integrated.defaultProfile.osx': 'wtpool-demo sh',
 };
 
 /**
- * A fresh sandbox below the system temporary folder, with the .vsix installed and `wtpool.path`
- * naming a wrapper that runs the harness's fake wtpool on the sandbox's config. The workspace folder
- * is called `name` (the repository's folder name), so the window title reads like the story.
+ * Creates a sandbox below the system temporary folder, with the .vsix installed and `wtpool.path`
+ * naming a wrapper that runs the fake wtpool on the sandbox's config. The workspace folder is
+ * called `name`, so the window title matches the story.
  */
-export function create(name) {
-  if (!existsSync(VSIX)) throw new Error('demo: no vscode/wtpool.vsix; run `npm run package` first');
+export function createSandbox(name) {
+  if (!existsSync(VSIX)) {
+    throw new Error('demo: no vscode/wtpool.vsix; run `npm run package` first');
+  }
   const root = mkdtempSync(path.join(os.tmpdir(), 'wtpool-demo-'));
-  // The harness's env() and close() keep their run files below WTPOOL_VERIFY_RUN_DIR.
+  // env() and close() of e2e/vscode.mjs keep their run files below WTPOOL_VERIFY_RUN_DIR.
   process.env.WTPOOL_VERIFY_RUN_DIR = root;
   const link = shortLink(root);
   const dirs = {
     root,
     link,
-    // VS Code's sockets go in these two, so VS Code gets them through the short link.
+    // VS Code puts its sockets in these two, so they go through the short link.
     userData: path.join(link, 'user-data'),
     tmp: path.join(link, 'tmp'),
     extensions: path.join(root, 'extensions'),
@@ -61,13 +60,13 @@ export function create(name) {
   mkdirSync(path.join(dirs.userData, 'User'), { recursive: true });
   writeFileSync(dirs.control, '');
   dirs.wtpoolPath = path.join(dirs.bin, 'wtpool');
-  // wtpool.path takes a binary with no shell (R8), so a two line wrapper hands the fake its config.
+  // `wtpool.path` runs a binary with no shell, so a wrapper script hands the fake its config.
   writeFileSync(
     dirs.wtpoolPath,
     `#!/bin/sh\nWTPOOL_FAKE_CONFIG='${dirs.fakeConfig}' exec '${process.execPath}' '${FAKE_WTPOOL}' "$@"\n`,
   );
   chmodSync(dirs.wtpoolPath, 0o755);
-  const settings = { ...QUIET_SETTINGS, ...LOOK, 'wtpool.path': dirs.wtpoolPath };
+  const settings = { ...QUIET_SETTINGS, ...RECORDING_SETTINGS, 'wtpool.path': dirs.wtpoolPath };
   writeFileSync(path.join(dirs.userData, 'User', 'settings.json'), JSON.stringify(settings, null, 2));
   execFileSync(
     vscodePaths().cli,
@@ -78,8 +77,8 @@ export function create(name) {
 }
 
 /**
- * Configures the fake wtpool: `wtpool status --watch` prints `first`, then whatever `emit` appends to
- * the control file, with an alive line each second; `wtpool free` and `wtpool fg` only log and succeed.
+ * Configures the fake wtpool. Its `status --watch` prints `first`, then each document that
+ * {@link emit} sends, with an alive line each second. Its `free` and `fg` only log and succeed.
  */
 export function configureFake(dirs, first) {
   writeFileSync(
@@ -93,9 +92,11 @@ export function emit(dirs, document) {
   writeFileSync(dirs.control, `emit ${JSON.stringify(document)}\n`, { flag: 'a' });
 }
 
-/** The argv of each start of the fake so far, oldest first. */
+/** Returns the argv of each start of the fake so far, oldest first. */
 export function fakeStarts(dirs) {
-  if (!existsSync(dirs.fakeLog)) return [];
+  if (!existsSync(dirs.fakeLog)) {
+    return [];
+  }
   return readFileSync(dirs.fakeLog, 'utf8')
     .split('\n')
     .filter(Boolean)
@@ -105,7 +106,7 @@ export function fakeStarts(dirs) {
 }
 
 /** Deletes the sandbox and its short link. */
-export function remove(dirs) {
+export function removeSandbox(dirs) {
   removeLink(dirs.link);
   rmSync(dirs.root, { recursive: true, force: true });
 }

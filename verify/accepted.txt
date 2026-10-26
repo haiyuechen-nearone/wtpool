@@ -168,3 +168,5 @@ accept cli-agent-guard af20038de504d21022708c044fd68cddfa1d81ee5421a0ee1bf8d2f9c
 accept merge-guard-hook 8b15aee44feac6a6e394db4e3e7085dd1d78e8d03dc8d2c647c9f87c552e9897
 # The cc fixtures follow Claude Code 2.1.310: a live record in which every cc check passed retired the 2.1.306 recordings; verify/fixtures/claude-2.1.310/ is scrubbed from the new ones, claude-2.1.306/ deleted, the lock's recordings table hashes the 2.1.310 recordings, and the fixture canary edits the new cc_idle_prompt.jsonl.
 accept cc-record 054ecbd89aa16a1448b08398614a1ba26113668ff8f8f0fc9783c236b8bdbd24
+# Status lines: status-panel.md revisions 24 to 28 and verification.md revisions 25 to 27 record the merged changes; H7, H9, H18, R9, X4, X6, X10 and U4 each gain a sentence on behaviour already built; R2 gains the four int checks of the CLI's escapes, from phase 3; the trace list names every check verify/trace.toml holds, X12's agent guard checks among them.
+accept status-lines 4bd6c19b8fe9f67108943f199600a98b39aa842eda9de612bb0901bb59ad3b8e

@@ -1,13 +1,12 @@
-// What the recording adds to the window and how it takes frames. Screenshots show no OS cursor,
-// so a drawn pointer and a click ring sit in an overlay on top of the workbench, and they move
-// with Playwright's mouse, which hovers and clicks for real. The webview's clock is shifted to
-// the story's start, so ages and clock times come from the scripted times alone.
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { sleep } from '../../test/e2e/vscode.mjs';
 
-/** Draws the pointer, an arrow with a dark rim, and the ring a click shows, at `start`. */
+/**
+ * Draws a pointer, an arrow with a dark rim, and the ring a click shows, at `start`, over the
+ * workbench, as screenshots show no OS cursor.
+ */
 export async function installPointer(window, start) {
   await window.evaluate(({ x, y }) => {
     const layer = document.createElement('div');
@@ -35,23 +34,29 @@ async function placePointer(window, x, y) {
   await window.evaluate(
     ({ x: left, y: top }) => {
       const layer = document.getElementById('wtpool-demo-pointer');
-      if (layer) layer.style.transform = `translate(${left}px,${top}px)`;
+      if (layer) {
+        layer.style.transform = `translate(${left}px,${top}px)`;
+      }
     },
     { x, y },
   );
   await window.mouse.move(x, y);
 }
 
-const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+function easeInOutQuad(t) {
+  return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+}
 
-/** Moves the pointer and the mouse from `from` to `to` over `ms`; returns `to`. */
+/** Moves the pointer and the mouse from `from` to `to` over `ms`, and returns `to`. */
 export async function movePointer(window, from, to, ms) {
   const begin = Date.now();
   for (;;) {
     const t = ms > 0 ? Math.min(1, (Date.now() - begin) / ms) : 1;
-    const k = ease(t);
+    const k = easeInOutQuad(t);
     await placePointer(window, from.x + (to.x - from.x) * k, from.y + (to.y - from.y) * k);
-    if (t >= 1) return to;
+    if (t >= 1) {
+      return to;
+    }
     await sleep(12);
   }
 }
@@ -74,9 +79,9 @@ export async function clickPointer(window, at) {
 }
 
 /**
- * Shifts the webview's clock so that the real time `realMs` reads as `storyMs`: the tab's ages
- * and the detail strip's times then follow the scripted times. The webview reads the clock only
- * through `Date.now()` (main.ts), each render and each second.
+ * Shifts the webview's clock so that the real time `realMs` reads as `storyMs`, and the tab's ages
+ * and the detail strip's times follow the scripted times. The webview reads the time only through
+ * `Date.now()`.
  */
 export async function shiftClock(frame, realMs, storyMs) {
   await frame.evaluate((shift) => {
@@ -115,13 +120,16 @@ export function record(window, dir, { fps, origin }) {
   };
 }
 
-/** The frame on screen at each tick of `fps` from 0 to `lengthMs`: the last one shown by then. */
+/** Picks the frame on screen at each tick of `fps` from 0 to `lengthMs`: the last one shown by then. */
 export function timeline(frames, fps, lengthMs) {
+  const tickMs = 1000 / fps;
   const picked = [];
   let index = 0;
-  for (let tick = 0; tick * (1000 / fps) <= lengthMs; tick += 1) {
-    const ms = tick * (1000 / fps);
-    while (index + 1 < frames.length && frames[index + 1].ms <= ms) index += 1;
+  for (let tick = 0; tick * tickMs <= lengthMs; tick += 1) {
+    const ms = tick * tickMs;
+    while (index + 1 < frames.length && frames[index + 1].ms <= ms) {
+      index += 1;
+    }
     picked.push(frames[index]);
   }
   return picked;

@@ -67,6 +67,11 @@ header__should_show_starting_before_the_first_line = 3
 stream__should_post_starting_before_the_first_line = 3
 # H21: the hook runs gc itself after a session's end, once a day per pool (round auto-gc).
 gc__should_run_once_a_day_on_session_end = 3
+# R2: the lines the CLI writes itself show X10's characters as escapes (round cli-presentation).
+ls__should_show_controls_bidi_and_zero_width_as_escapes = 3
+bg__should_show_controls_in_the_fetching_line_as_escapes = 3
+fg__should_show_controls_in_the_commit_subject_as_escapes = 3
+config__should_show_controls_in_paths_as_escapes = 3
 
 [ids.R1]
 phase = 1
@@ -74,7 +79,13 @@ checks = ["rows__should_show_name_role_and_branch"]
 
 [ids.R2]
 phase = 1
-checks = ["status__should_report_the_facts_wtpool_ls_reports"]
+checks = [
+  "status__should_report_the_facts_wtpool_ls_reports",
+  "ls__should_show_controls_bidi_and_zero_width_as_escapes",
+  "bg__should_show_controls_in_the_fetching_line_as_escapes",
+  "fg__should_show_controls_in_the_commit_subject_as_escapes",
+  "config__should_show_controls_in_paths_as_escapes",
+]
 
 [ids.R3]
 phase = 1
