@@ -107,8 +107,9 @@ test('flow__reload_restores', async () => {
     const selected = await poll(async () => (await detailOwners(frame)).join() === wt2, 5_000);
 
     // When
+    const reloaded = window.waitForEvent('load', { timeout: 60_000 });
     await runCommand(window, 'Developer: Reload Window');
-    await sleep(3000);
+    await reloaded;
     await workbench(window);
     const restored = await panelFrame(window, 60_000);
     const rows = restored ? await waitForRows(restored, scenarioRows(session), 15_000) : [];
@@ -277,8 +278,8 @@ test('flow__two_windows', async () => {
     // When: a second window on the same folder (R9: a window without one runs no wtpool).
     const second = await newWindow(session, session.pool);
     await openStatus(session, second);
-    await sleep(2000);
-    const both = watchers().filter((w) => wtpoolProcesses(main).some((p) => p.pid === w.pid));
+    const own = () => watchers().filter((w) => wtpoolProcesses(main).some((p) => p.pid === w.pid));
+    const both = (await poll(() => own().length === 2 && own(), 10_000)) || own();
     const firstRows = await rowsWithoutLast(await panelFrame(window, 5_000));
     const secondRows = await rowsWithoutLast(await panelFrame(second, 5_000));
 

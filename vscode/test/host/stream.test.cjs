@@ -17,7 +17,7 @@ const {
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-/** The longest a restarted fake wtpool may take to log its start and print a line: seconds on a loaded machine. */
+/** The longest a fake wtpool may take to log its start, print a line or end: seconds on a loaded machine. */
 const RESTART_MS = 10_000;
 
 async function viewsSince(from) {
@@ -180,15 +180,15 @@ describe('stream', () => {
     // When
     await openStatus();
     const first = await waitFor(() => starts()[0], 10_000);
-    await waitFor(() => first && ended(first.pid), 3_000);
-    const paused = await waitFor(async () => (await viewsSince(from)).find((v) => v.connection === 'paused'), 3_000);
+    await waitFor(() => first && ended(first.pid), RESTART_MS);
+    const paused = await waitFor(async () => (await viewsSince(from)).find((v) => v.connection === 'paused'), RESTART_MS);
     await advance(999);
     await sleep(400);
     const beforeRetry = starts().length;
     await advance(1);
     const live = await waitFor(async () =>
       (await viewsSince(from)).find((v) => v.connection === 'live' && same(v.status, expected)),
-    5_000);
+    RESTART_MS);
 
     // Then
     assert.ok(first, 'wtpool did not start');
@@ -212,18 +212,18 @@ describe('stream', () => {
     // When
     await openStatus();
     const first = await waitFor(() => starts()[0], 10_000);
-    await waitFor(() => first && ended(first.pid), 3_000);
-    const failed = await waitFor(async () => (await viewsSince(from)).find((v) => v.connection === 'paused'), 3_000);
+    await waitFor(() => first && ended(first.pid), RESTART_MS);
+    const failed = await waitFor(async () => (await viewsSince(from)).find((v) => v.connection === 'paused'), RESTART_MS);
     const fromSecond = (await posted()).length;
     await advance(1000);
-    const second = await waitFor(() => starts()[1], 3_000);
-    await waitFor(() => second && ended(second.pid), 3_000);
-    const silent = await waitFor(async () => (await viewsSince(fromSecond)).find((v) => v.connection === 'paused'), 3_000);
+    const second = await waitFor(() => starts()[1], RESTART_MS);
+    await waitFor(() => second && ended(second.pid), RESTART_MS);
+    const silent = await waitFor(async () => (await viewsSince(fromSecond)).find((v) => v.connection === 'paused'), RESTART_MS);
     const fromThird = (await posted()).length;
     await advance(2000);
     const live = await waitFor(async () =>
       (await viewsSince(fromThird)).find((v) => v.connection === 'live' && same(v.status, expected)),
-    5_000);
+    RESTART_MS);
 
     // Then
     assert.ok(stderr.length > 4096, 'setup: the stderr fits the tail the stream keeps');
@@ -326,10 +326,10 @@ describe('stream', () => {
     await sleep(500);
     const before30 = starts().length;
     await advance(1);
-    let restarted = await waitFor(() => starts().length >= 2, 2_000);
+    let restarted = await waitFor(() => starts().length >= 2, RESTART_MS);
     if (!restarted) {
       await advance(1000);
-      restarted = await waitFor(() => starts().length >= 2, 2_000);
+      restarted = await waitFor(() => starts().length >= 2, RESTART_MS);
     }
 
     // Then

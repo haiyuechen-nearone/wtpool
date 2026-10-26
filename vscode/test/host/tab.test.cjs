@@ -28,6 +28,12 @@ const {
 const MESSAGE_KINDS = ['showInformationMessage', 'showWarningMessage', 'showErrorMessage'];
 const SHELLS = ['sh', 'bash', 'zsh', 'dash', 'fish', 'ksh', 'tcsh', 'csh'];
 
+/** The Worktrees tab once it is the active tab of the active group. */
+function shownStatusTab() {
+  const found = openStatusTab();
+  return found?.tab.isActive && found.group === vscode.window.tabGroups.activeTabGroup ? found : undefined;
+}
+
 async function textEditor(column) {
   const document = await vscode.workspace.openTextDocument({ content: 'wtpool-verify' });
   return vscode.window.showTextDocument(document, { viewColumn: column, preview: false });
@@ -46,12 +52,10 @@ describe('tab', () => {
     const opened = await waitFor(openStatusTab, 10_000);
     await textEditor(vscode.ViewColumn.One);
     await vscode.commands.executeCommand('wtpool.openStatus');
-    await sleep(500);
-    const revealedFromOtherGroup = openStatusTab();
+    const revealedFromOtherGroup = (await waitFor(shownStatusTab, 10_000)) ?? openStatusTab();
     await textEditor(opened?.group.viewColumn);
     await vscode.commands.executeCommand('wtpool.openStatus');
-    await sleep(500);
-    const revealedInItsGroup = openStatusTab();
+    const revealedInItsGroup = (await waitFor(shownStatusTab, 10_000)) ?? openStatusTab();
 
     // Then
     assert.ok(opened, 'Worktrees: Open Status opened no tab');

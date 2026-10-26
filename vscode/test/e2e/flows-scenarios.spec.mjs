@@ -1,9 +1,10 @@
 // flow__every_activity_shows (verification.md, "User flows"): every phase 1 scenario that runs
-// in e2e, each in its own VS Code on its own pool (a pool is VS Code's
-// environment, WTPOOL_FOREGROUND and WTPOOL_SLOT_DIR, so one session cannot show two). It also gives
-// each scenario check its e2e result: <run>/e2e/scenarios.json, which layers/e2e.rs reads.
+// in e2e, each a case of its own, `flow__every_activity_shows <scenario>`, in its own VS Code on its
+// own pool (a pool is VS Code's environment, WTPOOL_FOREGROUND and WTPOOL_SLOT_DIR, so one session
+// cannot show two). Each case also gives its scenario check its e2e result:
+// <run>/e2e/scenarios/<scenario>.json, which layers/e2e.rs reads.
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, readdirSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, utimesSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from '@playwright/test';
 
@@ -140,41 +141,66 @@ function result(name, error) {
   return { title: name, outcome: 'fail', kind: assertion ? 'assertion' : 'error', message };
 }
 
-test('flow__every_activity_shows', async () => {
-  // Given
-  const names = readdirSync(SCENARIOS)
-    .filter((file) => file.endsWith('.json'))
-    .map((file) => file.slice(0, -'.json'.length))
-    .filter((name) => {
-      const scenario = JSON.parse(readFileSync(path.join(SCENARIOS, `${name}.json`), 'utf8'));
-      // The phase 1 scenarios; scenarios-agents.spec.mjs runs the later ones, which have hook steps.
-      return scenario.phase === 1 && scenario.phase <= PHASE && scenario.layers.includes('e2e');
-    });
-  const file = path.join(runDir(), 'e2e', 'scenarios.json');
+/** The phase 1 scenarios that run in e2e; scenarios-agents.spec.mjs runs the later ones, which have hook steps. */
+const NAMES = readdirSync(SCENARIOS)
+  .filter((file) => file.endsWith('.json'))
+  .map((file) => file.slice(0, -'.json'.length))
+  .filter((name) => {
+    const scenario = JSON.parse(readFileSync(path.join(SCENARIOS, `${name}.json`), 'utf8'));
+    return scenario.phase === 1 && scenario.phase <= PHASE && scenario.layers.includes('e2e');
+  });
+
+/** Writes `value` to `file` as JSON in one step, so a case running beside it reads all of it or none. */
+function writeWhole(file, value) {
   mkdirSync(path.dirname(file), { recursive: true });
+  const partial = `${file}.${process.pid}.partial`;
+  writeFileSync(partial, JSON.stringify(value, null, 2));
+  renameSync(partial, file);
+}
 
-  // When
-  const signatures = new Map();
-  const results = [];
-  for (const name of names) {
-    await test.step(name, async () => {
-      try {
-        judgeScenario(await showScenario(name), signatures);
-        results.push(result(name));
-      } catch (error) {
-        results.push(result(name, error));
-      }
-    });
-    writeFileSync(file, JSON.stringify(results, null, 2));
+/**
+ * Asserts across every case that has written <run>/e2e/icons/<scenario>.json so far: each
+ * activity shows one icon, and no two activities share one. Each case writes its own file before
+ * it reads the others', so of two cases that disagree the later reader fails, whatever their order.
+ */
+function judgeIcons() {
+  const dir = path.join(runDir(), 'e2e', 'icons');
+  const byActivity = new Map();
+  for (const file of readdirSync(dir).filter((name) => name.endsWith('.json'))) {
+    const scenario = file.slice(0, -'.json'.length);
+    for (const [activity, signature] of Object.entries(JSON.parse(readFileSync(path.join(dir, file), 'utf8')))) {
+      if (!byActivity.has(activity)) byActivity.set(activity, new Map());
+      if (!byActivity.get(activity).has(signature)) byActivity.get(activity).set(signature, scenario);
+    }
   }
-
-  // Then
-  assert.ok(names.length >= 8, `setup: ${names.length} scenarios of phase ${PHASE} run in e2e`);
-  const failed = results.filter((r) => r.outcome !== 'pass').map((r) => `${r.title}: ${r.message.split('\n')[0]}`);
-  assert.deepEqual(failed, [], 'scenarios whose rows, Last or icons the panel does not show');
-  for (const [activity, found] of signatures) {
-    assert.equal(found.size, 1, `${WORDS[activity]} shows ${found.size} different icons`);
+  for (const [activity, found] of byActivity) {
+    assert.equal(found.size, 1, `${WORDS[activity]} shows ${found.size} different icons, first in ${[...found.values()].join(', ')}`);
   }
-  const each = [...signatures].map(([activity, found]) => [activity, [...found][0]]);
+  const each = [...byActivity].map(([activity, found]) => [activity, [...found.keys()][0]]);
   assert.equal(new Set(each.map(([, signature]) => signature)).size, each.length, `activities share an icon: ${JSON.stringify(each)}`);
-});
+}
+
+for (const name of NAMES) {
+  test(`flow__every_activity_shows ${name}`, async () => {
+    // Given
+    assert.ok(NAMES.length >= 8, `setup: ${NAMES.length} scenarios of phase ${PHASE} run in e2e`);
+    const signatures = new Map();
+
+    // When
+    let failure;
+    try {
+      judgeScenario(await showScenario(name), signatures);
+    } catch (error) {
+      failure = error;
+    }
+    writeWhole(path.join(runDir(), 'e2e', 'scenarios', `${name}.json`), [result(name, failure)]);
+
+    // Then
+    if (failure) throw failure;
+    for (const [activity, found] of signatures) {
+      assert.equal(found.size, 1, `${WORDS[activity]} shows ${found.size} different icons in ${name}`);
+    }
+    writeWhole(path.join(runDir(), 'e2e', 'icons', `${name}.json`), Object.fromEntries([...signatures].map(([activity, found]) => [activity, [...found][0]])));
+    judgeIcons();
+  });
+}

@@ -349,9 +349,7 @@ test('flow__keyboard_only', async () => {
     if (PHASE >= 4) writeMachineToml(dirs, { limit: 4, heavy: ['just'] });
     await window.mouse.move(1, 1);
     const frame = await openStatus(session);
-    for (let step = 0; step < 3 && !(await frame.evaluate(() => document.hasFocus())); step += 1) {
-      await runCommand(window, 'View: Focus Next Editor Group');
-    }
+    assert.ok(await focusPage(frame), 'setup: the tab\'s page did not take keyboard focus');
     const status = resolved(scenarioDocuments(session.scenario).documents.at(-1), session.pool);
     const expected = rowOrder(status.pools[0].worktrees).flatMap((w) => [
       `row ${w.path}`,

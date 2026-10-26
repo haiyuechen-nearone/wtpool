@@ -231,7 +231,7 @@ pub fn parse(format: Format, text: &str) -> Result<Vec<TestOutcome>, String> {
 
 /// Reads the further outcomes a check writes for other checks, a JSON array of
 /// `{"title", "outcome": "pass" | "fail", "kind": "assertion" | "error" | null, "message"}`:
-/// flow__every_activity_shows gives each scenario check its e2e result this way.
+/// each case of flow__every_activity_shows gives its scenario check its e2e result this way.
 pub fn parse_extra(text: &str) -> Result<Vec<TestOutcome>, String> {
     let json: serde_json::Value =
         serde_json::from_str(text).map_err(|e| format!("no JSON: {e}"))?;

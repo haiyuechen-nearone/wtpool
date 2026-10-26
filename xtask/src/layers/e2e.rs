@@ -47,8 +47,9 @@ pub(super) fn e2e(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
         Err(error) => return fail_all(format!("setup: the xtask binary: {error}")),
     };
     let _ = fs::remove_dir_all(ctx.run_dir.join("e2e"));
-    // The phase 1 scenario checks of the e2e layer run inside flow__every_activity_shows, and it
-    // writes their outcomes to e2e/scenarios.json; `--only <scenario>` runs that flow.
+    // Each phase 1 scenario check of the e2e layer runs as a case of flow__every_activity_shows,
+    // `flow__every_activity_shows <scenario>`, which writes its outcome to
+    // e2e/scenarios/<scenario>.json; `--only <scenario>` runs that case.
     // Later scenarios are checks of their own in scenarios-agents.spec.mjs.
     let grep = ctx
         .only
@@ -56,7 +57,7 @@ pub(super) fn e2e(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
         .filter(|only| {
             crate::scenario::load(&ctx.root, only).is_ok_and(|scenario| scenario.phase == 1)
         })
-        .map(|_| crate::web::title_pattern(SCENARIO_FLOW));
+        .map(|only| crate::web::title_pattern(&format!("{SCENARIO_FLOW} {only}")));
     let envs = vec![
         (
             "WTPOOL_VERIFY_XTASK".to_owned(),
@@ -91,16 +92,20 @@ pub(super) fn e2e(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
         PlaywrightRun {
             results: Some("results-exclusive.json"),
             log: Some("e2e_exclusive"),
-            extra: vec![
-                ResultsFile {
-                    format: Format::Playwright,
-                    path: ctx.run_dir.join("e2e/results.json"),
-                },
+            extra: std::iter::once(ResultsFile {
+                format: Format::Playwright,
+                path: ctx.run_dir.join("e2e/results.json"),
+            })
+            .chain(crate::scenario::names(&ctx.root).into_iter().map(|name| {
                 ResultsFile {
                     format: Format::Extra,
-                    path: ctx.run_dir.join("e2e/scenarios.json"),
-                },
-            ],
+                    path: ctx
+                        .run_dir
+                        .join("e2e/scenarios")
+                        .join(format!("{name}.json")),
+                }
+            }))
+            .collect(),
             ..parallel
         },
     );

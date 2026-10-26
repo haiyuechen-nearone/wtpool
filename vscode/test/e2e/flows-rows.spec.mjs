@@ -8,7 +8,7 @@ import { test } from '@playwright/test';
 import { runDir } from '../support/paths.mjs';
 import { waitForRows } from './rows.mjs';
 import { detailOwners, detailText, openStatus, poll, rowOf, scenarioRows, withFlow, worktreePath } from './flows.mjs';
-import { releaseWtpool, sleep, wtpoolProcesses } from './vscode.mjs';
+import { releaseWtpool, wtpoolProcesses } from './vscode.mjs';
 
 test('flow__select_and_deselect', async () => {
   await withFlow('flow__select_and_deselect', {}, async (session) => {
@@ -80,9 +80,11 @@ test('flow__connection_states', async () => {
         if (n !== undefined) seen.push(n);
         return n >= 4 && n;
       }, 40_000, 100);
-      await sleep(2000);
-      const later = await pausedN();
-      if (later !== undefined) seen.push(later);
+      const later = await poll(async () => {
+        const n = await pausedN();
+        return n !== undefined && n < long && n;
+      }, 2_000, 100);
+      if (later) seen.push(later);
       renameSync(real, binary);
       const restoredAt = Date.now();
       const restoredN = await pausedN();
@@ -97,7 +99,7 @@ test('flow__connection_states', async () => {
       assert.ok(paused, 'the header never read "updates paused, retrying in N s" while the restart failed');
       assert.deepEqual(seen.filter((n) => n < 1 || n > 30), [], `N outside the 1 to 30 s backoff: ${seen}`);
       assert.ok(long, `no pause read "retrying in N s" with N of 4 or more while the backoff grew: ${seen}`);
-      assert.ok(later >= 1 && later <= long - 1, `N does not count down: ${long} s, then ${later} s 2 s later`);
+      assert.ok(later >= 1 && later <= long - 1, `N does not count down within 2 s of ${long} s: ${later}`);
       assert.ok(resumed, 'the header did not return to live after the stream resumed');
       if (restoredN !== undefined) {
         assert.ok(resumedMs <= (restoredN + 3) * 1000, `"retrying in ${restoredN} s", but live came ${resumedMs} ms later`);

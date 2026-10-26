@@ -3,8 +3,8 @@
 # runs shot and e2e, bench runs bench, cc runs cc. A check a layer reports that is not listed here for that
 # layer is an error, and so is a listed check the layer reported no result for. Scenario checks
 # take their layers from `layers` in verify/scenarios/<name>.json. In e2e a scenario check gets
-# its outcome from flow__every_activity_shows, which runs every scenario and writes each one's
-# outcome to <run>/e2e/scenarios.json (xtask/src/layers/e2e.rs).
+# its outcome from its case of flow__every_activity_shows, `flow__every_activity_shows <name>`,
+# which writes it to <run>/e2e/scenarios/<name>.json (xtask/src/layers/e2e.rs).
 
 [checks]
 # static: the extension's manifest, as written and as packaged in wtpool.vsix, and its bundle.

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { test } from '@playwright/test';
 
 import { scenarioDocuments } from '../support/docs.mjs';
+import { poll } from './flows.mjs';
 import { listening } from './sockets.mjs';
 import { close, descendants, launch, newWindow, panelFrame, pool, runCommand, sandbox, watchers } from './vscode.mjs';
 
@@ -86,11 +87,10 @@ test('windows__should_run_one_watcher_each', async () => {
     const second = await newWindow(session, poolInfo);
     await runCommand(second, 'Worktrees: Open Status');
     const secondFrame = await panelFrame(second);
-    await second.waitForTimeout(2000);
-    const both = watchers().filter((w) => descendants(main).includes(w.pid));
+    const own = () => watchers().filter((w) => descendants(main).includes(w.pid));
+    const both = (await poll(() => own().length === 2 && own(), 10_000)) || own();
     await runCommand(window, 'View: Close All Editors');
-    await window.waitForTimeout(2000);
-    const afterClose = watchers().filter((w) => descendants(main).includes(w.pid));
+    const afterClose = (await poll(() => own().length === 1 && own(), 10_000)) || own();
 
     // Then
     assert.ok(secondFrame, 'the second window shows no rows');
@@ -117,8 +117,9 @@ test('restore__should_rebuild_after_reload', async () => {
     await frame.locator('tr.detail').waitFor({ timeout: 5000 });
 
     // When
+    const reloaded = window.waitForEvent('load', { timeout: 60_000 });
     await runCommand(window, 'Developer: Reload Window');
-    await window.waitForTimeout(3000);
+    await reloaded;
     await window.locator('.monaco-workbench').waitFor({ timeout: 60_000 });
     const restored = await panelFrame(window, 60_000);
 

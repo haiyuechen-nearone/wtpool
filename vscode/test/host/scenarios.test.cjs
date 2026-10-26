@@ -131,8 +131,9 @@ describe('popups', () => {
     // When
     try {
       await resetFake({ documents: [scenarioDocuments('idle_pool').at(-1), waiting], aliveMs: 200 });
+      const from = (await posted()).length;
       await openStatus();
-      await waitFor(async () => (await posted()).some((m) => m?.type === 'view' && m.status?.generated === waiting.generated && m.status.pools[0].worktrees.some((w) => w.activity === 'waiting')), 10_000);
+      await waitFor(async () => (await posted()).slice(from).some((m) => m?.type === 'view' && m.status?.generated === waiting.generated && m.status.pools[0].worktrees.some((w) => w.activity === 'waiting')), 10_000);
       await vscode.commands.executeCommand('workbench.action.closeAllEditors');
       await resetFake({ documents: [waiting], aliveMs: 200 });
       await openStatus();

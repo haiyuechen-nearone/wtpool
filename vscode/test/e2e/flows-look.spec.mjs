@@ -78,7 +78,14 @@ test('flow__theme_switch', async () => {
     for (const [theme, bodyClass, matches] of THEMES) {
       writeSettings(session.dirs, { 'workbench.colorTheme': theme });
       const applied = await poll(async () => matches((await colours(frame)).body.split(/\s+/)), 15_000);
-      await sleep(500);
+      // The theme's colours settle some time after its body class: two reads in a row agree.
+      let last;
+      await poll(async () => {
+        const now = JSON.stringify(await colours(frame));
+        const settled = now === last;
+        last = now;
+        return settled;
+      }, 5_000, 100);
       seen.push({ theme, bodyClass, applied, ...(await colours(frame)) });
     }
 

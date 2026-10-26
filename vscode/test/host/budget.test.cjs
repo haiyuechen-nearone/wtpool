@@ -8,8 +8,12 @@ describe('budgets', () => {
   it('budget__b7', async () => {
     // Given
     await resetFake({ scenario: 'idle_pool', aliveMs: 0 });
+    const from = (await posted()).length;
     const opened = await openStatus();
-    await waitFor(async () => (await posted()).some((m) => m.type === 'view'), 10_000);
+    // The fake reads control lines only once it has printed its documents, and earlier checks
+    // posted idle_pool too, so only a view of this tab counts.
+    const final = JSON.stringify(scenarioDocuments('idle_pool').at(-1));
+    await waitFor(async () => (await posted()).slice(from).some((m) => m.type === 'view' && JSON.stringify(m.status) === final), 10_000);
     await sleep(500);
     const settled = (await posted()).length;
 
@@ -32,6 +36,7 @@ describe('budgets', () => {
     await sleep(1500);
     const whileHidden = (await posted()).slice(hidden);
     await vscode.commands.executeCommand('wtpool.openStatus');
+    await waitFor(async () => (await posted()).length > hidden + whileHidden.length, 10_000);
     await sleep(1500);
     const onShow = (await posted()).slice(hidden + whileHidden.length);
 
@@ -56,10 +61,10 @@ describe('budgets', () => {
 
       // When
       await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-      await sleep(1000);
+      const gone = await waitFor(() => ended(started.pid), 1_000);
 
       // Then
-      assert.ok(ended(started.pid), `wtpool ${started.pid} still runs 1 s after the tab closed (${fault})`);
+      assert.ok(gone, `wtpool ${started.pid} still runs 1 s after the tab closed (${fault})`);
     });
   }
 });

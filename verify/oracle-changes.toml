@@ -1221,3 +1221,21 @@ reason = "Two fixes of the oracle. The probe of the job checks, xtask/src/bin/pr
 "xtask/src/bin/probe.rs" = "cac831790e4bf4cc4c4e46223d146dbb0d37a02ce374b120ff6e5263d2569ce4"
 "xtask/src/layers.rs" = "b6a948e67c274d40cd6a957c749bb883caf65876b042cab31c5e10a0a7d32987"
 "xtask/src/layers/statics.rs" = "fc54d70898934fbd5d3ae799c948652ac6ff7f7214081e53eb2e86e80ea33638"
+
+[[change]]
+id = "flake-fixes-2"
+reason = "More host and e2e checks wait for the state their next step needs instead of a fixed moment; their assertions stay as they were. flow__keyboard_only gives the page keyboard focus with focusPage, as its document.hasFocus() loop could stay false in a window that is never active. windows__should_run_one_watcher_each and flow__two_windows wait up to 10 s for the watcher count they assert, restore__should_rebuild_after_reload and flow__reload_restores wait for the reloaded window's load event instead of 3 s, flow__connection_states waits up to 2 s for the paused header's N to drop instead of reading it 2 s later, and flow__theme_switch waits until two reads of the colours agree instead of 500 ms. In the host, the restart checks stream__should_post_paused_before_the_first_document, its wtpool_error variant and stall_30s give a fake wtpool 10 s to start, print a line or end, budget__b7 waits for a view of its own tab before writing control lines and for the post that showing the tab makes before its 1.5 s window, budget__b10 waits up to 1 s for the closed tab's wtpool to end, manifest__should_contribute_no_status_bar_item waits_raise_no_popup waits for a view of its own tab, and open__should_reveal_or_create_beside waits up to 10 s for the revealed tab to be active in the active group. flow__every_activity_shows runs each phase 1 scenario as a case of its own, flow__every_activity_shows <scenario>, so each case has its own 300 s limit, a failure names its scenario and the cases run in parallel; each case writes its scenario check's e2e result to e2e/scenarios/<scenario>.json, which the e2e layer now reads, and the icon of each activity it showed to e2e/icons/<scenario>.json, where each case checks across the cases so far that an activity keeps one icon and no two activities share one; --only <scenario> runs that case."
+[change.files]
+"verify/checks.toml" = "ad589a8ad89142e81992a89c5b5e0ccfc3203d4358eb04d0175358c9a546b93e"
+"vscode/test/e2e/flows-exclusive.spec.mjs" = "70de0a222d7282cd0ee4df91618c65b8fbba97a23dbc60960c9111595dfecfe0"
+"vscode/test/e2e/flows-look.spec.mjs" = "3c1faaee8893f7bd033e55ed7bd4f52bfbe14d44c868e7f61772d0443a253b13"
+"vscode/test/e2e/flows-scenarios.spec.mjs" = "2176323cd26265eac2d7ff129d93d5ac514cec08e3ac2b139095a467e13bdf7f"
+"vscode/test/e2e/flows-rows.spec.mjs" = "9823b4e41168c1a9a1f6a1bfffee54f9338ef26e456d9708fe3a05c3a8e027da"
+"vscode/test/e2e/flows-tab.spec.mjs" = "6773c8dfbdac89db937eb99026a7693ac592ed0332e66fdb00b5579a8ab89f5b"
+"vscode/test/e2e/panel.spec.mjs" = "dee337415c723093583603d789f16c0c8d2901a05d8c9dc67b2d806689d3323d"
+"vscode/test/host/budget.test.cjs" = "528186b11ffb537c2dc92daa1847990f1232cf2f7bce01a61c5cc8a109584128"
+"vscode/test/host/scenarios.test.cjs" = "fa50b3dc524232104d7d991c2cfad9a4827c21dd39223e8d71b11dd9062b2f25"
+"vscode/test/host/stream.test.cjs" = "eb75ab8e69d8a9f65a24f5be5fc4bef9d456412d98de6fe9a52700a51ee12d22"
+"vscode/test/host/tab.test.cjs" = "3272cfb216c73dbf31dbcfcaddbaad5f4e0bc140045c75e051e11e26b564d4f4"
+"xtask/src/layers/e2e.rs" = "5eb1da154c3a63ad5e91cebdae3702f882f6595dd10bb070bc4776fbdb7e2869"
+"xtask/src/web/reporters.rs" = "f37c23e739562b2abf0d68b7c982d55213f2113ec14b9b014cab635e2635d3db"
