@@ -7,11 +7,6 @@ use super::hook_place::bash_records;
 use super::hook_strings::written_text;
 use crate::support::hook::{Hooks, event, with};
 
-/// One event of session `s1` at fg, from `fixture`, with `fields` set.
-pub(super) fn ev(hooks: &Hooks, fixture: &str, fields: &[(&str, Value)]) -> Value {
-    with(event(&hooks.pool, fixture, "s1", &hooks.pool.fg), fields)
-}
-
 pub(super) fn bash(command: &str) -> Value {
     json!({ "command": command, "description": "Run" })
 }
@@ -63,7 +58,7 @@ pub(super) fn post_read(id: &str) -> Step {
 
 pub(super) fn run_steps(hooks: &Hooks, steps: &[Step]) {
     for step in steps {
-        let mut payload = ev(hooks, step.fixture, &step.fields);
+        let mut payload = hooks.event(step.fixture, "s1", &step.fields);
         if step.agent {
             payload["agent_id"] = json!("a1");
             payload["agent_type"] = json!("Explore");
@@ -388,29 +383,21 @@ fn in_flight__should_keep_at_most_32() {
 
     // When
     for id in &pres {
-        hooks.send(&ev(
-            &hooks,
-            "PreToolUse-Read",
-            &[("tool_use_id", json!(id))],
-        ));
+        hooks.send(&hooks.event("PreToolUse-Read", "s1", &[("tool_use_id", json!(id))]));
     }
     let flying = in_flight_ids(&hooks.must_record("s1"));
     for id in &posts {
-        hooks.send(&ev(
-            &hooks,
-            "PostToolUse-Read",
-            &[("tool_use_id", json!(id))],
-        ));
+        hooks.send(&hooks.event("PostToolUse-Read", "s1", &[("tool_use_id", json!(id))]));
     }
     let done = done_ids(&hooks.must_record("s1"));
-    hooks.send(&ev(
-        &hooks,
+    hooks.send(&hooks.event(
         "PreToolUse-Read",
+        "s1",
         &[("tool_use_id", json!("toolu_q70"))],
     ));
-    hooks.send(&ev(
-        &hooks,
+    hooks.send(&hooks.event(
         "PreToolUse-Read",
+        "s1",
         &[("tool_use_id", json!("toolu_q01"))],
     ));
     let late = in_flight_ids(&hooks.must_record("s1"));

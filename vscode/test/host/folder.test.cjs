@@ -6,14 +6,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vscode = require('vscode');
 
-const { created, ended, openStatus, posted, resetFake, scenarioDocuments, sleep, starts, waitFor } = require('./support.cjs');
+const { created, ended, expectedDocuments, openStatus, posted, resetFake, sleep, starts, viewsSince, waitFor } = require('./support.cjs');
 
 /** The time a check waits for a `wtpool` the extension must not start or stop. */
 const QUIET_MS = 1500;
-
-async function viewsSince(from) {
-  return (await posted()).slice(from).filter((m) => m && m.type === 'view');
-}
 
 /** Changes the workspace folders with `update` and waits until VS Code says they changed. */
 async function changeFolders(update) {
@@ -39,7 +35,8 @@ async function restoreFolders(home) {
 
 describe('first folder', () => {
   it('spawn__should_run_in_the_workspace_folder first_folder_changes', async () => {
-    // Given: the tab on a pool with one wait, so its title counts it. Every later start of wtpool
+    // Given
+    // The tab on a pool with one wait, so its title counts it. Every later start of wtpool
     // prints after 5 s, so the tab shows the part of the old pool it keeps before any new document.
     const folders = vscode.workspace.workspaceFolders ?? [];
     assert.ok(vscode.workspace.workspaceFile, 'setup: the host window has no workspace file, so its first folder cannot change');
@@ -48,7 +45,7 @@ describe('first folder', () => {
     const other = process.env.WTPOOL_VERIFY_OTHER_FOLDER;
     assert.ok(other, 'setup: run.mjs named no other folder');
     fs.mkdirSync(other, { recursive: true });
-    const [waiting] = scenarioDocuments('permission_wait_and_answer');
+    const [waiting] = expectedDocuments('permission_wait_and_answer');
     await resetFake({ documents: [waiting], faults: ['none', 'slow_start'], slowStartMs: 5000, aliveMs: 200 });
     await openStatus();
     const panel = created.filter((c) => c.viewType === 'wtpool.status').at(-1)?.panel;
@@ -57,13 +54,16 @@ describe('first folder', () => {
     const seen = {};
 
     try {
-      // When: another folder joins after the first, then leaves.
+      // When
+      // Another folder joins after the first, then leaves.
       await changeFolders(() => vscode.workspace.updateWorkspaceFolders(1, 0, { uri: vscode.Uri.file(other) }));
       await sleep(QUIET_MS);
       seen.second = { starts: starts().length, ended: Boolean(first && ended(first.pid)), title: panel?.title };
       await changeFolders(() => vscode.workspace.updateWorkspaceFolders(1, 1));
 
-      // When: the other folder replaces the first.
+      // When
+
+      // The other folder replaces the first.
       const fromMove = (await posted()).length;
       await changeFolders(() => vscode.workspace.updateWorkspaceFolders(0, 1, { uri: vscode.Uri.file(other) }));
       seen.title = panel?.title;
@@ -71,7 +71,9 @@ describe('first folder', () => {
       seen.firstEnded = await waitFor(() => first && ended(first.pid), 5_000);
       seen.movedViews = await viewsSince(fromMove);
 
-      // When: no folder is left, then the workspace folder comes back.
+      // When
+
+      // No folder is left, then the workspace folder comes back.
       const fromNone = (await posted()).length;
       await changeFolders(() => vscode.workspace.updateWorkspaceFolders(0, 1));
       seen.noFolder = await waitFor(async () => (await viewsSince(fromNone)).find((v) => v.no_folder === true), 5_000);

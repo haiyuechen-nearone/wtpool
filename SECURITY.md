@@ -59,23 +59,33 @@ agent does:
   character, or over 1,024 bytes, is not stored.
 
 The plugin runs `wtpool hook` by name, so it runs the first `wtpool` on the `PATH` that Claude
-Code's hooks see. The block that `wtpool hook install` prints runs one absolute path instead. On
+Code's hooks see. On Unix that search includes relative `PATH` entries, such as `.` or an empty
+entry, which resolve against the folder the hook starts in, so a repository could supply that
+`wtpool`. The block that `wtpool hook install` prints runs one absolute path instead. On
 Windows, a program started by name may be found in the working folder before the `PATH`, so use
 the block there.
 
 ### The heavy job policy fails open
 
 The hooks also run `wtpool hook policy` before each Bash, PowerShell and Monitor call. It is the
-one hook that can stop a call: under `enforce = "require"` it refuses a call whose command holds a
-heavy command that `wtpool job` does not wrap, and its reason names the wrapped command to run
-instead (H29, J21). It never rewrites a call.
+one hook that can stop a call, and it never rewrites one:
 
-- It exits 0 on every path, and prints at most that one refusal. On any error it prints nothing,
+- Under `enforce = "require"` it refuses a call whose command holds a heavy command that
+  `wtpool job` does not wrap, and its reason names the wrapped command to run instead (H29, J21).
+- Under every policy, `off` included, it refuses a background Bash call inside a git repository
+  whose command holds a wait loop with no time limit, or one that runs `pgrep -f` or `pkill -f`.
+  Its reason is a fixed text that gives the bounded form (H31). This is on by default, and
+  `bounded_waits = false` in the repository's `wtpool.toml` turns it off.
+
+Either way, it fails open and keeps nothing:
+
+- It exits 0 on every path, and prints at most one refusal. On any error it prints nothing,
   so the call goes on as it would without the hook: a payload, a config or a command it cannot
   read, no answer before its watchdog, a panic.
 - It writes no file and runs no git and no shell. Under `off` it returns once it has read the
-  policy.
-- Its reason quotes the call's own command back to Claude Code, which sent it. Nothing is stored.
+  policy, unless the call runs in the background.
+- A heavy command's reason quotes the call's own command back to Claude Code, which sent it.
+  Nothing is stored.
 
 So `require` guides agents that cooperate. It is not a sandbox: a command the hook cannot read, a
 heavy command that a script or an editor starts, and an agent tool without this hook all run
@@ -83,11 +93,15 @@ unrefused, and show as not queued.
 
 ### Heavy job settings
 
-- Only you set the limit and the policy, in `machine.toml`, by hand or through `wtpool job`. No
+- The limit and the policy live in `machine.toml`, set by hand or through `wtpool job`. No
   environment variable, repository, clone or hook sets them (J4). `limit` or `enforce` in a
   `wtpool.toml` is an error.
 - A repository can only add heavy patterns, in its own `.git/wtpool.toml`, which no clone
-  carries. It can never lower the limit or relax the policy.
+  carries. Its files cannot lower the limit or relax the policy.
+- An agent can. It runs as you, so it can run `wtpool job limit` or `wtpool job enforce off`, or
+  edit `machine.toml`. It can also make `.git/wtpool.toml` unreadable, and the policy then
+  decides nothing in that repository. The limit and the policy hold only for agents that
+  cooperate.
 - A repository's files suggest patterns: the names at its top level and the script names of its
   `package.json`, which a hostile repository controls. A suggestion only shows, and applies once
   you add it. A script name that is not a valid pattern is dropped, and a name is only ever the
@@ -96,8 +110,11 @@ unrefused, and show as not queued.
   nothing.
 - On Unix, `machine.toml` and its folder must belong to you and be writable by no one else (J5).
   The job folder must be a real folder that belongs to you, not a symlink, and writable by no
-  one else, or `wtpool job` exits 125 before its command runs (J7). On Windows these checks rely on
-  the access list of your profile folder (J17).
+  one else, or `wtpool job` exits 125 before its command runs (J7). On Windows wtpool makes none
+  of these checks and relies on the access list of your profile folder (J17). `XDG_STATE_HOME` or
+  `XDG_CONFIG_HOME` set to a folder outside your profile is not protected.
+- Windows tells wtpool no file ids, so there it never checks that a file it opens is the one it
+  checked just before, or that a lock file is still the one it locked.
 - `wtpool job` runs its command as given, with no shell. Its own files open close-on-exec, so the
   command and its children never hold the job's lock (J8).
 - `wtpool job` writes `machine.toml` and `wtpool.toml` through a new file, opened without
@@ -169,7 +186,8 @@ OSC 52 sequence, which writes your clipboard.
 
 - The CLI shows each control, bidi, zero width or other invisible format character of a branch,
   path or other string from git, a record or a setting as `\u{XXXX}`, in every line it writes
-  itself (R2).
+  itself (R2). That includes the program name in a line of `wtpool job`, such as
+  `wtpool job: cannot run <program>`.
 - Two outputs keep such strings as they are: its JSON, and the path that `fg`, `bg` or `path`
   prints when its standard output is not a terminal, so that `cd "$(wtpool bg <ref>)"` names the
   real folder.

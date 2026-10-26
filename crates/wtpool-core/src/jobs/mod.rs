@@ -16,19 +16,19 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 pub use config::{
-    ConfigSource, Enforce, LIMIT_BOUNDS, Limit, MAX_DEFAULT_LIMIT, MachineConfig,
-    MachineConfigError, machine_config_path,
+    ConfigSource, Enforce, InvalidEnforce, InvalidLimit, LIMIT_BOUNDS, Limit, MAX_DEFAULT_LIMIT,
+    MachineConfig, MachineConfigError, MachineConfigFault, machine_config_path,
 };
 pub use edit::{
     EditError, EditFault, ListChange, RepositoryChange, RepositoryLists, edit_machine_heavy,
     edit_repository_heavy, set_enforce, set_limit,
 };
-pub use folder::{FolderError, JobFolder, Liveness};
+pub use folder::{FolderError, JobFile, JobFolder, Liveness, LockState};
 pub use heavy_table::{HeavyName, HeavyTable};
 pub use listing::{JobListing, ListedJob};
 pub use machine::MachineJobs;
 pub use record::{JobId, JobRecord, JobState};
-pub use run::{JobCommand, JobContext, run_job};
+pub use run::{JobCommand, JobContext, inside_live_job, run_job};
 
 use crate::platform::dirs;
 
@@ -42,7 +42,7 @@ pub struct JobPaths {
     pub folder: PathBuf,
 }
 
-/// Why a job cannot run, or `wtpool job` cannot read its settings or jobs.
+/// A fault that stops a job before it runs, or stops `wtpool job` reading its settings or jobs.
 #[derive(Debug, thiserror::Error)]
 pub enum JobError {
     #[error(transparent)]

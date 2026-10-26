@@ -1,10 +1,10 @@
-use std::path::PathBuf;
+use std::ffi::OsString;
+
+use rstest::rstest;
 
 use super::*;
-use crate::clock::Timestamp;
-use crate::jobs::record::JobState;
 
-fn must_folder() -> (tempfile::TempDir, JobFolder) {
+fn temp_folder() -> (tempfile::TempDir, JobFolder) {
     let dir = tempfile::tempdir().unwrap();
     let folder = JobFolder::create(JobFolder::path_in(dir.path())).unwrap();
     (dir, folder)
@@ -12,17 +12,9 @@ fn must_folder() -> (tempfile::TempDir, JobFolder) {
 
 fn record(id: &JobId, ticket: u64) -> JobRecord {
     JobRecord {
-        version: RECORD_VERSION,
         id: id.clone(),
-        pid: 7,
-        started: None,
-        summary: "make".to_owned(),
-        label: None,
-        cwd: PathBuf::from("/w"),
         ticket,
-        state: JobState::Waiting,
-        queued: Timestamp::from_seconds(0),
-        since: Timestamp::from_seconds(0),
+        ..JobRecord::sample(7)
     }
 }
 
@@ -73,7 +65,7 @@ fn job_folder_create__should_refuse_a_symlink_and_a_folder_others_may_write() {
 #[test]
 fn job_folder_liveness__should_follow_the_lock() {
     // Given
-    let (_dir, folder) = must_folder();
+    let (_dir, folder) = temp_folder();
     let id = JobId::new(7);
     let unknown = JobId::new(8);
 
@@ -86,14 +78,14 @@ fn job_folder_liveness__should_follow_the_lock() {
     // Then
     assert_eq!(
         (held, freed, folder.liveness(&unknown)),
-        (Liveness::Live, Liveness::Dead, Liveness::Dead)
+        (LockState::Live, LockState::Dead, LockState::Dead)
     );
 }
 
 #[test]
 fn job_folder_sweep__should_delete_dead_records_and_their_locks() {
     // Given
-    let (_dir, folder) = must_folder();
+    let (_dir, folder) = temp_folder();
     let (live, dead, orphan) = (JobId::new(1), JobId::new(2), JobId::new(3));
     let held = folder.create_lock(&live).unwrap();
     drop(folder.create_lock(&dead).unwrap());
@@ -132,7 +124,7 @@ fn job_folder_sweep__should_delete_dead_records_and_their_locks() {
 #[test]
 fn job_folder_take_ticket__should_count_past_every_ticket() {
     // Given
-    let (_dir, folder) = must_folder();
+    let (_dir, folder) = temp_folder();
     let queue = folder.lock_queue().unwrap();
     let id = JobId::new(1);
 
@@ -148,7 +140,7 @@ fn job_folder_take_ticket__should_count_past_every_ticket() {
 #[test]
 fn job_folder_records__should_read_back_what_it_wrote() {
     // Given
-    let (_dir, folder) = must_folder();
+    let (_dir, folder) = temp_folder();
     let id = JobId::new(9);
     let written = record(&id, 3);
 
@@ -160,4 +152,54 @@ fn job_folder_records__should_read_back_what_it_wrote() {
     // Then
     assert_eq!(read, vec![written]);
     assert!(folder.records().is_empty());
+}
+
+#[rstest]
+#[case::a_record("42-0badc0de.json", JobFile::Record(JobId::parse("42-0badc0de").unwrap()))]
+#[case::a_lock("42-0badc0de.lock", JobFile::Lock(JobId::parse("42-0badc0de").unwrap()))]
+#[case::the_queue_lock("queue.lock", JobFile::Queue)]
+#[case::the_ticket("ticket", JobFile::Queue)]
+#[case::a_temp_record(".42-0badc0de.json.42.tmp", JobFile::Temp)]
+#[case::a_temp_ticket(".ticket.42.tmp", JobFile::Temp)]
+#[case::no_id("notes.json", JobFile::Other)]
+#[case::another_extension("42-0badc0de.toml", JobFile::Other)]
+fn job_folder_file_kind__should_tell_each_file_of_the_folder(
+    #[case] name: &str,
+    #[case] expected: JobFile,
+) {
+    // When
+    let kind = JobFolder::file_kind(&OsString::from(name));
+
+    // Then
+    assert_eq!(kind, expected);
+}
+
+#[test]
+fn job_folder_write_record__should_leave_no_temp_file() {
+    // Given
+    let (_dir, folder) = temp_folder();
+    let queue = folder.lock_queue().unwrap();
+    let id = JobId::new(5);
+
+    // When
+    folder.write_record(&record(&id, 1)).unwrap();
+    folder.write_record(&record(&id, 2)).unwrap();
+    let ticket = folder.take_ticket(&queue, &[]).unwrap();
+
+    // Then
+    let mut kinds: Vec<JobFile> = std::fs::read_dir(folder.dir())
+        .unwrap()
+        .flatten()
+        .map(|entry| JobFolder::file_kind(&entry.file_name()))
+        .collect();
+    kinds.sort_by_key(|kind| format!("{kind:?}"));
+    assert_eq!(
+        kinds,
+        vec![JobFile::Queue, JobFile::Queue, JobFile::Record(id.clone())]
+    );
+    assert_eq!(
+        folder.named_record(&id).map(|record| record.ticket),
+        Some(2)
+    );
+    assert_eq!(ticket, 1);
 }

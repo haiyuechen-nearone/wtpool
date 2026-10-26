@@ -8,7 +8,7 @@ use crate::heavy::{CommandWords, HeavyList};
 use crate::processes::RunningProcess;
 
 /// The ancestors followed from a process. A deeper one, or a loop, ends the walk.
-const MAX_ANCESTORS: usize = 128;
+pub(super) const MAX_ANCESTORS: usize = 128;
 
 /// The name a heavy pattern gives a process.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,8 +25,8 @@ pub struct HeavyTable<'a> {
     table: &'a [RunningProcess],
     parents: HashMap<u32, u32>,
     names: HashMap<u32, HeavyName>,
-    /// The index in the job list of the job each job process runs.
-    jobs: HashMap<u32, usize>,
+    /// The job each job process runs, and its index in the job list.
+    jobs: HashMap<u32, (usize, &'a JobRecord)>,
 }
 
 impl<'a> HeavyTable<'a> {
@@ -37,7 +37,7 @@ impl<'a> HeavyTable<'a> {
         table: &'a [RunningProcess],
         heavy: &HeavyList,
         suggested: &HeavyList,
-        jobs: &[&JobRecord],
+        jobs: &[&'a JobRecord],
     ) -> Self {
         let named_by = |list: &HeavyList, words: &CommandWords| {
             (!list.patterns().is_empty())
@@ -64,8 +64,11 @@ impl<'a> HeavyTable<'a> {
         let jobs = table
             .iter()
             .filter_map(|process| {
-                let index = jobs.iter().position(|job| runs(job, process))?;
-                Some((process.pid, index))
+                let (index, job) = jobs
+                    .iter()
+                    .enumerate()
+                    .find(|(_, job)| runs(job, process))?;
+                Some((process.pid, (index, *job)))
             })
             .collect();
         Self {
@@ -91,10 +94,19 @@ impl<'a> HeavyTable<'a> {
         self.names.get(&pid)
     }
 
-    /// The job, by its index in the job list, whose process is `pid` or the nearest of its
-    /// ancestors.
+    /// The job whose process is `pid` or the nearest of its ancestors.
+    #[must_use]
+    pub fn holding_job(&self, pid: u32) -> Option<&'a JobRecord> {
+        self.held_by(pid).map(|(_, job)| job)
+    }
+
+    /// The index in the job list of [`HeavyTable::holding_job`].
     #[must_use]
     pub fn holder(&self, pid: u32) -> Option<usize> {
+        self.held_by(pid).map(|(index, _)| index)
+    }
+
+    fn held_by(&self, pid: u32) -> Option<(usize, &'a JobRecord)> {
         std::iter::once(pid)
             .chain(self.ancestors(pid))
             .find_map(|pid| self.jobs.get(&pid).copied())
@@ -120,7 +132,7 @@ impl<'a> HeavyTable<'a> {
         let mut outside: Vec<&RunningProcess> = self
             .table
             .iter()
-            .filter(|process| listed(process.pid) && self.holder(process.pid).is_none())
+            .filter(|process| listed(process.pid) && self.holding_job(process.pid).is_none())
             .filter(|process| self.ancestors(process.pid).all(|pid| !listed(pid)))
             .collect();
         outside.sort_by_key(|process| std::cmp::Reverse((process.started, process.pid)));
@@ -145,7 +157,7 @@ mod tests {
     use super::*;
     use crate::clock::Timestamp;
     use crate::heavy::Pattern;
-    use crate::jobs::{JobId, JobState};
+    use crate::jobs::JobState;
     use crate::processes::StartTime;
 
     fn process(pid: u32, parent: u32, cmd: &[&str], started: &str) -> RunningProcess {
@@ -161,17 +173,9 @@ mod tests {
 
     fn job(pid: u32, started: Option<&str>) -> JobRecord {
         JobRecord {
-            version: 1,
-            id: JobId::new(pid),
-            pid,
             started: started.and_then(Timestamp::parse),
-            summary: "make".to_owned(),
-            label: None,
-            cwd: PathBuf::from("/w"),
-            ticket: 1,
             state: JobState::Running,
-            queued: Timestamp::from_seconds(0),
-            since: Timestamp::from_seconds(0),
+            ..JobRecord::sample(pid)
         }
     }
 
@@ -225,11 +229,14 @@ mod tests {
         let heavy = HeavyTable::new(&table, &list(&["make"]), &list(&[]), &jobs);
 
         // Then
-        let holders: Vec<Option<usize>> = [20, 21, 22, 31]
+        let holders: Vec<Option<(usize, u32)>> = [20, 21, 22, 31]
             .iter()
-            .map(|pid| heavy.holder(*pid))
+            .map(|pid| Some((heavy.holder(*pid)?, heavy.holding_job(*pid)?.pid)))
             .collect();
-        assert_eq!(holders, vec![Some(0), Some(0), Some(0), None]);
+        assert_eq!(
+            holders,
+            vec![Some((0, 20)), Some((0, 20)), Some((0, 20)), None]
+        );
     }
 
     #[test]

@@ -1,3 +1,6 @@
+//! The tree and its git state: the root, `HEAD`, run names, file hashes and walks, and the base
+//! commit.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -178,13 +181,9 @@ mod tests {
     use std::path::PathBuf;
 
     fn must_git(dir: &Path, args: &[&str]) -> String {
-        let output = std::process::Command::new("git")
-            .arg("-C")
-            .arg(dir)
+        let output = crate::cmd::isolated_git(dir)
             .args(["-c", "user.name=t", "-c", "user.email=t@example.com"])
             .args(args)
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .env("GIT_CONFIG_NOSYSTEM", "1")
             .output()
             .unwrap();
         assert!(output.status.success(), "git {args:?}");

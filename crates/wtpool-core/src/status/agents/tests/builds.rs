@@ -6,7 +6,10 @@ use super::*;
 
 /// The state and action `subject` shows `after` seconds, while `cargo-nextest` runs below the
 /// claude process.
-fn with_own_build(subject: &Record, after: i64) -> (Option<ActorState>, Option<(String, String)>) {
+fn with_own_build(
+    subject: &ActorRecord,
+    after: i64,
+) -> (Option<ActorState>, Option<(String, String)>) {
     let processes = [claude(Some(START - 3600))];
     let below = BTreeMap::from([(CLAUDE, vec![below("cargo-nextest")])]);
     let records = [subject];
@@ -75,7 +78,7 @@ fn read_action() -> Option<(String, String)> {
 )]
 #[case::ended(record("s1", RecordState::Ended), 10, None, None)]
 fn actor__should_work_while_a_build_of_its_session_runs(
-    #[case] mut subject: Record,
+    #[case] mut subject: ActorRecord,
     #[case] after: i64,
     #[case] state: Option<ActorState>,
     #[case] action: Option<(String, String)>,

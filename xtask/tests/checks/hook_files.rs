@@ -19,10 +19,6 @@ const WHOLE_WRITERS: usize = 16;
 const UPDATE_WRITERS: usize = 8;
 const UPDATE_ROUNDS: usize = 10;
 
-fn ev(hooks: &Hooks, fixture: &str, session: &str, fields: &[(&str, Value)]) -> Value {
-    with(event(&hooks.pool, fixture, session, &hooks.pool.fg), fields)
-}
-
 fn ids_in_flight(record: &Value) -> Vec<String> {
     record["in_flight"]
         .as_array()
@@ -77,7 +73,7 @@ fn hook__should_not_follow_a_symlinked_record(#[case] kind: &str) {
     match kind {
         "symlink" => must_symlink(&victim, &record),
         "oversize" => {
-            let mut old = ev(&hooks, "UserPromptSubmit", "s1", &[]);
+            let mut old = hooks.event("UserPromptSubmit", "s1", &[]);
             old["label"] = json!("WTPOOL-VERIFY-OLD");
             old["padding"] = json!("x".repeat(17 * 1024));
             fs::write(&record, old.to_string()).expect("setup: write a large record");
@@ -92,7 +88,7 @@ fn hook__should_not_follow_a_symlinked_record(#[case] kind: &str) {
     }
 
     // When
-    let run = hooks.run(&ev(&hooks, "UserPromptSubmit", "s1", &[]));
+    let run = hooks.run(&hooks.event("UserPromptSubmit", "s1", &[]));
     let meta = fs::symlink_metadata(&record);
     let text = fs::read_to_string(&record).unwrap_or_default();
 
@@ -133,7 +129,7 @@ fn hook__should_keep_a_record_it_can_read() {
     // Given
     let hooks = Hooks::must_new("hook-record-fits");
     let record_path = |stem: &str| hooks.activity().join(format!("{stem}.json"));
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "s-short", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "s-short", &[]));
     let short = fs::read(record_path("s-short")).map_or(0, |text| text.len());
     // The first event's cwd, kept as first_cwd, brings the record within 150 bytes of 16 KiB.
     let cwd = deeper(&hooks.pool.fg, MAX_RECORD - 150 - short);
@@ -203,7 +199,7 @@ fn hook__should_keep_a_record_it_can_read() {
 fn hook__should_keep_records_whole_under_parallel_writers() {
     // Given
     let hooks = Hooks::must_new("hook-whole-records");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
     let record = hooks.activity().join("s1.json");
     let stop = Arc::new(AtomicBool::new(false));
     let reader = {
@@ -225,8 +221,7 @@ fn hook__should_keep_records_whole_under_parallel_writers() {
     };
     let payloads: Vec<Value> = (0..WHOLE_WRITERS)
         .map(|n| {
-            ev(
-                &hooks,
+            hooks.event(
                 "PreToolUse-Read",
                 "s1",
                 &[("tool_use_id", json!(format!("toolu_w{n:03}")))],
@@ -275,8 +270,8 @@ fn liveness__should_record_the_parent_process() {
     };
 
     // When
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "s1", &[]));
-    let run = hooks.run_with(&ev(&hooks, "UserPromptSubmit", "s2", &[]), &orphan);
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
+    let run = hooks.run_with(&hooks.event("UserPromptSubmit", "s2", &[]), &orphan);
 
     // Then
     assert_eq!(run.code(), Some(0), "wtpool hook: {}", run.describe());
@@ -298,7 +293,7 @@ fn liveness__should_record_the_parent_process() {
 fn liveness__should_keep_the_record_when_reparented() {
     // Given
     let hooks = Hooks::must_new("liveness-reparented");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
     hooks.advance(5);
     let orphan = RunOptions {
         parent: Some(1),
@@ -306,7 +301,7 @@ fn liveness__should_keep_the_record_when_reparented() {
     };
 
     // When
-    let run = hooks.run_with(&ev(&hooks, "Stop", "s1", &[]), &orphan);
+    let run = hooks.run_with(&hooks.event("Stop", "s1", &[]), &orphan);
     let record = hooks.must_record("s1");
     let status = hooks.status();
 
@@ -335,10 +330,10 @@ fn liveness__should_keep_the_record_when_reparented() {
 fn merge__should_refuse_an_older_state() {
     // Given
     let hooks = Hooks::must_new("merge-older");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
     hooks.advance(1);
-    let older = ev(&hooks, "Stop", "s1", &[]);
-    let newer = ev(&hooks, "PreToolUse-AskUserQuestion", "s1", &[]);
+    let older = hooks.event("Stop", "s1", &[]);
+    let newer = hooks.event("PreToolUse-AskUserQuestion", "s1", &[]);
     let mut command = hooks.command(&older, &RunOptions::default());
     command
         .stdin(Stdio::piped())
@@ -380,7 +375,7 @@ fn merge__should_refuse_an_older_state() {
 fn hook__should_lose_no_update_under_parallel_writers() {
     // Given
     let hooks = Hooks::must_new("lose-no-update");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
     let mut problems = Vec::new();
 
     // When
@@ -391,12 +386,7 @@ fn hook__should_lose_no_update_under_parallel_writers() {
         let starts: Vec<Child> = ids
             .iter()
             .map(|id| {
-                let payload = ev(
-                    &hooks,
-                    "PreToolUse-Read",
-                    "s1",
-                    &[("tool_use_id", json!(id))],
-                );
+                let payload = hooks.event("PreToolUse-Read", "s1", &[("tool_use_id", json!(id))]);
                 spawn(&hooks, &payload, &RunOptions::default())
             })
             .collect();
@@ -413,12 +403,7 @@ fn hook__should_lose_no_update_under_parallel_writers() {
         let ends: Vec<Child> = ids
             .iter()
             .map(|id| {
-                let payload = ev(
-                    &hooks,
-                    "PostToolUse-Read",
-                    "s1",
-                    &[("tool_use_id", json!(id))],
-                );
+                let payload = hooks.event("PostToolUse-Read", "s1", &[("tool_use_id", json!(id))]);
                 spawn(&hooks, &payload, &RunOptions::default())
             })
             .collect();
@@ -458,7 +443,7 @@ fn hook__should_restart_when_gc_deleted_the_lock() {
     for round in 0..20 {
         let session = format!("g{round:02}");
         hooks.set_clock("2026-10-01T12:00:00Z");
-        let run = hooks.run_with(&ev(&hooks, "UserPromptSubmit", &session, &[]), &dead);
+        let run = hooks.run_with(&hooks.event("UserPromptSubmit", &session, &[]), &dead);
         if run.code() != Some(0) || hooks.record(&session).is_none() {
             problems.push(format!(
                 "round {round}: the first hook wrote no record: {}",
@@ -478,12 +463,7 @@ fn hook__should_restart_when_gc_deleted_the_lock() {
         gc.stdout(Stdio::null()).stderr(Stdio::piped());
         let mut children = vec![gc.spawn().expect("setup: start wtpool hook gc")];
         children.extend(ids.iter().map(|id| {
-            let payload = ev(
-                &hooks,
-                "PreToolUse-Read",
-                &session,
-                &[("tool_use_id", json!(id))],
-            );
+            let payload = hooks.event("PreToolUse-Read", &session, &[("tool_use_id", json!(id))]);
             spawn(&hooks, &payload, &dead)
         }));
         problems.extend(

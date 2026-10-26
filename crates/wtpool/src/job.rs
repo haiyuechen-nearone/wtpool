@@ -5,7 +5,7 @@ mod listing;
 mod settings;
 
 use std::ffi::OsString;
-use std::io::Write;
+use std::io::{self, Write};
 use std::num::NonZeroUsize;
 use std::process::ExitCode;
 
@@ -122,7 +122,52 @@ fn run(command: &JobCommand) -> Result<u8, String> {
         clock: &clock,
         processes: &SystemProcesses,
     };
-    run_job(command, &context, &mut std::io::stderr()).map_err(|error| error.to_string())
+    let mut notes = VisibleLines::new(std::io::stderr());
+    let ended = run_job(command, &context, &mut notes).map_err(|error| error.to_string());
+    let _ = notes.flush();
+    ended
+}
+
+/// A writer that passes each line on as [`visible`] shows it, so a program name or an error
+/// cannot send a terminal its controls.
+struct VisibleLines<W: Write> {
+    inner: W,
+    line: Vec<u8>,
+}
+
+impl<W: Write> VisibleLines<W> {
+    fn new(inner: W) -> Self {
+        Self {
+            inner,
+            line: Vec::new(),
+        }
+    }
+
+    fn pass_on(&mut self, line: &[u8], end: &str) -> io::Result<()> {
+        let shown = visible(&String::from_utf8_lossy(line)) + end;
+        self.inner.write_all(shown.as_bytes())
+    }
+}
+
+impl<W: Write> Write for VisibleLines<W> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.line.extend_from_slice(bytes);
+        while let Some(end) = self.line.iter().position(|&byte| byte == b'\n') {
+            let rest = self.line.split_off(end + 1);
+            let mut line = std::mem::replace(&mut self.line, rest);
+            line.pop();
+            self.pass_on(&line, "\n")?;
+        }
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if !self.line.is_empty() {
+            let line = std::mem::take(&mut self.line);
+            self.pass_on(&line, "")?;
+        }
+        self.inner.flush()
+    }
 }
 
 fn list(json: bool) -> Result<u8, String> {
@@ -258,5 +303,48 @@ mod tests {
 
         // Then
         assert_eq!(action, Ok(expected));
+    }
+
+    fn shown(writes: &[&[u8]]) -> String {
+        let mut notes = VisibleLines::new(Vec::new());
+        for bytes in writes {
+            notes.write_all(bytes).unwrap();
+        }
+        notes.flush().unwrap();
+        String::from_utf8(notes.inner).unwrap()
+    }
+
+    #[test]
+    fn visible_lines__should_escape_a_program_name_that_carries_a_terminal_command() {
+        // Given
+        let program = "\u{1b}]52;c;SGVsbG8=\u{7}nope";
+
+        // When
+        let text = shown(&[format!("wtpool job: cannot run {program}: No such file\n").as_bytes()]);
+
+        // Then
+        assert_eq!(
+            text,
+            "wtpool job: cannot run \\u{001B}]52;c;SGVsbG8=\\u{0007}nope: No such file\n"
+        );
+    }
+
+    #[rstest]
+    #[case::plain_lines(&[
+        b"wtpool job: 2 of 2 jobs run; waiting, 0 ahead\nwtpool job: started after 3 s\n".as_slice(),
+    ])]
+    #[case::a_line_in_pieces(&[
+        b"wtpool job: ".as_slice(),
+        b"started".as_slice(),
+        b" after 3 s\n".as_slice(),
+    ])]
+    #[case::a_character_in_pieces(&[b"caf\xc3".as_slice(), b"\xa9\n".as_slice()])]
+    #[case::no_last_line_end(&[b"a\nb".as_slice()])]
+    fn visible_lines__should_keep_the_visible_bytes(#[case] writes: &[&[u8]]) {
+        // When
+        let text = shown(writes);
+
+        // Then
+        assert_eq!(text.as_bytes(), writes.concat());
     }
 }

@@ -3,12 +3,8 @@
 
 use serde_json::{Value, json};
 
-use crate::support::hook::{CLAUDE, CLAUDE_STARTED, Hooks, event, with};
+use crate::support::hook::{CLAUDE, CLAUDE_STARTED, Hooks};
 use crate::support::worktree;
-
-fn ev(hooks: &Hooks, fixture: &str, fields: &[(&str, Value)]) -> Value {
-    with(event(&hooks.pool, fixture, "s1", &hooks.pool.fg), fields)
-}
 
 /// The actor `key` of the worktree `name`.
 fn actor(document: &Value, name: &str, key: &str) -> Value {
@@ -34,10 +30,10 @@ fn builds__should_keep_the_session_that_started_them_working() {
         ("tool_input", command),
         ("tool_use_id", json!("toolu_build")),
     ];
-    hooks.send(&ev(&hooks, "UserPromptSubmit", &[]));
-    hooks.send(&ev(&hooks, "PreToolUse-Bash", &call));
-    hooks.send(&ev(&hooks, "PostToolUse-Bash", &call));
-    hooks.send(&ev(&hooks, "Stop", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event("PreToolUse-Bash", "s1", &call));
+    hooks.send(&hooks.event("PostToolUse-Bash", "s1", &call));
+    hooks.send(&hooks.event("Stop", "s1", &[]));
     hooks.advance(600);
     let fg = hooks.pool.fg.clone();
     // The session's shell and its build, an MCP server of the session, and a build outside it.
@@ -76,8 +72,8 @@ fn builds__should_keep_no_session_working_through_other_children() {
     let mut hooks = Hooks::must_new("other-children");
     let fg = hooks.pool.fg.clone();
     let wt2 = hooks.pool.worktree("wt2");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", &[]));
-    hooks.send(&ev(&hooks, "Stop", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event("Stop", "s1", &[]));
     // An MCP server of the session and a build outside it.
     hooks.start_child(7200, CLAUDE, "node", &fg, CLAUDE_STARTED);
     hooks.start_child(7201, 7200, "python3", &fg, CLAUDE_STARTED);
@@ -100,9 +96,9 @@ fn background_test(hooks: &Hooks, worktree: &str, id: &str) -> Value {
         "cd {} && cargo test",
         hooks.pool.worktree(worktree).display()
     );
-    ev(
-        hooks,
+    hooks.event(
         "PostToolUse-Bash",
+        "s1",
         &[
             ("tool_use_id", json!(format!("toolu_{id}"))),
             (
@@ -136,14 +132,14 @@ fn as_subagent(mut payload: Value) -> Value {
 fn background__should_keep_a_session_working_until_its_task_ends() {
     // Given
     let hooks = Hooks::must_new("background-session");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
     hooks.send(&background_test(&hooks, "wt1", "b1"));
-    hooks.send(&ev(&hooks, "Stop", &still_running(&["b1"])));
+    hooks.send(&hooks.event("Stop", "s1", &still_running(&["b1"])));
     hooks.advance(600);
 
     // When
     let waiting = hooks.status();
-    hooks.send(&ev(&hooks, "Stop", &still_running(&[])));
+    hooks.send(&hooks.event("Stop", "s1", &still_running(&[])));
     let ended = hooks.status();
 
     // Then
@@ -164,24 +160,24 @@ fn background__should_keep_a_session_working_until_its_task_ends() {
 fn background__should_keep_a_subagent_working_until_its_task_ends() {
     // Given
     let hooks = Hooks::must_new("background-subagent");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", &[]));
-    hooks.send(&ev(&hooks, "PreToolUse-Agent", &[]));
-    hooks.send(&as_subagent(ev(&hooks, "SubagentStart", &[])));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event("PreToolUse-Agent", "s1", &[]));
+    hooks.send(&as_subagent(hooks.event("SubagentStart", "s1", &[])));
     hooks.send(&as_subagent(background_test(&hooks, "wt2", "b2")));
-    hooks.send(&as_subagent(ev(
-        &hooks,
+    hooks.send(&as_subagent(hooks.event(
         "SubagentStop",
+        "s1",
         &still_running(&["b2"]),
     )));
-    hooks.send(&ev(&hooks, "PostToolUse-Agent", &[]));
-    hooks.send(&ev(&hooks, "Stop", &still_running(&[])));
+    hooks.send(&hooks.event("PostToolUse-Agent", "s1", &[]));
+    hooks.send(&hooks.event("Stop", "s1", &still_running(&[])));
     hooks.advance(600);
 
     // When
     let waiting = hooks.status();
-    hooks.send(&as_subagent(ev(
-        &hooks,
+    hooks.send(&as_subagent(hooks.event(
         "SubagentStop",
+        "s1",
         &still_running(&[]),
     )));
     let ended = hooks.status();

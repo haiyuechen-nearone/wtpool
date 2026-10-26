@@ -218,3 +218,11 @@ accept watch-process-sample 72e9d570021da56a70cd4e13c34f9a29e629690b88960e0134cc
 accept build-machine-strip c5ba12e687fd7d59dc73af2be9c0ccf3cd82ba86d0ebb90d92d57df375e1dc03
 # Revision 30, approved: U17's run time and H31's bounded background waits inside repositories, with their int, render and shot checks from phase 4; U17 moves to phase 4, its rows say so, and three phase 3 checks read a heading with or without the run time.
 accept stale-waits fffe270de133982e5f7d13fb9f01eaeaafd83d3dd4af0457fbe353efce765385
+# The shell reader that the hook and both policies share reads timeout and gtimeout options, bash -lc and dash scripts, leading reserved words and the exec, command and builtin prefixes; the fixture gains a row for each.
+accept rs-shell 7db80694765dd74070d761424bef1643ed999fc6f39f7898f0c649de27987f29
+# Render checks of the jobSettings answers: each answer matched to its edit or save in order, and an unanswered save or edit stops blocking once a document shows it or its answer is overdue (U15, X21).
+accept ts-jobs-webview f1e7a8bd36bed2e067a391fca49462cd0fe899046392942da9f01762f463bb87
+# Harness tidy: Hooks event helpers, a per-command xtask parser that refuses flags its usage does not name, module docs, one isolated git test helper and pins of values the JS tests repeat; no check judges differently.
+accept hx-small a56fff5c95d5c7078c338d0a0a4320e0eb4c895b4711a689773a0dc2797d5647
+# JS harness tidy: shared expected text, shot helpers and host helpers, every check and assertion unchanged, one setup message naming its document time, and the host scenario helper renamed expectedDocuments.
+accept js-small db4ac1a031830d6f8a9bc02ed24e5645803191d51d0ffc93e684f30cb7868792

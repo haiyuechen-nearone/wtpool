@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { openStatus, posted, resetFake, scenarioDocuments, verifyApi, views, waitFor, wrap } = require('./support.cjs');
+const { expectedDocuments, openStatus, posted, resetFake, verifyApi, views, waitFor, wrap } = require('./support.cjs');
 
 const POOL = '/Users/verify/pool';
 const WT2 = `${POOL}/wt2`;
@@ -60,7 +60,7 @@ function actor(key, outputs, extra = {}) {
 
 /** idle_pool's last document with `wt2` and `wt3` holding these actors, at a new time. */
 function poolWith({ wt2 = [], wt3 = [], wt2Facts = {} } = {}) {
-  const doc = structuredClone(scenarioDocuments('idle_pool').at(-1));
+  const doc = structuredClone(expectedDocuments('idle_pool').at(-1));
   generation += 1;
   doc.generated = new Date(Date.parse(doc.generated) + generation * 1000).toISOString().replace('.000Z', 'Z');
   for (const [where, actors] of [

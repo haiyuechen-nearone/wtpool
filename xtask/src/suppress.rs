@@ -1,3 +1,6 @@
+//! `lint__no_suppressions`: no attribute, comment or configuration outside the oracle files
+//! silences a lint.
+
 use std::fs;
 use std::path::Path;
 

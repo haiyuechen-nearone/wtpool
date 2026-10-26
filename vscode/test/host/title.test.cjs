@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const vscode = require('vscode');
 
-const { created, openStatus, resetFake, scenarioDocuments, sleep, waitFor } = require('./support.cjs');
+const { created, expectedDocuments, openStatus, resetFake, sleep, waitFor } = require('./support.cjs');
 
 /** The panel the last Worktrees: Open Status created. */
 function statusPanel() {
@@ -35,7 +35,7 @@ async function titleBecomes(panel, title, timeoutMs = 10_000) {
 describe('title', () => {
   it('title__should_read_worktrees_without_waits', async () => {
     // Given
-    const idle = scenarioDocuments('idle_pool');
+    const idle = expectedDocuments('idle_pool');
     await resetFake({ documents: idle, aliveMs: 200 });
 
     // When
@@ -50,7 +50,7 @@ describe('title', () => {
 
   it('title__should_count_waits_while_hidden', async () => {
     // Given
-    const [waiting, answered] = scenarioDocuments('permission_wait_and_answer');
+    const [waiting, answered] = expectedDocuments('permission_wait_and_answer');
     const documents = [later(answered, 0), later(waiting, 1), later(twoWaiting(waiting), 2), later(answered, 3)];
     await resetFake({ documents, aliveMs: 200, gapMs: 4000 });
     await openStatus();
@@ -80,7 +80,7 @@ describe('title', () => {
 
   it('title__should_drop_the_count_when_a_wait_ends', async () => {
     // Given
-    const [waiting, answered] = scenarioDocuments('permission_wait_and_answer');
+    const [waiting, answered] = expectedDocuments('permission_wait_and_answer');
     const documents = [later(waiting, 0), later(answered, 1)];
     await resetFake({ documents, aliveMs: 200, gapMs: 3000 });
 

@@ -121,7 +121,7 @@ fn rescan__should_keep_only_the_newest_records() {
 
     // Then
     let events = last_events(&records);
-    let with_live = records.counted(|record| record.key == "s-0").len();
+    let with_live = records.counted(|record| record.key.as_str() == "s-0").len();
     assert_eq!((events.len(), with_live), (MAX_RECORDS, MAX_RECORDS + 1));
     assert!(!events.contains_key(Path::new("/p/0")));
     assert!(events.contains_key(Path::new(&format!("/p/{MAX_RECORDS}"))));
@@ -264,9 +264,9 @@ fn enabled__should_need_a_real_folder(
     assert_eq!(enabled, expected);
 }
 
-fn edit_record(ended: Option<(&str, CallKind)>) -> Record {
-    Record {
-        key: "s1".to_owned(),
+fn edit_record(ended: Option<(&str, CallKind)>) -> ActorRecord {
+    ActorRecord {
+        key: RecordKey::parse("s1").unwrap(),
         harness: "claude-code".to_owned(),
         label: String::new(),
         worktree: PathBuf::from("/p/wt1"),
@@ -275,7 +275,7 @@ fn edit_record(ended: Option<(&str, CallKind)>) -> Record {
         waiting: None,
         action: None,
         in_flight: Vec::new(),
-        ended: ended.map(|(id, kind)| Call {
+        ended: ended.map(|(id, kind)| RecordedCall {
             id: id.to_owned(),
             kind,
         }),
@@ -299,8 +299,8 @@ fn edit_record(ended: Option<(&str, CallKind)>) -> Record {
 #[case::nothing_ended(Some(edit_record(None)), edit_record(None), false)]
 #[case::first_record(None, edit_record(Some(("t1", CallKind::Shell))), true)]
 fn ended_an_edit__should_see_a_newly_ended_edit_or_shell_call(
-    #[case] old: Option<Record>,
-    #[case] new: Record,
+    #[case] old: Option<ActorRecord>,
+    #[case] new: ActorRecord,
     #[case] expected: bool,
 ) {
     // When

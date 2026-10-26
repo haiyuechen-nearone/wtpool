@@ -14,7 +14,7 @@ use super::document::{
 };
 use super::facts::{self, Busy, Facts, RefFacts};
 use super::jobs::{self, Harnesses, JobsFacts, JobsState, PoolFolders};
-use super::records::{Record, RecordState, Records};
+use super::records::{ActorRecord as Record, RecordState, Records};
 use super::repository::repository;
 use super::sources::Host;
 use crate::activity::ACTIVITY_DIR;

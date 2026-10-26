@@ -1,18 +1,22 @@
 //! [`JobFolder`]: `<state>/wtpool/jobs/`, the records and locks of this user's jobs.
 
+use std::ffi::OsStr;
 use std::fs::{File, OpenOptions, TryLockError};
-use std::io::{self, Read, Write};
+use std::io;
 use std::path::{Path, PathBuf};
 
 use super::record::{JobId, JobRecord, RECORD_VERSION};
 use crate::platform::fs::{
-    check_private, create_private_dir, open_private, open_without_following,
+    check_private, create_private_dir, open_private, open_without_following, read_regular,
+    replace_file,
 };
 
-/// A record holds a summary, a label and a folder; anything larger is no record.
+/// A record holds a summary, a label and a folder, so a larger file is no record.
 const MAX_RECORD_BYTES: u64 = 64 * 1024;
 const QUEUE_LOCK: &str = "queue.lock";
 const TICKET: &str = "ticket";
+const RECORD_SUFFIX: &str = ".json";
+const LOCK_SUFFIX: &str = ".lock";
 
 /// The private folder of this user's job records and locks.
 #[derive(Debug, Clone)]
@@ -31,15 +35,30 @@ pub enum FolderError {
 
 /// The exclusive lock on `queue.lock`, held until dropped.
 #[derive(Debug)]
-pub struct QueueLock {
+pub(super) struct QueueLock {
     _file: File,
 }
 
-/// Whether a job still runs, as its lock tells.
+/// The lock of a job: held while the job lives, free once it is gone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Liveness {
+pub enum LockState {
     Live,
     Dead,
+}
+
+/// Another name for [`LockState`].
+pub type Liveness = LockState;
+
+/// A file of the job folder, as its name tells.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum JobFile {
+    Record(JobId),
+    Lock(JobId),
+    /// The queue's lock or its ticket counter.
+    Queue,
+    /// A file a write renames over another once it is whole.
+    Temp,
+    Other,
 }
 
 impl JobFolder {
@@ -84,6 +103,26 @@ impl JobFolder {
         Ok(Self { dir })
     }
 
+    /// The kind of the file called `name` in a job folder.
+    #[must_use]
+    pub fn file_kind(name: &OsStr) -> JobFile {
+        let Some(name) = name.to_str() else {
+            return JobFile::Other;
+        };
+        let id_before = |suffix: &str| name.strip_suffix(suffix).and_then(JobId::parse);
+        if name == QUEUE_LOCK || name == TICKET {
+            JobFile::Queue
+        } else if name.starts_with('.') && name.ends_with(".tmp") {
+            JobFile::Temp
+        } else if let Some(id) = id_before(RECORD_SUFFIX) {
+            JobFile::Record(id)
+        } else if let Some(id) = id_before(LOCK_SUFFIX) {
+            JobFile::Lock(id)
+        } else {
+            JobFile::Other
+        }
+    }
+
     #[must_use]
     pub fn dir(&self) -> &Path {
         &self.dir
@@ -97,15 +136,15 @@ impl JobFolder {
     }
 
     fn record_path(&self, id: &JobId) -> PathBuf {
-        self.dir.join(format!("{id}.json"))
+        self.dir.join(format!("{id}{RECORD_SUFFIX}"))
     }
 
     fn lock_path(&self, id: &JobId) -> PathBuf {
-        self.dir.join(format!("{id}.lock"))
+        self.dir.join(format!("{id}{LOCK_SUFFIX}"))
     }
 
     /// Takes the queue's lock, waiting while another job holds it.
-    pub fn lock_queue(&self) -> Result<QueueLock, FolderError> {
+    pub(super) fn lock_queue(&self) -> Result<QueueLock, FolderError> {
         let file = open_private(
             OpenOptions::new()
                 .read(true)
@@ -120,12 +159,12 @@ impl JobFolder {
     }
 
     /// The next ticket, under `_queue`: one past the counter's and every ticket of `records`.
-    pub fn take_ticket(
+    pub(super) fn take_ticket(
         &self,
         _queue: &QueueLock,
         records: &[JobRecord],
     ) -> Result<u64, FolderError> {
-        let counted = read_small(&self.dir.join(TICKET))
+        let counted = read_text(&self.dir.join(TICKET))
             .and_then(|text| text.trim().parse::<u64>().ok())
             .unwrap_or(0);
         let highest = records
@@ -134,14 +173,14 @@ impl JobFolder {
             .max()
             .unwrap_or(0);
         let ticket = counted.max(highest).saturating_add(1);
-        self.write_whole(TICKET, ticket.to_string().as_bytes())
+        replace_file(&self.dir.join(TICKET), ticket.to_string().as_bytes())
             .map_err(|error| self.io_error(error))?;
         Ok(ticket)
     }
 
-    /// Creates and locks the lock file of `id`, which its job holds for its whole life. The
+    /// Creates and locks the lock file of `id`. Its job holds it for its whole life. The
     /// standard library opens it close-on-exec, so the job's command never holds the lock.
-    pub fn create_lock(&self, id: &JobId) -> Result<File, FolderError> {
+    pub(crate) fn create_lock(&self, id: &JobId) -> Result<File, FolderError> {
         let file = open_private(
             OpenOptions::new().read(true).write(true).create_new(true),
             &self.lock_path(id),
@@ -156,15 +195,15 @@ impl JobFolder {
         }
     }
 
-    /// Whether the job `id` holds its lock. A lock that cannot be probed counts as held.
+    /// The state of the lock of the job `id`. A lock that cannot be probed counts as held.
     #[must_use]
-    pub fn liveness(&self, id: &JobId) -> Liveness {
+    pub fn liveness(&self, id: &JobId) -> LockState {
         let Ok(file) = open_without_following(&self.lock_path(id)) else {
-            return Liveness::Dead;
+            return LockState::Dead;
         };
         match file.try_lock_shared() {
-            Ok(()) => Liveness::Dead,
-            Err(_) => Liveness::Live,
+            Ok(()) => LockState::Dead,
+            Err(_) => LockState::Live,
         }
     }
 
@@ -176,12 +215,9 @@ impl JobFolder {
         };
         entries
             .flatten()
-            .filter_map(|entry| {
-                let name = entry.file_name();
-                let id = JobId::parse(name.to_str()?.strip_suffix(".json")?)?;
-                let record: JobRecord =
-                    serde_json::from_str(&read_small(&self.record_path(&id))?).ok()?;
-                (record.version == RECORD_VERSION && record.id == id).then_some(record)
+            .filter_map(|entry| match Self::file_kind(&entry.file_name()) {
+                JobFile::Record(id) => self.named_record(&id),
+                _ => None,
             })
             .collect()
     }
@@ -189,9 +225,14 @@ impl JobFolder {
     /// The record of `id` while its job lives.
     #[must_use]
     pub fn live_record(&self, id: &JobId) -> Option<JobRecord> {
-        let record: JobRecord = serde_json::from_str(&read_small(&self.record_path(id))?).ok()?;
-        let named = record.version == RECORD_VERSION && record.id == *id;
-        (named && self.liveness(id) == Liveness::Live).then_some(record)
+        self.named_record(id)
+            .filter(|_| self.liveness(id) == LockState::Live)
+    }
+
+    /// The record of `id`, when its file holds one of this version that names `id`.
+    fn named_record(&self, id: &JobId) -> Option<JobRecord> {
+        let record: JobRecord = serde_json::from_str(&read_text(&self.record_path(id))?).ok()?;
+        (record.version == RECORD_VERSION && record.id == *id).then_some(record)
     }
 
     /// The records whose job lives.
@@ -199,24 +240,24 @@ impl JobFolder {
     pub fn live_records(&self) -> Vec<JobRecord> {
         self.records()
             .into_iter()
-            .filter(|record| self.liveness(&record.id) == Liveness::Live)
+            .filter(|record| self.liveness(&record.id) == LockState::Live)
             .collect()
     }
 
     /// The live records but `own`'s, under `_queue`, after deleting each dead record with its
     /// lock file, and each lock file no record names that no job holds.
     #[must_use]
-    pub fn sweep(&self, _queue: &QueueLock, own: Option<&JobId>) -> Vec<JobRecord> {
+    pub(super) fn sweep(&self, _queue: &QueueLock, own: Option<&JobId>) -> Vec<JobRecord> {
         let (live, dead): (Vec<JobRecord>, Vec<JobRecord>) = self
             .records()
             .into_iter()
             .filter(|record| Some(&record.id) != own)
-            .partition(|record| self.liveness(&record.id) == Liveness::Live);
+            .partition(|record| self.liveness(&record.id) == LockState::Live);
         for record in &dead {
             self.delete(&record.id);
         }
         for id in self.orphan_locks(own) {
-            if self.liveness(&id) == Liveness::Dead {
+            if self.liveness(&id) == LockState::Dead {
                 let _ = std::fs::remove_file(self.lock_path(&id));
             }
         }
@@ -229,49 +270,30 @@ impl JobFolder {
         };
         entries
             .flatten()
-            .filter_map(|entry| JobId::parse(entry.file_name().to_str()?.strip_suffix(".lock")?))
+            .filter_map(|entry| match Self::file_kind(&entry.file_name()) {
+                JobFile::Lock(id) => Some(id),
+                _ => None,
+            })
             .filter(|id| Some(id) != own && self.record_path(id).symlink_metadata().is_err())
             .collect()
     }
 
     /// Writes `record` through a temp file renamed over its record.
-    pub fn write_record(&self, record: &JobRecord) -> Result<(), FolderError> {
+    pub(super) fn write_record(&self, record: &JobRecord) -> Result<(), FolderError> {
         let text = serde_json::to_vec(record).map_err(|error| self.io_error(error.into()))?;
-        self.write_whole(&format!("{}.json", record.id), &text)
-            .map_err(|error| self.io_error(error))
+        replace_file(&self.record_path(&record.id), &text).map_err(|error| self.io_error(error))
     }
 
     /// Deletes the record of `id`, then its lock file.
-    pub fn delete(&self, id: &JobId) {
+    pub(super) fn delete(&self, id: &JobId) {
         let _ = std::fs::remove_file(self.record_path(id));
         let _ = std::fs::remove_file(self.lock_path(id));
-    }
-
-    /// Writes `bytes` as the file `name` through a temp file opened without following a
-    /// symlink, created anew, and renamed over the file.
-    fn write_whole(&self, name: &str, bytes: &[u8]) -> io::Result<()> {
-        let temp = self.dir.join(format!(".{name}.{}.tmp", std::process::id()));
-        let _ = std::fs::remove_file(&temp);
-        let mut file = open_private(OpenOptions::new().write(true).create_new(true), &temp)?;
-        let written = file
-            .write_all(bytes)
-            .and_then(|()| std::fs::rename(&temp, self.dir.join(name)));
-        if written.is_err() {
-            let _ = std::fs::remove_file(&temp);
-        }
-        written
     }
 }
 
 /// The text of the small regular file at `path`, never through a symlink.
-fn read_small(path: &Path) -> Option<String> {
-    let file = open_without_following(path).ok()?;
-    if !file.metadata().ok()?.is_file() {
-        return None;
-    }
-    let mut text = String::new();
-    file.take(MAX_RECORD_BYTES).read_to_string(&mut text).ok()?;
-    Some(text)
+fn read_text(path: &Path) -> Option<String> {
+    String::from_utf8(read_regular(path, MAX_RECORD_BYTES).ok()?).ok()
 }
 
 #[cfg(test)]

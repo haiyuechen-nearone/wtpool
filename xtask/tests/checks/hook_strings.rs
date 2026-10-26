@@ -5,12 +5,7 @@ use std::fs;
 use rstest::rstest;
 use serde_json::{Value, json};
 
-use crate::support::hook::{Hooks, RunOptions, event, with};
-
-/// One event of session `s1` at fg, from `fixture`, with `fields` set.
-fn ev(hooks: &Hooks, fixture: &str, fields: &[(&str, Value)]) -> Value {
-    with(event(&hooks.pool, fixture, "s1", &hooks.pool.fg), fields)
-}
+use crate::support::hook::{Hooks, RunOptions};
 
 /// Everything the hook wrote: every file of wtpool-activity/ and of its log folder.
 pub(super) fn written_text(hooks: &Hooks) -> String {
@@ -70,23 +65,19 @@ fn sanitize__should_strip_controls_bidi_and_zero_width() {
     let path = hooks.pool.worktree("wt2").join(&file);
 
     // When
-    hooks.send(&ev(
-        &hooks,
-        "UserPromptSubmit",
-        &[("session_title", json!(title))],
-    ));
-    hooks.send(&ev(
-        &hooks,
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[("session_title", json!(title))]));
+    hooks.send(&hooks.event(
         "PreToolUse-Read",
+        "s1",
         &[
             ("tool_input", json!({ "file_path": path })),
             ("session_title", json!(title)),
         ],
     ));
-    let mut start = ev(&hooks, "SubagentStart", &[]);
+    let mut start = hooks.event("SubagentStart", "s1", &[]);
     start["agent_type"] = json!(agent_type);
     hooks.send(&start);
-    hooks.send(&ev(&hooks, "StopFailure", &[("error", json!(error))]));
+    hooks.send(&hooks.event("StopFailure", "s1", &[("error", json!(error))]));
     let session = hooks.must_record("s1");
     let subagent = hooks.must_record("s1.a1");
 
@@ -124,28 +115,20 @@ fn hook__should_store_no_prompt_text() {
     let notice = "WTPOOL-VERIFY-NOTICE-91ab needs you";
 
     // When
-    hooks.send(&ev(
-        &hooks,
-        "UserPromptSubmit",
-        &[("prompt", json!(prompt_text))],
-    ));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[("prompt", json!(prompt_text))]));
     for fixture in [
         "Notification-permission_prompt",
         "Notification-elicitation_dialog",
         "Notification-idle_prompt",
     ] {
-        hooks.send(&ev(&hooks, fixture, &[("message", json!(notice))]));
+        hooks.send(&hooks.event(fixture, "s1", &[("message", json!(notice))]));
     }
     let options = RunOptions {
         envs: vec![("WTPOOL_VERIFY_PANIC".to_owned(), "UserPromptSubmit".into())],
         ..RunOptions::default()
     };
     let _ = hooks.run_with(
-        &ev(
-            &hooks,
-            "UserPromptSubmit",
-            &[("prompt", json!(prompt_text))],
-        ),
+        &hooks.event("UserPromptSubmit", "s1", &[("prompt", json!(prompt_text))]),
         &options,
     );
     let written = written_text(&hooks);
@@ -178,7 +161,7 @@ fn labels__should_prefer_session_title(#[case] titles: &[Option<&str>], #[case] 
 
     // When
     for title in titles {
-        let mut payload = ev(&hooks, "UserPromptSubmit", &[]);
+        let mut payload = hooks.event("UserPromptSubmit", "s1", &[]);
         if let Some(title) = title {
             payload["session_title"] = json!(title);
         }
@@ -200,14 +183,14 @@ fn labels__should_prefer_session_title(#[case] titles: &[Option<&str>], #[case] 
 fn labels__should_use_agent_type() {
     // Given
     let hooks = Hooks::must_new("labels-agent");
-    hooks.send(&ev(
-        &hooks,
+    hooks.send(&hooks.event(
         "UserPromptSubmit",
+        "s1",
         &[("session_title", json!("Main"))],
     ));
-    let mut start = ev(&hooks, "SubagentStart", &[]);
+    let mut start = hooks.event("SubagentStart", "s1", &[]);
     start["agent_type"] = json!("code-reviewer");
-    let mut read = ev(&hooks, "PreToolUse-Read-subagent", &[]);
+    let mut read = hooks.event("PreToolUse-Read-subagent", "s1", &[]);
     read["agent_type"] = json!("code-reviewer");
 
     // When
@@ -275,7 +258,7 @@ fn labels__should_follow_the_transcript_title() {
     for (event, lines) in &steps {
         let lines: Vec<&str> = lines.iter().map(String::as_str).collect();
         append_lines(&transcript, &lines);
-        hooks.send(&ev(&hooks, event, &[("transcript_path", path.clone())]));
+        hooks.send(&hooks.event(event, "s1", &[("transcript_path", path.clone())]));
         labels.push(hooks.must_record("s1")["label"].clone());
         hooks.advance(60);
     }
@@ -284,11 +267,7 @@ fn labels__should_follow_the_transcript_title() {
         format!("{}\n", custom_title("After a rewrite")),
     )
     .expect("setup: replace the transcript");
-    hooks.send(&ev(
-        &hooks,
-        "UserPromptSubmit",
-        &[("transcript_path", path)],
-    ));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[("transcript_path", path)]));
     labels.push(hooks.must_record("s1")["label"].clone());
 
     // Then
@@ -314,13 +293,13 @@ fn labels__should_follow_the_transcript_title() {
 fn labels__should_use_the_description_of_the_agent_call(#[case] order: &[&str]) {
     // Given
     let hooks = Hooks::must_new("labels-description");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
     let launched = json!({"isAsync": true, "status": "async_launched", "agentId": "a1",
                           "description": "Find the parser tests"});
 
     // When
     for fixture in order {
-        let mut payload = ev(&hooks, fixture, &[]);
+        let mut payload = hooks.event(fixture, "s1", &[]);
         match *fixture {
             "SubagentStart" => payload["agent_type"] = json!("Explore"),
             "PostToolUse-Agent" => payload["tool_response"] = launched.clone(),

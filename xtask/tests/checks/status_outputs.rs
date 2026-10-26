@@ -6,23 +6,15 @@ use std::fs;
 
 use serde_json::{Value, json};
 
-use crate::support::hook::{Hooks, RunOptions, event, with};
+use crate::support::hook::{Hooks, PROJECT, RunOptions};
 use crate::support::{schema_errors, worktree};
-
-const PROJECT: &str = "-home-verify-code-app";
-
-fn ev(hooks: &Hooks, fixture: &str, fields: &[(&str, Value)]) -> Value {
-    let mut payload = with(event(&hooks.pool, fixture, "s1", &hooks.pool.fg), fields);
-    payload["transcript_path"] = json!(format!("/home/verify/.claude/projects/{PROJECT}/s1.jsonl"));
-    payload
-}
 
 /// A PostToolUse of `cd wt1 && cargo build` that went to the background as `id`.
 fn background(hooks: &Hooks, id: &str) -> Value {
     let command = format!("cd {} && cargo build", hooks.pool.worktree("wt1").display());
-    ev(
-        hooks,
+    hooks.transcript_event(
         "PostToolUse-Bash",
+        "s1",
         &[
             ("tool_use_id", json!(format!("toolu_{id}"))),
             (
@@ -85,10 +77,10 @@ fn status__should_list_outputs() {
         let run = hooks.run_with(payload, &options);
         assert_eq!(run.code(), Some(0), "wtpool hook: {}", run.describe());
     };
-    send(&ev(&hooks, "UserPromptSubmit", &[]));
-    let mut read = ev(
-        &hooks,
+    send(&hooks.transcript_event("UserPromptSubmit", "s1", &[]));
+    let mut read = hooks.transcript_event(
         "PreToolUse-Read",
+        "s1",
         &[(
             "tool_input",
             json!({ "file_path": hooks.pool.worktree("wt2").join("f.txt") }),
@@ -121,9 +113,9 @@ fn status__should_list_outputs() {
     send(&background(&hooks, "b2"));
     let both = hooks.status();
     hooks.advance(10);
-    send(&ev(
-        &hooks,
+    send(&hooks.transcript_event(
         "Stop",
+        "s1",
         &[(
             "background_tasks",
             json!([{"id": "b2", "type": "shell", "status": "running"}]),

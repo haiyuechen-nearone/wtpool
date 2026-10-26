@@ -2,7 +2,13 @@
 
 use super::*;
 
-fn session(key: &str, pid: u32, started: Option<i64>, updated: i64, state: RecordState) -> Record {
+fn session(
+    key: &str,
+    pid: u32,
+    started: Option<i64>,
+    updated: i64,
+    state: RecordState,
+) -> ActorRecord {
     let mut record = record(key, state);
     record.updated = at(updated);
     record.process = Some(RecordedProcess {
@@ -26,12 +32,12 @@ fn superseded__should_keep_the_newest_main_session_of_each_process() {
         session("s5", 7002, None, 1, RecordState::Idle),
         session("s6", 7002, None, 9, RecordState::Ended),
         unplaced.clone(),
-        Record {
-            key: "s8".to_owned(),
+        ActorRecord {
+            key: RecordKey::parse("s8").unwrap(),
             ..unplaced
         },
     ];
-    let refs: Vec<&Record> = records.iter().collect();
+    let refs: Vec<&ActorRecord> = records.iter().collect();
 
     // When
     let hidden = superseded(&refs);

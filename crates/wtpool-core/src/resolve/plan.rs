@@ -167,10 +167,8 @@ impl<F> Pool<F> {
     }
 }
 
-/// A full ref, as git takes a tag before a branch of the same short name, and
-/// expands a fetch destination such as `tags/x` under `refs/` instead.
 pub(super) fn branch_ref(branch: &BranchName) -> String {
-    format!("refs/heads/{branch}")
+    branch.branch_ref()
 }
 
 #[cfg(test)]

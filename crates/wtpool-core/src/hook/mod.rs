@@ -6,7 +6,6 @@
 
 mod adapter;
 mod apply;
-pub(crate) mod bash;
 mod call_input;
 mod env;
 mod event;
@@ -23,6 +22,8 @@ mod sha256;
 mod store;
 mod tasks;
 pub mod text;
+
+pub(crate) use crate::shell as bash;
 
 pub use adapter::{Adapter, TranscriptTitles, WaitingTools};
 pub use call_input::CallInput;

@@ -3,8 +3,19 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vscode = require('vscode');
 
-const { control, ended, fakeLog, openStatus, posted, resetFake, scenarioDocuments, sleep, starts, verifyApi, views, waitFor } =
-  require('./support.cjs');
+const {
+  CONFIG,
+  ended,
+  expectedDocuments,
+  fakeLog,
+  posted,
+  show,
+  showingAlone,
+  sleep,
+  starts,
+  verifyApi,
+  waitFor,
+} = require('./support.cjs');
 
 const FAKE = path.join(__dirname, '..', 'fake-wtpool.mjs');
 const SHELLS = ['sh', 'bash', 'zsh', 'dash', 'fish', 'ksh', 'tcsh', 'csh'];
@@ -17,7 +28,7 @@ let generation = 0;
 
 /** idle_pool's last document with a new time and, unless `jobs` is null, a `machine.jobs`. */
 function documentWith(jobs) {
-  const doc = structuredClone(scenarioDocuments('idle_pool').at(-1));
+  const doc = structuredClone(expectedDocuments('idle_pool').at(-1));
   generation += 1;
   doc.generated = new Date(Date.parse(doc.generated) + generation * 1000).toISOString().replace('.000Z', 'Z');
   if (jobs !== null) {
@@ -28,7 +39,7 @@ function documentWith(jobs) {
       max: 64,
       enforce: 'warn',
       source: { limit: 'machine', enforce: 'machine' },
-      config: '/Users/verify/.config/wtpool/machine.toml',
+      config: CONFIG,
       error: null,
       heavy: [
         { pattern: 'just', source: 'machine' },
@@ -46,29 +57,6 @@ function documentWith(jobs) {
     };
   }
   return doc;
-}
-
-/** Waits until a view of `doc`, by its `generated`, reached the webview after view `from`. */
-async function reached(doc, from) {
-  const seen = await waitFor(async () => (await views()).slice(from).some((v) => v.status?.generated === doc.generated), 10_000);
-  assert.ok(seen, `setup: the document of ${doc.generated} never reached the webview`);
-}
-
-/** Opens the tab on `doc` alone, the fake configured with `config`. */
-async function showing(doc, config = {}) {
-  await resetFake({ documents: [doc], aliveMs: 0, ...config });
-  const from = (await views()).length;
-  await openStatus();
-  await reached(doc, from);
-  // The fake follows its control file once it printed its documents.
-  await sleep(300);
-}
-
-/** Shows `doc` in the open tab through the fake's control file. */
-async function show(doc) {
-  const from = (await views()).length;
-  control(`emit ${JSON.stringify(doc)}`);
-  await reached(doc, from);
 }
 
 const jobStarts = () => starts().filter((s) => s.argv?.[0] === 'job');
@@ -132,7 +120,7 @@ const heavy = (op, scope, pattern) => settings({ heavy: { op, scope, pattern } }
  * ended, and `settleMs` more for any call that must not come.
  */
 async function run(doc, messages, { count, config = {}, settleMs = QUIET_MS } = {}) {
-  await showing(doc, config);
+  await showingAlone(doc, config);
   const verify = await verifyApi();
   const from = (await posted()).length;
   const textsBefore = settingsTexts();
@@ -229,7 +217,8 @@ describe('job settings', () => {
   }
 
   it('job_settings__should_run_wtpool_once_each_and_report one_message_at_a_time', async () => {
-    // Given: each call takes 1.5 s, and two messages come at once.
+    // Given
+    // Each call takes 1.5 s, and two messages come at once.
     const doc = documentWith({});
 
     // When
@@ -248,7 +237,7 @@ describe('job settings', () => {
     assert.deepEqual(seen.answers, [OK, { ...OK, scope: 'machine' }], 'one answer per message, in order');
   });
 
-  const STDERR = 'wtpool: /Users/verify/.config/wtpool/machine.toml is a symlink to /Users/verify/dotfiles/machine.toml: edit it there';
+  const STDERR = `wtpool: ${CONFIG} is a symlink to /Users/verify/dotfiles/machine.toml: edit it there`;
   const failed = [
     {
       name: 'refused_limit_stops_enforce',
@@ -295,9 +284,10 @@ describe('job settings', () => {
   }
 
   it('job_settings__should_run_wtpool_once_each_and_report killed_after_10_s', async () => {
-    // Given: the first call never answers in time.
+    // Given
+    // The first call never answers in time.
     const doc = documentWith({});
-    await showing(doc, { jobHangMs: 60_000 });
+    await showingAlone(doc, { jobHangMs: 60_000 });
     const verify = await verifyApi();
     const from = (await posted()).length;
 
@@ -325,9 +315,10 @@ describe('job settings', () => {
   });
 
   it('job_settings__should_run_wtpool_once_each_and_report did_not_start', async () => {
-    // Given: wtpool.path names a file that does not exist, once the tab shows the document.
+    // Given
+    // The setting `wtpool.path` names a missing file, once the tab shows the document.
     const doc = documentWith({});
-    await showing(doc);
+    await showingAlone(doc);
     const verify = await verifyApi();
     const configuration = vscode.workspace.getConfiguration('wtpool');
     const previous = configuration.inspect('path').globalValue;
@@ -360,10 +351,11 @@ describe('job settings', () => {
 
 describe('job settings outside the set', () => {
   it('messages__should_ignore_everything_outside_the_set jobsettings', async () => {
-    // Given: limits 1 to 64, `just` on the machine's list, `make` on this repository's, and
+    // Given
+    // Limits 1 to 64, `just` on the machine's list, `make` on this repository's, and
     // `cargo nextest` suggested.
     const doc = documentWith({});
-    await showing(doc);
+    await showingAlone(doc);
     const verify = await verifyApi();
     const wt1 = doc.pools[0].worktrees.find((w) => w.name === 'wt1').path;
     const outside = [

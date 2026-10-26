@@ -9,7 +9,7 @@ use std::time::Duration;
 use rstest::rstest;
 use serde_json::{Value, json};
 
-use super::hook_state::{Step, bash, ev, post_read, pre_bash, pre_read, prompt, run_steps, step};
+use super::hook_state::{Step, bash, post_read, pre_bash, pre_read, prompt, run_steps, step};
 use crate::support::hook::{Hooks, RunOptions, wait_output};
 
 /// `value` as JSON text whose object keys run in reverse order, with spaces and a newline
@@ -72,11 +72,11 @@ fn wait__should_hash_input_with_sorted_keys(
         ]
     };
     // The PreToolUse payloads reach the hook as canonical text, keys sorted and no spaces.
-    hooks.send(&ev(&hooks, "PreToolUse-Bash", &fields("toolu_old")));
-    hooks.send(&ev(&hooks, "PreToolUse-Bash", &fields("toolu_new")));
-    let request = ev(
-        &hooks,
+    hooks.send(&hooks.event("PreToolUse-Bash", "s1", &fields("toolu_old")));
+    hooks.send(&hooks.event("PreToolUse-Bash", "s1", &fields("toolu_new")));
+    let request = hooks.event(
         "PermissionRequest-Bash",
+        "s1",
         &[("tool_name", json!(tool)), ("tool_input", asked.clone())],
     );
     let stdin = raw_stdin(&request, &reversed_text(&asked));
@@ -90,9 +90,9 @@ fn wait__should_hash_input_with_sorted_keys(
         },
     );
     let bound = hooks.must_record("s1");
-    hooks.send(&ev(&hooks, "PostToolUse-Bash", &fields("toolu_new")));
+    hooks.send(&hooks.event("PostToolUse-Bash", "s1", &fields("toolu_new")));
     let after_newer = hooks.must_record("s1");
-    hooks.send(&ev(&hooks, "PostToolUse-Bash", &fields("toolu_old")));
+    hooks.send(&hooks.event("PostToolUse-Bash", "s1", &fields("toolu_old")));
     let after_older = hooks.must_record("s1");
 
     // Then
@@ -251,8 +251,8 @@ fn case(name: &str) -> Case {
 /// Runs `end` as a hook that starts before `pre` and writes after it: the older writer merges
 /// into the record the newer one wrote.
 fn end_as_older_writer(hooks: &Hooks, pre: &Step, end: &Step) -> Result<(), String> {
-    let older = ev(hooks, end.fixture, &end.fields);
-    let newer = ev(hooks, pre.fixture, &pre.fields);
+    let older = hooks.event(end.fixture, "s1", &end.fields);
+    let newer = hooks.event(pre.fixture, "s1", &pre.fields);
     let mut command = hooks.command(&older, &RunOptions::default());
     command
         .stdin(Stdio::piped())

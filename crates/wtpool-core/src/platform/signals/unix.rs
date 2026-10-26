@@ -27,7 +27,7 @@ pub(super) struct Caught {
     command: Arc<AtomicU32>,
 }
 
-/// What a caught signal does.
+/// The handling of a caught signal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Route {
     /// The job is told, as no command runs yet.

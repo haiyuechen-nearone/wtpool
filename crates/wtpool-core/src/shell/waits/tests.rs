@@ -35,6 +35,8 @@ fn found(command: &str) -> Option<Vec<(bool, bool)>> {
 #[case::nested_loops("while :; do until test -e x; do sleep 1; done; done", &[OPEN, OPEN])]
 #[case::on_lines("until test -e x\ndo\n  sleep 1\ndone", &[OPEN])]
 #[case::sh_script("sh -c 'while :; do sleep 1; done'", &[OPEN])]
+#[case::dash_script("dash -c 'while :; do sleep 1; done'", &[OPEN])]
+#[case::exec_script("exec bash -c 'while :; do sleep 1; done'", &[OPEN])]
 #[case::bash_login_script("bash -lc 'while :; do sleep 1; done'", &[OPEN])]
 #[case::sleep_in_a_script("while :; do sh -c 'sleep 1'; done", &[OPEN])]
 #[case::timeout_beside("until test -e x; do sleep 1; done; timeout 5 true", &[OPEN])]
@@ -43,6 +45,7 @@ fn found(command: &str) -> Option<Vec<(bool, bool)>> {
 #[case::zero_seconds("timeout 0s sh -c 'until test -e x; do sleep 1; done'", &[OPEN])]
 #[case::unknown_duration("timeout $T sh -c 'until test -e x; do sleep 1; done'", &[OPEN])]
 #[case::timeout("timeout 60 sh -c 'until test -e x; do sleep 1; done'", &[BOUNDED])]
+#[case::long_timeout_options("timeout --signal KILL --kill-after 5 60 sh -c 'while :; do sleep 1; done'", &[BOUNDED])]
 #[case::gtimeout("gtimeout 1.5m zsh -c 'until test -e x; do sleep 1; done'", &[BOUNDED])]
 #[case::timeout_options("timeout -k 10 -s KILL --foreground 30m sh -c 'while :; do sleep 1; done'", &[BOUNDED])]
 #[case::through_prefixes("cd /x && timeout -k 10 30m nix develop -c env A=1 bash -lc 'while :; do sleep 1; done'", &[BOUNDED])]
@@ -65,6 +68,7 @@ fn found(command: &str) -> Option<Vec<(bool, bool)>> {
 #[case::keywords_as_arguments("echo while do sleep done", &[])]
 #[case::heredoc_body("cat <<EOF\nwhile :; do sleep 1; done\nEOF", &[])]
 #[case::script_file("bash ./wait.sh -c", &[])]
+#[case::rcfile_value("bash --rcfile f.sh -c 'while :; do sleep 1; done'", &[OPEN])]
 fn waits__should_find_each_loop_that_sleeps(
     #[case] command: &str,
     #[case] expected: &[(bool, bool)],
@@ -105,23 +109,4 @@ fn waits__should_refuse_scripts_nested_too_deep() {
 
     // Then
     assert_eq!(read, (Some(Vec::new()), None));
-}
-
-#[rstest]
-#[case::seconds("60", true)]
-#[case::fraction("0.5", true)]
-#[case::unit("30m", true)]
-#[case::days("1d", true)]
-#[case::zero("0", false)]
-#[case::zero_with_a_unit("0h", false)]
-#[case::negative("-1", false)]
-#[case::infinite("inf", false)]
-#[case::variable("$T", false)]
-#[case::unit_alone("s", false)]
-fn is_positive__should_read_a_duration_above_zero(#[case] duration: &str, #[case] expected: bool) {
-    // When
-    let positive = is_positive(duration);
-
-    // Then
-    assert_eq!(positive, expected);
 }

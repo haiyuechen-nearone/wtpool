@@ -40,8 +40,8 @@ impl JobSignals {
     }
 
     /// From now on hands [`JobSignal::Terminate`] and [`JobSignal::HangUp`] on to the process
-    /// `pid` and ignores the other two, which a terminal sends to that process too. One caught
-    /// since the last [`JobSignals::next_within`] is handed on at once.
+    /// `pid` and ignores the other two, since a terminal sends those to that process too. One
+    /// caught since the last [`JobSignals::next_within`] is handed on at once.
     pub fn hand_on_to(&self, pid: u32) {
         self.0.hand_on_to(pid);
     }
@@ -85,38 +85,52 @@ pub fn end_by(signal: JobSignal) -> ! {
     std::process::exit(1)
 }
 
-/// The exit code a job ends with once its command ended with `status`. A command ended by
-/// SIGINT, SIGQUIT, SIGTERM, SIGHUP, SIGPIPE or SIGKILL ends this process by the same signal, so
-/// a shell sees what it would see of the command; any other signal N gives 128 + N.
+/// How a job ends once its command ended: with an exit code, or by the signal that ended the
+/// command, so a shell sees what it would see of the command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ending {
+    Code(u8),
+    Signal(i32),
+}
+
+/// The [`Ending`] of a job whose command ended with `status`. A command ended by SIGINT, SIGQUIT,
+/// SIGTERM, SIGHUP, SIGPIPE or SIGKILL ends the job by the same signal. Any other signal N gives
+/// the code 128 + N.
 #[cfg(unix)]
 #[must_use]
-pub fn exit_code_like(status: ExitStatus) -> u8 {
+pub fn ending(status: ExitStatus) -> Ending {
     use std::os::unix::process::ExitStatusExt;
+    const MIRRORED: [i32; 6] = [
+        libc::SIGINT,
+        libc::SIGQUIT,
+        libc::SIGTERM,
+        libc::SIGHUP,
+        libc::SIGPIPE,
+        libc::SIGKILL,
+    ];
     match (status.code(), status.signal()) {
-        (Some(code), _) => code_byte(code),
-        (None, Some(signal)) => {
-            let mirrored = [
-                libc::SIGINT,
-                libc::SIGQUIT,
-                libc::SIGTERM,
-                libc::SIGHUP,
-                libc::SIGPIPE,
-                libc::SIGKILL,
-            ];
-            if mirrored.contains(&signal) {
-                end_by_number(signal)
-            }
-            code_byte(128_i32.saturating_add(signal))
-        }
-        (None, None) => 1,
+        (Some(code), _) => Ending::Code(code_byte(code)),
+        (None, Some(signal)) if MIRRORED.contains(&signal) => Ending::Signal(signal),
+        (None, Some(signal)) => Ending::Code(code_byte(128_i32.saturating_add(signal))),
+        (None, None) => Ending::Code(1),
     }
 }
 
 /// Windows passes exit codes as they are and ends no process by a signal.
 #[cfg(not(unix))]
 #[must_use]
+pub fn ending(status: ExitStatus) -> Ending {
+    Ending::Code(status.code().map_or(1, code_byte))
+}
+
+/// The exit code of a job whose command ended with `status`, by its [`ending`]. An ending by a
+/// signal ends this process by it and never returns.
+#[must_use]
 pub fn exit_code_like(status: ExitStatus) -> u8 {
-    status.code().map_or(1, code_byte)
+    match ending(status) {
+        Ending::Code(code) => code,
+        Ending::Signal(signal) => end_by_number(signal),
+    }
 }
 
 /// The low byte of `code`, as a shell reads an exit status.
@@ -124,11 +138,22 @@ fn code_byte(code: i32) -> u8 {
     u8::try_from(code & 0xff).unwrap_or(1)
 }
 
-/// Ends this process by `signal`, its default action restored for it, even for SIGPIPE, which
-/// Rust programs ignore. Exits 128 + N should the process outlive it.
+/// Ends this process by `signal`, its default action restored for it. That holds for SIGPIPE
+/// too, although Rust programs ignore it. Exits 128 + N should the process outlive it.
 #[cfg(unix)]
-fn end_by_number(signal: i32) -> ! {
+pub fn end_by_number(signal: i32) -> ! {
     let _ = signal_hook::low_level::emulate_default_handler(signal);
+    exit_after(signal)
+}
+
+/// Windows ends no process by a signal number.
+#[cfg(not(unix))]
+pub fn end_by_number(signal: i32) -> ! {
+    exit_after(signal)
+}
+
+/// Exits 128 + `signal`, as a shell reports a command that `signal` ended.
+fn exit_after(signal: i32) -> ! {
     std::process::exit(i32::from(code_byte(128_i32.saturating_add(signal))))
 }
 
@@ -165,6 +190,28 @@ mod tests {
 
         // Then
         assert_eq!(i32::from(mirrored), 128 + libc::SIGALRM);
+    }
+
+    #[rstest]
+    #[case::exit_code(3 << 8, Ending::Code(3))]
+    #[case::interrupt(libc::SIGINT, Ending::Signal(libc::SIGINT))]
+    #[case::terminate(libc::SIGTERM, Ending::Signal(libc::SIGTERM))]
+    #[case::pipe(libc::SIGPIPE, Ending::Signal(libc::SIGPIPE))]
+    #[case::kill(libc::SIGKILL, Ending::Signal(libc::SIGKILL))]
+    #[case::alarm(libc::SIGALRM, Ending::Code(142))]
+    #[case::stopped(0x137f, Ending::Code(1))]
+    fn ending__should_mirror_the_listed_signals_and_code_the_rest(
+        #[case] raw: i32,
+        #[case] expected: Ending,
+    ) {
+        // Given
+        let status = ExitStatus::from_raw(raw);
+
+        // When
+        let ended = ending(status);
+
+        // Then
+        assert_eq!(ended, expected);
     }
 
     #[test]

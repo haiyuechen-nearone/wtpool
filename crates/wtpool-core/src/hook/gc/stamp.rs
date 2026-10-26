@@ -5,7 +5,7 @@
 use std::fs::File;
 use std::io::{self, Read, Seek, Write};
 
-use super::super::store::Activity;
+use super::super::store::ActivityDir;
 use crate::clock::Timestamp;
 
 pub const STAMP: &str = "gc.stamp";
@@ -19,7 +19,7 @@ const MAX_BYTES: u64 = 64;
 /// any record is read. `false` when the stamp is fresh, another process holds its lock or it
 /// cannot be written.
 #[must_use]
-pub fn claim(activity: &Activity, now: Timestamp) -> bool {
+pub fn claim(activity: &ActivityDir, now: Timestamp) -> bool {
     let Some(mut file) = locked(activity) else {
         return false;
     };
@@ -29,7 +29,7 @@ pub fn claim(activity: &Activity, now: Timestamp) -> bool {
 
 /// Sets the stamp to `now`, as `wtpool hook gc` does before it runs. A process that holds the
 /// lock is writing it already.
-pub fn mark(activity: &Activity, now: Timestamp) {
+pub fn mark(activity: &ActivityDir, now: Timestamp) {
     if let Some(mut file) = locked(activity) {
         let _ = write_time(&mut file, now);
     }
@@ -37,13 +37,13 @@ pub fn mark(activity: &Activity, now: Timestamp) {
 
 /// Removes the stamp after a gc its budget stopped, so the next session's end goes on. No lock:
 /// a hook that read the old stamp meanwhile at worst runs one more gc, and a second gc is safe.
-pub fn clear(activity: &Activity) {
+pub fn clear(activity: &ActivityDir) {
     let _ = std::fs::remove_file(activity.file_path(STAMP));
 }
 
 /// The stamp, open and locked. The hook never waits for the lock: `None` while another process
 /// holds it.
-fn locked(activity: &Activity) -> Option<File> {
+fn locked(activity: &ActivityDir) -> Option<File> {
     let file = activity.open_file(STAMP)?;
     file.try_lock().ok()?;
     Some(file)

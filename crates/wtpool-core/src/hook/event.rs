@@ -13,7 +13,7 @@ use super::input::{CallFacts, Event, HookInput};
 use super::log;
 use super::place::{self, Shell, ToolPath, Worktree};
 use super::record::{Record, SubagentTitle};
-use super::store::Activity;
+use super::store::ActivityDir;
 use super::tasks::{self, Started, TaskEvent};
 use super::text::{self, MAX_LABEL, MAX_TEXT};
 use crate::activity::{ActorKey, PlacedBy, State};
@@ -25,7 +25,7 @@ struct Context<'a, A> {
     adapter: &'a A,
     input: &'a HookInput,
     env: &'a HookEnv,
-    activity: Activity,
+    activity: ActivityDir,
     key: ActorKey,
     cwd: PathBuf,
     cwd_worktree: Worktree,
@@ -51,7 +51,7 @@ fn handle_input<A: Adapter>(adapter: &A, input: &HookInput, env: &HookEnv) {
     let Some(cwd_worktree) = place::worktree_of(&cwd) else {
         return;
     };
-    let Some(activity) = Activity::open(&cwd_worktree.common) else {
+    let Some(activity) = ActivityDir::open(&cwd_worktree.common) else {
         return;
     };
     if activity.is_sandbox() && !env.sandbox {
@@ -75,7 +75,8 @@ fn handle_input<A: Adapter>(adapter: &A, input: &HookInput, env: &HookEnv) {
         now_time: now,
     };
     if context.run(&input.event).is_some() && input.event == Event::SessionEnd {
-        let deadline = env.entered_micros.saturating_add(gc::HOOK_BUDGET_MICROS);
+        let micros = env.entered_micros.saturating_add(gc::HOOK_BUDGET_MICROS);
+        let deadline = gc::Deadline::new(&env.clock, micros);
         let _ = gc::after_session_end(&context.activity, now, &env.processes, deadline);
     }
 }
@@ -92,6 +93,7 @@ impl<A: Adapter> Context<'_, A> {
         let lock = self
             .activity
             .lock(&stem)
+            .ok()
             .or_else(|| self.skipped("its record's lock cannot be taken"))?;
         let current = self.activity.read(&stem);
         if let Event::Notified(_) = event
@@ -139,7 +141,7 @@ impl<A: Adapter> Context<'_, A> {
             .into_iter()
             .filter(|stem| stem != own);
         for stem in others {
-            let Some(lock) = self.activity.lock(&stem) else {
+            let Ok(lock) = self.activity.lock(&stem) else {
                 continue;
             };
             if let Some(mut record) = self.activity.read(&stem)
@@ -362,7 +364,7 @@ impl<A: Adapter> Context<'_, A> {
             }
             Event::SessionEnd => {
                 for stem in self.activity.subagents_of(&self.key) {
-                    if let Some(lock) = self.activity.lock(&stem) {
+                    if let Ok(lock) = self.activity.lock(&stem) {
                         self.activity.delete(&stem, lock);
                     }
                 }
@@ -373,7 +375,7 @@ impl<A: Adapter> Context<'_, A> {
 
     /// Rewrites the record `stem` under its lock, keeping a state a later hook wrote.
     fn update(&self, stem: &str, change: impl Fn(&Record) -> Record) -> Option<()> {
-        let lock = self.activity.lock(stem)?;
+        let lock = self.activity.lock(stem).ok()?;
         let current = self.activity.read(stem)?;
         let result = apply::settle(
             &current,

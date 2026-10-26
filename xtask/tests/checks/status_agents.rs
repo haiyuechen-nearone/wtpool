@@ -1,5 +1,5 @@
-//! Agents in `wtpool status`: the decay table, activity precedence, records outside the pool and
-//! the records it reads.
+//! Agents in `wtpool status`: the state an actor shows as its last event ages, activity
+//! precedence, records outside the pool and the records it reads.
 
 use std::fs;
 use std::path::Path;
@@ -8,19 +8,8 @@ use std::time::{Duration, Instant, SystemTime};
 use rstest::rstest;
 use serde_json::{Value, json};
 
-use crate::support::hook::{CLAUDE_STARTED, Hooks, START, add_seconds, event, with};
+use crate::support::hook::{CLAUDE_STARTED, Hooks, START, add_seconds};
 use crate::support::{must_symlink, worktree};
-
-fn ev(hooks: &Hooks, fixture: &str, session: &str, fields: &[(&str, Value)]) -> Value {
-    with(event(&hooks.pool, fixture, session, &hooks.pool.fg), fields)
-}
-
-fn sub_ev(hooks: &Hooks, fixture: &str, fields: &[(&str, Value)]) -> Value {
-    let mut payload = ev(hooks, fixture, "s1", fields);
-    payload["agent_id"] = json!("a1");
-    payload["agent_type"] = json!("Explore");
-    payload
-}
 
 fn read_in(hooks: &Hooks, worktree: &str) -> Vec<(&'static str, Value)> {
     vec![
@@ -64,7 +53,7 @@ fn state_of(document: &Value, key: &str) -> Option<String> {
 
 /// Runs the case's events from START, then reads the document `after` seconds later.
 fn decay_case(hooks: &mut Hooks, case: &str) -> (i64, &'static str, Option<&'static str>) {
-    let s = |fixture: &str, fields: Vec<(&'static str, Value)>| ev(hooks, fixture, "s1", &fields);
+    let s = |fixture: &str, fields: Vec<(&'static str, Value)>| hooks.event(fixture, "s1", &fields);
     hooks.send(&s("UserPromptSubmit", vec![]));
     match case {
         "working_under_120_s" => (119, "s1", Some("working")),
@@ -97,34 +86,34 @@ fn decay_case(hooks: &mut Hooks, case: &str) -> (i64, &'static str, Option<&'sta
         }
         "agent_while_its_subagent_works" => {
             hooks.send(&s("PreToolUse-Agent", vec![]));
-            hooks.send(&sub_ev(hooks, "SubagentStart", &[]));
+            hooks.send(&hooks.sub_event("SubagentStart", "a1", &[]));
             (300, "s1", Some("working"))
         }
         "agent_while_its_subagent_waits" => {
             hooks.send(&s("PreToolUse-Agent", vec![]));
-            hooks.send(&sub_ev(hooks, "SubagentStart", &[]));
-            hooks.send(&sub_ev(
-                hooks,
+            hooks.send(&hooks.sub_event("SubagentStart", "a1", &[]));
+            hooks.send(&hooks.sub_event(
                 "PreToolUse-Bash",
+                "a1",
                 &bash_in(hooks, "wt2", "toolu_sub"),
             ));
             let command = json!({ "command": format!("cd {} && cargo test", hooks.pool.worktree("wt2").display()), "description": "Test" });
-            hooks.send(&sub_ev(
-                hooks,
+            hooks.send(&hooks.sub_event(
                 "PermissionRequest-Bash",
+                "a1",
                 &[("tool_input", command)],
             ));
             (300, "s1", Some("working"))
         }
         "agent_after_its_subagent_is_done" => {
             hooks.send(&s("PreToolUse-Agent", vec![]));
-            hooks.send(&sub_ev(hooks, "SubagentStart", &[]));
-            hooks.send(&sub_ev(hooks, "SubagentStop", &[]));
+            hooks.send(&hooks.sub_event("SubagentStart", "a1", &[]));
+            hooks.send(&hooks.sub_event("SubagentStop", "a1", &[]));
             (300, "s1", Some("quiet"))
         }
         "subagent_without_events" => {
             hooks.send(&s("PreToolUse-Agent", vec![]));
-            hooks.send(&sub_ev(hooks, "SubagentStart", &[]));
+            hooks.send(&hooks.sub_event("SubagentStart", "a1", &[]));
             (300, "s1.a1", Some("quiet"))
         }
         "waiting_never_decays" => {
@@ -137,14 +126,14 @@ fn decay_case(hooks: &mut Hooks, case: &str) -> (i64, &'static str, Option<&'sta
         }
         "done_under_a_minute" => {
             hooks.send(&s("PreToolUse-Agent", vec![]));
-            hooks.send(&sub_ev(hooks, "SubagentStart", &[]));
-            hooks.send(&sub_ev(hooks, "SubagentStop", &[]));
+            hooks.send(&hooks.sub_event("SubagentStart", "a1", &[]));
+            hooks.send(&hooks.sub_event("SubagentStop", "a1", &[]));
             (59, "s1.a1", Some("done"))
         }
         "done_over_a_minute" => {
             hooks.send(&s("PreToolUse-Agent", vec![]));
-            hooks.send(&sub_ev(hooks, "SubagentStart", &[]));
-            hooks.send(&sub_ev(hooks, "SubagentStop", &[]));
+            hooks.send(&hooks.sub_event("SubagentStart", "a1", &[]));
+            hooks.send(&hooks.sub_event("SubagentStop", "a1", &[]));
             (61, "s1.a1", None)
         }
         "ended" => {
@@ -241,7 +230,7 @@ fn activity__should_follow_the_precedence(
     let fg = hooks.pool.fg.clone();
     hooks.start(7002, "claude", &fg, CLAUDE_STARTED);
     let run_as = |hooks: &Hooks, session: &str, fixture: &str, fields: &[(&str, Value)]| {
-        let payload = ev(hooks, fixture, session, fields);
+        let payload = hooks.event(fixture, session, fields);
         let options = crate::support::hook::RunOptions {
             parent: Some(if session == "s2" { 7002 } else { 7001 }),
             ..Default::default()
@@ -274,16 +263,16 @@ fn activity__should_follow_the_precedence(
         "idle" | "idle_before_foreground" => run_as(&hooks, "s1", "Stop", &[]),
         "quiet_counts_as_idle" => clock_after = 200,
         "done_counts_as_nothing" => {
-            let mut moved = ev(&hooks, "PreToolUse-Read", "s1", &read_in(&hooks, "fg"));
+            let mut moved = hooks.event("PreToolUse-Read", "s1", &read_in(&hooks, "fg"));
             moved["tool_use_id"] = json!("toolu_back");
             hooks.send(&moved);
-            hooks.send(&sub_ev(&hooks, "SubagentStart", &[]));
-            hooks.send(&sub_ev(
-                &hooks,
+            hooks.send(&hooks.sub_event("SubagentStart", "a1", &[]));
+            hooks.send(&hooks.sub_event(
                 "PreToolUse-Read-subagent",
+                "a1",
                 &read_in(&hooks, target),
             ));
-            hooks.send(&sub_ev(&hooks, "SubagentStop", &[]));
+            hooks.send(&hooks.sub_event("SubagentStop", "a1", &[]));
         }
         "missing_before_waiting" => {
             run_as(
@@ -319,20 +308,10 @@ fn activity__should_follow_the_precedence(
 fn status__should_ignore_a_record_outside_the_pool() {
     // Given
     let hooks = Hooks::must_new("outside-pool");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "s1", &[]));
-    hooks.send(&ev(
-        &hooks,
-        "PreToolUse-Read",
-        "s1",
-        &read_in(&hooks, "wt1"),
-    ));
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "s3", &[]));
-    hooks.send(&ev(
-        &hooks,
-        "PreToolUse-Read",
-        "s3",
-        &read_in(&hooks, "wt3"),
-    ));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event("PreToolUse-Read", "s1", &read_in(&hooks, "wt1")));
+    hooks.send(&hooks.event("UserPromptSubmit", "s3", &[]));
+    hooks.send(&hooks.event("PreToolUse-Read", "s3", &read_in(&hooks, "wt3")));
     let mut foreign = hooks.must_record("s1");
     foreign["session_id"] = json!("s-foreign");
     foreign["worktree"] = json!("/Users/someone/other-repo");
@@ -385,13 +364,8 @@ fn copy_record(template: &Value, session: &str, path: &Path, extra: &[(&str, Val
 fn status__should_skip_fifos_symlinks_locks_and_large_records() {
     // Given
     let hooks = Hooks::must_new("skip-records");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "s1", &[]));
-    hooks.send(&ev(
-        &hooks,
-        "PreToolUse-Read",
-        "s1",
-        &read_in(&hooks, "wt1"),
-    ));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event("PreToolUse-Read", "s1", &read_in(&hooks, "wt1")));
     let template = hooks.must_record("s1");
     let dir = hooks.activity();
     let outside = hooks.sandbox.root.join("s-link-target.json");
@@ -464,16 +438,11 @@ fn set_mtime(path: &Path, seconds: i64) {
 fn status__should_keep_the_newest_512_records() {
     // Given
     let hooks = Hooks::must_new("newest-512");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "live", &[]));
-    hooks.send(&ev(
-        &hooks,
-        "PreToolUse-Read",
-        "live",
-        &read_in(&hooks, "wt3"),
-    ));
-    hooks.send(&ev(&hooks, "Stop", "live", &[]));
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "ended", &[]));
-    hooks.send(&ev(&hooks, "SessionEnd", "ended", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "live", &[]));
+    hooks.send(&hooks.event("PreToolUse-Read", "live", &read_in(&hooks, "wt3")));
+    hooks.send(&hooks.event("Stop", "live", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "ended", &[]));
+    hooks.send(&hooks.event("SessionEnd", "ended", &[]));
     let template = hooks.must_record("ended");
     fs::remove_file(hooks.activity().join("ended.json")).expect("setup: remove the template");
     let _ = fs::remove_file(hooks.activity().join("ended.json.lock"));
@@ -529,13 +498,8 @@ fn status__should_keep_the_newest_512_records() {
 fn status__should_skip_an_unknown_record_version() {
     // Given
     let hooks = Hooks::must_new("record-version");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "s1", &[]));
-    hooks.send(&ev(
-        &hooks,
-        "PreToolUse-Read",
-        "s1",
-        &read_in(&hooks, "wt1"),
-    ));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event("PreToolUse-Read", "s1", &read_in(&hooks, "wt1")));
     let template = hooks.must_record("s1");
     let dir = hooks.activity();
     copy_record(
@@ -603,9 +567,8 @@ fn status__should_read_the_kind_of_an_older_call() {
     // Past 120 s only a shell call during a build, or a call starting a subagent while that
     // subagent works, keeps a session working.
     let mut hooks = Hooks::must_new("older-kinds");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "s1", &[]));
-    hooks.send(&ev(
-        &hooks,
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event(
         "PreToolUse-Bash",
         "s1",
         &bash_in(&hooks, "wt1", "toolu_bash"),

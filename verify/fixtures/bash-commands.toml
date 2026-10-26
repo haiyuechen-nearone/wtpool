@@ -20,6 +20,10 @@
 #   substitution's command count, its `cd` targets among them, but its `cd` moves no shell.
 # - A simple command of `VAR=value` words only runs no program: the summary is the next one's.
 # - A `cd` in a subshell `( … )` is a `cd` of H9, as one after `sh -c` is.
+# - The script of sh, bash, zsh or dash follows any option word that holds `c`, as in `bash -lc`.
+# - The program follows the reserved words `if`, `then`, `elif`, `else`, `while`, `until`, `do`
+#   and `!` that lead a simple command, and the prefixes `exec`, `command` (not `command -v` or
+#   `-V`) and `builtin`, as it follows `timeout N` or `gtimeout N` with their options.
 
 [[command]]
 form = "a single match"
@@ -216,6 +220,83 @@ command = "timeout 600 cargo test"
 cwd = "fg"
 worktree = "fg"
 summary = "cargo test"
+
+[[command]]
+form = "timeout with long options whose value is the next word"
+command = "timeout --signal KILL --kill-after 5 60 cargo build"
+cwd = "fg"
+worktree = "fg"
+summary = "cargo build"
+
+[[command]]
+form = "gtimeout N"
+command = "gtimeout -k 5 60 cargo test"
+cwd = "fg"
+worktree = "fg"
+summary = "cargo test"
+
+[[command]]
+form = "a cd in the script of bash -lc"
+command = "bash -lc 'cd {pool}/wt2 && make'"
+cwd = "fg"
+worktree = "wt2"
+summary = "bash"
+
+[[command]]
+form = "a cd in the script of dash -c"
+command = "dash -c 'cd {pool}/wt3 && make'"
+cwd = "fg"
+worktree = "wt3"
+summary = "dash"
+
+[[command]]
+form = "the program after if"
+command = "if true; then make; fi"
+cwd = "fg"
+worktree = "fg"
+summary = "true"
+
+[[command]]
+form = "a cd after do, and the program after until"
+command = "until test -e {pool}/wt3/x; do cd {pool}/wt2; done"
+cwd = "fg"
+worktree = "wt2"
+summary = "test"
+
+[[command]]
+form = "the program after !"
+command = "! make check"
+cwd = "fg"
+worktree = "fg"
+summary = "make"
+
+[[command]]
+form = "exec with an option whose value is the next word"
+command = "exec -a build cargo build"
+cwd = "fg"
+worktree = "fg"
+summary = "cargo build"
+
+[[command]]
+form = "command runs the program"
+command = "command cargo test"
+cwd = "fg"
+worktree = "fg"
+summary = "cargo test"
+
+[[command]]
+form = "command -v runs no program"
+command = "command -v cargo"
+cwd = "fg"
+worktree = "fg"
+summary = "command"
+
+[[command]]
+form = "a cd after builtin"
+command = "builtin cd {pool}/wt2 && ls {pool}/wt3"
+cwd = "fg"
+worktree = "wt2"
+summary = "ls"
 
 [[command]]
 form = "env and VAR=value"

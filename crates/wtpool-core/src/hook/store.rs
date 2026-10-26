@@ -1,20 +1,21 @@
 //! Record files in `wtpool-activity/`: the lock each writer takes, reads that never follow a
 //! symlink or block on a FIFO, and writes through a temp file renamed over the record.
 
-use std::fs::{File, Metadata, OpenOptions};
-use std::io::{self, Write};
+use std::fmt;
+use std::fs::{File, Metadata, OpenOptions, TryLockError};
+use std::io;
 use std::path::{Path, PathBuf};
 
 use super::record::Record;
 use crate::activity::{ACTIVITY_DIR, ActorKey, Stem, read_record_file};
-use crate::platform::fs::{open_private, owner, same_file};
+use crate::platform::fs::{open_private, owner, replace_file, same_file};
 
 /// The most attempts a writer makes at a lock that keeps being replaced.
 const LOCK_ATTEMPTS: usize = 64;
 
 /// The real, owned `wtpool-activity/` folder of one repository.
 #[derive(Debug, Clone)]
-pub struct Activity {
+pub struct ActivityDir {
     dir: PathBuf,
     owner: Option<u32>,
 }
@@ -26,7 +27,55 @@ pub struct Locked {
     pub path: PathBuf,
 }
 
-impl Activity {
+/// The reason a record's lock was not taken.
+#[derive(Debug)]
+pub enum LockError {
+    /// The lock file belongs to another user.
+    ForeignOwner,
+    /// The lock path names a FIFO, a folder or another entry that is not a regular file.
+    NotAFile,
+    /// Another process holds the lock, and the caller would not wait for it.
+    Held,
+    /// The file locked was no longer the one the path names.
+    Replaced,
+    Io(io::Error),
+}
+
+impl fmt::Display for LockError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ForeignOwner => f.write_str("the lock file belongs to another user"),
+            Self::NotAFile => f.write_str("the lock file is not a regular file"),
+            Self::Held => f.write_str("another process holds the lock"),
+            Self::Replaced => f.write_str("the lock file was replaced while it was locked"),
+            Self::Io(error) => write!(f, "{error}"),
+        }
+    }
+}
+
+impl std::error::Error for LockError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+impl From<io::Error> for LockError {
+    fn from(error: io::Error) -> Self {
+        Self::Io(error)
+    }
+}
+
+/// Waits for a lock another process holds, or gives up at once.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Wait {
+    Block,
+    Never,
+}
+
+impl ActivityDir {
     /// The folder `<common>/wtpool-activity` when it exists as a real folder, not a symlink. It is
     /// never created here.
     #[must_use]
@@ -68,25 +117,32 @@ impl Activity {
         self.dir.join(format!("{stem}.json"))
     }
 
-    /// Takes the lock of the record `stem`, again while the lock file found is not the one the
-    /// path names, as `wtpool hook gc` deleted it meanwhile, up to [`LOCK_ATTEMPTS`] times. `None`
-    /// when the folder belongs to another user or the lock cannot be taken.
-    #[must_use]
-    pub fn lock(&self, stem: &str) -> Option<Locked> {
-        let path = self.dir.join(format!("{stem}.json.lock"));
-        (0..LOCK_ATTEMPTS).find_map(|_| self.try_lock(&path, true))
+    /// Takes the lock of the record `stem`, waiting while another process holds it. It tries
+    /// again while the lock file found is not the one the path names, as `wtpool hook gc` deleted
+    /// it meanwhile, and after an I/O error, up to [`LOCK_ATTEMPTS`] times.
+    pub fn lock(&self, stem: &str) -> Result<Locked, LockError> {
+        let path = self.lock_path(stem);
+        let mut last = LockError::Replaced;
+        for _ in 0..LOCK_ATTEMPTS {
+            match self.try_lock(&path, Wait::Block) {
+                Err(error @ (LockError::Replaced | LockError::Io(_))) => last = error,
+                taken => return taken,
+            }
+        }
+        Err(last)
     }
 
-    /// The lock of the record `stem` in one attempt that never waits: `None` while another
-    /// process holds it. gc takes this one, as a record being written is not old.
-    #[must_use]
-    pub fn lock_now(&self, stem: &str) -> Option<Locked> {
-        self.try_lock(&self.dir.join(format!("{stem}.json.lock")), false)
+    /// The lock of the record `stem` in one attempt that never waits: [`LockError::Held`] while
+    /// another process holds it. gc takes this one, as a record being written is not old.
+    pub fn lock_now(&self, stem: &str) -> Result<Locked, LockError> {
+        self.try_lock(&self.lock_path(stem), Wait::Never)
     }
 
-    /// One attempt at the lock at `path`, waiting for it with `wait`: `None` when it cannot be
-    /// taken, or when the file locked is no longer the one the path names.
-    fn try_lock(&self, path: &Path, wait: bool) -> Option<Locked> {
+    fn lock_path(&self, stem: &str) -> PathBuf {
+        self.dir.join(format!("{stem}.json.lock"))
+    }
+
+    fn try_lock(&self, path: &Path, wait: Wait) -> Result<Locked, LockError> {
         let file = open_private(
             OpenOptions::new()
                 .read(true)
@@ -94,19 +150,28 @@ impl Activity {
                 .create(true)
                 .truncate(false),
             path,
-        )
-        .ok()?;
-        let held = file.metadata().ok()?;
-        (self.owns(&held) && held.is_file()).then_some(())?;
-        if wait {
-            file.lock().ok()?;
-        } else {
-            file.try_lock().ok()?;
+        )?;
+        let held = file.metadata()?;
+        if !self.owns(&held) {
+            return Err(LockError::ForeignOwner);
         }
-        let named = path.symlink_metadata().ok()?;
+        if !held.is_file() {
+            return Err(LockError::NotAFile);
+        }
+        match wait {
+            Wait::Block => file.lock()?,
+            Wait::Never => file.try_lock().map_err(|error| match error {
+                TryLockError::WouldBlock => LockError::Held,
+                TryLockError::Error(error) => LockError::Io(error),
+            })?,
+        }
+        let named = path.symlink_metadata()?;
         // Where the system tells no file identity, as on Windows, the lock file still in place
         // counts as the one locked.
-        same_file(&named, &held).unwrap_or(true).then(|| Locked {
+        if !same_file(&named, &held).unwrap_or(true) {
+            return Err(LockError::Replaced);
+        }
+        Ok(Locked {
             _file: file,
             path: path.to_path_buf(),
         })
@@ -151,26 +216,11 @@ impl Activity {
         Record::from_json(&read_record_file(&self.record_path(stem))?)
     }
 
-    /// Writes `record` as `stem` through a temp file opened `O_CREAT | O_EXCL | O_NOFOLLOW` and
-    /// renamed over the record, so a symlink or FIFO there is replaced. A record that cannot fit
-    /// in [`MAX_RECORD_BYTES`](crate::activity::MAX_RECORD_BYTES) leaves the file as it was
-    /// ([`Record::to_json`]).
+    /// Writes `record` as `stem` with [`replace_file`], so a symlink or FIFO there is replaced. A
+    /// record that cannot fit in [`MAX_RECORD_BYTES`](crate::activity::MAX_RECORD_BYTES) leaves
+    /// the file as it was ([`Record::to_json`]).
     pub fn write(&self, stem: &str, record: &Record) -> io::Result<()> {
-        let text = record.to_json()?;
-        let temp = self
-            .dir
-            .join(format!(".{stem}.json.{}.tmp", std::process::id()));
-        let _ = std::fs::remove_file(&temp);
-        let mut options = OpenOptions::new();
-        options.write(true).create_new(true);
-        let mut file = open_private(&mut options, &temp)?;
-        let written = file
-            .write_all(&text)
-            .and_then(|()| std::fs::rename(&temp, self.record_path(stem)));
-        if written.is_err() {
-            let _ = std::fs::remove_file(&temp);
-        }
-        written
+        replace_file(&self.record_path(stem), &record.to_json()?)
     }
 
     /// Deletes the record `stem` and its lock, held by the caller.

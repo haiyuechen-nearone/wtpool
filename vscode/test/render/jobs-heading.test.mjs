@@ -3,7 +3,7 @@ import { afterEach, test } from 'vitest';
 
 import { POOL, actor, ago, document, mustValidate, worktree } from '../support/docs.mjs';
 import { DOT, WORDS } from '../support/grammar.mjs';
-import { buttonColours, buttonName, buttonText, busyDocument, firstOpenDocument, job, jobs, withJobs } from '../support/jobs.mjs';
+import { CONFIG, buttonColours, buttonName, buttonText, busyDocument, firstOpenDocument, job, jobs, withJobs } from '../support/jobs.mjs';
 import { accessibleName, mustButton, press, strip } from '../support/jobs-render.mjs';
 import { mount, rowById, seen, seenLines, text } from '../support/webview.mjs';
 
@@ -134,7 +134,7 @@ test('heading__should_offer_the_machine_button busy', async () => {
 
 test('heading__should_offer_the_machine_button config_error', async () => {
   // Given
-  const status = mustValidate(withJobs(busy, jobs({ limit: null, error: '/Users/verify/.config/wtpool/machine.toml: unknown key limits', running: [], waiting: [] })));
+  const status = mustValidate(withJobs(busy, jobs({ limit: null, error: `${CONFIG}: unknown key limits`, running: [], waiting: [] })));
   webview = await mount();
 
   // When

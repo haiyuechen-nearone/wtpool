@@ -241,7 +241,8 @@ fixtures__should_match_a_fresh_scrub = ["static"]
 # several agents in one row (U12, U13).
 # render: the webview's pattern check (J18), builds outside a job (A8, U14), the heading's machine
 # button and its counts (S14, U8, U10), the machine strip (U11, X20), the pattern editor (U15,
-# X22), the count of agent lines (U12) and the line icons (U13).
+# X22), each answer matched to its edit or save in order and none waited for forever (U15, X21),
+# the count of agent lines (U12) and the line icons (U13).
 pattern__should_match_the_cli_grammar = ["render"]
 not_queued__should_mark_builds_outside_jobs = ["render"]
 heading__should_count_jobs = ["render"]
@@ -251,6 +252,8 @@ machine_strip__should_update_in_place = ["render"]
 machine_strip__should_follow_the_keyboard = ["render"]
 heavy_editor__should_show_each_scope = ["render"]
 heavy_editor__should_follow_the_keyboard = ["render"]
+heavy_editor__should_match_answers_in_order = ["render"]
+machine_strip__should_save_again_without_an_answer = ["render"]
 count__should_follow_the_agent_lines = ["render"]
 line_icons__should_match_each_state = ["render"]
 # host: the extension runs wtpool job limit, enforce and heavy for each jobSettings and answers (X21).

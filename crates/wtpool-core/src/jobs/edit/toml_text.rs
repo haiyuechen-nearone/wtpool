@@ -8,6 +8,7 @@ use toml::Spanned;
 use toml::de::{DeString, DeTable, DeValue};
 
 use super::EditFault;
+use crate::toml_error::{TomlError, line_of};
 
 /// The table of a document that holds an edited key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,19 +23,19 @@ pub(super) enum TableName {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Form {
     Root,
-    /// A `[name]` header, which ends at this byte.
+    /// A `[name]` header, ending at this byte.
     Header(usize),
     Dotted,
     Inline,
 }
 
-/// The strings of an array, each with its own text, and how the array is laid out.
+/// The strings of an array, each with its own text, and the layout of the array.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct StringList {
     key: &'static str,
     items: Vec<Item>,
     layout: Layout,
-    /// The line of a comment inside the array, which a rewrite would drop.
+    /// The line of a comment inside the array, lost in a rewrite.
     comment: Option<usize>,
 }
 
@@ -78,7 +79,7 @@ impl StringList {
         });
     }
 
-    /// Removes each item `value`, and tells whether there was one.
+    /// Removes each item `value`, `true` when there was one.
     pub(super) fn remove(&mut self, value: &str) -> bool {
         let before = self.items.len();
         self.items.retain(|item| item.value != value);
@@ -148,8 +149,8 @@ pub(super) fn set_value(
     insert_lines(text, at, &format!("{key} = {value}\n"))
 }
 
-/// `text` without the line of `key` in `table`, trailing comment included; `None` when the table
-/// has no `key`.
+/// `text` without the line of `key` in `table`, trailing comment included, or `None` when the
+/// table has no `key`.
 pub(super) fn remove_key(
     text: &str,
     table: TableName,
@@ -223,13 +224,8 @@ fn parse(text: &str) -> Result<DeTable<'_>, EditFault> {
     DeTable::parse(text)
         .map(Spanned::into_inner)
         .map_err(|error| {
-            let line = error.span().map(|span| line_of(text, span.start));
-            let mut detail = error;
-            detail.set_input(None);
-            EditFault::Syntax {
-                line,
-                reason: detail.to_string().trim_end().replace('\n', " "),
-            }
+            let TomlError { line, reason } = TomlError::new(error, text);
+            EditFault::Syntax { line, reason }
         })
 }
 
@@ -262,7 +258,7 @@ fn entry<'d, 'i>(table: &'d DeTable<'i>, key: &str) -> Option<Entry<'d, 'i>> {
 }
 
 /// The end of the last line that holds a key of `table` and its value. The keys of tables with
-/// headers of their own lie on header lines, which start with `[`.
+/// headers of their own lie on header lines, starting with `[`.
 fn key_lines_end(table: &DeTable<'_>, text: &str) -> Option<usize> {
     table
         .iter()
@@ -316,15 +312,6 @@ fn indent_before(text: &str, at: usize) -> Option<&str> {
         .chars()
         .all(|c| c == ' ' || c == '\t')
         .then_some(before)
-}
-
-/// The line that byte `offset` of `text` is on, counting from 1.
-fn line_of(text: &str, offset: usize) -> usize {
-    text.bytes()
-        .take(offset)
-        .filter(|&byte| byte == b'\n')
-        .count()
-        .saturating_add(1)
 }
 
 fn splice(text: &str, range: Range<usize>, with: &str) -> Result<String, EditFault> {

@@ -7,14 +7,26 @@ use std::path::{Path, PathBuf};
 
 use crate::worktree_state::Operation;
 
+/// The entry of a worktree's top folder that holds its git directory, or names it.
+pub(crate) const DOT_GIT: &str = ".git";
+/// The start of the line of a linked worktree's `.git` file naming its git directory.
+pub(crate) const GITDIR_PREFIX: &str = "gitdir:";
+
 pub(crate) const HEAD: &str = "HEAD";
 pub(crate) const INDEX: &str = "index";
 
 // In the common git directory.
+pub(crate) const OBJECTS: &str = "objects";
 pub(crate) const REFS: &str = "refs";
 pub(crate) const PACKED_REFS: &str = "packed-refs";
 pub(crate) const CONFIG: &str = "config";
 pub(crate) const WORKTREES: &str = "worktrees";
+
+// In a linked worktree's git directory.
+/// Names the common git directory, relative to the linked worktree's git directory unless
+/// absolute.
+pub(crate) const COMMONDIR: &str = "commondir";
+const BACK_LINK: &str = "gitdir";
 
 const REBASE_MERGE: &str = "rebase-merge";
 const REBASE_APPLY: &str = "rebase-apply";
@@ -86,7 +98,7 @@ pub(crate) fn linked_git_dir(common: &Path, id: &OsStr) -> PathBuf {
 
 /// The file of the linked worktree git directory `git_dir` naming the worktree's `.git` file.
 pub(crate) fn back_link_file(git_dir: &Path) -> PathBuf {
-    git_dir.join("gitdir")
+    git_dir.join(BACK_LINK)
 }
 
 /// The `.git` file that the text of a [`back_link_file`] names, relative to its git directory

@@ -31,7 +31,9 @@ mod repository;
 mod resolve;
 mod run;
 mod settings;
+mod shell;
 pub mod status;
+mod toml_error;
 mod worktree;
 mod worktree_state;
 

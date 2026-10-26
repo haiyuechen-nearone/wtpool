@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const vscode = require('vscode');
 
-const { advance, control, ended, openStatus, posted, resetFake, scenarioDocuments, sleep, starts, waitFor } = require('./support.cjs');
+const { advance, control, ended, expectedDocuments, openStatus, posted, resetFake, sleep, starts, waitFor } = require('./support.cjs');
 
 describe('budgets', () => {
   it('budget__b7', async () => {
@@ -12,7 +12,7 @@ describe('budgets', () => {
     const opened = await openStatus();
     // The fake reads control lines only once it has printed its documents, and earlier checks
     // posted idle_pool too, so only a view of this tab counts.
-    const final = JSON.stringify(scenarioDocuments('idle_pool').at(-1));
+    const final = JSON.stringify(expectedDocuments('idle_pool').at(-1));
     await waitFor(async () => (await posted()).slice(from).some((m) => m.type === 'view' && JSON.stringify(m.status) === final), 10_000);
     await sleep(500);
     const settled = (await posted()).length;
@@ -26,7 +26,7 @@ describe('budgets', () => {
     await vscode.window.showTextDocument(document, { viewColumn: opened.group.viewColumn, preview: false });
     await sleep(500);
     const hidden = (await posted()).length;
-    const docs = scenarioDocuments('idle_pool');
+    const docs = expectedDocuments('idle_pool');
     for (let number = 1; number <= 3; number += 1) {
       const next = structuredClone(docs.at(-1));
       next.generated = `2026-10-20T12:0${number}:00Z`;

@@ -16,7 +16,7 @@ fn reason(text: &str) -> String {
     let path = write(dir.path(), text);
     let error = MachineConfig::read(&path, 16).unwrap_err();
     assert_eq!(error.path, path);
-    error.reason
+    error.fault.to_string()
 }
 
 #[rstest]
@@ -50,6 +50,66 @@ fn limit_new__should_keep_within_the_bounds(#[case] count: i64, #[case] expected
 
     // Then
     assert_eq!(limit.map(Limit::get), expected);
+}
+
+#[rstest]
+#[case::lowest("1", Ok(1))]
+#[case::highest("64", Ok(64))]
+#[case::leading_zero("08", Ok(8))]
+#[case::zero("0", Err(InvalidLimit))]
+#[case::past_the_highest("65", Err(InvalidLimit))]
+#[case::past_any_integer("99999999999999999999", Err(InvalidLimit))]
+#[case::signed("+6", Err(InvalidLimit))]
+#[case::negative("-1", Err(InvalidLimit))]
+#[case::blank(" 6", Err(InvalidLimit))]
+#[case::empty("", Err(InvalidLimit))]
+#[case::word("default", Err(InvalidLimit))]
+fn limit_from_str__should_take_only_decimal_digits_within_the_bounds(
+    #[case] text: &str,
+    #[case] expected: Result<u32, InvalidLimit>,
+) {
+    // When
+    let limit = text.parse::<Limit>();
+
+    // Then
+    assert_eq!(limit.map(Limit::get), expected);
+}
+
+#[test]
+fn invalid_limit__should_name_the_bounds() {
+    // When
+    let message = InvalidLimit.to_string();
+
+    // Then
+    assert_eq!(message, "the limit is a whole number from 1 to 64");
+}
+
+#[rstest]
+#[case::off("off", Ok(Enforce::Off))]
+#[case::warn("warn", Ok(Enforce::Warn))]
+#[case::require("require", Ok(Enforce::Require))]
+#[case::capitalized("Warn", Err(InvalidEnforce))]
+#[case::unknown("strict", Err(InvalidEnforce))]
+#[case::empty("", Err(InvalidEnforce))]
+fn enforce_from_str__should_take_the_name_the_config_writes(
+    #[case] name: &str,
+    #[case] expected: Result<Enforce, InvalidEnforce>,
+) {
+    // When
+    let enforce = name.parse::<Enforce>();
+
+    // Then
+    assert_eq!(enforce, expected);
+    assert_eq!(Enforce::from_name(name), expected.ok());
+}
+
+#[test]
+fn invalid_enforce__should_name_every_policy() {
+    // When
+    let message = InvalidEnforce.to_string();
+
+    // Then
+    assert_eq!(message, "the policy is off, warn or require");
 }
 
 #[test]
@@ -161,7 +221,6 @@ mod unix {
     #[case::file_writable_by_the_group(true, 0o664, "its group or other users may write to it")]
     #[case::file_writable_by_others(true, 0o646, "its group or other users may write to it")]
     #[case::folder_writable_by_the_group(false, 0o775, "its folder ")]
-    #[case::unreadable(true, 0o000, "Permission denied")]
     fn machine_config_read__should_refuse_a_file_others_may_change(
         #[case] file: bool,
         #[case] mode: u32,
@@ -176,8 +235,33 @@ mod unix {
         let error = MachineConfig::read(&path, 16).unwrap_err();
 
         // Then
-        assert!(error.reason.contains(part), "{:?}", error.reason);
+        let fault = error.fault.to_string();
+        assert!(fault.contains(part), "{fault:?}");
         assert!(error.to_string().contains(&path.display().to_string()));
+    }
+
+    #[test]
+    fn machine_config_read__should_refuse_a_file_this_user_may_not_read() {
+        // Root reads a file of mode 000 all the same.
+        if rustix::process::geteuid().is_root() {
+            return;
+        }
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let path = write(dir.path(), "[jobs]\nlimit = 2\n");
+        chmod(&path, 0o000);
+
+        // When
+        let error = MachineConfig::read(&path, 16).unwrap_err();
+
+        // Then
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "invalid machine config {}: Permission denied (os error 13)",
+                path.display()
+            )
+        );
     }
 
     #[test]
@@ -201,8 +285,8 @@ mod unix {
 
         // Then
         assert_eq!(through.limit.get(), 5);
-        assert_eq!(folder.reason, "not a regular file");
-        assert_eq!(nothing.reason, "it is a symlink to nothing");
+        assert_eq!(folder.fault.to_string(), "not a regular file");
+        assert_eq!(nothing.fault.to_string(), "it is a symlink to nothing");
     }
 }
 

@@ -132,11 +132,7 @@ impl MachineJobs {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::*;
-    use crate::clock::Timestamp;
-    use crate::jobs::record::RECORD_VERSION;
 
     fn paths(dir: &std::path::Path) -> JobPaths {
         JobPaths {
@@ -147,17 +143,10 @@ mod tests {
 
     fn record(id: &JobId, ticket: u64, state: JobState) -> JobRecord {
         JobRecord {
-            version: RECORD_VERSION,
             id: id.clone(),
-            pid: 1,
-            started: None,
-            summary: "make".to_owned(),
-            label: None,
-            cwd: PathBuf::from("/w"),
             ticket,
             state,
-            queued: Timestamp::from_seconds(0),
-            since: Timestamp::from_seconds(0),
+            ..JobRecord::sample(1)
         }
     }
 

@@ -2,7 +2,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use crate::error::{Error, GitError, SettingsError};
-use crate::git::{Git, GitMode};
+use crate::git::{Git, GitMode, discovery};
 use crate::paths::AbsolutePath;
 use crate::report::Discard;
 use crate::worktree::Worktree;
@@ -53,6 +53,11 @@ impl Repository {
         self.common_dir.join(CONFIG_FILE)
     }
 
+    /// The file whose lock every command that changes the pool holds.
+    pub fn lock_file(&self) -> AbsolutePath {
+        self.common_dir.join(LOCK_FILE)
+    }
+
     /// The first worktree git lists: the main worktree, or the repository itself
     /// when it is bare.
     pub fn main_worktree(&self) -> Result<Worktree, Error> {
@@ -65,6 +70,7 @@ impl Repository {
 }
 
 pub(crate) const CONFIG_FILE: &str = "wtpool.toml";
+pub(crate) const LOCK_FILE: &str = "wtpool.lock";
 
 /// git's stderr is dropped: no repository is an answer here, not an error.
 fn common_dir(git: &Git, dir: &AbsolutePath) -> Result<Option<Repository>, Error> {
@@ -95,21 +101,11 @@ fn ceilings(ceiling: Option<&OsStr>) -> Vec<PathBuf> {
         .unwrap_or_default()
 }
 
-/// The nearest `.git` entry in `dir` or above it, never looking into a
-/// directory of `ceilings`, as git searches. `None` also when `dir` is gone.
+/// The [`discovery::nearest_dot_git`] of `dir` with its symlinks resolved. `None` also when `dir`
+/// is gone.
 fn git_entry(dir: &Path, ceilings: &[PathBuf]) -> Option<PathBuf> {
     let dir = dir.canonicalize().ok()?;
-    let mut here = Some(dir.as_path());
-    while let Some(current) = here {
-        let entry = current.join(".git");
-        if entry.symlink_metadata().is_ok() {
-            return Some(entry);
-        }
-        here = current
-            .parent()
-            .filter(|parent| !ceilings.iter().any(|ceiling| ceiling == parent));
-    }
-    None
+    discovery::nearest_dot_git(&dir, ceilings).map(|(entry, _)| entry)
 }
 
 #[cfg(test)]

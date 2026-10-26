@@ -1,8 +1,8 @@
-//! Opens that never follow a symlink, a file's identity, owner, age and privacy from its
-//! metadata, and the prefix a path starts with.
+//! Opens that never follow a symlink, whole-file reads and replacements built on them, a file's
+//! identity, owner, age and privacy from its metadata, and the prefix a path starts with.
 
 use std::fs::{DirBuilder, File, Metadata, OpenOptions};
-use std::io;
+use std::io::{self, Read, Write};
 use std::path::{Component, Path, Prefix};
 
 /// Opens `path` with `options`, failing when its last component is a symlink, and never blocking
@@ -36,8 +36,48 @@ fn without_following(options: &mut OpenOptions) -> &mut OpenOptions {
     options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
 }
 
-/// Creates the folder `path`, which only its owner may enter, and its missing parents as usual.
-/// A folder already there stays as it is.
+/// The bytes of the regular file `path`, opened as [`open_without_following`] opens it. Fails on
+/// a symlink, a folder, a FIFO or any other file that is not regular, and on a file longer than
+/// `limit` bytes.
+pub fn read_regular(path: &Path, limit: u64) -> io::Result<Vec<u8>> {
+    let file = open_without_following(path)?;
+    if !file.metadata()?.is_file() {
+        return Err(io::Error::other("not a regular file"));
+    }
+    let mut bytes = Vec::new();
+    file.take(limit.saturating_add(1)).read_to_end(&mut bytes)?;
+    if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > limit {
+        return Err(io::Error::new(
+            io::ErrorKind::FileTooLarge,
+            format!("longer than {limit} bytes"),
+        ));
+    }
+    Ok(bytes)
+}
+
+/// Replaces the file `path` with `bytes` through a temp file beside it, created anew with
+/// [`open_private`] and renamed over `path`, so a reader sees the old file or the new one whole,
+/// and a symlink or FIFO at `path` is replaced, never followed. The new file is private to its
+/// owner. A failed write removes the temp file.
+pub fn replace_file(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let temp = path.with_file_name(format!(".{name}.{}.tmp", std::process::id()));
+    let _ = std::fs::remove_file(&temp);
+    let written = write_new(&temp, bytes).and_then(|()| std::fs::rename(&temp, path));
+    if written.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    written
+}
+
+/// Closes the file before it returns, so the rename that follows works on Windows too.
+fn write_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let mut file = open_private(OpenOptions::new().write(true).create_new(true), path)?;
+    file.write_all(bytes)
+}
+
+/// Creates the folder `path`, private to its owner, and its missing parents as usual. A folder
+/// already there stays as it is.
 pub fn create_private_dir(path: &Path) -> io::Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -118,7 +158,7 @@ pub fn owner(_: &Metadata) -> Option<u32> {
     None
 }
 
-/// Why a file or folder is not private to this user.
+/// The reason a file or folder is not private to this user.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NotPrivate {
     OtherOwner,
@@ -282,6 +322,115 @@ mod tests {
 
         // Then
         assert_eq!(checked, expected);
+    }
+
+    #[rstest]
+    #[case::within(4, Some("text"))]
+    #[case::over(3, None)]
+    fn read_regular__should_read_a_file_up_to_its_limit(
+        #[case] limit: u64,
+        #[case] expected: Option<&str>,
+    ) {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("file");
+        std::fs::write(&path, "text").unwrap();
+
+        // When
+        let read = read_regular(&path, limit);
+
+        // Then
+        assert_eq!(read.ok().as_deref(), expected.map(str::as_bytes));
+    }
+
+    #[test]
+    fn read_regular__should_refuse_a_folder() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+
+        // When
+        let read = read_regular(dir.path(), 1024);
+
+        // Then
+        assert!(read.is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_regular__should_refuse_a_symlink() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target");
+        std::fs::write(&target, "text").unwrap();
+        let link = dir.path().join("link");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        // When
+        let read = read_regular(&link, 1024);
+
+        // Then
+        assert!(read.is_err());
+    }
+
+    #[test]
+    fn replace_file__should_write_the_whole_file_and_leave_no_temp() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("file");
+        std::fs::write(&path, "old text").unwrap();
+
+        // When
+        replace_file(&path, b"new").unwrap();
+
+        // Then
+        assert_eq!(std::fs::read(&path).unwrap(), b"new");
+        let names: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(names, ["file"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn replace_file__should_replace_a_symlink_not_its_target() {
+        use std::os::unix::fs::PermissionsExt;
+
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target");
+        std::fs::write(&target, "kept").unwrap();
+        let link = dir.path().join("link");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        // When
+        replace_file(&link, b"new").unwrap();
+
+        // Then
+        assert_eq!(std::fs::read(&target).unwrap(), b"kept");
+        let meta = link.symlink_metadata().unwrap();
+        assert!(meta.is_file());
+        assert_eq!(meta.permissions().mode() & 0o777, 0o600);
+    }
+
+    #[test]
+    fn replace_file__should_leave_no_temp_when_the_rename_fails() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("folder");
+        std::fs::create_dir(&folder).unwrap();
+        std::fs::write(folder.join("inside"), "").unwrap();
+
+        // When
+        let replaced = replace_file(&folder, b"new");
+
+        // Then
+        assert!(replaced.is_err());
+        let names: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(names, ["folder"]);
     }
 
     #[cfg(unix)]

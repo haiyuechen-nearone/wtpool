@@ -3,7 +3,7 @@
 use super::{RunningProcess, StartTime};
 use crate::clock::Timestamp;
 
-/// The process a record names: its agent harness's pid and start time (H19).
+/// The process a record names: its agent harness's pid and start time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RecordedProcess {
     pub pid: u32,
@@ -16,11 +16,11 @@ pub struct RecordedProcess {
 pub enum Liveness {
     /// Only while the table lists the pid with the start the record holds. A record without a
     /// process or a start, and a pid listed without a start or with another, count as dead, so
-    /// a reused pid never keeps a record. gc deletes by it (H21).
+    /// a reused pid never keeps a record. gc deletes by it.
     SameStart,
     /// Unless the table shows the process gone: its pid unlisted, or listed with another start
     /// where the record and the table both hold one. A record without a process cannot be found
-    /// dead. `wtpool status` shows actors by it (A1).
+    /// dead. `wtpool status` shows actors by it.
     UnlessGone,
 }
 

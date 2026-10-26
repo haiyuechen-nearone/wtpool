@@ -128,7 +128,7 @@ impl Pool {
     }
 
     fn record(&self, stem: &str) -> Option<Record> {
-        Activity::open(&self.root.join("fg/.git"))
+        ActivityDir::open(&self.root.join("fg/.git"))
             .unwrap()
             .read(stem)
     }
@@ -206,7 +206,7 @@ fn handle__should_wait_on_a_tool_the_adapter_names() {
 fn handle__should_record_a_task_in_the_file_the_adapter_names() {
     // Given
     let pool = Pool::must_new();
-    let owner = Activity::open(&pool.root.join("fg/.git"))
+    let owner = ActivityDir::open(&pool.root.join("fg/.git"))
         .unwrap()
         .owner()
         .unwrap_or(0);

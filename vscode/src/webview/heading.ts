@@ -1,7 +1,7 @@
 import type { Pool } from '../generated/status';
 import { visible } from '../shared/invisible';
 import { scopePatterns, type Jobs } from '../shared/jobs';
-import { bdi, cell, setText, span, textSpan } from './dom';
+import { bdi, cell, setAttr, setText, span, textSpan } from './dom';
 import { DOT } from './text';
 
 function repositoryName(pool: Pool): string {
@@ -76,8 +76,8 @@ export class PoolHeading {
 
   update(pool: Pool, machine: string, jobs: Jobs | undefined): void {
     const name = visible(machine);
-    if (this.element.getAttribute('data-machine') !== name) this.element.setAttribute('data-machine', name);
-    if (this.element.getAttribute('data-pool') !== pool.common_dir) this.element.setAttribute('data-pool', pool.common_dir);
+    setAttr(this.element, 'data-machine', name);
+    setAttr(this.element, 'data-pool', pool.common_dir);
     setText(this.repository, visible(repositoryName(pool)));
     const shown = counts(jobs);
     const key = JSON.stringify([name, shown]);
@@ -89,12 +89,11 @@ export class PoolHeading {
       ]);
       this.button.replaceChildren(bdi(name), ...parts);
     }
-    const label = spokenName(name, jobs);
-    if (this.button.getAttribute('aria-label') !== label) this.button.setAttribute('aria-label', label);
+    setAttr(this.button, 'aria-label', spokenName(name, jobs));
   }
 
   /** Marks the machine strip open or closed. */
   expand(open: boolean): void {
-    this.button.setAttribute('aria-expanded', String(open));
+    setAttr(this.button, 'aria-expanded', String(open));
   }
 }

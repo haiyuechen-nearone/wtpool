@@ -1,9 +1,9 @@
 //! Each part's result records a hash of its inputs, and a part whose hash equals that of an
-//! earlier passing result of the same phase does not run again. The run copies that result and
-//! names its source.
+//! earlier passing result of the same `--phase` does not run again. The run copies that result
+//! and names its source.
 //!
 //! The inputs are wide, as a missed input is a hole and an extra one only costs time: every
-//! oracle file and oracle key of [`crate::oracle`], the lock, the phase, the files
+//! oracle file and oracle key of [`crate::oracle`], the lock, the `--phase`, the files
 //! [`is_part_input`] selects, untracked ones included, and the [`tool_versions`].
 
 use std::collections::BTreeMap;
@@ -505,6 +505,43 @@ mod tests {
         // Then
         let pinned = format!("export const PINNED_VERSION = '{PINNED_VSCODE}';");
         assert!(text.contains(&pinned), "{pinned}");
+    }
+
+    #[test]
+    fn cache_dir__should_be_the_cache_root_of_the_js_tests() {
+        // Given
+        let test = Path::new(env!("CARGO_MANIFEST_DIR")).join("../vscode/test");
+        let app = fs::read_to_string(test.join("support/vscode-app.mjs")).unwrap();
+        let code = fs::read_to_string(test.join("support/code.mjs")).unwrap();
+
+        // When
+        let cache = crate::dirs::cache_dir().unwrap();
+
+        // Then
+        let xdg = std::env::var_os("XDG_CACHE_HOME")
+            .map(PathBuf::from)
+            .filter(|dir| dir.is_absolute());
+        let base = xdg.unwrap_or_else(|| crate::dirs::home().unwrap().join(".cache"));
+        let name = cache.strip_prefix(&base).unwrap().to_str().unwrap();
+        for line in [
+            "const base = xdg && path.isAbsolute(xdg) ? xdg : path.join(os.homedir(), '.cache');"
+                .to_owned(),
+            format!("return path.join(base, '{name}');"),
+            "return path.join(cacheRoot(), 'vscode');".to_owned(),
+        ] {
+            assert!(app.contains(&line), "vscode-app.mjs no longer has {line}");
+        }
+        let links = "const LINKS = path.join(cacheRoot(), 's');";
+        assert!(code.contains(links), "code.mjs no longer has {links}");
+        for (file, text) in [
+            ("dirs.rs", include_str!("dirs.rs")),
+            ("layers/js.rs", include_str!("layers/js.rs")),
+        ] {
+            assert!(
+                text.contains(r#"cache.join("s")"#),
+                "{file} no longer has cache.join(\"s\")"
+            );
+        }
     }
 
     #[rstest]

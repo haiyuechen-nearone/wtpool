@@ -6,11 +6,16 @@ use std::path::PathBuf;
 use serde::Deserialize;
 
 use super::{ListProcesses, ProcessQuery, RunningProcess, StartTime};
+use crate::platform::fs::read_regular;
+
+/// The longest process file read, room for many thousands of lines.
+const MAX_PROCESS_FILE_BYTES: u64 = 16 << 20;
 
 /// A process table read from a file of JSON lines, read again on every listing. Each line holds
 /// a `pid` and an optional `ppid` and `started`, and needs a `name` and a `cwd` for a query that
 /// asks for them. Its `cmd`, the arguments, is optional even then: a line without one lists with
-/// none readable. Lines that do not parse are left out.
+/// none readable. Lines that do not parse are left out, and a file that is not a regular one, or
+/// is longer than 16 MiB, lists nothing.
 #[derive(Debug, Clone)]
 pub struct ProcessFile {
     path: PathBuf,
@@ -47,7 +52,8 @@ impl ProcessFile {
 
 impl ListProcesses for ProcessFile {
     fn list(&self, query: &ProcessQuery<'_>) -> Vec<RunningProcess> {
-        let text = std::fs::read_to_string(&self.path).unwrap_or_default();
+        let bytes = read_regular(&self.path, MAX_PROCESS_FILE_BYTES).unwrap_or_default();
+        let text = String::from_utf8(bytes).unwrap_or_default();
         text.lines()
             .filter_map(|line| process(line, query))
             .collect()

@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 
 use crate::config_file;
 use crate::error::{Error, SettingsError};
+use crate::git::discovery::worktree_of;
 use crate::heavy::Pattern;
-use crate::hook::place::worktree_of;
 use crate::paths::AbsolutePath;
 use crate::repository::CONFIG_FILE;
 

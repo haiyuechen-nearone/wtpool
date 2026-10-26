@@ -1,49 +1,56 @@
-//! The Claude Code plugin of this repository: its id, and a test that keeps its hook file
-//! `plugins/wtpool/hooks/hooks.json` equal to the [`block`](super::block::block) for the bare
-//! command `wtpool` plus a description. With `WTPOOL_WRITE_PLUGIN_HOOKS=1` that test writes the
-//! file.
+//! The Claude Code plugin of this repository: its id, and the text of its hook file
+//! `plugins/wtpool/hooks/hooks.json`, printed by
+//! `cargo run -q -p wtpool-claude-code --example plugin_hooks`.
+
+use serde_json::{Value, json};
+
+use super::block::block;
 
 /// The plugin's key in `enabledPlugins`: plugin `wtpool` of the marketplace `wtpool`.
 pub(super) const PLUGIN_ID: &str = "wtpool@wtpool";
+
+/// The command each hook of the plugin runs, found on the `PATH` of Claude Code: a plugin cannot
+/// know where `wtpool` was installed.
+const COMMAND: &str = "wtpool";
+
+const DESCRIPTION: &str = "Runs wtpool hook on each Claude Code event that wtpool status reads, \
+                           and wtpool hook policy before each shell call.";
+
+/// The plugin's hook file: the block `wtpool hook install` prints for the bare command `wtpool`,
+/// plus a description.
+#[must_use]
+pub fn plugin_hooks_file() -> String {
+    let mut file = block(COMMAND);
+    if let Value::Object(map) = &mut file {
+        map.insert("description".to_owned(), json!(DESCRIPTION));
+    }
+    format!(
+        "{}\n",
+        serde_json::to_string_pretty(&file).unwrap_or_default()
+    )
+}
 
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use serde_json::{Value, json};
+    use serde_json::Value;
 
-    use super::super::block::block;
-
-    /// The command each hook of the plugin runs, found on the `PATH` of Claude Code: a plugin
-    /// cannot know where `wtpool` was installed.
-    const COMMAND: &str = "wtpool";
-
-    const DESCRIPTION: &str = "Runs wtpool hook on each Claude Code event that wtpool status \
-                               reads, and wtpool hook policy before each shell call.";
-
-    fn hooks_file() -> String {
-        let mut file = block(COMMAND);
-        if let Value::Object(map) = &mut file {
-            map.insert("description".to_owned(), json!(DESCRIPTION));
-        }
-        format!("{}\n", serde_json::to_string_pretty(&file).unwrap())
-    }
+    use super::*;
 
     fn tracked_file() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../plugins/wtpool/hooks/hooks.json")
     }
 
     #[test]
-    fn hooks_file__should_match_the_plugin_file() {
+    fn plugin_hooks_file__should_match_the_tracked_file() {
         // Given
-        let expected = hooks_file();
+        let expected = plugin_hooks_file();
         let path = tracked_file();
-        std::env::var_os("WTPOOL_WRITE_PLUGIN_HOOKS")
-            .is_some_and(|value| value == "1")
-            .then(|| std::fs::write(&path, &expected).unwrap());
         let mismatch = format!(
-            "{} is not what the event table makes; run WTPOOL_WRITE_PLUGIN_HOOKS=1 cargo test -p \
-             wtpool-claude-code hooks_file to write it. Expected:\n{expected}",
+            "{} is not what the event table makes. Write it with cargo run -q -p \
+             wtpool-claude-code --example plugin_hooks > {}",
+            path.display(),
             path.display()
         );
 
@@ -72,9 +79,9 @@ mod tests {
     }
 
     #[test]
-    fn hooks_file__should_be_the_block_for_the_bare_command() {
+    fn plugin_hooks_file__should_be_the_block_for_the_bare_command() {
         // When
-        let file: Value = serde_json::from_str(&hooks_file()).unwrap();
+        let file: Value = serde_json::from_str(&plugin_hooks_file()).unwrap();
 
         // Then
         assert_eq!(file["hooks"], block("wtpool")["hooks"]);

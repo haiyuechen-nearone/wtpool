@@ -1,3 +1,5 @@
+//! Child processes run to a timeout that kills their whole process group, and git.
+
 use std::io::Read;
 use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
@@ -107,6 +109,19 @@ pub fn git(root: &Path, args: &[&str]) -> Result<String, String> {
         Command::new("git").arg("-C").arg(root).args(args),
         Duration::from_secs(120),
     )
+}
+
+/// `git -C dir` blind to the global and system config, for tests that make their own
+/// repositories.
+#[cfg(test)]
+pub(crate) fn isolated_git(dir: &Path) -> Command {
+    let mut command = Command::new("git");
+    command
+        .arg("-C")
+        .arg(dir)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1");
+    command
 }
 
 fn drain<R: Read + Send + 'static>(mut pipe: R) -> thread::JoinHandle<String> {

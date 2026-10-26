@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use super::agents::ActorJob;
 use super::document::{HeavyEntry, JobEntry, JobSources, Jobs, SuggestionEntry};
-use super::records::Record;
+use super::records::ActorRecord;
 use crate::activity::CallKind;
 use crate::clock::Timestamp;
 use crate::error::Error;
@@ -16,7 +16,7 @@ use crate::jobs::{
     Enforce, HeavyTable, JobId, JobPaths, JobRecord, JobState, LIMIT_BOUNDS, MachineJobs,
 };
 use crate::paths::comparable;
-use crate::processes::RunningProcess;
+use crate::processes::{Liveness, RunningProcess};
 use crate::settings::RepositoryPatterns;
 
 /// This user's jobs and the heavy patterns of the repository, as last read.
@@ -154,13 +154,13 @@ impl PoolFolders {
 
 /// The actors of the pool that show, by the harness process their records name.
 pub struct Harnesses<'a> {
-    records: &'a [&'a Record],
+    records: &'a [&'a ActorRecord],
 }
 
 impl<'a> Harnesses<'a> {
     /// `records`: those of the pool that show, neither ended, dead nor replaced.
     #[must_use]
-    pub fn new(records: &'a [&'a Record]) -> Self {
+    pub fn new(records: &'a [&'a ActorRecord]) -> Self {
         Self { records }
     }
 
@@ -176,32 +176,26 @@ impl<'a> Harnesses<'a> {
             .collect();
         table.ancestors(pid).find_map(|ancestor| {
             let process = by_pid.get(&ancestor)?;
-            let on_it: Vec<&Record> = self
+            let on_it: Vec<&ActorRecord> = self
                 .records
                 .iter()
                 .copied()
                 .filter(|record| is_harness(record, process))
                 .collect();
-            choose(&on_it, summary).map(|record| record.key.clone())
+            choose(&on_it, summary).map(|record| record.key.to_string())
         })
     }
 }
 
-/// `true` when `process` is the harness process `record` names: the same pid, and the same
-/// start where both tell one.
-fn is_harness(record: &Record, process: &RunningProcess) -> bool {
-    record.process.is_some_and(|harness| {
-        let same_start = match (harness.started, process.started) {
-            (Some(recorded), Some(listed)) => recorded == listed.second(),
-            _ => true,
-        };
-        harness.pid == process.pid && same_start
-    })
+/// `true` when `process` is the harness process `record` names, by [`Liveness::UnlessGone`].
+fn is_harness(record: &ActorRecord, process: &RunningProcess) -> bool {
+    record.process.is_some()
+        && Liveness::UnlessGone.runs(record.process, std::slice::from_ref(process))
 }
 
 /// Of the actors of one harness process, the one with a shell call in flight on `summary`, the
 /// newest first, else the session.
-fn choose<'a>(records: &[&'a Record], summary: &str) -> Option<&'a Record> {
+fn choose<'a>(records: &[&'a ActorRecord], summary: &str) -> Option<&'a ActorRecord> {
     let calling = records
         .iter()
         .copied()
@@ -225,7 +219,7 @@ fn choose<'a>(records: &[&'a Record], summary: &str) -> Option<&'a Record> {
         records
             .iter()
             .copied()
-            .filter(|record| !record.key.contains('.'))
+            .filter(|record| !record.key.is_subagent())
             .max_by_key(|record| record.updated.at())
             .or_else(|| records.first().copied())
     })
@@ -276,21 +270,18 @@ pub struct JobsFacts<'a> {
 pub fn jobs_document(state: &JobsState, facts: &JobsFacts<'_>) -> Option<Jobs> {
     let machine = state.machine.as_ref()?;
     let config = machine.config();
-    let records = machine.records();
-    let owner = |record: &JobRecord| {
-        records
-            .iter()
-            .position(|listed| listed.id == record.id)
-            .and_then(|index| facts.owners.get(index))
-            .cloned()
-            .flatten()
-    };
+    let owners: BTreeMap<&JobId, &str> = machine
+        .records()
+        .into_iter()
+        .zip(facts.owners)
+        .filter_map(|(record, owner)| Some((&record.id, owner.as_deref()?)))
+        .collect();
     let entry = |record: &&JobRecord| JobEntry {
         id: record.id.to_string(),
         summary: record.summary.clone(),
         label: record.label.clone(),
         worktree: facts.folders.worktree_of(&record.cwd),
-        actor: owner(record),
+        actor: owners.get(&record.id).map(|owner| (*owner).to_owned()),
         since: record.since,
     };
     let (running, waiting) = machine.queue();

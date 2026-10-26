@@ -12,17 +12,6 @@ use crate::support::hook::{Hooks, RunOptions, add_seconds, event, wait_output, w
 const NOW: &str = "2026-10-20T12:00:00Z";
 const DAY: i64 = 86_400;
 
-fn ev(hooks: &Hooks, fixture: &str, session: &str, fields: &[(&str, Value)]) -> Value {
-    with(event(&hooks.pool, fixture, session, &hooks.pool.fg), fields)
-}
-
-fn sub_ev(hooks: &Hooks, fixture: &str, agent: &str, fields: &[(&str, Value)]) -> Value {
-    let mut payload = ev(hooks, fixture, "s1", fields);
-    payload["agent_id"] = json!(agent);
-    payload["agent_type"] = json!("Explore");
-    payload
-}
-
 fn send_from(hooks: &Hooks, payload: &Value, parent: u32) {
     let options = RunOptions {
         parent: Some(parent),
@@ -64,16 +53,24 @@ fn set(names: &[&str]) -> BTreeSet<String> {
 fn aged_sessions(hooks: &Hooks) {
     let dead = 7098;
     hooks.set_clock(&add_seconds(NOW, -8 * DAY));
-    hooks.send(&ev(hooks, "UserPromptSubmit", "ended-8d", &[]));
-    hooks.send(&ev(hooks, "SessionEnd", "ended-8d", &[]));
-    send_from(hooks, &ev(hooks, "UserPromptSubmit", "dead-8d", &[]), dead);
-    hooks.send(&ev(hooks, "UserPromptSubmit", "live-8d", &[]));
-    hooks.send(&ev(hooks, "Stop", "live-8d", &[]));
-    hooks.send(&ev(hooks, "UserPromptSubmit", "working-8d", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "ended-8d", &[]));
+    hooks.send(&hooks.event("SessionEnd", "ended-8d", &[]));
+    send_from(
+        hooks,
+        &hooks.event("UserPromptSubmit", "dead-8d", &[]),
+        dead,
+    );
+    hooks.send(&hooks.event("UserPromptSubmit", "live-8d", &[]));
+    hooks.send(&hooks.event("Stop", "live-8d", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "working-8d", &[]));
     hooks.set_clock(&add_seconds(NOW, -6 * DAY));
-    hooks.send(&ev(hooks, "UserPromptSubmit", "ended-6d", &[]));
-    hooks.send(&ev(hooks, "SessionEnd", "ended-6d", &[]));
-    send_from(hooks, &ev(hooks, "UserPromptSubmit", "dead-6d", &[]), dead);
+    hooks.send(&hooks.event("UserPromptSubmit", "ended-6d", &[]));
+    hooks.send(&hooks.event("SessionEnd", "ended-6d", &[]));
+    send_from(
+        hooks,
+        &hooks.event("UserPromptSubmit", "dead-6d", &[]),
+        dead,
+    );
     hooks.set_clock(NOW);
 }
 
@@ -113,7 +110,7 @@ fn gc__should_delete_done_subagents_but_the_newest() {
     // Given
     let hooks = Hooks::must_new("gc-subagents");
     hooks.set_clock(&add_seconds(NOW, -3600));
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
     // (agent, worktree, minutes before NOW it ended, or None while it works)
     let agents: [(&str, &str, Option<i64>); 7] = [
         ("a1", "wt1", Some(30)),
@@ -126,10 +123,9 @@ fn gc__should_delete_done_subagents_but_the_newest() {
     ];
     for (agent, worktree, ended) in agents {
         hooks.set_clock(&add_seconds(NOW, -50 * 60));
-        hooks.send(&sub_ev(&hooks, "SubagentStart", agent, &[]));
+        hooks.send(&hooks.sub_event("SubagentStart", agent, &[]));
         let file = hooks.pool.worktree(worktree).join("f.txt");
-        hooks.send(&sub_ev(
-            &hooks,
+        hooks.send(&hooks.sub_event(
             "PreToolUse-Read-subagent",
             agent,
             &[
@@ -139,7 +135,7 @@ fn gc__should_delete_done_subagents_but_the_newest() {
         ));
         if let Some(minutes) = ended {
             hooks.set_clock(&add_seconds(NOW, -minutes * 60));
-            hooks.send(&sub_ev(&hooks, "SubagentStop", agent, &[]));
+            hooks.send(&hooks.sub_event("SubagentStop", agent, &[]));
         }
     }
     hooks.set_clock(NOW);
@@ -200,8 +196,8 @@ fn gc__should_run_once_a_day_on_session_end() {
     let later = add_seconds(NOW, 2 * DAY);
 
     // When
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "today", &[]));
-    hooks.send(&ev(&hooks, "SessionEnd", "today", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "today", &[]));
+    hooks.send(&hooks.event("SessionEnd", "today", &[]));
     let after_old_stamp = records(&hooks);
     let stamped = stamp(&hooks);
     hooks.set_clock(&later);
@@ -210,8 +206,8 @@ fn gc__should_run_once_a_day_on_session_end() {
         add_seconds(&later, -3600),
     )
     .expect("setup: write a stamp an hour old");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", "later", &[]));
-    hooks.send(&ev(&hooks, "SessionEnd", "later", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "later", &[]));
+    hooks.send(&hooks.event("SessionEnd", "later", &[]));
     let after_fresh_stamp = records(&hooks);
     must_gc(&hooks);
     let after_manual = records(&hooks);
@@ -296,7 +292,7 @@ fn budget__b11() {
         for session in 0..4 {
             let id = format!("d{day}s{session}");
             hooks.set_clock(&morning);
-            hooks.send(&ev(&hooks, "UserPromptSubmit", &id, &[]));
+            hooks.send(&hooks.event("UserPromptSubmit", &id, &[]));
             for batch in 0..5_i64 {
                 hooks.set_clock(&add_seconds(&morning, (session * 5 + batch) * 300));
                 let agents: Vec<String> = (0..10).map(|n| format!("b{batch}n{n}")).collect();
@@ -320,7 +316,7 @@ fn budget__b11() {
                 }
             }
             hooks.set_clock(&add_seconds(&morning, 8 * 3600));
-            hooks.send(&ev(&hooks, "SessionEnd", &id, &[]));
+            hooks.send(&hooks.event("SessionEnd", &id, &[]));
         }
         hooks.set_clock(&add_seconds(&start, day * DAY + 23 * 3600));
         must_gc(&hooks);

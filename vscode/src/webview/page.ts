@@ -11,7 +11,7 @@ import { DetailStrip } from './detail';
 import { cell, div, span } from './dom';
 import { Header } from './header';
 import { PoolHeading } from './heading';
-import { MachineStrip } from './machine';
+import { MachineStrip } from './machine_strip';
 import { RowView } from './row';
 import { rowOrder, waitAnnouncement } from './text';
 

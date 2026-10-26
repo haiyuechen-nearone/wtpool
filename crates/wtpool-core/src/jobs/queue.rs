@@ -5,7 +5,7 @@ use std::fs::File;
 
 use super::config::Limit;
 use super::folder::{FolderError, JobFolder};
-use super::record::{JobId, JobRecord, JobState};
+use super::record::{JobDraft, JobId, JobRecord, JobState};
 use crate::clock::Timestamp;
 
 /// A job in the queue: its lock, held until it leaves, and its record.
@@ -16,7 +16,7 @@ pub struct Place {
     record: JobRecord,
 }
 
-/// Whether a job may run now.
+/// A job's turn: to run now, or to wait with its standing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Turn {
     Run,
@@ -33,38 +33,36 @@ pub struct Standing {
 }
 
 impl Place {
-    /// Queues `record`'s job under the queue lock: takes the next ticket, creates and locks the
+    /// Queues `draft`'s job under the queue lock: takes the next ticket, creates and locks the
     /// job's lock file, and only then writes the record, running when its turn came, else
-    /// waiting. `record`'s ticket, state and times are set here.
+    /// waiting.
     pub fn join(
         folder: JobFolder,
-        mut record: JobRecord,
+        draft: JobDraft,
         limit: Limit,
         now: Timestamp,
     ) -> Result<(Self, Turn), FolderError> {
         let queue = folder.lock_queue()?;
         let live = folder.sweep(&queue, None);
-        record.ticket = folder.take_ticket(&queue, &live)?;
-        let lock = folder.create_lock(&record.id)?;
-        let turn = turn_of(&live, record.ticket, limit);
-        record.state = match turn {
+        let ticket = folder.take_ticket(&queue, &live)?;
+        let lock = folder.create_lock(&draft.id)?;
+        let turn = turn_of(&live, ticket, limit);
+        let state = match turn {
             Turn::Run => JobState::Running,
             Turn::Wait(_) => JobState::Waiting,
         };
-        record.queued = now;
-        record.since = now;
         let place = Self {
             folder,
             lock: Some(lock),
-            record,
+            record: draft.queued(ticket, state, now),
         };
         place.folder.write_record(&place.record)?;
         drop(queue);
         Ok((place, turn))
     }
 
-    /// Checks again under the queue lock whether this waiting job may run under `limit`, and
-    /// writes its record running from `now` once it may.
+    /// The turn of this waiting job under `limit`, checked again under the queue lock. Once it may
+    /// run, its record is written running from `now`.
     pub fn check(&mut self, limit: Limit, now: Timestamp) -> Result<Turn, FolderError> {
         let queue = self.folder.lock_queue()?;
         let live = self.folder.sweep(&queue, Some(&self.record.id));
@@ -121,28 +119,9 @@ fn turn_of(live: &[JobRecord], ticket: u64, limit: Limit) -> Turn {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use rstest::rstest;
 
     use super::*;
-    use crate::jobs::record::RECORD_VERSION;
-
-    fn record(ticket: u64, state: JobState) -> JobRecord {
-        JobRecord {
-            version: RECORD_VERSION,
-            id: JobId::new(7),
-            pid: 7,
-            started: None,
-            summary: "make".to_owned(),
-            label: None,
-            cwd: PathBuf::from("/w"),
-            ticket,
-            state,
-            queued: Timestamp::from_seconds(0),
-            since: Timestamp::from_seconds(0),
-        }
-    }
 
     #[rstest]
     #[case::a_free_place(&[(1, JobState::Running)], 2, Turn::Run)]
@@ -158,7 +137,11 @@ mod tests {
         // Given
         let live: Vec<JobRecord> = others
             .iter()
-            .map(|(ticket, state)| record(*ticket, *state))
+            .map(|(ticket, state)| JobRecord {
+                ticket: *ticket,
+                state: *state,
+                ..JobRecord::sample(7)
+            })
             .collect();
 
         // When

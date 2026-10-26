@@ -1,3 +1,5 @@
+//! The traces each part left, judged from the snapshots taken around it and at `--report`.
+
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};

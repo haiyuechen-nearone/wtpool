@@ -4,13 +4,14 @@
 use serde_json::{Map, Value, json};
 
 use crate::events::HookEvent;
+use crate::tools::SHELL_TOOLS;
 
+/// The arguments of the entry that records each event.
+pub const HOOK_ARGS: [&str; 1] = ["hook"];
 /// The arguments of the entry that judges a shell call before it runs.
 pub const POLICY_ARGS: [&str; 2] = ["hook", "policy"];
-/// The tools whose calls the policy entry judges.
-const POLICY_MATCHER: &str = "Bash|PowerShell|Monitor";
-/// Claude Code waits for the policy entry, so it ends well before Claude Code would give up.
-const POLICY_TIMEOUT: u64 = 2;
+/// The seconds Claude Code waits for a synchronous entry before it goes on without it.
+const TIMEOUT: u64 = 2;
 
 /// The `{"hooks": {...}}` block that runs `binary hook` on each event, and `binary hook policy`
 /// before each shell call.
@@ -21,23 +22,23 @@ pub fn block(binary: &str) -> Value {
         let mut entry = Map::new();
         entry.insert("type".to_owned(), json!("command"));
         entry.insert("command".to_owned(), json!(binary));
-        entry.insert("args".to_owned(), json!(["hook"]));
+        entry.insert("args".to_owned(), json!(HOOK_ARGS));
         entry.insert("onFailure".to_owned(), json!("continue"));
         if event.is_async() {
             entry.insert("async".to_owned(), json!(true));
         } else if event != HookEvent::SessionEnd {
-            entry.insert("timeout".to_owned(), json!(2));
+            entry.insert("timeout".to_owned(), json!(TIMEOUT));
         }
         hooks.insert(event.name().to_owned(), json!([{ "hooks": [entry] }]));
     }
     if let Some(Value::Array(groups)) = hooks.get_mut(HookEvent::PreToolUse.name()) {
         groups.push(json!({
-            "matcher": POLICY_MATCHER,
+            "matcher": SHELL_TOOLS.join("|"),
             "hooks": [{
                 "type": "command",
                 "command": binary,
                 "args": POLICY_ARGS,
-                "timeout": POLICY_TIMEOUT,
+                "timeout": TIMEOUT,
                 "onFailure": "continue",
             }],
         }));

@@ -23,7 +23,7 @@ fn open__should_take_only_a_real_folder(#[case] kind: Option<&str>, #[case] open
     }
 
     // When
-    let activity = Activity::open(dir.path());
+    let activity = ActivityDir::open(dir.path());
 
     // Then
     assert_eq!(activity.is_some(), opens);
@@ -163,7 +163,24 @@ fn lock__should_refuse_a_lock_that_is_no_file() {
     let lock = activity.lock("s1");
 
     // Then
-    assert!(lock.is_none());
+    assert!(matches!(lock, Err(LockError::NotAFile)), "{lock:?}");
+}
+
+#[cfg(unix)]
+#[test]
+fn lock__should_refuse_a_lock_file_of_another_user() {
+    // Given
+    let (dir, _) = must_activity();
+    let activity = ActivityDir {
+        dir: dir.path().join("wtpool-activity"),
+        owner: Some(u32::MAX),
+    };
+
+    // When
+    let lock = activity.lock("s1");
+
+    // Then
+    assert!(matches!(lock, Err(LockError::ForeignOwner)), "{lock:?}");
 }
 
 #[cfg(unix)]
@@ -231,9 +248,9 @@ fn lock_now__should_not_wait_for_a_held_lock() {
     // When
     let while_held = activity.lock_now("s1");
     drop(held);
-    let after = eventually(|| activity.lock_now("s1").is_some());
+    let after = eventually(|| activity.lock_now("s1").is_ok());
 
     // Then
-    assert!(while_held.is_none());
+    assert!(matches!(while_held, Err(LockError::Held)), "{while_held:?}");
     assert!(after);
 }

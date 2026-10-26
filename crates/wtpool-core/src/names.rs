@@ -1,5 +1,8 @@
 use std::fmt;
 
+/// The namespace of local branches among git's refs.
+pub(crate) const BRANCH_REFS: &str = "refs/heads/";
+
 /// A local branch name that `git check-ref-format --branch` accepts.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BranchName(String);
@@ -64,6 +67,20 @@ impl BranchName {
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// `refs/heads/<name>`. git takes a tag before a branch of the same short name, and expands
+    /// a fetch destination such as `tags/x` under `refs/` instead.
+    #[must_use]
+    pub fn branch_ref(&self) -> String {
+        format!("{BRANCH_REFS}{self}")
+    }
+
+    /// `refs/remotes/<remote>/<name>`, as a tag named `<remote>/<name>` would shadow the short
+    /// name.
+    #[must_use]
+    pub fn remote_ref(&self, remote: &RemoteName) -> String {
+        format!("refs/remotes/{remote}/{self}")
     }
 }
 
@@ -297,6 +314,25 @@ mod tests {
         // Then
         assert_eq!(name.as_str(), text);
         assert_eq!(name.to_string(), text);
+    }
+
+    #[test]
+    fn branch_name__should_spell_its_full_refs() {
+        // Given
+        let name = BranchName::try_new("pr-1234/feature").unwrap();
+        let remote = RemoteName::try_new("team/upstream").unwrap();
+
+        // When
+        let refs = (name.branch_ref(), name.remote_ref(&remote));
+
+        // Then
+        assert_eq!(
+            refs,
+            (
+                "refs/heads/pr-1234/feature".to_owned(),
+                "refs/remotes/team/upstream/pr-1234/feature".to_owned()
+            )
+        );
     }
 
     #[rstest]

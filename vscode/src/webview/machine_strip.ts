@@ -1,9 +1,20 @@
 import type { Worktree } from '../generated/status';
 import { visible } from '../shared/invisible';
-import { POLICIES, type HeavyEdit, type JobSettingsAnswer, type JobSettingsMessage, type Jobs, type Policy } from '../shared/jobs';
-import { bdi, cell, div, setText, span } from './dom';
-import { HeavyEditor } from './heavy';
-import { JobList } from './joblists';
+import {
+  answerDue,
+  POLICIES,
+  waitEnds,
+  type Awaiting,
+  type JobSettingsAnswer,
+  type JobSettingsMessage,
+  type Jobs,
+  type LimitMessage,
+  type Policy,
+  type PolicyMessage,
+} from '../shared/jobs';
+import { bdi, button, cell, div, label, paragraph, setAttr, setShownText, setText, span } from './dom';
+import { HeavyEditor } from './heavy_editor';
+import { JobList } from './job_list';
 import { DOT } from './text';
 
 /** Sends the strip's settings, speaks its answers, and closes it. */
@@ -28,31 +39,11 @@ const MEANINGS: Readonly<Record<Policy, string>> = {
   require: "Agents' heavy commands outside a job are refused, with the wrapped command to run.",
 };
 
-function paragraph(className: string): HTMLParagraphElement {
-  const element = document.createElement('p');
-  element.className = className;
-  return element;
-}
-
-function button(className: string, text: string): HTMLButtonElement {
-  const element = document.createElement('button');
-  element.type = 'button';
-  element.className = className;
-  element.textContent = text;
-  return element;
-}
-
-function label(target: string, text: string): HTMLLabelElement {
-  const element = document.createElement('label');
-  element.htmlFor = target;
-  element.textContent = text;
-  return element;
-}
-
-/** Sets `text` on `element` and shows it only while there is text. */
-function note(element: HTMLElement, text: string): void {
-  setText(element, text);
-  element.hidden = !text;
+/** A save sent and not yet answered: the field and the menu as it sent them. */
+interface Saving extends Awaiting {
+  limit: string;
+  enforce: string;
+  message: LimitMessage | PolicyMessage;
 }
 
 /** The sentence that names the command form, with that form as code. */
@@ -104,8 +95,11 @@ export class MachineStrip {
   private jobs?: Jobs;
   /** The field and the menu hold edits the user did not save. */
   private edited = { limit: false, enforce: false };
-  /** The field and the menu as the last save sent them, until its answer comes. */
-  private saving?: { limit: string; enforce: string };
+  /** The last save, until its answer comes or the wait for it ends. */
+  private saving?: Saving;
+  /** The due time of the answer to the last message sent. */
+  private answersDue = 0;
+  private nowMs = 0;
 
   constructor(
     columns: number,
@@ -118,7 +112,7 @@ export class MachineStrip {
     detailCell.append(this.box);
     this.element.append(detailCell);
     this.editor = new HeavyEditor({
-      send: (heavy: HeavyEdit) => void host.send({ type: 'jobSettings', heavy }),
+      send: (message) => this.post(message),
       announce: (text) => void host.announce(text),
     });
     this.buildForm();
@@ -163,7 +157,7 @@ export class MachineStrip {
     });
     this.enforce.addEventListener('change', () => {
       this.edited.enforce = true;
-      this.showMeaning();
+      if (this.jobs) this.showMeaning(this.jobs);
     });
     const enter = (event: KeyboardEvent): void => {
       if (event.key !== 'Enter') return;
@@ -179,30 +173,31 @@ export class MachineStrip {
   /** Shows `view`, changing only the parts that differ, and keeps the user's unsaved edits. */
   show(view: MachineView, nowMs: number): void {
     const name = visible(view.name);
-    const region = `Heavy jobs on ${name}`;
-    if (this.box.getAttribute('aria-label') !== region) this.box.setAttribute('aria-label', region);
+    setAttr(this.box, 'aria-label', `Heavy jobs on ${name}`);
     const jobs = view.jobs;
     this.jobs = jobs;
+    this.nowMs = nowMs;
+    this.settleSave(jobs);
     if (!jobs) {
       if (this.box.firstChild !== this.old) this.box.replaceChildren(this.old);
       return;
     }
     if (this.box.firstChild !== this.left) this.box.replaceChildren(this.left, this.right);
     setText(this.machineName, name);
-    note(this.fault, jobs.error === null ? '' : visible(jobs.error));
+    setShownText(this.fault, jobs.error === null ? '' : visible(jobs.error));
     if (!this.edited.limit) this.limit.value = jobs.limit === null ? '' : String(jobs.limit);
     if (!this.edited.enforce) this.enforce.value = jobs.enforce;
-    this.showMeaning();
+    this.showMeaning(jobs);
     const running = jobs.running.length;
     const limit = jobs.limit ?? running;
-    note(this.over, running > limit ? `${running} running, over the limit of ${limit}: they finish, and queued jobs start once fewer than ${limit} run.` : '');
+    setShownText(this.over, running > limit ? `${running} running, over the limit of ${limit}: they finish, and queued jobs start once fewer than ${limit} run.` : '');
     const fromFile = jobs.source.limit === 'machine' || jobs.source.enforce === 'machine';
     const saved = fromFile
       ? ['Saved in ', visible(jobs.config), `${DOT}defaults ${jobs.default}, warn${DOT}${jobs.min} to ${jobs.max}`]
       : ['Not saved: the defaults apply', '', ''];
     this.savedParts.forEach((part, at) => void setText(part, saved[at]));
-    note(this.remote, view.remote ? `This window's folder is not on this computer: the settings are for this computer, ${name}.` : '');
-    this.editor.show(jobs);
+    setShownText(this.remote, view.remote ? `This window's folder is not on this computer: the settings are for this computer, ${name}.` : '');
+    this.editor.show(jobs, nowMs);
     this.running.show(jobs.limit === null ? `Running ${running}` : `Running ${running} of ${jobs.limit}`, jobs.running, view.worktrees, nowMs);
     this.waiting.show(`Queued ${jobs.waiting.length}`, jobs.waiting, view.worktrees, nowMs);
     this.outside.show(`Not queued ${jobs.outside.length}`, jobs.outside, view.worktrees, nowMs);
@@ -210,11 +205,14 @@ export class MachineStrip {
     else if (!this.outside.element.isConnected) this.right.append(this.outside.element);
   }
 
-  /** Recomputes the ages of the jobs, nothing else. */
+  /** Recomputes the ages of the jobs, and stops waiting for overdue answers. */
   tick(nowMs: number): void {
+    this.nowMs = nowMs;
     for (const list of [this.running, this.waiting, this.outside]) {
       list.tick(nowMs);
     }
+    this.settleSave(undefined);
+    this.editor.tick(nowMs);
   }
 
   /** Moves focus to the Limit field, when the strip shows one. */
@@ -243,35 +241,47 @@ export class MachineStrip {
     const value = this.limit.value;
     const limit = /^\d+$/.test(value) && Number(value) >= jobs.min && Number(value) <= jobs.max ? Number(value) : undefined;
     const reason = limit === undefined ? `Enter a whole number from ${jobs.min} to ${jobs.max}.` : '';
-    this.limit.setAttribute('aria-invalid', String(limit === undefined));
+    setAttr(this.limit, 'aria-invalid', String(limit === undefined));
     if (reason && this.limitError.textContent !== reason) this.host.announce(reason);
-    note(this.limitError, reason);
+    setShownText(this.limitError, reason);
     return limit;
   }
 
-  private policy(): Policy {
-    return POLICIES.find((policy) => policy === this.enforce.value) ?? 'warn';
+  private policy(jobs: Jobs): Policy {
+    return POLICIES.find((policy) => policy === this.enforce.value) ?? jobs.enforce;
   }
 
-  private showMeaning(): void {
-    setText(this.meaning, MEANINGS[this.policy()]);
+  private showMeaning(jobs: Jobs): void {
+    setText(this.meaning, MEANINGS[this.policy(jobs)]);
   }
 
   /** Sends the changed limit and policy, and nothing for an invalid limit. */
   private save(): void {
-    const limit = this.jobs && this.checkLimit(this.jobs);
-    if (!this.jobs || limit === undefined) return;
-    const message: JobSettingsMessage = { type: 'jobSettings' };
-    if (limit !== this.jobs.limit) message.limit = limit;
-    if (this.policy() !== this.jobs.enforce) message.enforce = this.policy();
-    if (Object.keys(message).length > 1) this.send(message);
+    if (!this.jobs) return;
+    const limit = this.checkLimit(this.jobs);
+    if (limit === undefined) return;
+    const policy = this.policy(this.jobs);
+    const enforce = policy === this.jobs.enforce ? undefined : policy;
+    if (limit !== this.jobs.limit) this.send(enforce === undefined ? { type: 'jobSettings', limit } : { type: 'jobSettings', limit, enforce });
+    else if (enforce !== undefined) this.send({ type: 'jobSettings', enforce });
   }
 
   /** Sends `message` unless a save waits for its answer. */
-  private send(message: JobSettingsMessage): void {
+  private send(message: LimitMessage | PolicyMessage): void {
     if (this.saving) return;
-    this.saving = { limit: this.limit.value, enforce: this.enforce.value };
     setText(this.status, '');
+    this.saving = { limit: this.limit.value, enforce: this.enforce.value, message, due: this.post(message) };
+  }
+
+  /** Sends `message` and gives the time its answer is due by. */
+  private post(message: JobSettingsMessage): number {
+    this.answersDue = answerDue(message, this.nowMs, this.answersDue);
     this.host.send(message);
+    return this.answersDue;
+  }
+
+  /** Lets Save send again once the answer to the last save is overdue, or `jobs` has shown it a while. */
+  private settleSave(jobs: Jobs | undefined): void {
+    if (this.saving && waitEnds(this.saving, this.saving.message, jobs, this.nowMs)) this.saving = undefined;
   }
 }

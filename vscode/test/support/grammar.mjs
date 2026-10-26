@@ -82,6 +82,13 @@ export function age(time, nowMs) {
   return `${Math.floor(seconds / 86400)} d`;
 }
 
+/** The local `HH:MM` of an RFC 3339 time. */
+export function clock(time) {
+  const date = new Date(time);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export function worktreeText(worktree) {
   const name = visible(worktree.name);
   if (worktree.role === 'foreground') return `${name} fg`;
@@ -128,6 +135,11 @@ export function doing(actor) {
     default:
       throw new Error(`setup: unknown actor state ${actor.state}`);
   }
+}
+
+/** The visually hidden start of an actor's line. */
+export function statePrefix(actor) {
+  return actor.state === 'idle' && actor.error ? 'idle, API error: ' : `${actor.state}: `;
 }
 
 /** A task heading with the run time after `running` taken off, for checks that hold either way. */

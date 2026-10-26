@@ -7,7 +7,7 @@ pub(super) enum Token {
     Word(Word),
     /// `;`, `&&`, `||`, `|`, `&`, a new line, or a `{` or `}` that stands alone.
     Separator,
-    /// `;;`, `;&` or `;;&`, which end an item of a `case`.
+    /// `;;`, `;&` or `;;&`, the end of an item of a `case`.
     ItemEnd,
     /// `>`, `>>`, `<`, `2>`, `&>` and the like. The next word is its target.
     Redirect,
@@ -491,3 +491,6 @@ fn unescape_backquoted(inner: &str) -> String {
     }
     command
 }
+
+#[cfg(test)]
+mod tests;

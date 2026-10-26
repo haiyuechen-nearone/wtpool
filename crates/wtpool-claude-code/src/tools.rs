@@ -4,6 +4,11 @@
 use wtpool_core::activity::{CallKind, WaitReason};
 use wtpool_core::hook::{CallInput, Shell, ToolPath, WaitingTools};
 
+/// The Bash tool, the one shell tool that can run a call in the background.
+pub const BASH: &str = "Bash";
+/// The tools whose `command` runs in a shell.
+pub const SHELL_TOOLS: [&str; 3] = [BASH, "PowerShell", "Monitor"];
+
 /// The tools whose calls wait for the user.
 pub const WAITING: WaitingTools = WaitingTools(&[
     ("AskUserQuestion", WaitReason::Question),
@@ -13,7 +18,7 @@ pub const WAITING: WaitingTools = WaitingTools(&[
 #[must_use]
 pub fn kind_of(tool: &str) -> CallKind {
     match tool {
-        "Bash" => CallKind::Shell,
+        BASH => CallKind::Shell,
         "Edit" | "Write" | "NotebookEdit" => CallKind::Edit,
         "Agent" => CallKind::Agent,
         _ => CallKind::Other,
@@ -33,7 +38,7 @@ pub fn tool_path(tool: &str, input: &CallInput) -> ToolPath {
         "Read" | "Edit" | "Write" => field("file_path").map(ToolPath::File),
         "Grep" | "Glob" | "EnterWorktree" => field("path").map(ToolPath::File),
         "NotebookEdit" => field("notebook_path").map(ToolPath::File),
-        "Bash" | "PowerShell" | "Monitor" => field("command").map(command),
+        _ if SHELL_TOOLS.contains(&tool) => field("command").map(command),
         _ => None,
     };
     found.unwrap_or(ToolPath::None)

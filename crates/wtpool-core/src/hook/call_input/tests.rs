@@ -42,7 +42,7 @@ fn write_sorted(value: &Value, out: &mut String) {
     }
 }
 
-fn must_input(text: &str) -> CallInput {
+fn input(text: &str) -> CallInput {
     serde_json::from_str(text).unwrap()
 }
 
@@ -67,10 +67,10 @@ fn hash__should_match_the_hash_of_the_whole_value(#[case] text: &str) {
     let value: Value = serde_json::from_str(text).unwrap();
 
     // When
-    let input = must_input(text);
+    let parsed = input(text);
 
     // Then
-    assert_eq!(input.hash(), value_hash(&value));
+    assert_eq!(parsed.hash(), value_hash(&value));
 }
 
 #[rstest]
@@ -87,10 +87,7 @@ fn hash__should_ignore_key_order_only(
     #[case] same: bool,
 ) {
     // When
-    let (a, b) = (
-        must_input(&first.to_string()),
-        must_input(&second.to_string()),
-    );
+    let (a, b) = (input(&first.to_string()), input(&second.to_string()));
 
     // Then
     assert_eq!(a.hash() == b.hash(), same);
@@ -103,20 +100,20 @@ fn hash__should_hash_the_sorted_text() {
     let text = r#"{"b":"x","a":null}"#;
 
     // When
-    let input = must_input(text);
+    let parsed = input(text);
 
     // Then
-    assert_eq!(input.hash(), sha256::hex(br#"{"a":null,"b":"x"}"#));
+    assert_eq!(parsed.hash(), sha256::hex(br#"{"a":null,"b":"x"}"#));
 }
 
 #[test]
 fn null__should_hash_as_null() {
     // When
-    let input = CallInput::null();
+    let null = CallInput::null();
 
     // Then
-    assert_eq!(input, must_input("null"));
-    assert_eq!(input.string("command"), None);
+    assert_eq!(null, input("null"));
+    assert_eq!(null.string("command"), None);
 }
 
 #[rstest]
@@ -133,10 +130,10 @@ fn string__should_read_only_top_level_string_fields(
     #[case] expected: Option<&str>,
 ) {
     // When
-    let input = must_input(text);
+    let parsed = input(text);
 
     // Then
-    assert_eq!(input.string("command"), expected);
+    assert_eq!(parsed.string("command"), expected);
 }
 
 #[rstest]
@@ -148,10 +145,10 @@ fn string__should_read_only_top_level_string_fields(
 #[case::missing(r#"{"command":"x"}"#, false)]
 fn is_true__should_read_only_a_top_level_true(#[case] text: &str, #[case] expected: bool) {
     // When
-    let input = must_input(text);
+    let parsed = input(text);
 
     // Then
-    assert_eq!(input.is_true("run_in_background"), expected);
+    assert_eq!(parsed.is_true("run_in_background"), expected);
 }
 
 #[rstest]
@@ -162,15 +159,15 @@ fn deserialize__should_refuse_the_depth_a_whole_value_refuses(
     #[case] parses: bool,
 ) {
     // Given
-    let input = format!(
+    let text = format!(
         r#"{{"tool_input":{}{}}}"#,
         "[".repeat(depth),
         "]".repeat(depth)
     );
 
     // When
-    let streamed = serde_json::from_str::<BTreeMap<String, CallInput>>(&input).is_ok();
-    let whole = serde_json::from_str::<BTreeMap<String, Value>>(&input).is_ok();
+    let streamed = serde_json::from_str::<BTreeMap<String, CallInput>>(&text).is_ok();
+    let whole = serde_json::from_str::<BTreeMap<String, Value>>(&text).is_ok();
 
     // Then
     assert_eq!((streamed, whole), (parses, parses));

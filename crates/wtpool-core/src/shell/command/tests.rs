@@ -32,6 +32,18 @@ const HOME: &str = "/h";
 #[case::assignment("TOKEN=s cargo build", &[], &[], "cargo build")]
 #[case::env_prefix("env -i A=1 npm run build", &[], &[], "npm run")]
 #[case::timeout_prefix("timeout -s KILL 600 cargo test", &[], &[], "cargo test")]
+#[case::timeout_long_options("timeout --signal KILL --kill-after 5 60 cargo build", &[], &[], "cargo build")]
+#[case::gtimeout_prefix("gtimeout -k 5 60 cargo test", &[], &[], "cargo test")]
+#[case::shell_login_script("bash -lc 'cd /p/wt2 && make'", &["/p/wt2"], &[], "bash")]
+#[case::dash_script("dash -c 'cat /p/wt3/x'", &[], &["/p/wt3/x"], "dash")]
+#[case::if_condition("if true; then make; fi", &[], &[], "true")]
+#[case::while_condition("while sleep 1; do make; done", &[], &[], "sleep")]
+#[case::cd_after_then("if true; then cd /p/wt2; fi", &["/p/wt2"], &[], "true")]
+#[case::negation("! make check", &[], &[], "make")]
+#[case::exec_prefix("exec -a x cargo build", &[], &[], "cargo build")]
+#[case::command_prefix("command -p make", &[], &[], "make")]
+#[case::command_lookup("command -v make", &[], &[], "command")]
+#[case::builtin_cd("builtin cd /p/wt2 && ls /p/wt3", &["/p/wt2"], &["/p/wt3"], "ls")]
 #[case::time_and_nice("time nice -n 5 make check", &[], &[], "make")]
 #[case::basename("/usr/bin/git status", &[], &[], "git status")]
 #[case::capital_word("git Status", &[], &[], "git")]
@@ -92,42 +104,6 @@ fn parse__should_keep_words_without_a_home() {
 
     // Then
     assert_eq!(parsed.paths, vec![PathBuf::from("/p/fg/~/x")]);
-}
-
-fn words_of(tokens: &[Token]) -> Vec<&lex::Word> {
-    tokens
-        .iter()
-        .filter_map(|token| match token {
-            Token::Word(word) => Some(word),
-            _ => None,
-        })
-        .collect()
-}
-
-#[rstest]
-#[case::nested("a $(b $(c d)) e", &["a", "$(b $(c d))", "e"], &["b $(c d)"])]
-#[case::arithmetic("x $((1+2))", &["x", "$((1+2))"], &[])]
-#[case::quoted_parenthesis("\"$(echo \")\")\"", &["$(echo \")\")"], &["echo \")\""])]
-#[case::backquotes("`a \\`b\\``", &["`a \\`b\\``"], &["a `b`"])]
-#[case::parameter("${A:-x y} z", &["${A:-x y}", "z"], &[])]
-#[case::unclosed("a $(b 'c", &["a", "$(b 'c)"], &["b 'c"])]
-fn tokenize__should_keep_substitutions_in_their_word(
-    #[case] command: &str,
-    #[case] words: &[&str],
-    #[case] substitutions: &[&str],
-) {
-    // When
-    let tokens = lex::tokenize(command);
-
-    // Then
-    let found = words_of(&tokens);
-    let texts: Vec<&str> = found.iter().map(|w| w.text.as_str()).collect();
-    let inner: Vec<&str> = found
-        .iter()
-        .flat_map(|w| w.substitutions.iter().map(String::as_str))
-        .collect();
-    assert_eq!(texts, words, "words");
-    assert_eq!(inner, substitutions, "substitutions");
 }
 
 #[test]

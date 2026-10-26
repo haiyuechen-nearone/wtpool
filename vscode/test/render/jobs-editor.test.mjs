@@ -3,7 +3,7 @@ import { afterEach, test } from 'vitest';
 
 import { mustValidate } from '../support/docs.mjs';
 import { normalizeEscapes, visible } from '../support/grammar.mjs';
-import { PATTERN_CASES, TEXT, busyDocument, firstOpenDocument, isPattern, jobs, scopePatterns, suggestionGroups, withJobs } from '../support/jobs.mjs';
+import { CONFIG, PATTERN_CASES, TEXT, busyDocument, firstOpenDocument, isPattern, jobs, scopePatterns, suggestionGroups, withJobs } from '../support/jobs.mjs';
 import {
   accessibleName,
   announced,
@@ -404,7 +404,7 @@ test('heavy_editor__should_follow_the_keyboard add_all', async () => {
 
 test('heavy_editor__should_follow_the_keyboard enter_in_an_input_and_errors', async () => {
   // Given
-  const error = 'wtpool: go test is already in /Users/verify/.config/wtpool/machine.toml';
+  const error = `wtpool: go test is already in ${CONFIG}`;
   webview = await mount();
   webview.show(mustValidate(busy));
   openStrip(webview);

@@ -3,8 +3,8 @@ import { test } from '@playwright/test';
 
 import { mustValidate } from '../support/docs.mjs';
 import { busyDocument, firstOpenDocument, TEXT } from '../support/jobs.mjs';
-import { axeViolations, buttonFacts, chipFacts, notQueuedDocument, openStrip, showView, stripFacts, stripStates, tabToButton } from '../support/jobs-shot.mjs';
-import { clipping, ring, textContrast } from '../support/measure.mjs';
+import { buttonFacts, chipFacts, notQueuedDocument, openStrip, showView, stripFacts, stripStates, tabToButton } from '../support/jobs-shot.mjs';
+import { axeRun, clipping, ring, ringProblems, textContrast } from '../support/measure.mjs';
 import { THEME_NAMES, computedThemeColours } from '../support/page.mjs';
 import { away, settle, visualPanel } from '../support/states.mjs';
 
@@ -40,14 +40,6 @@ async function looks(page, at) {
   ];
 }
 
-function ringProblems(at, r) {
-  if (!r || r.missing) return [`${at}: no focus ring`];
-  const out = [];
-  if (Object.keys(r.lost).length) out.push(`${at}: ring ${r.outline} cut by ${r.clippedBy.join(', ')} ${JSON.stringify(r.lost)}`);
-  if (r.contrast && r.contrast.ratio < 3) out.push(`${at}: ring ${r.contrast.ring} on ${r.contrast.under} is ${r.contrast.ratio}:1, under 3:1`);
-  return out;
-}
-
 /** The focused control's selector, else the focused element's tag and classes. */
 function focusedControl() {
   const el = document.activeElement;
@@ -71,7 +63,7 @@ for (const theme of THEME_NAMES) {
         await showOpen(page, state.doc, state.extra, at);
         const facts = await page.evaluate(stripFacts);
         problems.push(...(await looks(page, at)));
-        for (const v of await axeViolations(page)) problems.push(`${at}: axe ${v}`);
+        for (const v of (await axeRun(page)).violations) problems.push(`${at}: axe ${v}`);
         assert.ok(facts.present && facts.shown, `${at}: the machine strip tr.machine-detail is not shown (U11)`);
         if (state.text) assert.ok(facts.text.includes(state.text), `${at}: the strip does not say "${state.text}": ${facts.text}`);
         const boxed = facts.boxes.some((b) => b.sides.every((s) => Math.abs(s.width - 1) < 0.01 && s.style !== 'none' && s.colour === description) && b.ratio >= 3);
@@ -131,7 +123,7 @@ for (const theme of THEME_NAMES) {
           for (const g of chip.glyphs.filter((x) => x.found && x.ratio < 3)) problems.push(`${where}: ${g.el} glyph ${g.ratio}:1, under 3:1`);
         }
         problems.push(...(await looks(page, at)));
-        for (const v of await axeViolations(page)) problems.push(`${at}: axe ${v}`);
+        for (const v of (await axeRun(page)).violations) problems.push(`${at}: axe ${v}`);
       }
       // An inline error under This repository's input.
       await showOpen(page, states[0].doc, {}, `error at ${width} px`);
@@ -142,7 +134,7 @@ for (const theme of THEME_NAMES) {
       await settle(page);
       const error = await page.locator('tr.machine-detail .heavy-error').evaluateAll((els) => els.map((el) => el.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean));
       problems.push(...(await looks(page, `error at ${width} px`)));
-      for (const v of await axeViolations(page)) problems.push(`error at ${width} px: axe ${v}`);
+      for (const v of (await axeRun(page)).violations) problems.push(`error at ${width} px: axe ${v}`);
       await context.close();
 
       // Then

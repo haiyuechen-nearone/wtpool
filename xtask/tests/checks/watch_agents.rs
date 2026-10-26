@@ -12,17 +12,13 @@ use std::time::{Duration, Instant, SystemTime};
 
 use serde_json::{Value, json};
 
-use crate::support::hook::{Hooks, START, add_seconds, event, with};
+use crate::support::hook::{Hooks, START, add_seconds};
 use crate::support::{GitLog, Watch, started_at, worktree};
 
 fn watch(hooks: &Hooks) -> Watch {
     let envs = hooks.base_envs();
     let envs: Vec<(&str, &OsStr)> = envs.iter().map(|(k, v)| (*k, v.as_os_str())).collect();
     Watch::must_start(&hooks.sandbox, &envs)
-}
-
-fn ev(hooks: &Hooks, fixture: &str, fields: &[(&str, Value)]) -> Value {
-    with(event(&hooks.pool, fixture, "s1", &hooks.pool.fg), fields)
 }
 
 fn actor_state(document: &Value, key: &str) -> Option<String> {
@@ -43,11 +39,11 @@ fn watch__should_turn_quiet_on_time() {
     watch
         .status_where(Duration::from_secs(5), |_| true)
         .expect("wtpool status --watch printed no document");
-    hooks.send(&ev(&hooks, "UserPromptSubmit", &[]));
-    hooks.send(&ev(&hooks, "PreToolUse-Agent", &[]));
-    let mut start = ev(&hooks, "SubagentStart", &[]);
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
+    hooks.send(&hooks.event("PreToolUse-Agent", "s1", &[]));
+    let mut start = hooks.event("SubagentStart", "s1", &[]);
     start["agent_id"] = json!("a1");
-    let mut stop = ev(&hooks, "SubagentStop", &[]);
+    let mut stop = hooks.event("SubagentStop", "s1", &[]);
     stop["agent_id"] = json!("a1");
     hooks.send(&start);
     hooks.send(&stop);
@@ -143,9 +139,9 @@ fn post(hooks: &Hooks, fixture: &str, file: &str, id: &str) -> Value {
         }
         _ => json!({ "file_path": path, "content": "x" }),
     };
-    ev(
-        hooks,
+    hooks.event(
         fixture,
+        "s1",
         &[("tool_input", input), ("tool_use_id", json!(id))],
     )
 }
@@ -157,7 +153,7 @@ fn watch__should_refresh_git_after_an_edit_or_bash_call() {
     let mut log = hooks.sandbox.must_log_git();
     let mut watch = watch(&hooks);
     let first = watch.settle_after_heartbeat();
-    hooks.send(&ev(&hooks, "UserPromptSubmit", &[]));
+    hooks.send(&hooks.event("UserPromptSubmit", "s1", &[]));
     let mut problems = Vec::new();
     assert_eq!(dirty(&first), Some(0), "setup: wt1 starts clean");
 
@@ -166,9 +162,9 @@ fn watch__should_refresh_git_after_an_edit_or_bash_call() {
     watch.lines_until_alive(Duration::from_secs(12));
     let quiet_from = SystemTime::now();
     fs::write(hooks.pool.worktree("wt1").join("new-0.txt"), "x\n").expect("setup: write a file");
-    hooks.send(&ev(
-        &hooks,
+    hooks.send(&hooks.event(
         "PreToolUse-Write",
+        "s1",
         &[(
             "tool_input",
             json!({ "file_path": hooks.pool.worktree("wt1").join("new-0.txt"), "content": "x" }),

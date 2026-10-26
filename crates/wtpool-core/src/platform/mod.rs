@@ -3,7 +3,7 @@
 
 pub mod dirs;
 pub mod fs;
-pub(crate) mod processes;
+pub(crate) mod machine;
 pub mod shell;
 pub mod signals;
 pub(crate) mod zone;

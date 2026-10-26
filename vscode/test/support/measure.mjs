@@ -1,10 +1,16 @@
 // In-page measurements of the panel's layout and colours. `installHelpers` runs once per page
 // through page.evaluate and defines window.__visual. Each other export runs through page.evaluate
-// after it and uses nothing else from outside.
+// after it and uses nothing else from outside. {@link ringProblems} and {@link axeRun} run in Node
+// instead.
 //
 // The tab's horizontal scroller is the viewport or an ancestor of the table with overflow-x auto
 // or scroll. Content inside such a scroller counts as reachable when it lies in its scrollable
 // area. Every other box that clips (overflow not visible) cuts the part outside its padding box.
+
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
+import { TEST } from './paths.mjs';
 
 /** Defines window.__visual: geometry, clipping and WCAG colour helpers. */
 export function installHelpers() {
@@ -444,6 +450,15 @@ export function ring() {
   };
 }
 
+/** The problems of a {@link ring} measurement, one line each, `at` naming the control. */
+export function ringProblems(at, r) {
+  if (!r || r.missing) return [`${at}: no focus ring`];
+  const out = [];
+  if (Object.keys(r.lost).length) out.push(`${at}: ring ${r.outline} cut by ${r.clippedBy.join(', ')} ${JSON.stringify(r.lost)}`);
+  if (r.contrast && r.contrast.ratio < 3) out.push(`${at}: ring ${r.contrast.ring} on ${r.contrast.under} is ${r.contrast.ratio}:1, under 3:1`);
+  return out;
+}
+
 /** Finds every shown text below 4.5:1 (3:1 when large) against its composited background. */
 export function textContrast() {
   const V = window.__visual;
@@ -563,4 +578,23 @@ export function iconBoxes() {
     const bg = V.bgOf(icon ?? cell);
     return { row: row.dataset.rowId.split('/').pop(), word: cell.textContent.trim(), found: Boolean(icon), x: r.left, y: r.top, w: r.width, h: r.height, bg: [bg.r, bg.g, bg.b].map(Math.round) };
   });
+}
+
+/**
+ * axe-core's WCAG 2 A and AA rules over the whole page, colour contrast off: the violations, one
+ * line each, and the number of rules that passed or were incomplete.
+ */
+export async function axeRun(page) {
+  const source = readFileSync(path.join(TEST, 'node_modules', 'axe-core', 'axe.min.js'), 'utf8');
+  await page.evaluate(source);
+  const result = await page.evaluate(() =>
+    window.axe.run(document, {
+      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
+      rules: { 'color-contrast': { enabled: false } },
+    }),
+  );
+  return {
+    violations: result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`),
+    checked: result.passes.concat(result.incomplete).length,
+  };
 }

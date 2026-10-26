@@ -5,6 +5,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use crate::git::discovery::within_git_dir;
 use crate::platform::dirs;
 use crate::platform::fs::open_private;
 
@@ -19,7 +20,7 @@ pub fn log_dir(state_home: Option<&Path>, home: Option<&Path>) -> Option<PathBuf
 /// Appends `line` to `hook.log` in `dir`, rotating first when it would pass 1 MiB. Writes
 /// nothing when `dir` lies inside a git directory.
 pub fn append(dir: &Path, line: &str) {
-    if in_git_dir(dir) || std::fs::create_dir_all(dir).is_err() {
+    if within_git_dir(dir) || std::fs::create_dir_all(dir).is_err() {
         return;
     }
     let log = dir.join("hook.log");
@@ -33,13 +34,6 @@ pub fn append(dir: &Path, line: &str) {
         text.push('\n');
         let _ = file.write_all(text.as_bytes());
     }
-}
-
-fn in_git_dir(dir: &Path) -> bool {
-    dir.ancestors().any(|ancestor| {
-        ancestor.join("HEAD").is_file()
-            && (ancestor.join("objects").is_dir() || ancestor.join("commondir").is_file())
-    })
 }
 
 #[cfg(test)]

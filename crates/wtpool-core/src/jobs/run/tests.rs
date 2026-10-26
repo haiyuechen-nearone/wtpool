@@ -1,11 +1,13 @@
 use std::path::Path;
+use std::sync::atomic::{AtomicI64, Ordering};
 
 use rstest::rstest;
 
 use super::*;
 use crate::clock::{SystemClock, Timestamp};
 use crate::heavy::Pattern;
-use crate::processes::RunningProcess;
+use crate::jobs::{JobRecord, JobState};
+use crate::processes::{RunningProcess, StartTime};
 
 fn command(program: &str, args: &[&str]) -> JobCommand {
     JobCommand {
@@ -53,20 +55,43 @@ fn waited_text__should_count_minutes_and_seconds(#[case] waited: Duration, #[cas
     assert_eq!(text, expected);
 }
 
-/// A process table that lists this process as started at noon.
-struct Noon;
+/// A process table of this process, started at noon, and of its parents, nearest first.
+struct Lineage(Vec<u32>);
 
-impl ListProcesses for Noon {
+impl ListProcesses for Lineage {
     fn list(&self, query: &ProcessQuery<'_>) -> Vec<RunningProcess> {
-        vec![RunningProcess {
-            pid: std::process::id(),
-            parent: None,
-            started: crate::processes::StartTime::parse("2026-10-20T12:00:00Z")
-                .filter(|_| query.started),
-            name: String::new(),
-            cwd: PathBuf::new(),
-            cmd: Vec::new(),
-        }]
+        let pids = std::iter::once(std::process::id()).chain(self.0.iter().copied());
+        let parents = self
+            .0
+            .iter()
+            .copied()
+            .map(Some)
+            .chain(std::iter::once(None));
+        pids.zip(parents)
+            .filter(|(pid, _)| query.pids.is_none_or(|pids| pids.contains(pid)))
+            .map(|(pid, parent)| RunningProcess {
+                pid,
+                parent: parent.filter(|_| query.parent),
+                started: StartTime::parse("2026-10-20T12:00:00Z").filter(|_| query.started),
+                name: String::new(),
+                cwd: PathBuf::new(),
+                cmd: Vec::new(),
+            })
+            .collect()
+    }
+}
+
+/// A clock whose system time moves on by 192 s at each read.
+#[derive(Default)]
+struct Steps(AtomicI64);
+
+impl ReadClock for Steps {
+    fn now(&self) -> Timestamp {
+        Timestamp::from_seconds(0)
+    }
+
+    fn system_micros(&self) -> i64 {
+        self.0.fetch_add(192_000_000, Ordering::SeqCst)
     }
 }
 
@@ -75,7 +100,9 @@ static NO_PATTERNS: RepositoryPatterns = RepositoryPatterns {
     build_processes: Vec::new(),
 };
 
-fn context(dir: &Path) -> JobContext<'static> {
+const OUTER: u32 = 4242;
+
+fn context<'a, C, P>(dir: &Path, clock: &'a C, processes: &'a P) -> JobContext<'a, C, P> {
     JobContext {
         paths: JobPaths {
             config: dir.join("config/wtpool/machine.toml"),
@@ -85,30 +112,47 @@ fn context(dir: &Path) -> JobContext<'static> {
         parent: None,
         cwd: dir.to_path_buf(),
         repository: &NO_PATTERNS,
-        clock: &SystemClock,
-        processes: &Noon,
+        clock,
+        processes,
     }
 }
 
+fn write_limit<C, P>(context: &JobContext<'_, C, P>, limit: u32) {
+    std::fs::create_dir_all(context.paths.config.parent().unwrap()).unwrap();
+    std::fs::write(&context.paths.config, format!("[jobs]\nlimit = {limit}\n")).unwrap();
+}
+
+/// A running job of the process `pid` in `folder`, with the lock it holds.
+fn running_job(folder: &JobFolder, pid: u32) -> (JobRecord, std::fs::File) {
+    let record = JobRecord {
+        state: JobState::Running,
+        ..JobRecord::sample(pid)
+    };
+    let held = folder.create_lock(&record.id).unwrap();
+    folder.write_record(&record).unwrap();
+    (record, held)
+}
+
 #[test]
-fn new_record__should_name_the_job_by_the_repository_patterns_too() {
+fn draft__should_name_the_job_by_the_repository_patterns_too() {
     // Given
     let dir = tempfile::tempdir().unwrap();
     let repository = RepositoryPatterns {
         heavy: vec![Pattern::parse("cargo xtask verify").unwrap()],
         build_processes: vec!["protoc".to_owned()],
     };
-    let mut context = context(dir.path());
+    let processes = Lineage(Vec::new());
+    let mut context = context(dir.path(), &SystemClock, &processes);
     context.repository = &repository;
     let config = MachineConfig::defaults(dir.path().join("machine.toml"), 4);
 
     // When
-    let verify = new_record(
+    let verify = draft(
         &command("cargo", &["xtask", "verify", "--phase", "4"]),
         &context,
         &config,
     );
-    let protoc = new_record(&command("protoc", &["--rust_out=x"]), &context, &config);
+    let protoc = draft(&command("protoc", &["--rust_out=x"]), &context, &config);
 
     // Then
     assert_eq!(
@@ -118,23 +162,28 @@ fn new_record__should_name_the_job_by_the_repository_patterns_too() {
 }
 
 #[test]
-fn new_record__should_hold_the_summary_label_and_start_of_this_job() {
+fn draft__should_hold_the_summary_label_and_start_of_this_job() {
     // Given
     let dir = tempfile::tempdir().unwrap();
     let mut job = command("cargo", &["test", "--token=secret"]);
     job.label = Some("\u{202e}unit tests".to_owned());
     let config = MachineConfig::defaults(dir.path().join("machine.toml"), 4);
+    let processes = Lineage(Vec::new());
 
     // When
-    let record = new_record(&job, &context(dir.path()), &config);
+    let draft = draft(
+        &job,
+        &context(dir.path(), &SystemClock, &processes),
+        &config,
+    );
 
     // Then
     assert_eq!(
         (
-            record.summary.as_str(),
-            record.label.as_deref(),
-            record.started,
-            record.pid
+            draft.summary.as_str(),
+            draft.label.as_deref(),
+            draft.started,
+            draft.pid
         ),
         (
             "cargo test",
@@ -143,6 +192,7 @@ fn new_record__should_hold_the_summary_label_and_start_of_this_job() {
             std::process::id()
         )
     );
+    let record = draft.queued(1, JobState::Waiting, Timestamp::from_seconds(0));
     assert!(!serde_json::to_string(&record).unwrap().contains("secret"));
 }
 
@@ -151,7 +201,8 @@ fn new_record__should_hold_the_summary_label_and_start_of_this_job() {
 fn run_job__should_pass_the_exit_code_and_leave_no_record() {
     // Given
     let dir = tempfile::tempdir().unwrap();
-    let context = context(dir.path());
+    let processes = Lineage(Vec::new());
+    let context = context(dir.path(), &SystemClock, &processes);
     let mut notes = Vec::new();
 
     // When
@@ -183,21 +234,12 @@ fn run_job__should_pass_the_exit_code_and_leave_no_record() {
 fn run_job__should_run_inside_a_live_job_at_once_and_record_nothing() {
     // Given
     let dir = tempfile::tempdir().unwrap();
-    let mut context = context(dir.path());
-    std::fs::create_dir_all(context.paths.config.parent().unwrap()).unwrap();
-    std::fs::write(&context.paths.config, "[jobs]\nlimit = 1\n").unwrap();
+    let processes = Lineage(vec![OUTER, 1]);
+    let mut context = context(dir.path(), &SystemClock, &processes);
+    write_limit(&context, 1);
     let folder = JobFolder::create(context.paths.folder.clone()).unwrap();
-    let outer = JobId::new(1);
-    let _held = folder.create_lock(&outer).unwrap();
-    let mut running = new_record(
-        &command("make", &[]),
-        &context,
-        &MachineConfig::defaults(PathBuf::new(), 4),
-    );
-    running.id = outer.clone();
-    running.state = JobState::Running;
-    folder.write_record(&running).unwrap();
-    context.parent = Some(OsString::from(outer.as_str()));
+    let (running, _held) = running_job(&folder, OUTER);
+    context.parent = Some(OsString::from(running.id.as_str()));
 
     // When
     let code = run_job(&command("sh", &["-c", "exit 0"]), &context, &mut Vec::new()).unwrap();
@@ -205,4 +247,83 @@ fn run_job__should_run_inside_a_live_job_at_once_and_record_nothing() {
     // Then
     assert_eq!(code, 0);
     assert_eq!(folder.records(), vec![running]);
+}
+
+#[rstest]
+#[case::the_parent(&[OUTER, 1], true)]
+#[case::a_grandparent(&[7, OUTER, 1], true)]
+#[case::no_ancestor(&[7, 1], false)]
+#[case::a_loop_of_parents(&[7, 8, 7, 8], false)]
+fn inside_live_job__should_need_the_job_process_among_the_ancestors(
+    #[case] parents: &[u32],
+    #[case] expected: bool,
+) {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let folder = JobFolder::create(dir.path().join("jobs")).unwrap();
+    let (running, _held) = running_job(&folder, OUTER);
+
+    // When
+    let inside = inside_live_job(
+        &folder,
+        Some(OsStr::new(running.id.as_str())),
+        &Lineage(parents.to_vec()),
+    );
+
+    // Then
+    assert_eq!(inside, expected);
+}
+
+#[test]
+fn inside_live_job__should_need_a_live_job() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let folder = JobFolder::create(dir.path().join("jobs")).unwrap();
+    let (dead, held) = running_job(&folder, OUTER);
+    drop(held);
+    let processes = Lineage(vec![OUTER, 1]);
+
+    // When
+    let inside = [
+        Some(OsStr::new(dead.id.as_str())),
+        Some(OsStr::new("4242-0badc0de")),
+        Some(OsStr::new("4242")),
+        None,
+    ]
+    .map(|job| inside_live_job(&folder, job, &processes));
+
+    // Then
+    assert_eq!(inside, [false; 4]);
+}
+
+#[test]
+fn wait_for_turn__should_run_once_the_limit_rises_and_time_the_wait_by_the_clock() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let processes = Lineage(Vec::new());
+    let clock = Steps::default();
+    let context = context(dir.path(), &clock, &processes);
+    let folder = JobFolder::create(context.paths.folder.clone()).unwrap();
+    let (_running, _held) = running_job(&folder, OUTER);
+    let one = Limit::new(1).unwrap();
+    let config = MachineConfig::defaults(PathBuf::new(), 4);
+    let job = command("make", &[]);
+    let (place, turn) =
+        Place::join(folder, draft(&job, &context, &config), one, clock.now()).unwrap();
+    let Turn::Wait(standing) = turn else {
+        panic!("the job ran over its limit");
+    };
+    write_limit(&context, 2);
+    let signals = JobSignals::catch().unwrap();
+    let mut notes = Vec::new();
+
+    // When
+    let place = wait_for_turn(place, standing, &job, &context, one, &signals, &mut notes);
+
+    // Then
+    assert!(place.is_ok());
+    assert_eq!(
+        String::from_utf8_lossy(&notes),
+        "wtpool job: 1 of 1 jobs run; waiting, 0 ahead\nwtpool job: started after 3 m 12 s\n"
+    );
 }

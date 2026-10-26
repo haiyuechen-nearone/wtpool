@@ -1,7 +1,10 @@
+use std::sync::atomic::{AtomicI64, Ordering};
+
 use rstest::rstest;
 
 use super::super::record::{HarnessProcess, Record};
 use super::*;
+use crate::clock::SystemClock;
 use crate::hook::fixture::{self, NOW, eventually, later, must_activity};
 use crate::processes::ProcessFile;
 
@@ -9,7 +12,7 @@ const CLAUDE: &str =
     r#"{"pid":7001,"ppid":1,"started":"2026-10-20T11:00:00Z","name":"claude","cwd":"/"}"#;
 
 /// An empty `wtpool-activity/` and a process table that lists the live claude.
-fn must_activity_with_claude() -> (tempfile::TempDir, Activity, ProcessFile) {
+fn must_activity_with_claude() -> (tempfile::TempDir, ActivityDir, ProcessFile) {
     let (dir, activity) = must_activity();
     let procs = dir.path().join("procs");
     std::fs::write(&procs, CLAUDE).unwrap();
@@ -89,7 +92,7 @@ fn collect__should_keep_the_newest_done_subagent_of_each_worktree() {
 }
 
 /// A pool of `count` sessions that ended 8 days ago, and the table of their live claude.
-fn ended_week_old(count: usize) -> (tempfile::TempDir, Activity, ProcessFile) {
+fn ended_week_old(count: usize) -> (tempfile::TempDir, ActivityDir, ProcessFile) {
     let (dir, activity, table) = must_activity_with_claude();
     for n in 0..count {
         let session = format!("s{n}");
@@ -99,8 +102,28 @@ fn ended_week_old(count: usize) -> (tempfile::TempDir, Activity, ProcessFile) {
     (dir, activity, table)
 }
 
+/// A clock whose system time starts at 0 and moves a microsecond on every read.
+#[derive(Default)]
+struct Ticking(AtomicI64);
+
+impl ReadClock for Ticking {
+    fn now(&self) -> Timestamp {
+        NOW
+    }
+
+    fn system_micros(&self) -> i64 {
+        self.0.fetch_add(1, Ordering::Relaxed)
+    }
+}
+
+/// A deadline the system clock never reaches.
+fn far_ahead() -> Deadline<'static> {
+    Deadline::new(&SystemClock, i64::MAX)
+}
+
 #[rstest]
 #[case::passed(Some(0), 0, true)]
+#[case::after_the_reads_and_one_delete(Some(4), 1, true)]
 #[case::far_ahead(Some(i64::MAX), 3, false)]
 #[case::none(None, 3, false)]
 fn collect__should_stop_at_its_deadline(
@@ -110,8 +133,10 @@ fn collect__should_stop_at_its_deadline(
 ) {
     // Given
     let (_dir, activity, table) = ended_week_old(3);
+    let clock = Ticking::default();
 
     // When
+    let deadline = deadline.map(|micros| Deadline::new(&clock, micros));
     let collected = collect(&activity, NOW, &table, deadline);
 
     // Then
@@ -132,13 +157,13 @@ fn after_session_end__should_collect_once_a_day() {
     let (_dir, activity, table) = ended_week_old(2);
 
     // When
-    let first = after_session_end(&activity, NOW, &table, i64::MAX);
+    let first = after_session_end(&activity, NOW, &table, far_ahead());
     let ended = record("s9", None, State::Ended, 8 * 86_400, true);
     activity.write("s9", &ended).unwrap();
-    let same_day = after_session_end(&activity, later(23 * 3600), &table, i64::MAX);
+    let same_day = after_session_end(&activity, later(23 * 3600), &table, far_ahead());
     let mut next_day = None;
     let ran = eventually(|| {
-        next_day = after_session_end(&activity, later(24 * 3600), &table, i64::MAX);
+        next_day = after_session_end(&activity, later(24 * 3600), &table, far_ahead());
         next_day.is_some()
     });
 
@@ -156,8 +181,8 @@ fn after_session_end__should_leave_the_day_open_when_stopped() {
     let (_dir, activity, table) = ended_week_old(2);
 
     // When
-    let stopped = after_session_end(&activity, NOW, &table, 0);
-    let again = after_session_end(&activity, later(60), &table, i64::MAX);
+    let stopped = after_session_end(&activity, NOW, &table, Deadline::new(&SystemClock, 0));
+    let again = after_session_end(&activity, later(60), &table, far_ahead());
 
     // Then
     assert_eq!(
@@ -175,7 +200,7 @@ fn after_session_end__should_leave_the_day_open_when_stopped() {
 fn collect_now__should_run_on_a_fresh_stamp_and_stamp_the_pool() {
     // Given
     let (_dir, activity, table) = ended_week_old(1);
-    assert!(after_session_end(&activity, later(-60), &table, i64::MAX).is_some());
+    assert!(after_session_end(&activity, later(-60), &table, far_ahead()).is_some());
     let ended = record("s9", None, State::Ended, 8 * 86_400, true);
     activity.write("s9", &ended).unwrap();
 

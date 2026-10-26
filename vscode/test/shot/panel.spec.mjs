@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
 import { REPOSITORY, document, everyActivity, mustValidate, scenarioDocuments, withActor, worktree } from '../support/docs.mjs';
 import { GROUP_TOKENS, GROUPS, WORDS, rowOrder } from '../support/grammar.mjs';
 import { REPO, SCENARIOS, runDir } from '../support/paths.mjs';
+import { axeRun } from '../support/measure.mjs';
 import { THEME_NAMES, computedThemeColours, openPanel } from '../support/page.mjs';
 
 const APPROVED = path.join(REPO, 'verify', 'shots', 'approved');
@@ -243,27 +244,18 @@ test.describe('axe', () => {
       // Given
       const context = await browser.newContext({ bypassCSP: true });
       const page = await context.newPage();
-      const source = readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'node_modules', 'axe-core', 'axe.min.js'), 'utf8');
       const panel = await openPanel(page, { theme });
       await panel.show(mustValidate(everyActivity()));
       await page.locator('tr[data-row-id$="/wt1"]').click();
       await page.clock.runFor(50);
-      await page.evaluate(source);
 
       // When
-      const result = await page.evaluate(() =>
-        window.axe.run(document, {
-          runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
-          rules: { 'color-contrast': { enabled: false } },
-        }),
-      );
+      const { violations, checked } = await axeRun(page);
       await context.close();
 
       // Then
-      const violations = result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
       assert.deepEqual(violations, [], `axe in ${theme}`);
-      const table = result.passes.concat(result.incomplete).length;
-      assert.ok(table > 0, 'setup: axe checked nothing');
+      assert.ok(checked > 0, 'setup: axe checked nothing');
     });
   }
 

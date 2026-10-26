@@ -4,12 +4,10 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use crate::error::{Error, Refusal};
-use crate::git::Git;
 use crate::names::{BranchName, InvalidSlotName, SlotName};
 use crate::report::{Discard, Report};
-use crate::resolve::{self, Divergence};
 use crate::worktree::{self, Head};
-use crate::worktree_state::{Row, State, Upstream};
+use crate::worktree_state::Row;
 
 use super::refusals::{self, WorktreeState};
 use super::{AgentGuard, Pool, git, slots};
@@ -28,7 +26,7 @@ impl<F> Pool<F> {
                 continue;
             }
             let role = self.config.role_of(&worktree);
-            let upstream = upstream_counts(&worktree.git())?;
+            let state = worktree.facts(&self.git())?.state();
             let branch = match worktree.head() {
                 Head::Branch(branch) => BranchName::try_new(branch).ok(),
                 Head::Detached | Head::Unknown => None,
@@ -36,12 +34,7 @@ impl<F> Pool<F> {
             rows.push(Row {
                 branch,
                 role,
-                state: State {
-                    dirty: worktree.uncommitted()?,
-                    upstream,
-                    unreferenced: worktree.unreferenced(&self.git())?,
-                    operation: worktree.operation()?,
-                },
+                state,
                 worktree: worktree.name(),
             });
         }
@@ -185,17 +178,4 @@ impl<F> Pool<F> {
         slots::slot_setup(failures)?;
         Ok(rows)
     }
-}
-
-fn upstream_counts(git: &Git) -> Result<Upstream, Error> {
-    let ran = git.run(["rev-parse", "--abbrev-ref", "@{upstream}"])?;
-    let Some(track) = ran.line().filter(|track| !track.is_empty()) else {
-        return Ok(Upstream::default());
-    };
-    Ok(
-        match resolve::left_right(git, &format!("HEAD...{track}"))? {
-            Some(Divergence { ahead, behind }) => Upstream::Counted { ahead, behind },
-            None => Upstream::Unknown,
-        },
-    )
 }

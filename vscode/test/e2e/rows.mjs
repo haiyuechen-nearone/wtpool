@@ -1,10 +1,10 @@
-import { age, expectedRow, normalizeEscapes, rowOrder } from '../support/grammar.mjs';
+import { age, expectedRow, normalizeEscapes, rowOrder, shownActors, statePrefix } from '../support/grammar.mjs';
 
 /**
  * The rows of the panel as support/grammar.mjs lists them, Last included. A cell's text leaves
  * out the agent count, `.count`, and the visually hidden text for screen readers, an element taken
- * out of the flow whose box is at most 1 px square or clipped away, so the expected text of phases
- * 1 to 3 still matches a phase 4 row.
+ * out of the flow whose box is at most 1 px square or clipped away, so the text matches
+ * {@link expectedRow} with or without them.
  */
 export async function shownRows(frame) {
   return frame.locator('tr[data-row-id]').evaluateAll((rows) =>
@@ -196,21 +196,15 @@ export async function lineFacts(frame) {
   );
 }
 
-/** The visually hidden start of an actor's line. */
-export function statePrefix(actor) {
-  return actor.state === 'idle' && actor.error ? 'idle, API error: ' : `${actor.state}: `;
-}
-
 /** The {@link lineFacts} each row of `status` must show: the count, hidden text, line prefixes. */
 export function expectedLineFacts(status, poolInfo) {
   return rowOrder(resolved(status, poolInfo).pools[0].worktrees).map((w) => {
     const n = w.actors.length;
-    const shown = [...w.actors].sort((a, b) => Date.parse(b.updated) - Date.parse(a.updated));
     return {
       id: w.path,
       count: n >= 2 ? `×${n}` : null,
       activityHidden: n >= 2 ? `, ${n} agents` : '',
-      prefixes: shown.map(statePrefix),
+      prefixes: shownActors(w).map(statePrefix),
     };
   });
 }

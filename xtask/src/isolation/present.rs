@@ -1,3 +1,6 @@
+//! The remotes that lead outside the run folder and the real pool's refs on commits the harness
+//! made, read once at `--report`.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

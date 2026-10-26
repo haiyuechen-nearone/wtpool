@@ -1,6 +1,7 @@
 // Plumbing of the host checks: the extension's verify API, the fake wtpool's configuration and
-// log, and wrappers of the VS Code calls the checks watch. Requiring this file wraps
-// `createWebviewPanel` and `registerWebviewPanelSerializer` before the extension activates.
+// log, the steps that show a document in the tab, and wrappers of the VS Code calls the checks
+// watch. Requiring this file wraps `createWebviewPanel` and `registerWebviewPanelSerializer`
+// before the extension activates.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -14,6 +15,8 @@ const SCENARIOS = path.join(REPO, 'verify', 'scenarios');
 const HOST_DIR = process.env.WTPOOL_VERIFY_HOST_DIR;
 const LOG = path.join(HOST_DIR ?? '/nonexistent', 'fake-wtpool.jsonl');
 const CONTROL = path.join(HOST_DIR ?? '/nonexistent', 'fake-control.txt');
+/** The `machine.jobs.config` of the documents the checks feed. */
+const CONFIG = '/Users/verify/.config/wtpool/machine.toml';
 
 const created = [];
 const serializers = [];
@@ -48,8 +51,8 @@ let api;
 async function verifyApi() {
   if (api) return api;
   const extension = vscode.extensions.getExtension(EXTENSION_ID);
-  // verify/oracle.lock pins the manifest, so an extension that does not load or activate is the
-  // product's failure, an assertion.
+  // The checks hash the manifest, so an extension that does not load or activate is the product's
+  // failure, an assertion.
   assert.ok(extension, `the extension ${EXTENSION_ID} is not loaded`);
   try {
     api = await extension.activate();
@@ -74,7 +77,17 @@ async function views() {
   return (await posted()).filter((m) => m && m.type === 'view');
 }
 
-function scenarioDocuments(name) {
+/** The views among the messages posted after message `from`. */
+async function viewsSince(from) {
+  return (await posted()).slice(from).filter((m) => m && m.type === 'view');
+}
+
+/**
+ * The status documents a scenario file expects, `{pool}` and `{common}` replaced by fixed paths.
+ * The ESM support/docs.mjs `scenarioDocuments` gives the scenario with them, but the extension host
+ * cannot require an ES module.
+ */
+function expectedDocuments(name) {
   const scenario = JSON.parse(fs.readFileSync(path.join(SCENARIOS, `${name}.json`), 'utf8'));
   const docs = scenario.steps.filter((s) => s.expect).map((s) => s.expect);
   docs.push(scenario.expect);
@@ -125,6 +138,43 @@ function ended(pid) {
 
 function control(command) {
   fs.appendFileSync(CONTROL, `${command}\n`);
+}
+
+/** Waits until a view of `doc`, by its `generated`, reached the webview after view `from`. */
+async function reached(doc, from) {
+  const seen = await waitFor(async () => (await views()).slice(from).some((v) => v.status?.generated === doc.generated), 10_000);
+  assert.ok(seen, `setup: the document of ${doc.generated} never reached the webview`);
+}
+
+/** Shows `doc` in the open tab through the fake's control file. */
+async function show(doc) {
+  const from = (await views()).length;
+  control(`emit ${JSON.stringify(doc)}`);
+  await reached(doc, from);
+}
+
+/** Opens the tab on `doc` alone, the fake configured with `config`. */
+async function showingAlone(doc, config = {}) {
+  await resetFake({ documents: [doc], aliveMs: 0, ...config });
+  const from = (await views()).length;
+  await openStatus();
+  await reached(doc, from);
+  // The fake follows its control file once it printed its documents.
+  await sleep(300);
+}
+
+/** Opens the tab on idle_pool, then shows `doc` and waits until the webview got it. */
+async function showingAfterIdle(doc, config = {}) {
+  await resetFake({ scenario: 'idle_pool', aliveMs: 0, ...config });
+  // Earlier checks posted idle_pool too, so only views of this tab count.
+  const from = (await views()).length;
+  await openStatus();
+  const last = expectedDocuments('idle_pool').at(-1);
+  const first = await waitFor(async () => (await views()).slice(from).some((v) => JSON.stringify(v.status) === JSON.stringify(last)), 10_000);
+  assert.ok(first, 'setup: idle_pool never reached the webview');
+  // The fake follows its control file once it printed the scenario.
+  await sleep(300);
+  await show(doc);
 }
 
 function openStatusTab() {
@@ -210,6 +260,7 @@ function wrapClipboard() {
 }
 
 module.exports = {
+  CONFIG,
   CONTROL,
   LOG,
   REPO,
@@ -218,18 +269,22 @@ module.exports = {
   control,
   created,
   ended,
+  expectedDocuments,
   fakeLog,
   openStatus,
   openStatusTab,
   posted,
   resetFake,
-  scenarioDocuments,
   serializers,
+  show,
+  showingAfterIdle,
+  showingAlone,
   sleep,
   starts,
   statusTabs,
   verifyApi,
   views,
+  viewsSince,
   waitFor,
   wrap,
   wrapClipboard,

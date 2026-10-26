@@ -1,4 +1,5 @@
-//! [`JobRecord`]: what a job writes of itself, and the [`JobId`] that names it.
+//! [`JobRecord`]: the file a job writes of itself, the [`JobDraft`] of it before it queues, and the
+//! [`JobId`] that names it.
 
 use std::collections::hash_map::RandomState;
 use std::fmt;
@@ -29,6 +30,17 @@ pub struct JobRecord {
     pub queued: Timestamp,
     /// When it started to run, or while it waits, when it queued.
     pub since: Timestamp,
+}
+
+/// The record of a job before it queues: everything but its place in the queue.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobDraft {
+    pub id: JobId,
+    pub pid: u32,
+    pub started: Option<Timestamp>,
+    pub summary: String,
+    pub label: Option<String>,
+    pub cwd: PathBuf,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -72,6 +84,46 @@ impl JobId {
 impl fmt::Display for JobId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
+    }
+}
+
+impl JobDraft {
+    /// The record of this job with `ticket`, in `state` since it queued at `now`.
+    #[must_use]
+    pub fn queued(self, ticket: u64, state: JobState, now: Timestamp) -> JobRecord {
+        JobRecord {
+            version: RECORD_VERSION,
+            id: self.id,
+            pid: self.pid,
+            started: self.started,
+            summary: self.summary,
+            label: self.label,
+            cwd: self.cwd,
+            ticket,
+            state,
+            queued: now,
+            since: now,
+        }
+    }
+}
+
+#[cfg(test)]
+impl JobRecord {
+    /// A waiting `make` of the process `pid` in `/w`, with ticket 1, queued at the epoch.
+    pub(crate) fn sample(pid: u32) -> Self {
+        Self {
+            version: RECORD_VERSION,
+            id: JobId::new(pid),
+            pid,
+            started: None,
+            summary: "make".to_owned(),
+            label: None,
+            cwd: PathBuf::from("/w"),
+            ticket: 1,
+            state: JobState::Waiting,
+            queued: Timestamp::from_seconds(0),
+            since: Timestamp::from_seconds(0),
+        }
     }
 }
 
@@ -120,17 +172,13 @@ mod tests {
     fn job_record__should_keep_its_fields_through_json() {
         // Given
         let record = JobRecord {
-            version: RECORD_VERSION,
             id: JobId::parse("7-0badc0de").unwrap(),
-            pid: 7,
             started: Some(Timestamp::from_seconds(1_792_497_600)),
             summary: "cargo test".to_owned(),
-            label: None,
-            cwd: PathBuf::from("/w"),
             ticket: 3,
-            state: JobState::Waiting,
             queued: Timestamp::from_seconds(1_792_497_601),
             since: Timestamp::from_seconds(1_792_497_601),
+            ..JobRecord::sample(7)
         };
 
         // When

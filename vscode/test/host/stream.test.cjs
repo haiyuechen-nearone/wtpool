@@ -4,13 +4,14 @@ const assert = require('node:assert/strict');
 const {
   advance,
   ended,
+  expectedDocuments,
   fakeLog,
   openStatus,
   posted,
   resetFake,
-  scenarioDocuments,
   sleep,
   starts,
+  viewsSince,
   waitFor,
 } = require('./support.cjs');
 
@@ -22,10 +23,6 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
  */
 const RESTART_MS = 10_000;
 
-async function viewsSince(from) {
-  return (await posted()).slice(from).filter((m) => m && m.type === 'view');
-}
-
 /**
  * Opens the tab on a fake whose first two starts print a whole document, then a `fault` line,
  * and whose later starts work. The document makes the check independent of earlier checks: the
@@ -34,7 +31,7 @@ async function viewsSince(from) {
 async function restartAfter(fault) {
   await resetFake({ scenario: 'idle_pool', faults: [fault, fault, 'none'], lead: true, aliveMs: 200 });
   const from = (await posted()).length;
-  const expected = scenarioDocuments('idle_pool').at(-1);
+  const expected = expectedDocuments('idle_pool').at(-1);
   await openStatus();
   const first = await waitFor(() => starts()[0], 10_000);
   assert.ok(first, 'wtpool did not start');
@@ -106,7 +103,7 @@ describe('stream', () => {
     // When
     await openStatus();
     const shown = await waitFor(async () =>
-      (await viewsSince(from)).find((v) => same(v.status, scenarioDocuments('idle_pool')[0])),
+      (await viewsSince(from)).find((v) => same(v.status, expectedDocuments('idle_pool')[0])),
     10_000);
     await advance(2000, { step: 500, realMs: 200 });
 
@@ -121,7 +118,8 @@ describe('stream', () => {
     ['unknown_version', 'unknown_version'],
   ]) {
     it(check, async () => {
-      // Given / When
+      // Given
+      // When
       const run = await restartAfter(fault);
 
       // Then
@@ -177,7 +175,7 @@ describe('stream', () => {
     // Given
     await resetFake({ scenario: 'idle_pool', faults: ['early_exit', 'none'], aliveMs: 200 });
     const from = (await posted()).length;
-    const expected = scenarioDocuments('idle_pool').at(-1);
+    const expected = expectedDocuments('idle_pool').at(-1);
 
     // When
     await openStatus();
@@ -203,13 +201,14 @@ describe('stream', () => {
   });
 
   it('stream__should_post_paused_before_the_first_document wtpool_error', async () => {
-    // Given: the first start writes more stderr than the stream keeps, its last line before blank
+    // Given
+    // The first start writes more stderr than the stream keeps, its last line before blank
     // ones, and exits 2. The second exits 1 with no stderr. The third works.
     const message = 'wtpool: not inside a git repository: run wtpool in your repository or set WTPOOL_FOREGROUND';
     const stderr = `${'wtpool: a line before the error\n'.repeat(300)}${message}\n  \n\n`;
     await resetFake({ scenario: 'idle_pool', faults: ['error_exit', 'early_exit', 'none'], stderr, exitCode: 2, aliveMs: 200 });
     const from = (await posted()).length;
-    const expected = scenarioDocuments('idle_pool').at(-1);
+    const expected = expectedDocuments('idle_pool').at(-1);
 
     // When
     await openStatus();
@@ -240,11 +239,12 @@ describe('stream', () => {
   });
 
   it('stream__should_post_starting_before_the_first_line', async () => {
-    // Given: wtpool prints its first line 5 s after it starts, as after a reload it first
+    // Given
+    // `wtpool` prints its first line 5 s after it starts, as after a reload it first
     // computes the git facts of every worktree.
     await resetFake({ scenario: 'idle_pool', faults: ['slow_start'], slowStartMs: 5000, aliveMs: 200 });
     const from = (await posted()).length;
-    const expected = scenarioDocuments('idle_pool')[0];
+    const expected = expectedDocuments('idle_pool')[0];
 
     // When
     await openStatus();
@@ -283,7 +283,7 @@ describe('stream', () => {
     await openStatus();
     await advance(10_000, { step: 2000, realMs: 300 });
     const shown = await waitFor(async () =>
-      (await viewsSince(from)).find((v) => same(v.status, scenarioDocuments('idle_pool')[0]) && v.connection === 'live'),
+      (await viewsSince(from)).find((v) => same(v.status, expectedDocuments('idle_pool')[0]) && v.connection === 'live'),
     10_000);
 
     // Then
@@ -295,7 +295,7 @@ describe('stream', () => {
     // Given
     await resetFake({ scenario: 'idle_pool', count: 2000, aliveMs: 0 });
     const from = (await posted()).length;
-    const last = structuredClone(scenarioDocuments('idle_pool').at(-1));
+    const last = structuredClone(expectedDocuments('idle_pool').at(-1));
     last.generated = new Date(Date.parse(last.generated) + 2000 * 1000).toISOString().replace('.000Z', 'Z');
     last.pools[0].skipped_records = 2000;
 

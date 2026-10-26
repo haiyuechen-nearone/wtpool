@@ -1,3 +1,5 @@
+//! `static:doc_links`: every relative link and anchor of the repository's Markdown resolves.
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};

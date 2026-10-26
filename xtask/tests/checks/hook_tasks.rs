@@ -9,11 +9,8 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 
-use crate::support::hook::{HookRun, Hooks, RunOptions, event, with};
+use crate::support::hook::{HookRun, Hooks, PROJECT, RunOptions, with};
 use crate::support::worktree;
-
-/// The project folder of the transcripts these payloads name.
-const PROJECT: &str = "-home-verify-code-app";
 
 /// The hook's watchdog. A hook that opened a FIFO would wait for it.
 const WATCHDOG: Duration = Duration::from_millis(900);
@@ -65,24 +62,13 @@ impl Tasks {
         self.send_in(payload, Some(&self.tmp))
     }
 
-    fn ev(&self, fixture: &str, session: &str, fields: &[(&str, Value)]) -> Value {
-        let mut payload = with(
-            event(&self.hooks.pool, fixture, session, &self.hooks.pool.fg),
-            fields,
-        );
-        payload["transcript_path"] = json!(format!(
-            "/home/verify/.claude/projects/{PROJECT}/{session}.jsonl"
-        ));
-        payload
-    }
-
     /// A PostToolUse of `cd wt1 && cargo build --release` that went to the background as `id`.
     fn background(&self, session: &str, id: &Value) -> Value {
         let command = format!(
             "cd {} && cargo build --release",
             self.hooks.pool.worktree("wt1").display()
         );
-        self.ev(
+        self.hooks.transcript_event(
             "PostToolUse-Bash",
             session,
             &[
@@ -169,7 +155,7 @@ fn hook__should_record_background_tasks() {
         .status()
         .expect("setup: run mkfifo");
     assert!(made.success(), "setup: mkfifo failed");
-    tasks.send(&tasks.ev("UserPromptSubmit", "s1", &[]));
+    tasks.send(&tasks.hooks.transcript_event("UserPromptSubmit", "s1", &[]));
 
     // When
     let first = tasks.send(&tasks.background("s1", &json!("b1")));
@@ -221,7 +207,7 @@ fn hook__should_record_background_tasks() {
         tasks.background("s1", &json!("b12")),
         &[("transcript_path", json!("projects/-relative/s1.jsonl"))],
     ));
-    tasks.send(&tasks.ev(
+    tasks.send(&tasks.hooks.transcript_event(
         "PostToolUse-Bash",
         "s1",
         &[("tool_use_id", json!("toolu_foreground"))],
@@ -236,7 +222,7 @@ fn hook__should_record_background_tasks() {
 
     // When
     tasks.hooks.advance(60);
-    tasks.send(&tasks.ev(
+    tasks.send(&tasks.hooks.transcript_event(
         "Stop",
         "s1",
         &[(
@@ -246,9 +232,9 @@ fn hook__should_record_background_tasks() {
         )],
     ));
     let after_stop = tasks.ended("s1");
-    tasks.send(&tasks.ev("Stop", "s1", &[]));
+    tasks.send(&tasks.hooks.transcript_event("Stop", "s1", &[]));
     let after_bare_stop = tasks.ended("s1");
-    tasks.send(&tasks.ev(
+    tasks.send(&tasks.hooks.transcript_event(
         "PostToolUse-Bash",
         "s1",
         &[
@@ -258,7 +244,7 @@ fn hook__should_record_background_tasks() {
         ],
     ));
     let after_task_stop = tasks.ended("s1");
-    tasks.send(&tasks.ev("SessionEnd", "s1", &[]));
+    tasks.send(&tasks.hooks.transcript_event("SessionEnd", "s1", &[]));
 
     // Then
     let stopped = pairs(&[
@@ -316,7 +302,10 @@ fn subagent_task_under_tmp() {
     // When
     tasks.send_in(&start, None);
     let started = tasks.tasks("s1.a1");
-    let mut stop = tasks.ev("SubagentStop", "s1", &[("background_tasks", json!([]))]);
+    let mut stop =
+        tasks
+            .hooks
+            .transcript_event("SubagentStop", "s1", &[("background_tasks", json!([]))]);
     stop["agent_id"] = json!("a1");
     tasks.send_in(&stop, None);
 
@@ -373,10 +362,13 @@ fn actor_in_wt1(document: &Value, key: &str) -> Value {
 fn hook__should_end_a_task_through_its_session() {
     // Given
     let tasks = Tasks::must_new("hook-tasks-session");
-    tasks.send(&tasks.ev("UserPromptSubmit", "s1", &[]));
+    tasks.send(&tasks.hooks.transcript_event("UserPromptSubmit", "s1", &[]));
     tasks.send(&tasks.background("s1", &json!("b0")));
     for (agent, id) in [("a1", "b1"), ("a2", "b2")] {
-        tasks.send(&as_agent(tasks.ev("SubagentStart", "s1", &[]), agent));
+        tasks.send(&as_agent(
+            tasks.hooks.transcript_event("SubagentStart", "s1", &[]),
+            agent,
+        ));
         tasks.send(&as_agent(tasks.background("s1", &json!(id)), agent));
     }
     let a1_stop = stop_fields(&[
@@ -384,14 +376,20 @@ fn hook__should_end_a_task_through_its_session() {
         entry("b0", "shell", "running"),
         entry("b1", "shell", "running"),
     ]);
-    tasks.send(&as_agent(tasks.ev("SubagentStop", "s1", &a1_stop), "a1"));
+    tasks.send(&as_agent(
+        tasks.hooks.transcript_event("SubagentStop", "s1", &a1_stop),
+        "a1",
+    ));
     let a2_stop = stop_fields(&[
         entry("a2", "subagent", "running"),
         entry("b0", "shell", "running"),
         entry("b1", "shell", "running"),
         entry("b2", "shell", "running"),
     ]);
-    tasks.send(&as_agent(tasks.ev("SubagentStop", "s1", &a2_stop), "a2"));
+    tasks.send(&as_agent(
+        tasks.hooks.transcript_event("SubagentStop", "s1", &a2_stop),
+        "a2",
+    ));
     let later = tasks.hooks.advance(600);
     let stuck = tasks.hooks.status();
 
@@ -401,7 +399,7 @@ fn hook__should_end_a_task_through_its_session() {
         entry("b0", "shell", "completed"),
         entry("b2", "shell", "running"),
     ]);
-    tasks.send(&tasks.ev("Stop", "s1", &stop));
+    tasks.send(&tasks.hooks.transcript_event("Stop", "s1", &stop));
     let cleared = tasks.hooks.status();
 
     // Then
@@ -448,9 +446,12 @@ fn hook__should_end_a_task_through_its_session() {
 fn hook__should_end_no_task_of_a_record_it_cannot_lock() {
     // Given
     let tasks = Tasks::must_new("hook-tasks-unlockable");
-    tasks.send(&tasks.ev("UserPromptSubmit", "s1", &[]));
+    tasks.send(&tasks.hooks.transcript_event("UserPromptSubmit", "s1", &[]));
     for (agent, id) in [("a1", "b1"), ("a2", "b2")] {
-        tasks.send(&as_agent(tasks.ev("SubagentStart", "s1", &[]), agent));
+        tasks.send(&as_agent(
+            tasks.hooks.transcript_event("SubagentStart", "s1", &[]),
+            agent,
+        ));
         tasks.send(&as_agent(tasks.background("s1", &json!(id)), agent));
     }
     let lock = tasks.hooks.activity().join("s1.a1.json.lock");
@@ -459,7 +460,11 @@ fn hook__should_end_no_task_of_a_record_it_cannot_lock() {
     tasks.hooks.advance(600);
 
     // When
-    tasks.send(&tasks.ev("Stop", "s1", &stop_fields(&[])));
+    tasks.send(
+        &tasks
+            .hooks
+            .transcript_event("Stop", "s1", &stop_fields(&[])),
+    );
 
     // Then
     assert_eq!(

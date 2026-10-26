@@ -201,9 +201,8 @@ impl<F> Pool<F> {
         Ok(())
     }
 
-    /// A full ref, as a tag named `<remote>/<branch>` would shadow the short name.
     fn remote_ref(&self, branch: &BranchName) -> String {
-        format!("refs/remotes/{}/{branch}", self.config.remote)
+        branch.remote_ref(&self.config.remote)
     }
 
     /// `branch.<branch>.<key>` from the git config. Read from the config, not by

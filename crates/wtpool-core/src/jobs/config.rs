@@ -2,13 +2,17 @@
 //! from `<config>/wtpool/machine.toml`.
 
 use std::fmt;
+use std::io;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
+use crate::error::at_line;
 use crate::heavy::Pattern;
 use crate::platform::dirs;
-use crate::platform::fs::check_private;
+use crate::platform::fs::{NotPrivate, check_private};
+use crate::toml_error::TomlError;
 
 /// The lowest and highest limit the machine config takes.
 pub const LIMIT_BOUNDS: (u32, u32) = (1, 64);
@@ -49,12 +53,43 @@ pub struct MachineConfig {
     pub heavy: Vec<Pattern>,
 }
 
+/// Text that is not a limit: no whole number, or one outside [`LIMIT_BOUNDS`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("the limit is a whole number from {} to {}", LIMIT_BOUNDS.0, LIMIT_BOUNDS.1)]
+pub struct InvalidLimit;
+
+/// Text that names no [`Enforce`] policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("the policy is off, warn or require")]
+pub struct InvalidEnforce;
+
 /// A machine config that cannot be read or is not valid.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("invalid machine config {}: {reason}", path.display())]
+#[derive(Debug, thiserror::Error)]
+#[error("invalid machine config {}: {fault}", path.display())]
 pub struct MachineConfigError {
     pub path: PathBuf,
-    pub reason: String,
+    pub fault: MachineConfigFault,
+}
+
+/// The fault of a [`MachineConfigError`].
+#[derive(Debug, thiserror::Error)]
+pub enum MachineConfigFault {
+    #[error("it is a symlink to nothing")]
+    DanglingSymlink,
+    #[error("not a regular file")]
+    NotAFile,
+    #[error("{0}")]
+    NotPrivate(NotPrivate),
+    #[error("its folder {}: {fault}", folder.display())]
+    FolderNotPrivate { folder: PathBuf, fault: NotPrivate },
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error("not valid UTF-8")]
+    NotUtf8,
+    #[error("{}{reason}", at_line(*line))]
+    Syntax { line: Option<usize>, reason: String },
+    #[error("limit = {count}: {}", InvalidLimit)]
+    Limit { count: i64 },
 }
 
 #[derive(Debug, Deserialize)]
@@ -95,6 +130,18 @@ impl Limit {
     }
 }
 
+impl FromStr for Limit {
+    type Err = InvalidLimit;
+
+    /// A limit written in decimal digits alone, without a sign.
+    fn from_str(text: &str) -> Result<Self, InvalidLimit> {
+        if text.is_empty() || !text.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err(InvalidLimit);
+        }
+        text.parse().ok().and_then(Self::new).ok_or(InvalidLimit)
+    }
+}
+
 impl fmt::Display for Limit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
@@ -107,12 +154,7 @@ impl Enforce {
     /// The policy `off`, `warn` or `require` names, as the machine config writes it.
     #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "off" => Some(Self::Off),
-            "warn" => Some(Self::Warn),
-            "require" => Some(Self::Require),
-            _ => None,
-        }
+        name.parse().ok()
     }
 
     #[must_use]
@@ -122,6 +164,17 @@ impl Enforce {
             Self::Warn => "warn",
             Self::Require => "require",
         }
+    }
+}
+
+impl FromStr for Enforce {
+    type Err = InvalidEnforce;
+
+    fn from_str(name: &str) -> Result<Self, InvalidEnforce> {
+        Self::ALL
+            .into_iter()
+            .find(|policy| policy.as_str() == name)
+            .ok_or(InvalidEnforce)
     }
 }
 
@@ -176,34 +229,24 @@ impl MachineConfig {
     /// is missing. Reading follows a symlink to a regular file. The file and the folders that
     /// hold it and its target must belong to this user and be writable by no one else.
     pub fn read(path: &Path, cores: usize) -> Result<Self, MachineConfigError> {
-        let invalid = |reason: String| MachineConfigError {
+        let invalid = |fault: MachineConfigFault| MachineConfigError {
             path: path.to_path_buf(),
-            reason,
+            fault,
         };
         let Some(text) = read_private(path).map_err(invalid)? else {
             return Ok(Self::defaults(path.to_path_buf(), cores));
         };
         let parsed: MachineToml = toml::from_str(&text).map_err(|error| {
-            let line = error.span().map(|span| line_of(&text, span.start));
-            let mut detail = error;
-            detail.set_input(None);
-            let reason = detail.to_string().trim_end().replace('\n', " ");
-            invalid(match line {
-                Some(line) => format!("line {line}: {reason}"),
-                None => reason,
-            })
+            let TomlError { line, reason } = TomlError::new(error, &text);
+            invalid(MachineConfigFault::Syntax { line, reason })
         })?;
         let mut config = Self::defaults(path.to_path_buf(), cores);
         let Some(jobs) = parsed.jobs else {
             return Ok(config);
         };
         if let Some(count) = jobs.limit {
-            config.limit = Limit::new(count).ok_or_else(|| {
-                invalid(format!(
-                    "limit = {count}: the limit is a whole number from {} to {}",
-                    LIMIT_BOUNDS.0, LIMIT_BOUNDS.1
-                ))
-            })?;
+            config.limit =
+                Limit::new(count).ok_or_else(|| invalid(MachineConfigFault::Limit { count }))?;
             config.limit_source = ConfigSource::Machine;
         }
         if let Some(enforce) = jobs.enforce {
@@ -216,44 +259,33 @@ impl MachineConfig {
 }
 
 /// The text of the private regular file at `path`, `None` when nothing is there.
-fn read_private(path: &Path) -> Result<Option<String>, String> {
+fn read_private(path: &Path) -> Result<Option<String>, MachineConfigFault> {
     let meta = match std::fs::metadata(path) {
         Ok(meta) => meta,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
             return match path.symlink_metadata() {
-                Ok(_) => Err("it is a symlink to nothing".to_owned()),
+                Ok(_) => Err(MachineConfigFault::DanglingSymlink),
                 Err(_) => Ok(None),
             };
         }
-        Err(error) => return Err(error.to_string()),
+        Err(error) => return Err(error.into()),
     };
     if !meta.is_file() {
-        return Err("not a regular file".to_owned());
+        return Err(MachineConfigFault::NotAFile);
     }
-    check_private(&meta).map_err(|fault| fault.to_string())?;
+    check_private(&meta).map_err(MachineConfigFault::NotPrivate)?;
     let mut folders = vec![path.parent().map(Path::to_path_buf)];
     if path.symlink_metadata().is_ok_and(|link| link.is_symlink()) {
-        let target = std::fs::canonicalize(path).map_err(|error| error.to_string())?;
-        folders.push(target.parent().map(Path::to_path_buf));
+        folders.push(std::fs::canonicalize(path)?.parent().map(Path::to_path_buf));
     }
     for folder in folders.into_iter().flatten() {
-        let held = std::fs::metadata(&folder).map_err(|error| error.to_string())?;
+        let held = std::fs::metadata(&folder)?;
         check_private(&held)
-            .map_err(|fault| format!("its folder {}: {fault}", folder.display()))?;
+            .map_err(|fault| MachineConfigFault::FolderNotPrivate { folder, fault })?;
     }
-    let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
-    String::from_utf8(bytes)
+    String::from_utf8(std::fs::read(path)?)
         .map(Some)
-        .map_err(|_| "not valid UTF-8".to_owned())
-}
-
-/// The line that byte `offset` of `text` is on, counting from 1.
-fn line_of(text: &str, offset: usize) -> usize {
-    text.bytes()
-        .take(offset)
-        .filter(|&byte| byte == b'\n')
-        .count()
-        .saturating_add(1)
+        .map_err(|_| MachineConfigFault::NotUtf8)
 }
 
 #[cfg(test)]

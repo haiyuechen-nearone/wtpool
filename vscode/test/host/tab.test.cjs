@@ -7,12 +7,12 @@ const vscode = require('vscode');
 const {
   control,
   created,
+  expectedDocuments,
   fakeLog,
   openStatus,
   openStatusTab,
   posted,
   resetFake,
-  scenarioDocuments,
   serializers,
   sleep,
   starts,
@@ -276,7 +276,7 @@ describe('tab', () => {
     // Earlier checks posted idle_pool too, so only views of this tab count.
     const from = (await views()).length;
     await openStatus();
-    const final = scenarioDocuments('idle_pool').at(-1);
+    const final = expectedDocuments('idle_pool').at(-1);
     const shown = await waitFor(
       async () => (await views()).slice(from).some((v) => JSON.stringify(v.status) === JSON.stringify(final)),
       10_000,
@@ -326,7 +326,7 @@ describe('tab', () => {
     // The scenario checks posted folder_missing too, so only views of this tab count.
     const from = (await views()).length;
     await openStatus();
-    const final = scenarioDocuments('folder_missing').at(-1);
+    const final = expectedDocuments('folder_missing').at(-1);
     const shown = await waitFor(
       async () => (await views()).slice(from).some((v) => JSON.stringify(v.status) === JSON.stringify(final)),
       10_000,
@@ -412,7 +412,7 @@ describe('tab', () => {
     await resetFake({ scenario: 'idle_pool', aliveMs: 0 });
     const from = (await views()).length;
     const opened = await openStatus();
-    const docs = scenarioDocuments('idle_pool');
+    const docs = expectedDocuments('idle_pool');
     // The fake reads control lines only once it has printed its documents, and earlier checks
     // posted idle_pool too, so only a view of this tab counts.
     const first = await waitFor(

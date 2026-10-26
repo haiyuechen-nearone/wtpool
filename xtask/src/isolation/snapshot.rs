@@ -1,3 +1,6 @@
+//! Reads the real places a run must not touch: the real pool, its git state and activity, the
+//! Claude Code settings and the installed extensions.
+
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fs;
@@ -301,6 +304,7 @@ fn mentions(haystack: &[u8], needle: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cmd::isolated_git;
     use rstest::rstest;
 
     #[rstest]
@@ -360,14 +364,7 @@ mod tests {
                 "a",
             ],
         ] {
-            let status = std::process::Command::new("git")
-                .arg("-C")
-                .arg(&pool)
-                .args(args)
-                .env("GIT_CONFIG_GLOBAL", "/dev/null")
-                .env("GIT_CONFIG_NOSYSTEM", "1")
-                .status()
-                .unwrap();
+            let status = isolated_git(&pool).args(args).status().unwrap();
             assert!(status.success(), "git {args:?}");
         }
         pool
@@ -404,12 +401,8 @@ mod tests {
         let pool = must_pool("heads");
         let slot = pool.with_extension("wt1");
         let slot_text = slot.to_string_lossy().into_owned();
-        let status = std::process::Command::new("git")
-            .arg("-C")
-            .arg(&pool)
+        let status = isolated_git(&pool)
             .args(["worktree", "add", "--quiet", "--detach", &slot_text])
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .env("GIT_CONFIG_NOSYSTEM", "1")
             .env("EMAIL", VERIFY_EMAIL)
             .status()
             .unwrap();
@@ -451,12 +444,8 @@ mod tests {
         let pool = must_pool(&format!("folders-{delete_folder}-{delete_git_link}"));
         let slot = pool.with_extension("wt1");
         let slot_text = slot.to_string_lossy().into_owned();
-        let status = std::process::Command::new("git")
-            .arg("-C")
-            .arg(&pool)
+        let status = isolated_git(&pool)
             .args(["worktree", "add", "--quiet", "--detach", &slot_text])
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .env("GIT_CONFIG_NOSYSTEM", "1")
             .status()
             .unwrap();
         assert!(status.success());
@@ -526,14 +515,7 @@ mod tests {
             commands.push(vec!["worktree", "lock", "--reason", reason, &slot_text]);
         }
         for args in commands {
-            let status = std::process::Command::new("git")
-                .arg("-C")
-                .arg(&pool)
-                .args(&args)
-                .env("GIT_CONFIG_GLOBAL", "/dev/null")
-                .env("GIT_CONFIG_NOSYSTEM", "1")
-                .status()
-                .unwrap();
+            let status = isolated_git(&pool).args(&args).status().unwrap();
             assert!(status.success(), "git {args:?}");
         }
         let places = Places {

@@ -9,14 +9,27 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub use timestamp::Timestamp;
 
+use crate::platform::fs::read_regular;
+
+/// The longest clock file read, far longer than any RFC 3339 time.
+const MAX_CLOCK_FILE_BYTES: u64 = 4096;
+
 /// Reads the current time.
 pub trait ReadClock: Send + Sync {
     fn now(&self) -> Timestamp;
 
     /// The time left until the clock reads `time`, zero once it does.
     fn until(&self, time: Timestamp) -> Duration {
-        let seconds = time.seconds_since(self.now());
-        Duration::from_secs(u64::try_from(seconds).unwrap_or(0))
+        whole_seconds_until(self.now(), time)
+    }
+
+    /// The system clock in microseconds since the Unix epoch, finer than a [`Timestamp`], for
+    /// deadlines and the time a process entered. A [`FileClock`] holds whole seconds, so it gives
+    /// the system clock's too.
+    fn system_micros(&self) -> i64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |d| i64::try_from(d.as_micros()).unwrap_or(i64::MAX))
     }
 
     /// The file the clock reads, whose change moves it, if any.
@@ -43,13 +56,15 @@ pub enum Clock {
     File(FileClock),
 }
 
-/// The system clock in microseconds, finer than a [`Timestamp`]. A [`FileClock`] holds whole
-/// seconds, so times this fine come from the system clock under one too.
+/// [`ReadClock::system_micros`] of the [`SystemClock`].
 #[must_use]
 pub fn system_micros() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_micros()).unwrap_or(i64::MAX))
+    SystemClock.system_micros()
+}
+
+/// The whole seconds from `now` until `time`, zero once it passed.
+fn whole_seconds_until(now: Timestamp, time: Timestamp) -> Duration {
+    Duration::from_secs(u64::try_from(time.seconds_since(now)).unwrap_or(0))
 }
 
 impl ReadClock for SystemClock {
@@ -57,10 +72,14 @@ impl ReadClock for SystemClock {
         Timestamp::from_system_time(SystemTime::now())
     }
 
-    /// To the start of that second, so a change due then fires at its exact time.
+    /// To the start of that second, so a change due then fires at its exact time. A time past the
+    /// system's range counts in whole seconds.
     fn until(&self, time: Timestamp) -> Duration {
-        let at = UNIX_EPOCH + Duration::from_secs(u64::try_from(time.seconds()).unwrap_or(0));
-        at.duration_since(SystemTime::now()).unwrap_or_default()
+        let since_epoch = Duration::from_secs(u64::try_from(time.seconds()).unwrap_or(0));
+        match UNIX_EPOCH.checked_add(since_epoch) {
+            Some(at) => at.duration_since(SystemTime::now()).unwrap_or_default(),
+            None => whole_seconds_until(self.now(), time),
+        }
     }
 }
 
@@ -73,8 +92,9 @@ impl FileClock {
 
 impl ReadClock for FileClock {
     fn now(&self) -> Timestamp {
-        std::fs::read_to_string(&self.path)
+        read_regular(&self.path, MAX_CLOCK_FILE_BYTES)
             .ok()
+            .and_then(|bytes| String::from_utf8(bytes).ok())
             .and_then(|text| Timestamp::parse(text.trim()))
             .unwrap_or_else(|| SystemClock.now())
     }
@@ -106,6 +126,13 @@ impl ReadClock for Clock {
         match self {
             Self::System(clock) => clock.until(time),
             Self::File(clock) => clock.until(time),
+        }
+    }
+
+    fn system_micros(&self) -> i64 {
+        match self {
+            Self::System(clock) => clock.system_micros(),
+            Self::File(clock) => clock.system_micros(),
         }
     }
 
@@ -212,14 +239,65 @@ mod tests {
     }
 
     #[test]
+    fn system_clock_until__should_wait_until_the_last_time_without_overflow() {
+        // When
+        let wait = SystemClock.until(Timestamp::from_seconds(i64::MAX));
+
+        // Then
+        assert!(wait > Duration::from_secs(1 << 40), "{wait:?}");
+    }
+
+    #[test]
+    fn whole_seconds_until__should_count_down_to_zero() {
+        // Given
+        let now = Timestamp::from_seconds(NOON);
+
+        // When
+        let waits = [NOON + 5, NOON - 5]
+            .map(|time| whole_seconds_until(now, Timestamp::from_seconds(time)));
+
+        // Then
+        assert_eq!(waits, [Duration::from_secs(5), Duration::ZERO]);
+    }
+
+    #[test]
     fn system_micros__should_read_the_system_clock_finer_than_a_second() {
         // Given
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("clock");
+        std::fs::write(&path, "2026-10-20T12:00:00Z").unwrap();
         let before = SystemClock.now();
 
         // When
-        let micros = system_micros();
+        let micros = [
+            system_micros(),
+            Clock::from_file(None).system_micros(),
+            Clock::from_file(Some(path)).system_micros(),
+        ];
 
         // Then
-        assert!(micros / 1_000_000 >= before.seconds(), "{micros}");
+        assert!(
+            micros
+                .iter()
+                .all(|micros| micros / 1_000_000 >= before.seconds()),
+            "{micros:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn file_clock__should_not_follow_a_symlink() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target");
+        std::fs::write(&target, "2026-10-20T12:00:00Z").unwrap();
+        let link = dir.path().join("clock");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        // When
+        let now = FileClock::new(link).now();
+
+        // Then
+        assert_ne!(now.seconds(), NOON);
     }
 }

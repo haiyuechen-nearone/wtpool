@@ -2,7 +2,7 @@
 // editor and the agent lines' count and icons.
 import assert from 'node:assert/strict';
 
-import { shownActors } from './grammar.mjs';
+import { shownActors, statePrefix } from './grammar.mjs';
 import { isDisplayed, isShown, isVisuallyHidden, spoken, text } from './webview.mjs';
 
 export const button = (doc) => doc.querySelector('tr.pool-heading button.machine-button');
@@ -189,11 +189,6 @@ export function answer(webview, fields) {
 /** The messages the webview posted since `from`, jobSettings only. */
 export function settingsSince(webview, from) {
   return webview.posted.slice(from).filter((message) => message?.type === 'jobSettings');
-}
-
-/** The visually hidden prefix of an actor's line. */
-export function statePrefix(actor) {
-  return actor.state === 'idle' && actor.error ? 'idle, API error: ' : `${actor.state}: `;
 }
 
 /**

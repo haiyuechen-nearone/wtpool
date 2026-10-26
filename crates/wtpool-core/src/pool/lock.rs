@@ -1,15 +1,16 @@
 //! The pool lock, held by every command that changes the pool.
 
 use std::fs::{File, OpenOptions, TryLockError};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::activity::{self, ACTIVITY_DIR};
 use crate::error::{Error, GitError, SettingsError};
 use crate::paths;
 use crate::report::Report;
+use crate::repository::Repository;
 use crate::worktree::Worktree;
 
-use super::{Pool, git};
+use super::Pool;
 
 /// Held for the whole of a command that changes the pool, so parallel runs cannot
 /// pick the same slot. Also proof that the foreground is a listed worktree.
@@ -29,20 +30,16 @@ impl<F> Pool<F> {
     #[must_use = "the lock is released when the returned guard is dropped"]
     pub(super) fn lock(&self, report: &mut impl Report) -> Result<PoolLock, Error> {
         let foreground = self.foreground_worktree(report)?;
-        let args = ["rev-parse", "--path-format=absolute", "--git-common-dir"];
-        let ran = git::run_reported(&foreground.git(), args, report)?;
-        let common_dir = ran
-            .line()
-            .filter(|dir| !dir.is_empty())
+        let repository = Repository::at(foreground.path(), foreground.git().mode())?
             .ok_or_else(|| GitError::NoGitDir(foreground.path().to_path_buf()))?;
-        let common_dir = Path::new(common_dir);
+        let common_dir = repository.common_dir().as_path();
         if let Err(error) = activity::create_activity(common_dir) {
             report.warn(&format!(
                 "could not create {}: {error}",
                 common_dir.join(ACTIVITY_DIR).display()
             ));
         }
-        let path = common_dir.join("wtpool.lock");
+        let path = repository.lock_file().into_path_buf();
         let lock_error = |source| Error::Lock {
             path: path.clone(),
             source,

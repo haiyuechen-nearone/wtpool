@@ -22,6 +22,8 @@ use super::{Sandbox, must_repo, must_status_json, must_wtpool_bin, set_executabl
 pub const CLAUDE: u32 = 7001;
 pub const CLAUDE_STARTED: &str = "2026-10-20T11:00:00Z";
 pub const START: &str = "2026-10-20T12:00:00Z";
+/// The project folder of the transcripts [`Hooks::transcript_event`] names.
+pub const PROJECT: &str = "-home-verify-code-app";
 
 static RUNS: AtomicUsize = AtomicUsize::new(0);
 
@@ -288,6 +290,29 @@ impl Hooks {
 
     pub fn run(&self, payload: &Value) -> HookRun {
         self.run_with(payload, &RunOptions::default())
+    }
+
+    /// The fixture `name` as `session` sends it from fg, with `fields` set.
+    pub fn event(&self, name: &str, session: &str, fields: &[(&str, Value)]) -> Value {
+        with(event(&self.pool, name, session, &self.pool.fg), fields)
+    }
+
+    /// [`Self::event`] from the Explore subagent `agent` of session s1.
+    pub fn sub_event(&self, name: &str, agent: &str, fields: &[(&str, Value)]) -> Value {
+        let mut payload = self.event(name, "s1", fields);
+        payload["agent_id"] = json!(agent);
+        payload["agent_type"] = json!("Explore");
+        payload
+    }
+
+    /// [`Self::event`] naming the transcript of `session` in [`PROJECT`], next to which Claude
+    /// Code keeps that session's task outputs.
+    pub fn transcript_event(&self, name: &str, session: &str, fields: &[(&str, Value)]) -> Value {
+        let mut payload = self.event(name, session, fields);
+        payload["transcript_path"] = json!(format!(
+            "/home/verify/.claude/projects/{PROJECT}/{session}.jsonl"
+        ));
+        payload
     }
 
     /// Runs `payload` and asserts the hook exited 0: a hook that fails is the product's failure.

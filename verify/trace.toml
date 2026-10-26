@@ -99,6 +99,8 @@ machine_strip__should_update_in_place = 4
 machine_strip__should_follow_the_keyboard = 4
 heavy_editor__should_show_each_scope = 4
 heavy_editor__should_follow_the_keyboard = 4
+heavy_editor__should_match_answers_in_order = 4
+machine_strip__should_save_again_without_an_answer = 4
 count__should_follow_the_agent_lines = 4
 line_icons__should_match_each_state = 4
 job_settings__should_run_wtpool_once_each_and_report = 4
@@ -911,6 +913,7 @@ checks = [
 phase = 4
 checks = [
   "heavy_editor__should_show_each_scope",
+  "heavy_editor__should_match_answers_in_order",
   "heavy_editor__should_clip_nothing_in_every_theme",
   "flow__jobs_edit_patterns",
 ]
@@ -943,6 +946,7 @@ checks = [
 phase = 4
 checks = [
   "job_settings__should_run_wtpool_once_each_and_report",
+  "machine_strip__should_save_again_without_an_answer",
   "flow__jobs_change_settings",
   "flow__jobs_edit_patterns",
   "flow__jobs_wtpool_missing",

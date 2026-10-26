@@ -1,12 +1,12 @@
-//! [`SystemProcesses`] and [`host_name`]: the system's process table and the machine's name, read
-//! through the `sysinfo` crate, as each platform's own interface tells them.
+//! [`SystemProcesses`]: the system's process table, read through the `sysinfo` crate.
 
 use std::path::{Path, PathBuf};
 
 use sysinfo::{Pid, Process, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
+use super::{ListProcesses, ProcessQuery, RunningProcess, StartTime};
 use crate::clock::Timestamp;
-use crate::processes::{ListProcesses, ProcessQuery, RunningProcess, StartTime};
+use crate::platform::machine::parent_pid;
 
 /// The system's process table.
 #[derive(Debug, Clone, Copy, Default)]
@@ -59,12 +59,6 @@ impl ListProcesses for SystemProcesses {
     }
 }
 
-/// The machine's host name, `None` when the system does not tell it.
-#[must_use]
-pub fn host_name() -> Option<String> {
-    System::host_name()
-}
-
 /// `process` with the facts `query` asks for.
 fn running(process: &Process, query: &ProcessQuery<'_>) -> RunningProcess {
     let started = i64::try_from(process.start_time())
@@ -95,20 +89,6 @@ fn running(process: &Process, query: &ProcessQuery<'_>) -> RunningProcess {
             Vec::new()
         },
     }
-}
-
-/// The pid of this process's parent, from the system without reading its table.
-#[cfg(unix)]
-fn parent_pid() -> Option<u32> {
-    Some(std::os::unix::process::parent_id())
-}
-
-/// The pid of this process's parent, from the process table.
-#[cfg(not(unix))]
-fn parent_pid() -> Option<u32> {
-    let pids = [std::process::id()];
-    let listed = SystemProcesses.list(&ProcessQuery::only(&pids).with_parent());
-    listed.first()?.parent
 }
 
 #[cfg(test)]
@@ -175,18 +155,5 @@ mod tests {
         assert!(listed.iter().all(|process| process.name.is_empty()));
         assert!(none.is_empty());
         assert_eq!((this.started, this.pid), (None, std::process::id()));
-    }
-
-    #[test]
-    fn host_name__should_be_the_host_name() {
-        // Given
-        let output = std::process::Command::new("hostname").output().unwrap();
-        let host = String::from_utf8(output.stdout).unwrap();
-
-        // When
-        let name = host_name();
-
-        // Then
-        assert_eq!(name.as_deref(), Some(host.trim()));
     }
 }

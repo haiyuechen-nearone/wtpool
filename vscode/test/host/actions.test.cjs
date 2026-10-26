@@ -5,10 +5,11 @@ const fs = require('node:fs');
 const vscode = require('vscode');
 
 const {
-  control,
+  expectedDocuments,
   openStatus,
   resetFake,
-  scenarioDocuments,
+  show,
+  showingAfterIdle,
   sleep,
   starts,
   verifyApi,
@@ -27,7 +28,7 @@ let generation = 0;
 
 /** idle_pool's last document, wt2 (a slot on feature-a) holding `actors`, with a new time. */
 function poolWith(actors, activity) {
-  const doc = structuredClone(scenarioDocuments('idle_pool').at(-1));
+  const doc = structuredClone(expectedDocuments('idle_pool').at(-1));
   generation += 1;
   doc.generated = new Date(Date.parse(doc.generated) + generation * 1000).toISOString().replace('.000Z', 'Z');
   const wt2 = doc.pools[0].worktrees.find((w) => w.path === WT2);
@@ -53,27 +54,6 @@ function actor(key, state, extra = {}) {
     updated: '2026-10-20T11:59:30Z',
     ...extra,
   };
-}
-
-/** Opens the tab on idle_pool, then shows `doc` and waits until the webview got it. */
-async function showing(doc, config = {}) {
-  await resetFake({ scenario: 'idle_pool', aliveMs: 0, ...config });
-  // Earlier checks posted idle_pool too, so only views of this tab count.
-  const from = (await views()).length;
-  await openStatus();
-  const last = scenarioDocuments('idle_pool').at(-1);
-  const first = await waitFor(async () => (await views()).slice(from).some((v) => JSON.stringify(v.status) === JSON.stringify(last)), 10_000);
-  assert.ok(first, 'setup: idle_pool never reached the webview');
-  // The fake follows its control file once it printed the scenario.
-  await sleep(300);
-  await show(doc);
-}
-
-async function show(doc) {
-  const from = (await views()).length;
-  control(`emit ${JSON.stringify(doc)}`);
-  const shown = await waitFor(async () => (await views()).slice(from).some((v) => JSON.stringify(v.status) === JSON.stringify(doc)), 10_000);
-  assert.ok(shown, 'setup: the document never reached the webview');
 }
 
 /** The items a dialog call offers, after its message and options. */
@@ -137,7 +117,7 @@ describe('actions', () => {
   ]) {
     it(`actions__should_confirm_naming_the_worktree ${verb}_confirmed`, async () => {
       // Given
-      await showing(poolWith([]));
+      await showingAfterIdle(poolWith([]));
       const shown = dialogs((call) => (call.modal ? confirmItem(call.args) : undefined));
 
       // When
@@ -161,7 +141,7 @@ describe('actions', () => {
 
     it(`actions__should_confirm_naming_the_worktree ${verb}_cancelled`, async () => {
       // Given
-      await showing(poolWith([]));
+      await showingAfterIdle(poolWith([]));
       const shown = dialogs(() => undefined);
 
       // When
@@ -186,7 +166,7 @@ describe('actions', () => {
   ]) {
     it(`actions__should_confirm_naming_the_worktree ${verb}_fails`, async () => {
       // Given
-      await showing(poolWith([]), { actionExit: 1, actionStderr: STDERR });
+      await showingAfterIdle(poolWith([]), { actionExit: 1, actionStderr: STDERR });
       const shown = dialogs((call) => (call.modal ? confirmItem(call.args) : undefined));
 
       // When
@@ -217,7 +197,7 @@ describe('actions', () => {
   ]) {
     it(`actions__should_confirm_naming_the_worktree ${verb}_spawn_throws`, async () => {
       // Given
-      await showing(poolWith([]));
+      await showingAfterIdle(poolWith([]));
       const configuration = vscode.workspace.getConfiguration('wtpool');
       const previous = configuration.inspect('path').globalValue;
       const broken = `${process.env.WTPOOL_VERIFY_HOST_FAKES ?? '/nonexistent'}/wtpool\u0000nul`;
@@ -260,7 +240,7 @@ describe('actions', () => {
     for (const [change, apply] of Object.entries(changes)) {
       it(`actions__should_confirm_naming_the_worktree ${verb}_${change}_while_asked`, async () => {
         // Given
-        await showing(poolWith([]));
+        await showingAfterIdle(poolWith([]));
         let confirm;
         const held = new Promise((resolve) => {
           confirm = resolve;
@@ -325,7 +305,7 @@ describe('actions', () => {
       it(titles.refuse(name), async () => {
         // Given
         const doc = poolWith(actors(), actors().some((a) => a.state === 'waiting') ? 'waiting' : 'working');
-        await showing(doc);
+        await showingAfterIdle(doc);
         // The user takes the first way ahead in every dialog.
         const shown = dialogs((call) => confirmItem(call.args));
 
@@ -347,7 +327,7 @@ describe('actions', () => {
 
     it(titles.refuse('working_by_the_confirm'), async () => {
       // Given
-      await showing(poolWith([actor('s1', 'idle')], 'idle'));
+      await showingAfterIdle(poolWith([actor('s1', 'idle')], 'idle'));
       let confirm;
       const held = new Promise((resolve) => {
         confirm = resolve;
@@ -385,7 +365,7 @@ describe('actions', () => {
     for (const [name, { actors, activity, word }] of Object.entries(warnings)) {
       it(titles.warn(name), async () => {
         // Given
-        await showing(poolWith(actors(), activity));
+        await showingAfterIdle(poolWith(actors(), activity));
         const shown = dialogs((call) => (call.modal ? confirmItem(call.args) : undefined));
 
         // When
@@ -411,7 +391,7 @@ describe('actions', () => {
 
     it(titles.warn('no_actor_no_idle_warning'), async () => {
       // Given
-      await showing(poolWith([]));
+      await showingAfterIdle(poolWith([]));
       const shown = dialogs(() => undefined);
 
       // When
@@ -448,14 +428,16 @@ describe('workspace folder', () => {
       return found;
     };
 
-    // When: the watch, then free and fg confirmed.
+    // When
+
+    // The watch, then free and fg confirmed.
     await resetFake({ scenario: 'idle_pool', aliveMs: 0 });
     await openStatus();
     const watch = await waitFor(() => starts()[0], 10_000);
     assert.ok(watch, 'wtpool status --watch did not start');
     assert.deepEqual(wrong(watch), [], 'the watch');
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-    await showing(poolWith([]));
+    await showingAfterIdle(poolWith([]));
     const shown = dialogs((call) => (call.modal ? confirmItem(call.args) : undefined));
     try {
       for (const verb of ['free', 'fg']) {

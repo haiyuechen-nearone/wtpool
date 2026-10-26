@@ -4,23 +4,24 @@
 use std::ffi::{OsStr, OsString};
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::process::{Command, ExitStatus};
-use std::time::{Duration, Instant};
+use std::process::Command;
+use std::time::Duration;
 
 use super::config::{Limit, MachineConfig};
-use super::folder::{JobFolder, Liveness};
+use super::folder::JobFolder;
+use super::heavy_table::MAX_ANCESTORS;
 use super::queue::{Place, Standing, Turn};
-use super::record::{JobId, JobRecord, JobState, RECORD_VERSION};
+use super::record::{JobDraft, JobId};
 use super::{JOB_VARIABLE, JobError, JobPaths};
 use crate::clock::ReadClock;
 use crate::heavy::{CommandWords, HeavyList};
 use crate::hook::bash;
 use crate::hook::text::{MAX_LABEL, MAX_TEXT, clean};
-use crate::platform::signals::{JobSignals, end_by, exit_code_like};
+use crate::platform::signals::{Ending, JobSignals, end_by, end_by_number, ending};
 use crate::processes::{ListProcesses, ProcessQuery};
 use crate::settings::RepositoryPatterns;
 
-/// How often the first job in line checks for its turn, and how often the others do.
+/// The pause between checks for its turn of the first job in line, and of the others.
 const FIRST_IN_LINE_CHECK: Duration = Duration::from_millis(250);
 const IN_LINE_CHECK: Duration = Duration::from_secs(1);
 
@@ -28,7 +29,7 @@ const IN_LINE_CHECK: Duration = Duration::from_secs(1);
 const NOT_FOUND: u8 = 127;
 const NOT_RUNNABLE: u8 = 126;
 
-/// The command a job runs, and how it shows.
+/// The command a job runs, with its label and its notes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JobCommand {
     pub program: OsString,
@@ -38,8 +39,9 @@ pub struct JobCommand {
     pub quiet: bool,
 }
 
-/// What a job reads besides its command.
-pub struct JobContext<'a> {
+/// The folders, settings and ports a job reads besides its command, with the clock `C` and the
+/// process table `P`.
+pub struct JobContext<'a, C, P> {
     pub paths: JobPaths,
     /// The cores the default limit is a quarter of.
     pub cores: usize,
@@ -48,35 +50,29 @@ pub struct JobContext<'a> {
     pub cwd: PathBuf,
     /// The heavy patterns of the repository the job runs in, beside the machine's.
     pub repository: &'a RepositoryPatterns,
-    pub clock: &'a dyn ReadClock,
-    /// The table that tells when this process started.
-    pub processes: &'a dyn ListProcesses,
+    pub clock: &'a C,
+    /// The table that tells when this process started, and its ancestors.
+    pub processes: &'a P,
 }
 
 /// Runs `command` once its turn comes, with `notes` for the lines on waiting, and returns the
 /// exit code to end with: the command's, 127 when it is not found, 126 when it cannot start
-/// otherwise. A command that a signal ended ends this process by the same signal before this
-/// returns, as [`exit_code_like`] says. An error comes before the command runs, and the queue
+/// otherwise. A command that a signal ended ends this process by the same signal once the job
+/// left the queue, as [`ending`] says. An error comes before the command runs, and the queue
 /// keeps nothing of the job then.
-pub fn run_job(
+pub fn run_job<C: ReadClock, P: ListProcesses>(
     command: &JobCommand,
-    context: &JobContext<'_>,
+    context: &JobContext<'_, C, P>,
     notes: &mut dyn Write,
 ) -> Result<u8, JobError> {
     let config = MachineConfig::read(&context.paths.config, context.cores)?;
     let folder = JobFolder::create(context.paths.folder.clone())?;
     let signals = JobSignals::catch().map_err(JobError::Signals)?;
-    let inside_live_job = context
-        .parent
-        .as_deref()
-        .and_then(OsStr::to_str)
-        .and_then(JobId::parse)
-        .is_some_and(|parent| folder.liveness(&parent) == Liveness::Live);
-    if inside_live_job {
-        return Ok(spawn_and_wait(command, None, &signals, notes).exit_code());
+    if inside_live_job(&folder, context.parent.as_deref(), context.processes) {
+        return Ok(end_as(spawn_and_wait(command, None, &signals, notes)));
     }
-    let record = new_record(command, context, &config);
-    let (place, turn) = Place::join(folder, record, config.limit, context.clock.now())?;
+    let draft = draft(command, context, &config);
+    let (place, turn) = Place::join(folder, draft, config.limit, context.clock.now())?;
     let place = match turn {
         Turn::Run => place,
         Turn::Wait(standing) => {
@@ -84,41 +80,63 @@ pub fn run_job(
             wait_for_turn(place, standing, command, context, limit, &signals, notes)?
         }
     };
-    let ended = spawn_and_wait(command, Some(place.id()), &signals, notes);
+    let ending = spawn_and_wait(command, Some(place.id()), &signals, notes);
     place.leave();
-    Ok(ended.exit_code())
+    Ok(end_as(ending))
 }
 
-/// How a job's command ended.
-enum Ended {
-    Exited(ExitStatus),
-    NotRun(u8),
+/// `true` when `job`, a value of [`JOB_VARIABLE`], names a live job of `folder` whose process is
+/// an ancestor of this one in `processes`. Job ids are public, so a live id alone proves nothing.
+#[must_use]
+pub fn inside_live_job(
+    folder: &JobFolder,
+    job: Option<&OsStr>,
+    processes: &impl ListProcesses,
+) -> bool {
+    job.and_then(OsStr::to_str)
+        .and_then(JobId::parse)
+        .and_then(|id| folder.live_record(&id))
+        .is_some_and(|record| is_ancestor(record.pid, processes))
 }
 
-impl Ended {
-    /// The exit code a job ends with, after which only its exit is left: a command a signal
-    /// ended ends this process by that signal here.
-    fn exit_code(self) -> u8 {
-        match self {
-            Self::Exited(status) => exit_code_like(status),
-            Self::NotRun(code) => code,
-        }
+/// `true` when the process `pid` is the parent of this process, or a parent's parent and so on.
+fn is_ancestor(pid: u32, processes: &impl ListProcesses) -> bool {
+    let parent_of = |child: &u32| {
+        let pids = [*child];
+        processes
+            .list(&ProcessQuery::only(&pids).with_parent())
+            .into_iter()
+            .find(|process| process.pid == *child)?
+            .parent
+    };
+    let parent = processes.this_process().and_then(|this| this.parent);
+    std::iter::successors(parent, parent_of)
+        .take(MAX_ANCESTORS)
+        .any(|ancestor| ancestor == pid)
+}
+
+/// The exit code of a job that ended as `ending` says, else, for an ending by a signal, no
+/// return: this process ends by that signal, so nothing may be left to undo.
+fn end_as(ending: Ending) -> u8 {
+    match ending {
+        Ending::Code(code) => code,
+        Ending::Signal(signal) => end_by_number(signal),
     }
 }
 
 /// Waits until `place`'s turn comes, checking at the pace of its standing and reading the limit
-/// again for each check; a limit that cannot be read keeps the last one. A caught signal
+/// again for each check. A limit that cannot be read keeps the last one. A caught signal
 /// leaves the queue and ends this process by it.
-fn wait_for_turn(
+fn wait_for_turn<C: ReadClock, P>(
     mut place: Place,
     mut standing: Standing,
     command: &JobCommand,
-    context: &JobContext<'_>,
+    context: &JobContext<'_, C, P>,
     mut limit: Limit,
     signals: &JobSignals,
     notes: &mut dyn Write,
 ) -> Result<Place, JobError> {
-    let waited = Instant::now();
+    let queued = context.clock.system_micros();
     if !command.quiet {
         let _ = writeln!(
             notes,
@@ -148,10 +166,17 @@ fn wait_for_turn(
         let _ = writeln!(
             notes,
             "wtpool job: started after {}",
-            waited_text(waited.elapsed())
+            waited_text(micros_since(queued, context.clock))
         );
     }
     Ok(place)
+}
+
+/// The time from `earlier` until now, both in [`ReadClock::system_micros`], zero should the
+/// clock go back.
+fn micros_since(earlier: i64, clock: &impl ReadClock) -> Duration {
+    let elapsed = clock.system_micros().saturating_sub(earlier);
+    Duration::from_micros(u64::try_from(elapsed).unwrap_or(0))
 }
 
 /// Runs `command` with [`JOB_VARIABLE`] set to `id`, or as inherited when `id` is `None`, and
@@ -161,7 +186,7 @@ fn spawn_and_wait(
     id: Option<&JobId>,
     signals: &JobSignals,
     notes: &mut dyn Write,
-) -> Ended {
+) -> Ending {
     let mut process = Command::new(&command.program);
     process.args(&command.args);
     if let Some(id) = id {
@@ -175,7 +200,7 @@ fn spawn_and_wait(
                 "wtpool job: cannot run {}: {error}",
                 command.program.to_string_lossy()
             );
-            return Ended::NotRun(if error.kind() == io::ErrorKind::NotFound {
+            return Ending::Code(if error.kind() == io::ErrorKind::NotFound {
                 NOT_FOUND
             } else {
                 NOT_RUNNABLE
@@ -183,17 +208,24 @@ fn spawn_and_wait(
         }
     };
     signals.hand_on_to(child.id());
-    match child.wait() {
-        Ok(status) => Ended::Exited(status),
+    let waited = child.wait();
+    // The reaped pid may soon name another process. Pid 0 hands a signal on to none.
+    signals.hand_on_to(0);
+    match waited {
+        Ok(status) => ending(status),
         Err(error) => {
             let _ = writeln!(notes, "wtpool job: lost the command: {error}");
-            Ended::NotRun(NOT_RUNNABLE)
+            Ending::Code(NOT_RUNNABLE)
         }
     }
 }
 
 /// The record of the job of this process before it queues.
-fn new_record(command: &JobCommand, context: &JobContext<'_>, config: &MachineConfig) -> JobRecord {
+fn draft<C, P: ListProcesses>(
+    command: &JobCommand,
+    context: &JobContext<'_, C, P>,
+    config: &MachineConfig,
+) -> JobDraft {
     let pid = std::process::id();
     let started = context
         .processes
@@ -201,9 +233,7 @@ fn new_record(command: &JobCommand, context: &JobContext<'_>, config: &MachineCo
         .first()
         .and_then(|process| process.started)
         .map(|started| started.second());
-    let now = context.clock.now();
-    JobRecord {
-        version: RECORD_VERSION,
+    JobDraft {
         id: JobId::new(pid),
         pid,
         started,
@@ -221,10 +251,6 @@ fn new_record(command: &JobCommand, context: &JobContext<'_>, config: &MachineCo
             .map(|label| clean(label, MAX_LABEL))
             .filter(|label| !label.is_empty()),
         cwd: context.cwd.clone(),
-        ticket: 0,
-        state: JobState::Waiting,
-        queued: now,
-        since: now,
     }
 }
 

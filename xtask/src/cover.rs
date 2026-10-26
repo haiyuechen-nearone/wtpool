@@ -1,3 +1,6 @@
+//! `cover`: every line of product Rust and extension source changed since the base commit is hit
+//! in the coverage reports of the run.
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;

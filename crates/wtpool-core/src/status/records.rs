@@ -2,16 +2,18 @@
 
 use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
+use std::fmt;
 use std::fs::Metadata;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
-use super::outputs::{self, Task, TaskFields};
+use super::outputs::{self, RecordedTask, TaskFields};
 use super::record_time::RecordTime;
 pub use crate::activity::State as RecordState;
 use crate::activity::{
-    CallKind, Harness, PlacedBy, RECORD_VERSION, Stem, legacy_kind, read_record_file,
+    CallKind, Harness, PlacedBy, RECORD_VERSION, Stem, WaitReason, legacy_kind, read_record_file,
 };
 use crate::clock::Timestamp;
 use crate::platform::fs::{self, FileId};
@@ -36,7 +38,7 @@ struct Entry {
 /// The result of reading a record.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Content {
-    Record(Box<Record>),
+    Record(Box<ActorRecord>),
     /// An unknown version or a parse error, counted in `skipped_records`.
     Skipped,
     /// Not a regular file, too large, or unreadable.
@@ -46,9 +48,9 @@ enum Content {
 /// One actor's record: a session, `<session_id>.json`, or a subagent,
 /// `<session_id>.<agent_id>.json`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Record {
-    /// The file name without `.json`, the actor's key.
-    pub key: String,
+pub struct ActorRecord {
+    /// The file name without `.json`.
+    pub key: RecordKey,
     /// The harness whose hooks wrote the record, `claude-code` when it names none.
     pub harness: String,
     pub label: String,
@@ -57,9 +59,9 @@ pub struct Record {
     pub state: RecordState,
     pub waiting: Option<Waiting>,
     pub action: Option<ToolTarget>,
-    pub in_flight: Vec<Call>,
+    pub in_flight: Vec<RecordedCall>,
     /// The last call that ended.
-    pub ended: Option<Call>,
+    pub ended: Option<RecordedCall>,
     pub error: Option<String>,
     pub since: RecordTime,
     pub updated: RecordTime,
@@ -70,7 +72,14 @@ pub struct Record {
     /// A session's titles of its subagents by agent id, the newest last.
     pub subagents: Vec<SubagentTitle>,
     /// The background tasks the actor started.
-    pub tasks: Vec<Task>,
+    pub tasks: Vec<RecordedTask>,
+}
+
+/// The key of a record's actor: `<session>` for a session, `<session>.<agent>` for a subagent.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RecordKey {
+    stem: String,
+    session_len: usize,
 }
 
 /// The title of a subagent that its session's record keeps.
@@ -83,7 +92,8 @@ pub struct SubagentTitle {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default)]
 pub struct Waiting {
-    pub reason: Option<String>,
+    #[serde(deserialize_with = "wait_reason")]
+    pub reason: Option<WaitReason>,
     pub tool: Option<String>,
     pub target: Option<String>,
 }
@@ -97,7 +107,7 @@ pub struct ToolTarget {
 
 /// A call, in flight or ended, by its kind. `wtpool status` reads the kind, never the tool.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Call {
+pub struct RecordedCall {
     pub id: String,
     pub kind: CallKind,
 }
@@ -161,6 +171,55 @@ struct ProcessFields {
     started: Option<String>,
 }
 
+impl RecordKey {
+    /// The key of the record whose file stem is `stem`, when it is a record [`Stem`].
+    #[must_use]
+    pub fn parse(stem: &str) -> Option<Self> {
+        let session_len = Stem::parse(stem)?.head.len();
+        Some(Self {
+            stem: stem.to_owned(),
+            session_len,
+        })
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.stem
+    }
+
+    /// The key of the actor's session, the whole key for a session.
+    #[must_use]
+    pub fn session(&self) -> &str {
+        &self.stem[..self.session_len]
+    }
+
+    /// `true` for the key of a subagent.
+    #[must_use]
+    pub fn is_subagent(&self) -> bool {
+        self.agent().is_some()
+    }
+
+    /// The subagent's id, `None` for a session.
+    #[must_use]
+    pub fn agent(&self) -> Option<&str> {
+        self.stem.get(self.session_len + 1..)
+    }
+}
+
+impl Deref for RecordKey {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.stem
+    }
+}
+
+impl fmt::Display for RecordKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.stem)
+    }
+}
+
 impl Records {
     #[must_use]
     pub fn new(dir: PathBuf) -> Self {
@@ -215,7 +274,7 @@ impl Records {
 
     /// The records that count: the newest [`MAX_RECORDS`] by modification time, and older ones
     /// that `live` accepts.
-    pub fn counted(&self, live: impl Fn(&Record) -> bool) -> Vec<&Record> {
+    pub fn counted(&self, live: impl Fn(&ActorRecord) -> bool) -> Vec<&ActorRecord> {
         self.newest_first()
             .into_iter()
             .enumerate()
@@ -240,7 +299,7 @@ impl Records {
 
     /// The record of the actor `key`, if read.
     #[must_use]
-    pub fn get(&self, key: &str) -> Option<&Record> {
+    pub fn get(&self, key: &str) -> Option<&ActorRecord> {
         self.entries
             .get(OsStr::new(&format!("{key}.json")))?
             .record()
@@ -268,7 +327,7 @@ impl Records {
 }
 
 impl Entry {
-    fn record(&self) -> Option<&Record> {
+    fn record(&self) -> Option<&ActorRecord> {
         match &self.content {
             Content::Record(record) => Some(record),
             Content::Skipped | Content::Ignored => None,
@@ -276,7 +335,7 @@ impl Entry {
     }
 }
 
-fn ended_an_edit(old: Option<&Record>, new: &Record) -> bool {
+fn ended_an_edit(old: Option<&ActorRecord>, new: &ActorRecord) -> bool {
     new.ended.as_ref().is_some_and(|ended| {
         ended.kind.edits_files()
             && old
@@ -305,20 +364,18 @@ fn read_record(path: &Path) -> Content {
     let Some(bytes) = read_record_file(path) else {
         return Content::Ignored;
     };
-    let key = path
-        .file_stem()
-        .map(|stem| stem.to_string_lossy().into_owned())
-        .unwrap_or_default();
+    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
     serde_json::from_slice::<RecordFields>(&bytes)
         .ok()
-        .and_then(|fields| record_of(key, fields))
+        .and_then(|fields| record_of(&stem, fields))
         .map_or(Content::Skipped, |record| Content::Record(Box::new(record)))
 }
 
-fn record_of(key: String, fields: RecordFields) -> Option<Record> {
+fn record_of(stem: &str, fields: RecordFields) -> Option<ActorRecord> {
     if fields.version != u64::from(RECORD_VERSION) {
         return None;
     }
+    let key = RecordKey::parse(stem)?;
     let updated = RecordTime::parse(&fields.updated)?;
     let since = match fields.since {
         Some(since) => RecordTime::parse(&since)?,
@@ -329,7 +386,7 @@ fn record_of(key: String, fields: RecordFields) -> Option<Record> {
         .filter(|name| !name.is_empty())
         .unwrap_or_else(|| Harness::default().to_string());
     let call = |call: CallFields| call_of(&harness, call);
-    Some(Record {
+    Some(ActorRecord {
         in_flight: fields.in_flight.into_iter().map(call).collect(),
         ended: fields.ended.map(call),
         harness: harness.clone(),
@@ -355,13 +412,26 @@ fn record_of(key: String, fields: RecordFields) -> Option<Record> {
 
 /// A call with its kind. One without, as an older wtpool wrote it, takes the kind
 /// [`legacy_kind`] gives its tool, or [`CallKind::Other`] for a harness this wtpool does not know.
-fn call_of(harness: &str, call: CallFields) -> Call {
+fn call_of(harness: &str, call: CallFields) -> RecordedCall {
     let kind = call.kind.unwrap_or_else(|| {
         harness
             .parse::<Harness>()
             .map_or(CallKind::Other, |harness| legacy_kind(harness, &call.tool))
     });
-    Call { id: call.id, kind }
+    RecordedCall { id: call.id, kind }
+}
+
+/// A wait reason by its name. `plan approval` names [`WaitReason::Plan`] too, and an unknown
+/// name reads as none.
+fn wait_reason<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<WaitReason>, D::Error> {
+    let reason = Option::<String>::deserialize(deserializer)?;
+    Ok(match reason.as_deref() {
+        Some("permission") => Some(WaitReason::Permission),
+        Some("question") => Some(WaitReason::Question),
+        Some("plan" | "plan approval") => Some(WaitReason::Plan),
+        Some("input") => Some(WaitReason::Input),
+        _ => None,
+    })
 }
 
 #[cfg(test)]

@@ -24,7 +24,7 @@ fn running(id: &str, summary: &str, started: i64) -> Value {
 }
 
 /// `record` with the action `Read f.txt` and `tasks`.
-fn with_tasks(mut record: Record, tasks: &[Value]) -> Record {
+fn with_tasks(mut record: ActorRecord, tasks: &[Value]) -> ActorRecord {
     record.action = Some(tool_target("Read", "f.txt"));
     record.tasks = outputs::tasks(serde_json::from_value(Value::from(tasks.to_vec())).unwrap());
     record
@@ -33,7 +33,7 @@ fn with_tasks(mut record: Record, tasks: &[Value]) -> Record {
 /// The state and action `subject` shows `after` seconds, while `cargo` runs below the claude
 /// process when `build`.
 fn shown(
-    subject: &Record,
+    subject: &ActorRecord,
     after: i64,
     build: bool,
 ) -> (Option<ActorState>, Option<(String, String)>) {
@@ -159,7 +159,7 @@ fn action(tool: &str, target: &str) -> Option<(String, String)> {
     None
 )]
 fn actor__should_work_while_a_background_task_runs(
-    #[case] subject: Record,
+    #[case] subject: ActorRecord,
     #[case] after: i64,
     #[case] build: bool,
     #[case] state: Option<ActorState>,

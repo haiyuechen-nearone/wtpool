@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 
 import { ago, actor, document, git, mustValidate, worktree } from '../support/docs.mjs';
-import { withoutRunTime } from '../support/grammar.mjs';
+import { clock, withoutRunTime } from '../support/grammar.mjs';
 import { mount, rowById, text } from '../support/webview.mjs';
 
 let webview;
@@ -10,13 +10,6 @@ afterEach(() => {
   webview?.close();
   webview = undefined;
 });
-
-/** The local `HH:MM` of an RFC 3339 time, as the strip shows `since`. */
-function clock(time) {
-  const date = new Date(time);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
 
 const TASK = '/private/tmp/claude-501/-Users-verify-pool/s1/tasks/b1.output';
 

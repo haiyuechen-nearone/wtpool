@@ -1,18 +1,20 @@
-//! The process port, [`ListProcesses`]: the hook (H19, H21) and `wtpool status` (S4, A1) read
-//! the process table through it alone, the system's, or in a `verify` build a file of JSON lines
+//! The process port, [`ListProcesses`]: the hook and `wtpool status` read the process table
+//! through it alone, the system's, or in a `verify` build a file of JSON lines
 //! (`WTPOOL_VERIFY_PROCS`). [`Liveness`] names the two rules for counting the process a record
 //! names as running.
 
 mod file;
 mod liveness;
+mod system;
 
 use std::path::PathBuf;
 
 pub use file::ProcessFile;
 pub use liveness::{Liveness, RecordedProcess};
+pub use system::SystemProcesses;
 
 use crate::clock::Timestamp;
-pub use crate::platform::processes::{SystemProcesses, host_name};
+pub use crate::platform::machine::host_name;
 
 /// Lists the processes that run now.
 pub trait ListProcesses: Send + Sync {
@@ -20,7 +22,7 @@ pub trait ListProcesses: Send + Sync {
     fn list(&self, query: &ProcessQuery<'_>) -> Vec<RunningProcess>;
 
     /// This process with its parent, and with its start only where the table tells it to the
-    /// microsecond (H24). `None` when the table does not list it.
+    /// microsecond. `None` when the table does not list it.
     fn this_process(&self) -> Option<RunningProcess> {
         let pids = [std::process::id()];
         let query = ProcessQuery::only(&pids).with_parent().with_started();

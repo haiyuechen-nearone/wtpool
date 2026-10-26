@@ -3,17 +3,15 @@
 
 use std::path::Path;
 
-use crate::hook::bash::{is_assignment, program_start, simple_commands};
 use crate::platform::shell::program_key;
+use crate::shell::{SHELLS, program_start, simple_commands};
 
 /// The words a command is named by besides its program.
 const MAX_ARGUMENT_WORDS: usize = 2;
 
-/// Programs that run a script named by their first argument that is no option, so that script
-/// names the process.
-const INTERPRETERS: [&str; 8] = [
-    "node", "python", "python3", "ruby", "perl", "sh", "bash", "zsh",
-];
+/// Programs besides the [`SHELLS`] that run a script named by their first argument that is no
+/// option, so that script names the process.
+const INTERPRETERS: [&str; 5] = ["node", "python", "python3", "ruby", "perl"];
 
 /// A command's program, as the system compares program names, then its next arguments that start
 /// with neither `-` nor `+`, at most two.
@@ -26,15 +24,16 @@ pub struct ShellCommand {
     pub words: CommandWords,
     /// `wtpool job … --` runs it.
     pub wrapped: bool,
-    /// The byte offset in the command line of its first word that is no `VAR=value`: where
-    /// `wtpool job -- ` would go to wrap it.
+    /// The byte offset in the command line where `wtpool job -- ` would go to wrap it: its first
+    /// word after the reserved words, assignments and shell builtins that lead it.
     pub wrap_at: usize,
 }
 
 impl CommandWords {
     /// The words of the command whose arguments are `args`, the program first, after the
-    /// prefixes a shell user puts before a program: `VAR=value`, `env`, `timeout N`, `time`,
-    /// `nice`, `nix develop … -c` and `wtpool job … --`.
+    /// reserved words and prefixes a shell user puts before a program: `VAR=value`, `env`,
+    /// `timeout N`, `time`, `nice`, `exec`, `command`, `nix develop … -c`, `wtpool job … --`
+    /// and the like.
     #[must_use]
     pub fn of_command(args: &[String]) -> Self {
         let start = program_start(args).at;
@@ -60,7 +59,8 @@ impl CommandWords {
             return Self(vec![program_key(&file_name(name))]);
         }
         let interpreter = args.first().is_some_and(|program| {
-            INTERPRETERS.contains(&program_key(&file_name(program)).as_str())
+            let program = program_key(&file_name(program));
+            INTERPRETERS.contains(&program.as_str()) || SHELLS.contains(&program.as_str())
         });
         if interpreter {
             let script = args
@@ -112,15 +112,14 @@ pub fn shell_commands(command: &str) -> Option<Vec<ShellCommand>> {
     let commands = simple_commands(command)?
         .into_iter()
         .map(|words| {
-            let wrap_at = words
-                .iter()
-                .find(|word| !is_assignment(&word.text))
-                .map_or(command.len(), |word| word.start);
-            let texts: Vec<String> = words.into_iter().map(|word| word.text).collect();
+            let texts: Vec<String> = words.iter().map(|word| word.text.clone()).collect();
+            let start = program_start(&texts);
             ShellCommand {
-                wrapped: program_start(&texts).wrapped,
-                words: CommandWords::of_command(&texts),
-                wrap_at,
+                wrapped: start.wrapped,
+                words: CommandWords::of_program(texts.get(start.at..).unwrap_or_default()),
+                wrap_at: words
+                    .get(start.wrap_at)
+                    .map_or(command.len(), |word| word.start),
             }
         })
         .filter(|command| !command.words.words().is_empty())
@@ -166,6 +165,13 @@ mod tests {
     #[case::wrapped(&["wtpool", "job", "--label", "x", "--", "npm", "ci"], &["npm", "ci"])]
     #[case::wtpool_job_without_dashes(&["wtpool", "job", "ls"], &["wtpool", "job", "ls"])]
     #[case::assignments_alone(&["A=1"], &[])]
+    #[case::gtimeout(&["gtimeout", "--signal", "KILL", "60", "cargo", "test"], &["cargo", "test"])]
+    #[case::reserved_word(&["then", "cargo", "test"], &["cargo", "test"])]
+    #[case::negation(&["!", "make"], &["make"])]
+    #[case::exec(&["exec", "make"], &["make"])]
+    #[case::command(&["command", "make"], &["make"])]
+    #[case::command_lookup(&["command", "-v", "make"], &["command", "make"])]
+    #[case::builtin(&["builtin", "make"], &["make"])]
     fn command_words_of_command__should_skip_prefixes_and_options(
         #[case] args: &[&str],
         #[case] expected: &[&str],
@@ -184,6 +190,7 @@ mod tests {
     #[case::node_script("node", &["node", "x/vite.js", "build"], &["vite", "build"])]
     #[case::node_option_first("node", &["node", "--max-old-space-size=4096", "x/vite.js", "build"], &["vite", "build"])]
     #[case::shell_script("bash", &["bash", "./scripts/build.sh"], &["build"])]
+    #[case::dash_script("dash", &["dash", "./scripts/build.sh"], &["build"])]
     #[case::interpreter_alone("node", &["node", "--inspect"], &["node"])]
     #[case::no_arguments("node", &[], &["node"])]
     #[case::a_path_with_a_space("cargo", &["/opt/my tools/cargo", "build"], &["cargo", "build"])]
@@ -233,6 +240,38 @@ mod tests {
                 (owned(&["cargo", "test"]), true, &line[17..]),
                 (owned(&["echo", "cargo test"]), false, &line[43..]),
                 (owned(&["make"]), false, "make -j8"),
+            ]
+        );
+    }
+
+    #[test]
+    fn shell_commands__should_wrap_after_reserved_words_and_builtins() {
+        // Given
+        let line = "if true; then make; fi; for i in 1; do cargo test; done; exec make; ! make";
+
+        // When
+        let commands = shell_commands(line).unwrap();
+
+        // Then
+        let found: Vec<(Vec<String>, &str)> = commands
+            .iter()
+            .map(|command| {
+                let rest = line.get(command.wrap_at..).unwrap_or_default();
+                (command.words.words().to_vec(), rest)
+            })
+            .collect();
+        let tail = |from: &str| line.get(line.find(from).unwrap()..).unwrap();
+        assert_eq!(
+            found,
+            vec![
+                (owned(&["true"]), tail("true;")),
+                (owned(&["make"]), tail("make; fi")),
+                (owned(&["fi"]), tail("fi;")),
+                (owned(&["for", "i", "in"]), tail("for")),
+                (owned(&["cargo", "test"]), tail("cargo")),
+                (owned(&["done"]), tail("done")),
+                (owned(&["make"]), tail("make; !")),
+                (owned(&["make"]), "make"),
             ]
         );
     }

@@ -1,20 +1,47 @@
 import type { Piece } from './text';
 
+/** Makes a span of the class `className`. */
 export function span(className: string): HTMLSpanElement {
   const element = document.createElement('span');
   element.className = className;
   return element;
 }
 
+/** Makes a div of the class `className`. */
 export function div(className: string): HTMLDivElement {
   const element = document.createElement('div');
   element.className = className;
   return element;
 }
 
+/** Makes a table cell of the class `className`. */
 export function cell(className: string): HTMLTableCellElement {
   const element = document.createElement('td');
   element.className = className;
+  return element;
+}
+
+/** Makes a paragraph of the class `className`. */
+export function paragraph(className: string): HTMLParagraphElement {
+  const element = document.createElement('p');
+  element.className = className;
+  return element;
+}
+
+/** Makes a button that submits no form, of the class `className`, holding `text`. */
+export function button(className: string, text = ''): HTMLButtonElement {
+  const element = document.createElement('button');
+  element.type = 'button';
+  element.className = className;
+  element.textContent = text;
+  return element;
+}
+
+/** Makes the label `text` of the control whose id is `target`. */
+export function label(target: string, text: string): HTMLLabelElement {
+  const element = document.createElement('label');
+  element.htmlFor = target;
+  element.textContent = text;
   return element;
 }
 
@@ -29,6 +56,26 @@ export function bdi(text: string, className = ''): HTMLElement {
 /** Sets a node's text only when it differs, so an unchanged value makes no mutation. */
 export function setText(node: Node, text: string): void {
   if (node.textContent !== text) node.textContent = text;
+}
+
+/** Sets `text` on `element` and shows the element only while there is text. */
+export function setShownText(element: HTMLElement, text: string): void {
+  setText(element, text);
+  element.hidden = !text;
+}
+
+/** The attributes {@link setAttr} sets, each by a literal name, as the DOM sink lint reads only those. */
+const SETTERS = {
+  'aria-expanded': (element: Element, value: string) => void element.setAttribute('aria-expanded', value),
+  'aria-invalid': (element: Element, value: string) => void element.setAttribute('aria-invalid', value),
+  'aria-label': (element: Element, value: string) => void element.setAttribute('aria-label', value),
+  'data-machine': (element: Element, value: string) => void element.setAttribute('data-machine', value),
+  'data-pool': (element: Element, value: string) => void element.setAttribute('data-pool', value),
+};
+
+/** Sets an attribute only when it differs, so an unchanged value makes no mutation. */
+export function setAttr(element: Element, name: keyof typeof SETTERS, value: string): void {
+  if (element.getAttribute(name) !== value) SETTERS[name](element, value);
 }
 
 /** Makes a span that holds `text`. */
@@ -54,6 +101,7 @@ export function pieceNodes(pieces: Piece[]): Node[] {
   });
 }
 
+/** Makes a div of the class `className` that holds the nodes of `pieces`. */
 export function line(pieces: Piece[], className = 'line'): HTMLDivElement {
   const element = div(className);
   element.append(...pieceNodes(pieces));

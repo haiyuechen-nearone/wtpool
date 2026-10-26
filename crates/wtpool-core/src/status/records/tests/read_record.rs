@@ -4,7 +4,7 @@ use rstest::rstest;
 
 use super::*;
 
-fn record_in(content: &Content) -> Option<&Record> {
+fn record_in(content: &Content) -> Option<&ActorRecord> {
     match content {
         Content::Record(record) => Some(record),
         _ => None,
@@ -61,15 +61,15 @@ fn read_record__should_read_every_field() {
     let content = read_record(&dir.path().join("s1.a1.json"));
 
     // Then
-    let expected = Record {
-        key: "s1.a1".to_owned(),
+    let expected = ActorRecord {
+        key: RecordKey::parse("s1.a1").unwrap(),
         harness: "claude-code".to_owned(),
         label: "Explore".to_owned(),
         worktree: PathBuf::from("/p/wt2"),
         placed_by: PlacedBy::Path,
         state: RecordState::Waiting,
         waiting: Some(Waiting {
-            reason: Some("permission".to_owned()),
+            reason: Some(WaitReason::Permission),
             tool: Some("Bash".to_owned()),
             target: Some("git push".to_owned()),
         }),
@@ -77,11 +77,11 @@ fn read_record__should_read_every_field() {
             tool: "Bash".to_owned(),
             target: "git push".to_owned(),
         }),
-        in_flight: vec![Call {
+        in_flight: vec![RecordedCall {
             id: "t1".to_owned(),
             kind: CallKind::Shell,
         }],
-        ended: Some(Call {
+        ended: Some(RecordedCall {
             id: "t0".to_owned(),
             kind: CallKind::Other,
         }),
@@ -191,4 +191,65 @@ fn read_record__should_need_version_1_worktree_state_and_times(
         "{content:?}"
     );
     assert_eq!(content == Content::Skipped, !read, "{content:?}");
+}
+
+#[rstest]
+#[case::permission(r#""permission""#, Some(WaitReason::Permission))]
+#[case::question(r#""question""#, Some(WaitReason::Question))]
+#[case::plan(r#""plan""#, Some(WaitReason::Plan))]
+#[case::plan_approval(r#""plan approval""#, Some(WaitReason::Plan))]
+#[case::input(r#""input""#, Some(WaitReason::Input))]
+#[case::other(r#""elsewhere""#, None)]
+#[case::null("null", None)]
+fn waiting__should_read_each_reason_and_the_plan_approval_alias(
+    #[case] reason: &str,
+    #[case] expected: Option<WaitReason>,
+) {
+    // When
+    let waiting: Waiting =
+        serde_json::from_str(&format!(r#"{{"reason":{reason},"tool":"Bash"}}"#)).unwrap();
+
+    // Then
+    assert_eq!(waiting.reason, expected);
+    assert_eq!(waiting.tool.as_deref(), Some("Bash"));
+}
+
+#[test]
+fn waiting__should_refuse_a_reason_that_is_no_text() {
+    // When
+    let read = serde_json::from_str::<Waiting>(r#"{"reason":1}"#);
+
+    // Then
+    assert!(read.is_err());
+}
+
+#[rstest]
+#[case::session("s-1", "s-1", None)]
+#[case::subagent("s-1.a-2", "s-1", Some("a-2"))]
+fn record_key__should_split_the_session_and_the_agent(
+    #[case] stem: &str,
+    #[case] session: &str,
+    #[case] agent: Option<&str>,
+) {
+    // When
+    let key = RecordKey::parse(stem).unwrap();
+
+    // Then
+    assert_eq!(
+        (key.as_str(), key.session(), key.agent(), key.is_subagent()),
+        (stem, session, agent, agent.is_some())
+    );
+    assert_eq!(key.to_string(), stem);
+}
+
+#[rstest]
+#[case::three_parts("a.b.c")]
+#[case::empty_agent("s.")]
+#[case::underscore("s_1")]
+fn record_key__should_refuse_a_stem_of_no_record(#[case] stem: &str) {
+    // When
+    let key = RecordKey::parse(stem);
+
+    // Then
+    assert_eq!(key, None);
 }

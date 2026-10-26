@@ -115,7 +115,8 @@ a symlink: only the names of its `scripts`, never their commands. It runs nothin
 nothing for them.
 
 `wtpool hook policy` stores nothing. Under `require` its one line of output, a refusal, quotes the
-call's own command back to Claude Code, which sent it.
+call's own command back to Claude Code, which sent it. Under every policy it can also refuse a
+background wait loop in a repository, with a fixed text.
 
 ## What talks to the network
 

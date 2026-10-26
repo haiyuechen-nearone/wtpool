@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use super::record::Record;
-use super::store::Activity;
+use super::store::ActivityDir;
 use crate::activity::{Harness, PlacedBy, State};
 use crate::clock::Timestamp;
 
@@ -57,10 +57,10 @@ pub fn eventually(mut attempt: impl FnMut() -> bool) -> bool {
 }
 
 /// An empty `wtpool-activity/` in a temporary folder.
-pub fn must_activity() -> (tempfile::TempDir, Activity) {
+pub fn must_activity() -> (tempfile::TempDir, ActivityDir) {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("wtpool-activity")).unwrap();
-    let activity = Activity::open(dir.path()).unwrap();
+    let activity = ActivityDir::open(dir.path()).unwrap();
     (dir, activity)
 }
 

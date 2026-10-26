@@ -1,10 +1,11 @@
 //! The environment of a hook run, and the facts of its own process.
 
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 use super::log;
 use super::record::HarnessProcess;
-use crate::clock::{self, Clock};
+use crate::clock::{Clock, ReadClock};
 use crate::platform::dirs;
 use crate::processes::{ListProcesses, ProcessQuery, ProcessTable, StartTime};
 
@@ -33,20 +34,31 @@ pub struct Me {
 }
 
 impl HookEnv {
-    /// The environment of this process, the clock and process table read from the named
-    /// files when they are given.
+    /// [`Self::from_env`] of this process's environment.
     #[must_use]
     pub fn from_process(clock: Option<PathBuf>, processes: Option<PathBuf>) -> Self {
-        let home = dirs::home();
-        let state_home = std::env::var_os("XDG_STATE_HOME").map(PathBuf::from);
+        Self::from_env(clock, processes, |name| std::env::var_os(name))
+    }
+
+    /// The environment `var` reads, the clock and process table read from the named files when
+    /// they are given.
+    #[must_use]
+    pub fn from_env(
+        clock: Option<PathBuf>,
+        processes: Option<PathBuf>,
+        var: impl Fn(&str) -> Option<OsString>,
+    ) -> Self {
+        let home = dirs::home_folder(var("HOME"), std::env::home_dir);
+        let state_home = var("XDG_STATE_HOME").map(PathBuf::from);
+        let clock = Clock::from_file(clock);
         Self {
-            clock: Clock::from_file(clock),
             processes: ProcessTable::from_file(processes),
-            sandbox: std::env::var_os("WTPOOL_VERIFY_SANDBOX").is_some_and(|v| v == "1"),
+            sandbox: var("WTPOOL_VERIFY_SANDBOX").is_some_and(|v| v == "1"),
             log: log::log_dir(state_home.as_deref(), home.as_deref()),
             home,
-            tz: std::env::var("TZ").ok(),
-            entered_micros: clock::system_micros(),
+            tz: var("TZ").and_then(|tz| tz.into_string().ok()),
+            entered_micros: clock.system_micros(),
+            clock,
         }
     }
 
@@ -139,6 +151,29 @@ mod tests {
                 parent: None
             }
         );
+    }
+
+    #[test]
+    fn from_env__should_read_the_variables_it_is_given() {
+        // Given
+        let var = |name: &str| {
+            let value = match name {
+                "HOME" => "/h",
+                "TZ" => "Europe/Zurich",
+                "WTPOOL_VERIFY_SANDBOX" => "1",
+                _ => return None,
+            };
+            Some(OsString::from(value))
+        };
+
+        // When
+        let env = HookEnv::from_env(None, None, var);
+
+        // Then
+        assert_eq!(env.home, Some(PathBuf::from("/h")));
+        assert_eq!(env.tz.as_deref(), Some("Europe/Zurich"));
+        assert!(env.sandbox);
+        assert_eq!(env.log, Some(PathBuf::from("/h/.local/state/wtpool")));
     }
 
     #[test]

@@ -7,8 +7,8 @@ use std::path::Path;
 use super::builds::BuildBelow;
 use super::document::{Action, Actor, ActorKind, ActorState};
 use super::outputs;
-use super::records::{Record, RecordState};
-use crate::activity::{CallKind, WaitReason};
+use super::records::{ActorRecord, RecordState};
+use crate::activity::CallKind;
 use crate::clock::Timestamp;
 use crate::processes::{Liveness, RunningProcess};
 
@@ -39,7 +39,7 @@ pub struct Context<'a> {
     pub now: Timestamp,
     pub processes: &'a [RunningProcess],
     /// Every record that counts, for the subagents of a session.
-    pub records: &'a [&'a Record],
+    pub records: &'a [&'a ActorRecord],
     /// `true` when a build works in the worktree and no job of an actor other than the one
     /// keyed so holds it.
     pub building: &'a dyn Fn(&Path, &str) -> bool,
@@ -54,12 +54,12 @@ pub struct Context<'a> {
 
 /// The actor `record` shows as, `None` when it is hidden.
 #[must_use]
-pub fn actor(record: &Record, context: &Context<'_>) -> Option<Actor> {
+pub fn actor(record: &ActorRecord, context: &Context<'_>) -> Option<Actor> {
     let state = shown_state(record, context)?;
     let outputs = outputs::outputs(&record.tasks);
     let queued = context
         .jobs
-        .get(&record.key)
+        .get(record.key.as_str())
         .and_then(|job| job.waiting.as_deref())
         .filter(|_| state != ActorState::Waiting);
     let build = (queued.is_none() && matches!(state, ActorState::Idle | ActorState::Quiet))
@@ -108,15 +108,15 @@ pub fn actor(record: &Record, context: &Context<'_>) -> Option<Actor> {
     }
     .filter(|action| !action.tool.is_empty());
     Some(Actor {
-        key: record.key.clone(),
-        kind: if record.key.contains('.') {
+        key: record.key.to_string(),
+        kind: if record.key.is_subagent() {
             ActorKind::Subagent
         } else {
             ActorKind::Session
         },
         label: label_of(record, context),
         state,
-        reason: waiting.and_then(|waiting| wait_reason(waiting.reason.as_deref()?)),
+        reason: waiting.and_then(|waiting| waiting.reason),
         action,
         placed_by: record.placed_by,
         error: record.error.clone(),
@@ -127,11 +127,10 @@ pub fn actor(record: &Record, context: &Context<'_>) -> Option<Actor> {
     })
 }
 
-fn shown_state(record: &Record, context: &Context<'_>) -> Option<ActorState> {
-    let session = record.key.split('.').next().unwrap_or_default();
+fn shown_state(record: &ActorRecord, context: &Context<'_>) -> Option<ActorState> {
     if record.state == RecordState::Ended
         || !Liveness::UnlessGone.runs(record.process, context.processes)
-        || context.superseded.contains(session)
+        || context.superseded.contains(record.key.session())
     {
         return None;
     }
@@ -158,8 +157,8 @@ fn shown_state(record: &Record, context: &Context<'_>) -> Option<ActorState> {
 /// The outermost build below the session's harness process that no job of another actor holds,
 /// while it runs. A subagent's record names the same process, so only its session works on
 /// the build.
-fn own_build<'a>(record: &Record, context: &Context<'a>) -> Option<&'a str> {
-    if record.key.contains('.') {
+fn own_build<'a>(record: &ActorRecord, context: &Context<'a>) -> Option<&'a str> {
+    if record.key.is_subagent() {
         return None;
     }
     context
@@ -170,25 +169,28 @@ fn own_build<'a>(record: &Record, context: &Context<'a>) -> Option<&'a str> {
             build
                 .owner
                 .as_deref()
-                .is_none_or(|owner| owner == record.key)
+                .is_none_or(|owner| owner == record.key.as_str())
         })
         .map(|build| build.name.as_str())
 }
 
 /// `true` while a job of the actor's own runs.
-fn runs_a_job(record: &Record, context: &Context<'_>) -> bool {
-    context.jobs.get(&record.key).is_some_and(|job| job.running)
+fn runs_a_job(record: &ActorRecord, context: &Context<'_>) -> bool {
+    context
+        .jobs
+        .get(record.key.as_str())
+        .is_some_and(|job| job.running)
 }
 
 /// A subagent's title from a record of its session, else the record's own label.
-fn label_of(record: &Record, context: &Context<'_>) -> String {
-    let Some((session, agent)) = record.key.split_once('.') else {
+fn label_of(record: &ActorRecord, context: &Context<'_>) -> String {
+    let Some(agent) = record.key.agent() else {
         return record.label.clone();
     };
     context
         .records
         .iter()
-        .filter(|other| other.key.split('.').next() == Some(session))
+        .filter(|other| other.key.session() == record.key.session())
         .find_map(|other| {
             other
                 .subagents
@@ -199,42 +201,32 @@ fn label_of(record: &Record, context: &Context<'_>) -> String {
         .map_or_else(|| record.label.clone(), |subagent| subagent.title.clone())
 }
 
-fn runs_a_task(record: &Record) -> bool {
+fn runs_a_task(record: &ActorRecord) -> bool {
     record.tasks.iter().any(|task| task.ended.is_none())
 }
 
-fn building_in_a_shell(record: &Record, context: &Context<'_>) -> bool {
-    has_call(record, CallKind::Shell) && (context.building)(&record.worktree, &record.key)
+fn building_in_a_shell(record: &ActorRecord, context: &Context<'_>) -> bool {
+    has_call(record, CallKind::Shell) && (context.building)(&record.worktree, record.key.as_str())
 }
 
-fn waits_for_a_subagent(record: &Record, context: &Context<'_>) -> bool {
-    let prefix = format!("{}.", record.key);
+fn waits_for_a_subagent(record: &ActorRecord, context: &Context<'_>) -> bool {
     has_call(record, CallKind::Agent)
         && context.records.iter().any(|other| {
-            other.key.starts_with(&prefix)
+            other.key.is_subagent()
+                && other.key.session() == record.key.as_str()
                 && matches!(other.state, RecordState::Working | RecordState::Waiting)
                 && Liveness::UnlessGone.runs(other.process, context.processes)
         })
 }
 
-fn has_call(record: &Record, kind: CallKind) -> bool {
+fn has_call(record: &ActorRecord, kind: CallKind) -> bool {
     record.in_flight.iter().any(|call| call.kind == kind)
-}
-
-fn wait_reason(reason: &str) -> Option<WaitReason> {
-    match reason {
-        "permission" => Some(WaitReason::Permission),
-        "question" => Some(WaitReason::Question),
-        "plan" | "plan approval" => Some(WaitReason::Plan),
-        "input" => Some(WaitReason::Input),
-        _ => None,
-    }
 }
 
 /// The first time after `now` that an actor of `records` changes state on its own: a working one
 /// turns quiet, a done one leaves.
 #[must_use]
-pub fn next_change(records: &[&Record], now: Timestamp) -> Option<Timestamp> {
+pub fn next_change(records: &[&ActorRecord], now: Timestamp) -> Option<Timestamp> {
     records
         .iter()
         .filter_map(|record| {
@@ -250,15 +242,15 @@ pub fn next_change(records: &[&Record], now: Timestamp) -> Option<Timestamp> {
 }
 
 /// The sessions that a newer main session of the same process replaced: per process, by pid
-/// and start time, every session but the one with the newest [`Record::updated`], then the
-/// newest [`Record::writer_started`]. A session that ended, or whose record names no process,
+/// and start time, every session but the one with the newest [`ActorRecord::updated`], then the
+/// newest [`ActorRecord::writer_started`]. A session that ended, or whose record names no process,
 /// replaces none.
 #[must_use]
-pub fn superseded(records: &[&Record]) -> BTreeSet<String> {
-    let mut by_process: BTreeMap<(u32, Option<Timestamp>), Vec<&Record>> = BTreeMap::new();
+pub fn superseded(records: &[&ActorRecord]) -> BTreeSet<String> {
+    let mut by_process: BTreeMap<(u32, Option<Timestamp>), Vec<&ActorRecord>> = BTreeMap::new();
     for record in records {
         if let Some(process) = record.process
-            && !record.key.contains('.')
+            && !record.key.is_subagent()
             && record.state != RecordState::Ended
         {
             let sessions = by_process
@@ -280,7 +272,7 @@ pub fn superseded(records: &[&Record]) -> BTreeSet<String> {
             sessions
                 .into_iter()
                 .skip(1)
-                .map(|record| record.key.clone())
+                .map(|record| record.key.to_string())
         })
         .collect()
 }

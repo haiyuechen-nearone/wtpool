@@ -5,10 +5,10 @@ use rstest::rstest;
 
 use super::*;
 use crate::activity::CallKind;
-use crate::activity::PlacedBy;
+use crate::activity::{PlacedBy, WaitReason};
 use crate::processes::{RecordedProcess, StartTime};
 use crate::status::record_time::RecordTime;
-use crate::status::records::{Call, SubagentTitle, ToolTarget, Waiting};
+use crate::status::records::{RecordKey, RecordedCall, SubagentTitle, ToolTarget, Waiting};
 
 mod background;
 mod builds;
@@ -21,9 +21,9 @@ fn at(seconds: i64) -> RecordTime {
     RecordTime::parse(&Timestamp::from_seconds(START + seconds).to_rfc3339()).unwrap()
 }
 
-fn record(key: &str, state: RecordState) -> Record {
-    Record {
-        key: key.to_owned(),
+fn record(key: &str, state: RecordState) -> ActorRecord {
+    ActorRecord {
+        key: RecordKey::parse(key).unwrap(),
         harness: "claude-code".to_owned(),
         label: "label".to_owned(),
         worktree: PathBuf::from("/p/wt1"),
@@ -67,8 +67,8 @@ fn below(name: &str) -> BuildBelow {
     }
 }
 
-fn call(kind: CallKind) -> Call {
-    Call {
+fn call(kind: CallKind) -> RecordedCall {
+    RecordedCall {
         id: format!("toolu_{kind:?}"),
         kind,
     }
@@ -76,9 +76,14 @@ fn call(kind: CallKind) -> Call {
 
 /// The state `subject` shows `after` seconds, with `others` and a build in `/p/wt1` when
 /// `build`.
-fn state_after(subject: &Record, others: &[Record], after: i64, build: bool) -> Option<ActorState> {
+fn state_after(
+    subject: &ActorRecord,
+    others: &[ActorRecord],
+    after: i64,
+    build: bool,
+) -> Option<ActorState> {
     let processes = [claude(Some(START - 3600))];
-    let records: Vec<&Record> = others.iter().chain([subject]).collect();
+    let records: Vec<&ActorRecord> = others.iter().chain([subject]).collect();
     let building = move |path: &Path, _: &str| build && path == Path::new("/p/wt1");
     let context = Context {
         now: Timestamp::from_seconds(START + after),
@@ -92,7 +97,7 @@ fn state_after(subject: &Record, others: &[Record], after: i64, build: bool) -> 
     actor(subject, &context).map(|actor| actor.state)
 }
 
-fn with_calls(mut record: Record, calls: &[CallKind]) -> Record {
+fn with_calls(mut record: ActorRecord, calls: &[CallKind]) -> ActorRecord {
     record.in_flight = calls.iter().map(|kind| call(*kind)).collect();
     record
 }
@@ -117,8 +122,8 @@ fn with_calls(mut record: Record, calls: &[CallKind]) -> Record {
 #[case::done_at_a_minute(record("s1.a1", RecordState::Done), vec![], 60, false, None)]
 #[case::ended(record("s1", RecordState::Ended), vec![], 1, false, None)]
 fn actor__should_follow_the_decay_table(
-    #[case] subject: Record,
-    #[case] others: Vec<Record>,
+    #[case] subject: ActorRecord,
+    #[case] others: Vec<ActorRecord>,
     #[case] after: i64,
     #[case] build: bool,
     #[case] expected: Option<ActorState>,
@@ -147,26 +152,19 @@ fn actor__should_not_count_a_dead_subagent_as_working() {
     assert_eq!(state, Some(ActorState::Quiet));
 }
 
-fn waiting(reason: Option<&str>, tool: Option<&str>) -> Waiting {
+fn waiting(reason: Option<WaitReason>, tool: Option<&str>) -> Waiting {
     Waiting {
-        reason: reason.map(str::to_owned),
+        reason,
         tool: tool.map(str::to_owned),
         target: Some("git push".to_owned()),
     }
 }
 
 #[rstest]
-#[case::permission(Some("permission"), Some(WaitReason::Permission))]
-#[case::question(Some("question"), Some(WaitReason::Question))]
-#[case::plan(Some("plan"), Some(WaitReason::Plan))]
-#[case::plan_approval(Some("plan approval"), Some(WaitReason::Plan))]
-#[case::input(Some("input"), Some(WaitReason::Input))]
-#[case::other(Some("elsewhere"), None)]
-#[case::none(None, None)]
-fn actor__should_name_the_reason_of_a_wait(
-    #[case] reason: Option<&str>,
-    #[case] expected: Option<WaitReason>,
-) {
+#[case::permission(Some(WaitReason::Permission))]
+#[case::plan(Some(WaitReason::Plan))]
+#[case::none(None)]
+fn actor__should_name_the_reason_of_a_wait(#[case] reason: Option<WaitReason>) {
     // Given
     let mut subject = record("s1", RecordState::Waiting);
     subject.waiting = Some(waiting(reason, Some("Bash")));
@@ -185,7 +183,7 @@ fn actor__should_name_the_reason_of_a_wait(
     let shown = actor(&subject, &context).unwrap();
 
     // Then
-    assert_eq!(shown.reason, expected);
+    assert_eq!(shown.reason, reason);
 }
 
 fn tool_target(tool: &str, target: &str) -> ToolTarget {
@@ -199,14 +197,14 @@ fn tool_target(tool: &str, target: &str) -> ToolTarget {
 #[case::working_action(RecordState::Working, Some(tool_target("Read", "f.txt")), None, Some(("Read", "f.txt")))]
 #[case::no_action(RecordState::Idle, None, None, None)]
 #[case::empty_tool(RecordState::Idle, Some(tool_target("", "x")), None, None)]
-#[case::waiting_call(RecordState::Waiting, Some(tool_target("Read", "f.txt")), Some(waiting(Some("permission"), Some("Bash"))), Some(("Bash", "git push")))]
+#[case::waiting_call(RecordState::Waiting, Some(tool_target("Read", "f.txt")), Some(waiting(Some(WaitReason::Permission), Some("Bash"))), Some(("Bash", "git push")))]
 #[case::waiting_without_tool(
     RecordState::Waiting,
     Some(tool_target("Read", "f.txt")),
-    Some(waiting(Some("input"), None)),
+    Some(waiting(Some(WaitReason::Input), None)),
     None
 )]
-#[case::working_after_a_wait(RecordState::Working, Some(tool_target("Read", "f.txt")), Some(waiting(Some("permission"), Some("Bash"))), Some(("Read", "f.txt")))]
+#[case::working_after_a_wait(RecordState::Working, Some(tool_target("Read", "f.txt")), Some(waiting(Some(WaitReason::Permission), Some("Bash"))), Some(("Read", "f.txt")))]
 fn actor__should_show_the_call_it_waits_for_else_its_action(
     #[case] state: RecordState,
     #[case] action: Option<ToolTarget>,
@@ -399,7 +397,7 @@ fn actor__should_label_a_subagent_with_its_title(
         agent_id: agent.to_owned(),
         title: title.to_owned(),
     };
-    let records: Vec<Record> = keys
+    let records: Vec<ActorRecord> = keys
         .iter()
         .map(|key| {
             let mut record = record(key, RecordState::Working);
@@ -415,8 +413,11 @@ fn actor__should_label_a_subagent_with_its_title(
             record
         })
         .collect();
-    let refs: Vec<&Record> = records.iter().collect();
-    let subject = records.iter().find(|record| record.key == key).unwrap();
+    let refs: Vec<&ActorRecord> = records.iter().collect();
+    let subject = records
+        .iter()
+        .find(|record| record.key.as_str() == key)
+        .unwrap();
     let processes = [claude(None)];
     let context = Context {
         now: Timestamp::from_seconds(START),

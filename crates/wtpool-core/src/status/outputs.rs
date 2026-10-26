@@ -21,7 +21,7 @@ pub struct TaskFields {
 
 /// A background task of a record.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Task {
+pub struct RecordedTask {
     pub id: String,
     pub path: String,
     pub summary: String,
@@ -33,7 +33,7 @@ pub struct Task {
 /// The tasks of a record with an id, an absolute path of only normal components and times that
 /// parse. The others are skipped.
 #[must_use]
-pub fn tasks(fields: Vec<TaskFields>) -> Vec<Task> {
+pub fn tasks(fields: Vec<TaskFields>) -> Vec<RecordedTask> {
     fields
         .into_iter()
         .filter(|task| !task.id.is_empty() && paths::is_plain_absolute(Path::new(&task.path)))
@@ -42,7 +42,7 @@ pub fn tasks(fields: Vec<TaskFields>) -> Vec<Task> {
                 Some(ended) => Some(RecordTime::parse(ended)?),
                 None => None,
             };
-            Some(Task {
+            Some(RecordedTask {
                 started: RecordTime::parse(&task.started)?,
                 ended,
                 id: task.id,
@@ -56,8 +56,9 @@ pub fn tasks(fields: Vec<TaskFields>) -> Vec<Task> {
 /// The outputs an actor lists: its running tasks, newest start first, then the task that ended
 /// last. Among equal times the later task of the record comes first.
 #[must_use]
-pub fn outputs(tasks: &[Task]) -> Vec<Output> {
-    let mut running: Vec<&Task> = tasks.iter().rev().filter(|t| t.ended.is_none()).collect();
+pub fn outputs(tasks: &[RecordedTask]) -> Vec<Output> {
+    let mut running: Vec<&RecordedTask> =
+        tasks.iter().rev().filter(|t| t.ended.is_none()).collect();
     running.sort_by_key(|task| std::cmp::Reverse(task.started.at()));
     let last_ended = tasks
         .iter()
@@ -67,7 +68,7 @@ pub fn outputs(tasks: &[Task]) -> Vec<Output> {
     running.into_iter().chain(last_ended).map(output).collect()
 }
 
-fn output(task: &Task) -> Output {
+fn output(task: &RecordedTask) -> Output {
     Output {
         task: task.id.clone(),
         path: task.path.clone(),
@@ -98,7 +99,7 @@ mod tests {
         format!("2026-10-20T12:{minute:02}:00Z")
     }
 
-    fn task(id: &str, started: u32, ended: Option<u32>) -> Task {
+    fn task(id: &str, started: u32, ended: Option<u32>) -> RecordedTask {
         tasks(vec![fields(
             id,
             &format!("/t/claude-501/p/s1/tasks/{id}.output"),
@@ -164,7 +165,7 @@ mod tests {
         &[("b4", true), ("b3", true), ("b2", false)]
     )]
     fn outputs__should_list_running_newest_first_then_the_last_ended(
-        #[case] tasks: Vec<Task>,
+        #[case] tasks: Vec<RecordedTask>,
         #[case] expected: &[(&str, bool)],
     ) {
         // When

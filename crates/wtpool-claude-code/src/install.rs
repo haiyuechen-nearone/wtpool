@@ -8,5 +8,6 @@ mod presence;
 mod settings;
 mod text;
 
+pub use plugin::plugin_hooks_file;
 pub use settings::settings_file;
 pub use text::text;

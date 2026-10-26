@@ -31,6 +31,39 @@ pub struct State {
     pub operation: Operation,
 }
 
+/// The git facts of one worktree, read once.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct WorktreeFacts {
+    /// `None` without an upstream.
+    pub upstream: Option<Tracking>,
+    pub dirty: Uncommitted,
+    pub unreferenced: Unreferenced,
+    pub operation: Operation,
+}
+
+impl WorktreeFacts {
+    /// The facts `wtpool ls` shows. A branch without an upstream counts as level with it.
+    pub fn state(&self) -> State {
+        State {
+            dirty: self.dirty,
+            upstream: self
+                .upstream
+                .as_ref()
+                .map_or_else(Upstream::default, |tracking| tracking.counts),
+            unreferenced: self.unreferenced,
+            operation: self.operation,
+        }
+    }
+}
+
+/// The upstream of a branch, as `<branch>@{upstream}` names it, and the branch's ahead and behind
+/// counts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Tracking {
+    pub name: String,
+    pub counts: Upstream,
+}
+
 /// The uncommitted files of a worktree, as `git status --porcelain` counts them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Uncommitted {

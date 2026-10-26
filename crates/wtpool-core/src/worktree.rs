@@ -3,11 +3,13 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{Error, GitError};
 use crate::git::layout::{self, Marker};
-use crate::git::{Git, GitMode};
-use crate::names::{BranchName, ObjectId};
+use crate::git::{Divergence, Git, GitMode, left_right};
+use crate::names::{BRANCH_REFS, BranchName, ObjectId};
 use crate::paths::AbsolutePath;
 use crate::report::Report;
-use crate::worktree_state::{Operation, Uncommitted, Unreferenced};
+use crate::worktree_state::{
+    Operation, Tracking, Uncommitted, Unreferenced, Upstream, WorktreeFacts,
+};
 
 /// A worktree that `git worktree list` reports for the pool's repository. It
 /// can only be obtained from [`Worktree::list_with`], so a path that merely lies
@@ -91,6 +93,34 @@ impl Worktree {
 
     pub fn head_commit(&self) -> Option<&ObjectId> {
         self.head_commit.as_ref()
+    }
+
+    /// Every [`WorktreeFacts`] of this worktree, its [`Unreferenced`] commits counted in `repo`.
+    pub fn facts(&self, repo: &Git) -> Result<WorktreeFacts, Error> {
+        Ok(WorktreeFacts {
+            upstream: self.upstream()?,
+            dirty: self.uncommitted()?,
+            unreferenced: self.unreferenced(repo)?,
+            operation: self.operation()?,
+        })
+    }
+
+    /// The upstream of the branch `HEAD` names. `None` without one, also when `HEAD` is
+    /// detached.
+    pub fn upstream(&self) -> Result<Option<Tracking>, Error> {
+        let git = self.git();
+        let ran = git.run(["rev-parse", "--abbrev-ref", "@{upstream}"])?;
+        let Some(name) = ran.line().filter(|name| !name.is_empty()) else {
+            return Ok(None);
+        };
+        let counts = match left_right(&git, &format!("HEAD...{name}"))? {
+            Some(Divergence { ahead, behind }) => Upstream::Counted { ahead, behind },
+            None => Upstream::Unknown,
+        };
+        Ok(Some(Tracking {
+            name: name.to_owned(),
+            counts,
+        }))
     }
 
     /// The files `git status --porcelain` lists. [`Uncommitted::Unknown`] when git
@@ -205,7 +235,7 @@ impl Worktree {
 /// of the same name, and refusing then is safe.
 fn branch_in(line: &str) -> Option<String> {
     let line = line.trim();
-    (!line.is_empty()).then(|| line.strip_prefix("refs/heads/").unwrap_or(line).to_owned())
+    (!line.is_empty()).then(|| line.strip_prefix(BRANCH_REFS).unwrap_or(line).to_owned())
 }
 
 /// The operation a `sequencer/todo` list belongs to, read from its first
@@ -241,7 +271,10 @@ fn parse_list(listing: &str, mode: GitMode) -> Option<Vec<Worktree>> {
         } else if let Some(current) = worktrees.last_mut() {
             if let Some(commit) = field.strip_prefix("HEAD ") {
                 current.head_commit = ObjectId::new(commit);
-            } else if let Some(branch) = field.strip_prefix("branch refs/heads/") {
+            } else if let Some(branch) = field
+                .strip_prefix("branch ")
+                .and_then(|branch| branch.strip_prefix(BRANCH_REFS))
+            {
                 current.head = Head::Branch(branch.to_owned());
             } else if field == "detached" {
                 current.head = Head::Detached;
@@ -272,7 +305,7 @@ mod tests {
 
     const HEAD: &str = "1111111111111111111111111111111111111111";
 
-    fn must_parse_one(path: &Path, fields: &[&str]) -> Worktree {
+    fn parse_one(path: &Path, fields: &[&str]) -> Worktree {
         let mut listing = format!("worktree {}\0", path.display());
         for field in fields {
             listing.push_str(field);
@@ -386,7 +419,7 @@ mod tests {
     #[test]
     fn unreferenced__should_be_unknown_without_a_recorded_head_commit() {
         // Given
-        let bare = must_parse_one(Path::new("/w/bare"), &["bare"]);
+        let bare = parse_one(Path::new("/w/bare"), &["bare"]);
         let unused = Git::at(&AbsolutePath::try_new("/nonexistent/wtpool-test").unwrap());
 
         // When
@@ -422,7 +455,7 @@ mod tests {
         // Given
         let dir = tempfile::tempdir().unwrap();
         let (path, fields) = setup(&dir.path().canonicalize().unwrap());
-        let worktree = must_parse_one(&path, fields);
+        let worktree = parse_one(&path, fields);
 
         // When
         let operation = worktree.operation().unwrap();

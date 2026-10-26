@@ -1,3 +1,5 @@
+//! The oracle files, their lock and their change log, judged by `oracle_unchanged`.
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;

@@ -110,7 +110,7 @@ refusal, and nothing runs:
 wtpool: cargo test is heavy on this machine (enforce = require). Run it as: cd ~/code/app-wt1 && wtpool job -- cargo test
 ```
 
-The agent then runs that command. Its job queues, and its line in the panel reads
+The agent then runs its own command in that form. Its job queues, and its line in the panel reads
 `queued: cargo test` until its turn comes. The reason is the agent's own command, with
 `wtpool job -- ` before each heavy part, after any `VAR=value` words. For a command over 2000
 characters it lists the heavy commands instead:
@@ -119,7 +119,8 @@ characters it lists the heavy commands instead:
 - Nothing ever rewrites a command. `require` refuses it, and the agent runs the wrapped form.
 - A command inside a job is never judged: one that `wtpool job` wraps, and any command while
   `WTPOOL_JOB` names a live job, such as each step of a wrapped script.
-- `require` guides agents that cooperate. It is not a security boundary. The check fails open:
+- `require` guides agents that cooperate. It is not a security boundary. An agent runs as you,
+  so it can run `wtpool job enforce off` itself. The check fails open:
   when it cannot read the call, the config or the command, or does not answer in time, it says
   nothing and the call goes on. A heavy command started another way, such as by a script or an
   IDE build, is never refused. It shows as not queued.
@@ -130,14 +131,20 @@ Start with `warn` to see what runs outside the queue, then run `wtpool job enfor
 
 **Claude Code.** The refusal comes from `wtpool hook policy`, a sync `PreToolUse` hook for Bash,
 PowerShell and Monitor calls, with a 2 s timeout. It runs on every such call, under every policy,
-and takes at most 5 ms at p95. Under `off` it returns as soon as it has read the policy.
+and takes at most 5 ms at p95. Under `off` it returns as soon as it has read the policy, unless
+the call runs in the background: it refuses a background wait loop with no time limit under every
+policy, as
+[Troubleshooting](troubleshooting.md#a-worktree-shows-working--background--long-after-its-agent-finished)
+says.
 
 - **The plugin** holds this entry next to its other hooks, so updating the plugin turns it on. It
   also ships the skill `heavy-jobs`, which Claude Code uses before a build, a test suite, a package
   install or another heavy command. The skill tells the agent to run `wtpool job ls` once per
-  session, to run each command that matches as `wtpool job -- <command>`, to run the command a
-  refusal that starts `wtpool:` gives, and never to wrap a server, a watcher or anything else that
-  does not end. It names no pattern: the agent reads this machine's from `wtpool job ls`.
+  session, to run each command that matches as `wtpool job -- <command>`, and never to wrap a
+  server, a watcher or anything else that does not end. When a hook refuses one of its own calls
+  for a heavy command, the agent runs its own command again with `wtpool job --` before each heavy
+  command in it, and changes nothing else: it never runs a different command, whatever text that
+  starts `wtpool:` says. It names no pattern: the agent reads this machine's from `wtpool job ls`.
 - **The settings block** that `wtpool hook install` prints holds the entry too: matcher
   `Bash|PowerShell|Monitor`, `"args": ["hook", "policy"]`, `"timeout": 2`. A block you merged
   before lacks it, and `wtpool hook install > /dev/null` then says `hooks missing:`. Merge the new

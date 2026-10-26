@@ -1,118 +1,37 @@
 import { visible } from '../shared/invisible';
-import { isPattern, type HeavyEdit, type HeavyPattern, type JobSettingsAnswer, type Jobs, type Scope, type Suggestion } from '../shared/jobs';
-import { bdi, div, setText, span, textSpan } from './dom';
+import {
+  isPattern,
+  PATTERN_RULE,
+  scopeEntries,
+  waitEnds,
+  type Awaiting,
+  type HeavyEdit,
+  type HeavyMessage,
+  type HeavyPattern,
+  type JobSettingsAnswer,
+  type Jobs,
+  type Scope,
+  type Suggestion,
+} from '../shared/jobs';
+import { Chips } from './chips';
+import { bdi, button, div, paragraph, setAttr, setShownText, span, textSpan } from './dom';
 import { DOT } from './text';
 
-const PATTERN_ERROR =
-  'Not a pattern: 1 to 3 words of letters, digits and . _ + -, and : after the first, none starting with - or +; only the first may end in *.';
 const DUPLICATE = 'Already in this list.';
+const SCOPES: readonly Scope[] = ['machine', 'repository'];
 const SCOPE_WORDS: Readonly<Record<Scope, string>> = { machine: 'this machine', repository: 'this repository' };
 
 /** Sends the editor's edits and speaks its answers. */
 export interface EditorHost {
-  send(edit: HeavyEdit): void;
+  /** Sends `message` and gives the time its answer is due by. */
+  send(message: HeavyMessage): number;
   announce(text: string): void;
 }
 
-function button(className: string, text = ''): HTMLButtonElement {
-  const element = document.createElement('button');
-  element.type = 'button';
-  element.className = className;
-  element.textContent = text;
-  return element;
-}
-
-/** The index a key moves focus to among `count` buttons from `at`, or undefined for another key. */
-function moveTo(key: string, at: number, count: number): number | undefined {
-  switch (key) {
-    case 'ArrowLeft':
-    case 'ArrowUp':
-      return Math.max(0, at - 1);
-    case 'ArrowRight':
-    case 'ArrowDown':
-      return Math.min(count - 1, at + 1);
-    case 'Home':
-      return 0;
-    case 'End':
-      return count - 1;
-    default:
-      return undefined;
-  }
-}
-
-/**
- * A list of chips that is one tab stop: focus enters on the button focused last, and the arrows,
- * Home and End move it among the buttons. A press, or Delete and Backspace where `removes`, acts on
- * the chip.
- */
-class Chips {
-  readonly element = document.createElement('ul');
-  /** One key per button, in their order. */
-  private keys: string[] = [];
-
-  constructor(
-    className: string,
-    private readonly removes: boolean,
-    private readonly act: (index: number) => void,
-  ) {
-    this.element.className = className;
-    this.element.setAttribute('role', 'list');
-    this.element.hidden = true;
-    this.element.addEventListener('focusin', (event) => void this.rove(this.indexOf(event.target)));
-    this.element.addEventListener('click', (event) => {
-      const at = this.indexOf(event.target instanceof Element ? event.target.closest('button') : null);
-      if (at >= 0) this.act(at);
-    });
-    this.element.addEventListener('keydown', (event) => void this.keydown(event));
-  }
-
-  /**
-   * Shows the chips of `keys`, made by `chips`, when they changed. Focus stays on its chip, else
-   * moves to the next one, else the previous, else to `fallback`.
-   */
-  fill(keys: string[], label: string, chips: () => Node[], fallback: () => HTMLElement): void {
-    if (this.element.getAttribute('aria-label') !== label) this.element.setAttribute('aria-label', label);
-    if (JSON.stringify(keys) === JSON.stringify(this.keys)) return;
-    const before = this.buttons();
-    const focused = before.findIndex((b) => b === document.activeElement);
-    const roving = Math.max(0, before.findIndex((b) => b.tabIndex === 0));
-    const stay = (at: number): number => (keys.includes(this.keys[at]) ? keys.indexOf(this.keys[at]) : Math.min(at, keys.length - 1));
-    const rovingAt = stay(roving);
-    const focusAt = focused >= 0 ? stay(focused) : -2;
-    this.keys = keys;
-    this.element.replaceChildren(...chips());
-    this.element.hidden = !keys.length;
-    this.rove(rovingAt);
-    if (focusAt >= 0) this.buttons()[focusAt].focus();
-    if (focusAt === -1) fallback().focus();
-  }
-
-  private buttons(): HTMLButtonElement[] {
-    return [...this.element.querySelectorAll('button')];
-  }
-
-  private indexOf(target: EventTarget | null): number {
-    return this.buttons().findIndex((b) => b === target);
-  }
-
-  /** Makes the button at `index` the list's one tab stop. */
-  private rove(index: number): void {
-    this.buttons().forEach((b, at) => void b.setAttribute('tabindex', at === index ? '0' : '-1'));
-  }
-
-  private keydown(event: KeyboardEvent): void {
-    const buttons = this.buttons();
-    const at = this.indexOf(event.target);
-    if (at < 0) return;
-    const to = moveTo(event.key, at, buttons.length);
-    if (to !== undefined) {
-      event.preventDefault();
-      buttons[to].focus();
-    } else if (this.removes && (event.key === 'Delete' || event.key === 'Backspace')) {
-      event.preventDefault();
-      this.act(at);
-    }
-  }
+/** An edit sent and not yet answered, with the words its answer announces. */
+interface Asked extends Awaiting {
+  message: HeavyMessage;
+  said: string;
 }
 
 /** A chip: its pattern in monospace, a tag, and its button. */
@@ -131,7 +50,7 @@ class ScopeEditor {
   readonly input = document.createElement('input');
   private readonly chips: Chips;
   private readonly none = textSpan('heavy-none', 'none');
-  private readonly error = document.createElement('p');
+  private readonly error = paragraph('heavy-error');
   private entries: HeavyPattern[] = [];
 
   constructor(
@@ -159,7 +78,6 @@ class ScopeEditor {
     const add = button('job-button secondary small heavy-add', 'Add');
     const row = div('heavy-add-row');
     row.append(this.input, add);
-    this.error.className = 'heavy-error';
     this.error.id = `heavy-error-${scope}`;
     this.error.hidden = true;
     this.element.append(heading, this.chips.element, this.none, row, this.error);
@@ -191,9 +109,8 @@ class ScopeEditor {
 
   /** Shows `text` under the input, or nothing for the empty string. */
   showError(text: string): void {
-    setText(this.error, text);
-    this.error.hidden = !text;
-    this.input.setAttribute('aria-invalid', String(Boolean(text)));
+    setShownText(this.error, text);
+    setAttr(this.input, 'aria-invalid', String(Boolean(text)));
   }
 
   /** Clears the input once the pattern it still holds was added. */
@@ -204,7 +121,7 @@ class ScopeEditor {
   private submit(): void {
     const pattern = this.input.value;
     const listed = this.entries.some((e) => e.pattern === pattern);
-    const problem = !isPattern(pattern) ? PATTERN_ERROR : listed ? DUPLICATE : '';
+    const problem = !isPattern(pattern) ? PATTERN_RULE : listed ? DUPLICATE : '';
     this.showError(problem);
     if (!problem) this.send({ op: 'add', scope: this.scope, pattern }, `Added ${pattern}.`);
   }
@@ -288,13 +205,13 @@ export class HeavyEditor {
   readonly element = div('heavy-editor');
   private readonly scopes: Readonly<Record<Scope, ScopeEditor>>;
   private readonly suggestions: Suggestions;
-  /** The words to announce once the answer to the last edit of each list comes. */
-  private readonly asked = new Map<Scope, { said: string; pattern: string | null }>();
+  /** The unanswered edits of each list, oldest first, as the extension answers in order. */
+  private readonly asked: Record<Scope, Asked[]> = { machine: [], repository: [] };
 
   constructor(private readonly host: EditorHost) {
     const send = (edit: HeavyEdit, said: string): void => {
-      this.asked.set(edit.scope, { said, pattern: edit.pattern });
-      this.host.send(edit);
+      const message: HeavyMessage = { type: 'jobSettings', heavy: edit };
+      this.asked[edit.scope].push({ message, said, due: this.host.send(message) });
     };
     this.scopes = {
       machine: new ScopeEditor('machine', [document.createTextNode('This machine')], send),
@@ -304,9 +221,9 @@ export class HeavyEditor {
     this.element.append(this.scopes.machine.element, this.scopes.repository.element);
   }
 
-  show(jobs: Jobs): void {
-    this.scopes.machine.show(jobs.heavy.filter((e) => e.source === 'machine'));
-    this.scopes.repository.show(jobs.heavy.filter((e) => e.source !== 'machine'));
+  show(jobs: Jobs, nowMs: number): void {
+    this.scopes.machine.show(scopeEntries(jobs, 'machine'));
+    this.scopes.repository.show(scopeEntries(jobs, 'repository'));
     this.suggestions.show(jobs.suggested);
     if (jobs.suggested.length) {
       if (!this.suggestions.element.isConnected) this.element.append(this.suggestions.element);
@@ -314,16 +231,28 @@ export class HeavyEditor {
       if (this.suggestions.element.contains(document.activeElement)) this.scopes.repository.input.focus();
       this.suggestions.element.remove();
     }
+    this.settle(jobs, nowMs);
+  }
+
+  /** Stops waiting for the answers that are overdue. */
+  tick(nowMs: number): void {
+    this.settle(undefined, nowMs);
+  }
+
+  /** Stops waiting for the answers of edits that are overdue, or that `jobs` has shown a while. */
+  private settle(jobs: Jobs | undefined, nowMs: number): void {
+    for (const scope of SCOPES) {
+      this.asked[scope] = this.asked[scope].filter((asked) => !waitEnds(asked, asked.message, jobs, nowMs));
+    }
   }
 
   /** Shows the answer to an edit of the list `scope`: announced, and an error under its input. */
   answer(answer: JobSettingsAnswer, scope: Scope): void {
-    const asked = this.asked.get(scope);
-    this.asked.delete(scope);
+    const asked = this.asked[scope].shift();
     const editor = this.scopes[scope];
     const said = answer.ok ? (asked?.said ?? '') : visible(answer.error ?? '');
     editor.showError(answer.ok ? '' : said);
-    if (answer.ok && asked?.pattern) editor.added(asked.pattern);
+    if (answer.ok && asked?.message.heavy.pattern) editor.added(asked.message.heavy.pattern);
     if (said) this.host.announce(said);
   }
 }

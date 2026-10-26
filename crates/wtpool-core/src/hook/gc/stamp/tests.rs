@@ -5,7 +5,7 @@ use rstest::rstest;
 use super::*;
 use crate::hook::fixture::{NOW, eventually, later, must_activity};
 
-fn stamp_text(activity: &Activity) -> Option<String> {
+fn stamp_text(activity: &ActivityDir) -> Option<String> {
     std::fs::read_to_string(activity.file_path(STAMP)).ok()
 }
 

@@ -5,7 +5,7 @@ use crate::activity::PlacedBy;
 use crate::jobs::JobId;
 use crate::processes::{RecordedProcess, StartTime};
 use crate::status::record_time::RecordTime;
-use crate::status::records::{Call, RecordState, ToolTarget};
+use crate::status::records::{RecordKey, RecordState, RecordedCall, ToolTarget};
 
 const START: &str = "2026-10-20T11:00:00Z";
 
@@ -16,9 +16,9 @@ fn at(seconds: i64) -> RecordTime {
 
 /// The record `key` of the harness process `harness`, with a shell call on `target` in flight
 /// when there is one, last changed `since` seconds after the start.
-fn record(key: &str, harness: u32, target: Option<&str>, since: i64) -> Record {
-    Record {
-        key: key.to_owned(),
+fn record(key: &str, harness: u32, target: Option<&str>, since: i64) -> ActorRecord {
+    ActorRecord {
+        key: RecordKey::parse(key).unwrap(),
         harness: "claude-code".to_owned(),
         label: "label".to_owned(),
         worktree: PathBuf::from("/p/wt1"),
@@ -30,7 +30,7 @@ fn record(key: &str, harness: u32, target: Option<&str>, since: i64) -> Record {
             target: target.to_owned(),
         }),
         in_flight: target
-            .map(|_| Call {
+            .map(|_| RecordedCall {
                 id: format!("toolu_{key}"),
                 kind: CallKind::Shell,
             })
@@ -95,7 +95,7 @@ fn harnesses_actor_of__should_take_the_nearest_harness_and_its_call_on_the_summa
         record("s1.a2", 100, Some("cargo build"), 20),
         record("s2", 200, None, 30),
     ];
-    let records: Vec<&Record> = records.iter().collect();
+    let records: Vec<&ActorRecord> = records.iter().collect();
     let heavy = HeavyTable::new(&table, &HeavyList::default(), &HeavyList::default(), &[]);
     let harnesses = Harnesses::new(&records);
 
@@ -126,7 +126,7 @@ fn harnesses_actor_of__should_skip_a_harness_of_another_start() {
     restarted.started = StartTime::parse("2026-10-20T12:00:00Z");
     let table = [restarted, process(101, 100, &["cargo", "test"])];
     let records = [record("s1", 100, Some("cargo test"), 0)];
-    let records: Vec<&Record> = records.iter().collect();
+    let records: Vec<&ActorRecord> = records.iter().collect();
     let heavy = HeavyTable::new(&table, &HeavyList::default(), &HeavyList::default(), &[]);
 
     // When

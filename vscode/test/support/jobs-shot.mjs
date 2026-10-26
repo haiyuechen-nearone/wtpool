@@ -3,12 +3,9 @@
 // chips, the `×N` count and the agent line icons. Each in-page function runs through page.evaluate
 // after measure.mjs's installHelpers and uses nothing else from outside.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 
 import { POOL, actor, ago, document, mustValidate, view, withActor, worktree } from './docs.mjs';
-import { busyDocument, firstOpenDocument, job, jobs, withJobs } from './jobs.mjs';
-import { TEST } from './paths.mjs';
+import { CONFIG, busyDocument, firstOpenDocument, job, jobs, withJobs } from './jobs.mjs';
 
 /** The states of the open strip: busy, first open, over the limit, error, old wtpool, remote. */
 export function stripStates() {
@@ -17,7 +14,7 @@ export function stripStates() {
   const error = withJobs(busy, {
     ...busy.machine.jobs,
     limit: null,
-    error: '/Users/verify/.config/wtpool/machine.toml: line 2: limit = 0 is outside 1 to 64',
+    error: `${CONFIG}: line 2: limit = 0 is outside 1 to 64`,
     running: [],
     waiting: [],
   });
@@ -119,19 +116,6 @@ export async function tabToButton(page, steps = 30) {
     if (await page.evaluate(() => document.activeElement?.matches?.('button.machine-button') ?? false)) return true;
   }
   return false;
-}
-
-/** axe-core over the whole page, its contrast rule off as in axe__should_report_no_violation. */
-export async function axeViolations(page) {
-  const source = readFileSync(path.join(TEST, 'node_modules', 'axe-core', 'axe.min.js'), 'utf8');
-  await page.evaluate(source);
-  const result = await page.evaluate(() =>
-    window.axe.run(document, {
-      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'] },
-      rules: { 'color-contrast': { enabled: false } },
-    }),
-  );
-  return result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
 }
 
 /**

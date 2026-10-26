@@ -4,7 +4,7 @@
 //! `CLAUDE_CODE_TMPDIR`, else `/tmp`, its symlinks resolved, and `<project>` the folder of the
 //! session's transcript, `<config>/projects/<project>/<session_id>.jsonl`. A Stop or SubagentStop
 //! lists the tasks still in flight in the whole session (`background_tasks`), its subagents'
-//! included. TaskStop, and KillShell before it, stops one. The hook never opens an output file.
+//! included. TaskStop or KillShell stops one. The hook never opens an output file.
 
 use std::ffi::OsStr;
 use std::path::Path;
@@ -16,6 +16,7 @@ use wtpool_core::hook::text;
 
 use crate::events::HookEvent;
 use crate::payload::Payload;
+use crate::tools::BASH;
 
 /// The longest output path a record keeps, in bytes.
 pub const MAX_TASK_PATH: usize = 1024;
@@ -25,8 +26,7 @@ const MAX_PROJECT: usize = 255;
 /// The task a PostToolUse of Bash started.
 #[must_use]
 pub fn task_start(payload: &Payload) -> Option<TaskId> {
-    if payload.event() != Some(HookEvent::PostToolUse)
-        || payload.tool_name.as_deref() != Some("Bash")
+    if payload.event() != Some(HookEvent::PostToolUse) || payload.tool_name.as_deref() != Some(BASH)
     {
         return None;
     }
@@ -35,8 +35,7 @@ pub fn task_start(payload: &Payload) -> Option<TaskId> {
 }
 
 /// The ids a Stop or SubagentStop lists in flight in its whole session, `None` without the list,
-/// so nothing ends. Claude Code 2.1.310 sends the list on every Stop and SubagentStop, `[]` when
-/// nothing is in flight.
+/// so nothing ends. The list is `[]` when nothing is in flight.
 #[must_use]
 pub fn tasks_running(payload: &Payload) -> Option<Vec<TaskId>> {
     if !matches!(
@@ -56,8 +55,7 @@ pub fn tasks_running(payload: &Payload) -> Option<Vec<TaskId>> {
     )
 }
 
-/// Claude Code 2.1.310 lists only `running` and `pending` tasks, but a listed task without a
-/// `status` text still counts as in flight.
+/// A listed task without a `status` text counts as in flight.
 fn in_flight(status: Option<&Value>) -> bool {
     status
         .and_then(Value::as_str)

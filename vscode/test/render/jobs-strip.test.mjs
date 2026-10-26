@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 
 import { document, mustValidate, view, worktree } from '../support/docs.mjs';
-import { TEXT, busyDocument, jobLineParts, jobs, withJobs } from '../support/jobs.mjs';
+import { CONFIG, TEXT, busyDocument, jobLineParts, jobs, withJobs } from '../support/jobs.mjs';
 import {
   announced,
   answer,
@@ -156,7 +156,7 @@ test('machine_strip__should_show_settings_patterns_and_jobs remote_folder', asyn
 
 test('machine_strip__should_show_settings_patterns_and_jobs config_error', async () => {
   // Given
-  const error = '/Users/verify/.config/wtpool/machine.toml: limit = 0 is out of bounds 1 to 64';
+  const error = `${CONFIG}: limit = 0 is out of bounds 1 to 64`;
   const status = mustValidate(withJobs(busy, jobs({ limit: null, error })));
   webview = await mount();
   webview.show(status);
@@ -404,7 +404,7 @@ test('machine_strip__should_follow_the_keyboard waits_for_the_answer', async () 
 
 test('machine_strip__should_follow_the_keyboard shows_the_refusal', async () => {
   // Given
-  const error = 'wtpool: /Users/verify/.config/wtpool/machine.toml is a symlink to /etc/x; edit it by hand';
+  const error = `wtpool: ${CONFIG} is a symlink to /etc/x; edit it by hand`;
   webview = await mount();
   webview.show(mustValidate(busy));
   const shown = openStrip(webview);

@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { isDeepStrictEqual } = require('node:util');
 
-const { openStatus, posted, resetFake, scenarioDocuments, sleep, starts, waitFor } = require('./support.cjs');
+const { expectedDocuments, openStatus, posted, resetFake, sleep, starts, waitFor } = require('./support.cjs');
 
 const UNKNOWN = 'wtpool_verify_unknown';
 
@@ -41,8 +41,8 @@ describe('unknown properties', () => {
     // Given: a document with actors and actions, then one with a build, each given unknown
     // properties, distinct by `generated`.
     const plain = [
-      scenarioDocuments('several_agents_one_worktree').at(-1),
-      scenarioDocuments('building_without_agent')[0],
+      expectedDocuments('several_agents_one_worktree').at(-1),
+      expectedDocuments('building_without_agent')[0],
     ].map((doc, index) => ({ ...doc, generated: `2026-10-20T13:00:0${index}Z` }));
     const documents = plain.map(withUnknown);
     const count = (key) => JSON.stringify(documents).split(`"${key}"`).length - 1;

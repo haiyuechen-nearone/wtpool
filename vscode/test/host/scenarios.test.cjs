@@ -10,10 +10,10 @@ const {
   REPO,
   control,
   ended,
+  expectedDocuments,
   openStatus,
   posted,
   resetFake,
-  scenarioDocuments,
   sleep,
   starts,
   waitFor,
@@ -32,7 +32,7 @@ describe('scenarios', () => {
     it(name, async () => {
       // Given
       await resetFake({ scenario: name, aliveMs: 200, gapMs: 500 });
-      const expected = scenarioDocuments(name).map((doc) => JSON.stringify(doc));
+      const expected = expectedDocuments(name).map((doc) => JSON.stringify(doc));
       const from = (await posted()).length;
 
       // When
@@ -61,7 +61,7 @@ describe('validator', () => {
   it('validator__should_accept_every_scenario_document', async () => {
     // Given
     // Each document distinct, so a product that skips a repeated document still posts each.
-    const documents = names.flatMap((name) => scenarioDocuments(name)).map((doc, index) => ({
+    const documents = names.flatMap((name) => expectedDocuments(name)).map((doc, index) => ({
       ...doc,
       generated: new Date(Date.parse(doc.generated) + index * 1000).toISOString().replace('.000Z', 'Z'),
     }));
@@ -103,7 +103,7 @@ describe('validator', () => {
 describe('popups', () => {
   it('manifest__should_contribute_no_status_bar_item waits_raise_no_popup', async () => {
     // Given
-    const waiting = structuredClone(scenarioDocuments('idle_pool').at(-1));
+    const waiting = structuredClone(expectedDocuments('idle_pool').at(-1));
     const slot = waiting.pools[0].worktrees.find((w) => w.name === 'wt2');
     Object.assign(slot, {
       activity: 'waiting',
@@ -130,7 +130,7 @@ describe('popups', () => {
 
     // When
     try {
-      await resetFake({ documents: [scenarioDocuments('idle_pool').at(-1), waiting], aliveMs: 200 });
+      await resetFake({ documents: [expectedDocuments('idle_pool').at(-1), waiting], aliveMs: 200 });
       const from = (await posted()).length;
       await openStatus();
       await waitFor(async () => (await posted()).slice(from).some((m) => m?.type === 'view' && m.status?.generated === waiting.generated && m.status.pools[0].worktrees.some((w) => w.activity === 'waiting')), 10_000);

@@ -7,12 +7,23 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use super::block::POLICY_ARGS;
+use super::block::{HOOK_ARGS, POLICY_ARGS};
 use super::plugin::PLUGIN_ID;
 use crate::events::HookEvent;
+use crate::tools::SHELL_TOOLS;
 
 /// The marketplace that publishes the plugin.
 const MARKETPLACE: &str = "haiyuechen-nearone/wtpool";
+
+/// The `wtpool` that a settings file runs for the policy check of shell calls.
+#[derive(Debug, PartialEq, Eq)]
+enum PolicyEntry<'a> {
+    /// The `binary` of the block.
+    This,
+    /// Another `wtpool`, and never the `binary` of the block.
+    Other(&'a str),
+    Missing,
+}
 
 /// The `wtpool hook` entries of a settings file, by event.
 struct Hooks<'a> {
@@ -22,8 +33,32 @@ struct Hooks<'a> {
     others: BTreeMap<&'a str, Vec<&'static str>>,
     /// `true` when an event runs some `wtpool hook`, this one or another.
     any: bool,
-    /// The `wtpool` paths of the policy entries before shell calls.
-    policy: Vec<&'a str>,
+    policy: PolicyEntry<'a>,
+}
+
+impl Hooks<'_> {
+    /// `true` when each event and the policy check run the `binary` of the block.
+    fn is_complete(&self) -> bool {
+        self.missing.is_empty() && self.others.is_empty() && self.policy == PolicyEntry::This
+    }
+}
+
+/// The way Claude Code runs `wtpool hook` for a settings file.
+enum Presence<'a> {
+    /// The file is missing or cannot be read.
+    Unreadable,
+    /// The file is not valid JSON.
+    Malformed(&'a serde_json::Error),
+    /// The file enables the plugin and also holds `wtpool hook` entries.
+    Twice,
+    /// The file enables the plugin.
+    Plugin,
+    /// The file holds the whole block of `binary`.
+    Block,
+    /// The file holds no `wtpool hook` entry. `disabled` when it turns the plugin off.
+    Absent { disabled: bool },
+    /// The file holds some `wtpool hook` entries, and not the whole block of `binary`.
+    Partial(Hooks<'a>),
 }
 
 /// The `command` of each entry of `event` in `settings` whose `args` are `args`.
@@ -41,11 +76,6 @@ fn commands<'a>(settings: &'a Value, event: &str, args: &Value) -> Vec<&'a str> 
         .collect()
 }
 
-/// The `command` of each entry of `event` in `settings` whose `args` are `["hook"]`.
-fn hook_commands<'a>(settings: &'a Value, event: &str) -> Vec<&'a str> {
-    commands(settings, event, &json!(["hook"]))
-}
-
 fn is_wtpool(command: &str) -> bool {
     Path::new(command)
         .file_stem()
@@ -53,18 +83,26 @@ fn is_wtpool(command: &str) -> bool {
 }
 
 fn hooks<'a>(settings: &'a Value, binary: &str) -> Hooks<'a> {
-    let policy: Vec<&str> = commands(settings, HookEvent::PreToolUse.name(), &json!(POLICY_ARGS))
+    let policies: Vec<&str> = commands(settings, HookEvent::PreToolUse.name(), &json!(POLICY_ARGS))
         .into_iter()
         .filter(|command| is_wtpool(command))
         .collect();
+    let policy = if policies.contains(&binary) {
+        PolicyEntry::This
+    } else {
+        policies
+            .first()
+            .map_or(PolicyEntry::Missing, |other| PolicyEntry::Other(other))
+    };
     let mut found = Hooks {
         missing: Vec::new(),
         others: BTreeMap::new(),
-        any: !policy.is_empty(),
+        any: policy != PolicyEntry::Missing,
         policy,
     };
+    let args = json!(HOOK_ARGS);
     for event in HookEvent::ALL.map(HookEvent::name) {
-        let commands = hook_commands(settings, event);
+        let commands = commands(settings, event, &args);
         if commands.contains(&binary) {
             found.any = true;
             continue;
@@ -81,11 +119,20 @@ fn hooks<'a>(settings: &'a Value, binary: &str) -> Hooks<'a> {
     found
 }
 
-fn events(events: &[&str]) -> String {
-    if events.len() == HookEvent::ALL.len() {
-        "every event".to_owned()
-    } else {
-        events.join(", ")
+fn presence<'a>(settings: &'a Value, binary: &str) -> Presence<'a> {
+    let plugin = settings
+        .get("enabledPlugins")
+        .and_then(|plugins| plugins.get(PLUGIN_ID))
+        .and_then(Value::as_bool);
+    let hooks = hooks(settings, binary);
+    match plugin {
+        Some(true) if hooks.any => Presence::Twice,
+        Some(true) => Presence::Plugin,
+        _ if hooks.is_complete() => Presence::Block,
+        _ if !hooks.any => Presence::Absent {
+            disabled: plugin == Some(false),
+        },
+        _ => Presence::Partial(hooks),
     }
 }
 
@@ -98,74 +145,95 @@ pub(super) fn note(
     settings: Option<&str>,
     on_path: Option<&Path>,
 ) -> String {
-    let Some(text) = settings else {
-        return missing(shown, &[format!("{shown} is missing or cannot be read.")]);
+    let parsed = settings.map(serde_json::from_str::<Value>);
+    let presence = match &parsed {
+        None => Presence::Unreadable,
+        Some(Err(error)) => Presence::Malformed(error),
+        Some(Ok(settings)) => presence(settings, binary),
     };
-    let settings = match serde_json::from_str::<Value>(text) {
-        Ok(settings) => settings,
-        Err(error) => {
-            return missing(shown, &[format!("{shown} is not valid JSON ({error}).")]);
+    text(&presence, binary, shown, on_path)
+}
+
+fn text(presence: &Presence, binary: &str, shown: &str, on_path: Option<&Path>) -> String {
+    match presence {
+        Presence::Unreadable => missing(shown, &[format!("{shown} is missing or cannot be read.")]),
+        Presence::Malformed(error) => {
+            missing(shown, &[format!("{shown} is not valid JSON ({error}).")])
         }
-    };
-    let plugin = settings
-        .get("enabledPlugins")
-        .and_then(|plugins| plugins.get(PLUGIN_ID))
-        .and_then(Value::as_bool);
-    let hooks = hooks(&settings, binary);
-    if plugin == Some(true) && hooks.any {
-        return format!(
+        Presence::Twice => format!(
             "hooks present twice: {shown} enables the plugin {PLUGIN_ID} and holds a wtpool hook \
              block, so each event runs wtpool hook twice.\nRemove the block: delete each entry \
              under \"hooks\" in {shown} whose \"args\" are [\"hook\"] or [\"hook\", \"policy\"].\n"
-        );
-    }
-    if plugin == Some(true) {
-        let path_line = match on_path {
-            Some(path) => format!("Its hooks run the wtpool on PATH, here {}.", path.display()),
-            None => "Its hooks run wtpool from PATH, and no wtpool is on PATH here: put wtpool \
+        ),
+        Presence::Plugin => {
+            let path_line = match on_path {
+                Some(path) => format!("Its hooks run the wtpool on PATH, here {}.", path.display()),
+                None => {
+                    "Its hooks run wtpool from PATH, and no wtpool is on PATH here: put wtpool \
                      there, in the PATH Claude Code starts with."
-                .to_owned(),
-        };
-        return format!("hooks present: {shown} enables the plugin {PLUGIN_ID}.\n{path_line}\n");
+                        .to_owned()
+                }
+            };
+            format!("hooks present: {shown} enables the plugin {PLUGIN_ID}.\n{path_line}\n")
+        }
+        Presence::Block => format!("hooks present: {shown} holds this block.\n"),
+        Presence::Absent { disabled: true } => missing(
+            shown,
+            &[format!(
+                "{shown} disables the plugin {PLUGIN_ID} and holds no wtpool hook."
+            )],
+        ),
+        Presence::Absent { disabled: false } => missing(
+            shown,
+            &[format!(
+                "{shown} neither enables the plugin {PLUGIN_ID} nor holds this block."
+            )],
+        ),
+        Presence::Partial(hooks) => missing(shown, &gaps(hooks, binary, shown)),
     }
-    let policy_here = hooks.policy.contains(&binary);
-    if hooks.missing.is_empty() && hooks.others.is_empty() && policy_here {
-        return format!("hooks present: {shown} holds this block.\n");
-    }
+}
+
+/// One line for each part of the block of `binary` that `hooks` lacks.
+fn gaps(hooks: &Hooks, binary: &str, shown: &str) -> Vec<String> {
     let mut lines = Vec::new();
-    if !hooks.any {
-        lines.push(if plugin == Some(false) {
-            format!("{shown} disables the plugin {PLUGIN_ID} and holds no wtpool hook.")
-        } else {
-            format!("{shown} neither enables the plugin {PLUGIN_ID} nor holds this block.")
-        });
-    } else {
-        if !hooks.missing.is_empty() {
-            lines.push(format!(
-                "{shown} holds no wtpool hook for {}.",
-                events(&hooks.missing)
-            ));
-        }
-        for (other, those) in &hooks.others {
-            lines.push(format!(
-                "{shown} runs another wtpool, {other}, for {}: replace that path with {binary}.",
-                events(those)
-            ));
-        }
-        if !policy_here {
-            lines.push(match hooks.policy.first() {
-                Some(other) => format!(
-                    "{shown} runs another wtpool, {other}, for the policy check of shell calls: \
-                     replace that path with {binary}."
-                ),
-                None => format!(
-                    "{shown} holds no wtpool hook policy entry for Bash, PowerShell and Monitor \
-                     calls."
-                ),
-            });
-        }
+    if !hooks.missing.is_empty() {
+        lines.push(format!(
+            "{shown} holds no wtpool hook for {}.",
+            events(&hooks.missing)
+        ));
     }
-    missing(shown, &lines)
+    for (other, those) in &hooks.others {
+        lines.push(format!(
+            "{shown} runs another wtpool, {other}, for {}: replace that path with {binary}.",
+            events(those)
+        ));
+    }
+    match hooks.policy {
+        PolicyEntry::This => {}
+        PolicyEntry::Other(other) => lines.push(format!(
+            "{shown} runs another wtpool, {other}, for the policy check of shell calls: replace \
+             that path with {binary}."
+        )),
+        PolicyEntry::Missing => lines.push(format!(
+            "{shown} holds no wtpool hook policy entry for {} calls.",
+            shell_tools()
+        )),
+    }
+    lines
+}
+
+fn events(events: &[&str]) -> String {
+    if events.len() == HookEvent::ALL.len() {
+        "every event".to_owned()
+    } else {
+        events.join(", ")
+    }
+}
+
+/// The [`SHELL_TOOLS`] as one phrase, `Bash, PowerShell and Monitor`.
+fn shell_tools() -> String {
+    let [rest @ .., last] = SHELL_TOOLS;
+    format!("{} and {last}", rest.join(", "))
 }
 
 /// A `hooks missing:` note: `lines`, then the ways to add the hooks.

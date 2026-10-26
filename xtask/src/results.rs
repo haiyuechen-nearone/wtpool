@@ -1,3 +1,5 @@
+//! The result of each check, and the part files that store them in a run folder.
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};

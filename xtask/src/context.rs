@@ -1,3 +1,6 @@
+//! `repo_context__should_be_unchanged`: the files Claude Code reads as instructions match the
+//! base commit.
+
 use std::collections::BTreeMap;
 use std::path::Path;
 

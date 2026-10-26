@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
-import { actionBoxes, ring } from '../support/measure.mjs';
+import { actionBoxes, ring, ringProblems } from '../support/measure.mjs';
 import { THEME_NAMES } from '../support/page.mjs';
 import { inkBounds, pixelHelper } from '../support/pixels.mjs';
 import { hoverActions, rowIds, short, showPlain, visualPanel } from '../support/states.mjs';
@@ -13,14 +13,6 @@ const CENTRE_PX = 0.5;
 const INK_THRESHOLD = 60;
 
 test.describe.configure({ mode: 'parallel' });
-
-function ringProblems(r) {
-  if (r.missing) return [`${r.key} (${r.state}): no focus ring`];
-  const out = [];
-  if (Object.keys(r.lost).length) out.push(`${r.key} (${r.state}): ring ${r.outline} cut by ${r.clippedBy.join(', ')} ${JSON.stringify(r.lost)}`);
-  if (r.contrast && r.contrast.ratio < 3) out.push(`${r.key} (${r.state}): ring ${r.contrast.ring} on ${r.contrast.under} is ${r.contrast.ratio}:1, under 3:1`);
-  return out;
-}
 
 for (const theme of THEME_NAMES) {
   for (const width of [1100, 600]) {
@@ -35,7 +27,7 @@ for (const theme of THEME_NAMES) {
         if (!r) return null;
         stops += 1;
         if (r.state.startsWith('selected')) selectedStops += 1;
-        for (const p of ringProblems(r)) if (!problems.has(p)) problems.set(p, at);
+        for (const p of ringProblems(`${r.key} (${r.state})`, r)) if (!problems.has(p)) problems.set(p, at);
         return r;
       };
       const tab = async (key = 'Tab') => {

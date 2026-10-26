@@ -1,24 +1,24 @@
 //! `wtpool hook`, `wtpool hook policy`, `wtpool hook gc` and `wtpool hook install`.
 
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use wtpool_claude_code::ClaudeCode;
-use wtpool_core::hook::{self, Adapter as _, HookEnv, PolicyEnv};
+use wtpool_core::hook::{self, Adapter, HookEnv, PolicyEnv};
 
 use crate::verify_files;
 
 /// The time a hook may run before its watchdog ends it.
 const WATCHDOG: Duration = Duration::from_secs(1);
 
-/// An adapter `wtpool hook` can run, one variant per harness.
+/// The adapters `wtpool hook` can run, one variant per harness.
 #[derive(Debug)]
-enum Adapter {
+enum Harnesses {
     ClaudeCode(ClaudeCode),
 }
 
-impl Adapter {
+impl Harnesses {
     fn from_process() -> Self {
         Self::ClaudeCode(ClaudeCode::from_process())
     }
@@ -55,14 +55,7 @@ impl Adapter {
 pub fn run_hook() {
     let env = hook_env();
     let log = env.log.clone();
-    let watchdog_log = log.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(WATCHDOG);
-        if let Some(dir) = &watchdog_log {
-            hook::log_line(dir, "wtpool hook: the watchdog ended a run after 1 s");
-        }
-        std::process::exit(0);
-    });
+    arm_watchdog(log.clone());
     std::panic::set_hook(Box::new(move |info| {
         let at = info
             .location()
@@ -72,10 +65,10 @@ pub fn run_hook() {
         log.iter().for_each(|dir| hook::log_line(dir, &line));
     }));
     let _ = std::panic::catch_unwind(|| {
-        let adapter = Adapter::from_process();
+        let harness = Harnesses::from_process();
         let input = hook::read_input(std::io::stdin().lock());
-        verify_panic(&adapter, &input);
-        adapter.handle(&input, &env);
+        verify_panic(&harness, &input);
+        harness.handle(&input, &env);
     });
 }
 
@@ -83,17 +76,14 @@ pub fn run_hook() {
 /// shell call outside a job, or nothing. It writes no file, and every fault, a panic or a hang
 /// included, ends it with nothing printed and exit 0, so the call goes on.
 pub fn run_policy() {
-    std::thread::spawn(|| {
-        std::thread::sleep(WATCHDOG);
-        std::process::exit(0);
-    });
+    arm_watchdog(None);
     std::panic::set_hook(Box::new(|_| {}));
     let decision = std::panic::catch_unwind(|| {
-        let adapter = Adapter::from_process();
+        let harness = Harnesses::from_process();
         let input = hook::read_input(std::io::stdin().lock());
-        verify_panic(&adapter, &input);
+        verify_panic(&harness, &input);
         let env = PolicyEnv::from_env(|name| std::env::var_os(name))?;
-        adapter.judge(&input, &env)
+        harness.judge(&input, &env)
     });
     if let Ok(Some(line)) = decision {
         let mut stdout = std::io::stdout().lock();
@@ -101,6 +91,18 @@ pub fn run_policy() {
             .write_all(line.as_bytes())
             .and_then(|()| stdout.flush());
     }
+}
+
+/// Ends the process with exit 0 once it has run for [`WATCHDOG`], noting that in the hook's log
+/// at `log` when it is given.
+fn arm_watchdog(log: Option<PathBuf>) {
+    std::thread::spawn(move || {
+        std::thread::sleep(WATCHDOG);
+        if let Some(dir) = &log {
+            hook::log_line(dir, "wtpool hook: the watchdog ended a run after 1 s");
+        }
+        std::process::exit(0);
+    });
 }
 
 /// Runs `wtpool hook gc` on the pool whose common git directory is `common`, and returns the
@@ -127,7 +129,7 @@ pub fn install_text() -> Result<hook::Printed, String> {
             binary.display()
         ));
     }
-    Ok(Adapter::from_process().install(&binary.to_string_lossy()))
+    Ok(Harnesses::from_process().install(&binary.to_string_lossy()))
 }
 
 /// The inputs of `wtpool hook` and `wtpool hook gc` besides the payload: this process's
@@ -141,12 +143,12 @@ fn hook_env() -> HookEnv {
 /// In a `verify` build, panics when `WTPOOL_VERIFY_PANIC` names the payload's event.
 #[cfg(feature = "verify")]
 #[expect(clippy::panic)]
-fn verify_panic(adapter: &Adapter, input: &[u8]) {
+fn verify_panic(harness: &Harnesses, input: &[u8]) {
     let wanted = std::env::var("WTPOOL_VERIFY_PANIC").ok();
-    if wanted.is_some() && wanted == adapter.event_name(input) {
+    if wanted.is_some() && wanted == harness.event_name(input) {
         panic!("WTPOOL_VERIFY_PANIC");
     }
 }
 
 #[cfg(not(feature = "verify"))]
-fn verify_panic(_: &Adapter, _: &[u8]) {}
+fn verify_panic(_: &Harnesses, _: &[u8]) {}
