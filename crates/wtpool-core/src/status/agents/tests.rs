@@ -6,8 +6,9 @@ use rstest::rstest;
 use super::*;
 use crate::activity::CallKind;
 use crate::activity::PlacedBy;
-use crate::status::records::{Call, ProcessId, SubagentTitle, ToolTarget, Waiting};
-use crate::status::time::RecordTime;
+use crate::processes::{RecordedProcess, StartTime};
+use crate::status::record_time::RecordTime;
+use crate::status::records::{Call, SubagentTitle, ToolTarget, Waiting};
 
 mod background;
 
@@ -34,7 +35,7 @@ fn record(key: &str, state: RecordState) -> Record {
         since: at(0),
         updated: at(0),
         writer_started: 0,
-        process: Some(ProcessId {
+        process: Some(RecordedProcess {
             pid: CLAUDE,
             started: Some(Timestamp::from_seconds(START - 3600)),
         }),
@@ -43,11 +44,13 @@ fn record(key: &str, state: RecordState) -> Record {
     }
 }
 
-fn claude(started: Option<i64>) -> Process {
-    Process {
+fn claude(started: Option<i64>) -> RunningProcess {
+    RunningProcess {
         pid: CLAUDE,
         parent: Some(1),
-        started: started.map(Timestamp::from_seconds),
+        started: started
+            .map(Timestamp::from_seconds)
+            .and_then(StartTime::from_second),
         name: "claude".to_owned(),
         cwd: PathBuf::from("/p/fg"),
     }
@@ -120,7 +123,7 @@ fn actor__should_not_count_a_dead_subagent_as_working() {
     // Given
     let subject = with_calls(record("s1", RecordState::Working), &[CallKind::Agent]);
     let mut subagent = record("s1.a1", RecordState::Working);
-    subagent.process = Some(ProcessId {
+    subagent.process = Some(RecordedProcess {
         pid: 9,
         started: None,
     });
@@ -130,44 +133,6 @@ fn actor__should_not_count_a_dead_subagent_as_working() {
 
     // Then
     assert_eq!(state, Some(ActorState::Quiet));
-}
-
-#[rstest]
-#[case::same_start(Some(START - 3600), Some(START - 3600), true)]
-#[case::pid_reused(Some(START - 3600), Some(START - 60), false)]
-#[case::record_without_start(None, Some(START - 60), true)]
-#[case::table_without_start(Some(START - 3600), None, true)]
-fn is_alive__should_match_pid_and_start_time(
-    #[case] recorded: Option<i64>,
-    #[case] running: Option<i64>,
-    #[case] expected: bool,
-) {
-    // Given
-    let mut subject = record("s1", RecordState::Idle);
-    subject.process = Some(ProcessId {
-        pid: CLAUDE,
-        started: recorded.map(Timestamp::from_seconds),
-    });
-
-    // When
-    let alive = is_alive(&subject, &[claude(running)]);
-
-    // Then
-    assert_eq!(alive, expected);
-}
-
-#[test]
-fn is_alive__should_find_a_gone_pid_dead_and_a_record_without_process_alive() {
-    // Given
-    let mut without = record("s2", RecordState::Idle);
-    without.process = None;
-
-    // When
-    let gone = is_alive(&record("s1", RecordState::Idle), &[]);
-    let unknown = is_alive(&without, &[]);
-
-    // Then
-    assert_eq!((gone, unknown), (false, true));
 }
 
 fn waiting(reason: Option<&str>, tool: Option<&str>) -> Waiting {
@@ -403,7 +368,7 @@ fn sort__should_put_the_newest_first_then_by_key() {
 fn session(key: &str, pid: u32, started: Option<i64>, updated: i64, state: RecordState) -> Record {
     let mut record = record(key, state);
     record.updated = at(updated);
-    record.process = Some(ProcessId {
+    record.process = Some(RecordedProcess {
         pid,
         started: started.map(Timestamp::from_seconds),
     });

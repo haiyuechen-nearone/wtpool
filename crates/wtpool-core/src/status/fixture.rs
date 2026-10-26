@@ -4,12 +4,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 
-use super::procs::{ListProcesses, Process};
 use super::state::PoolState;
 use crate::activity::ACTIVITY_DIR;
 use crate::config::{Config, SlotCount};
 use crate::names::SlotPrefix;
 use crate::paths::AbsolutePath;
+use crate::processes::{ListProcesses, ProcessQuery, RunningProcess};
 use crate::settings::Source;
 
 pub fn must_git(dir: &Path, args: &[&str]) -> String {
@@ -28,22 +28,22 @@ pub fn must_git(dir: &Path, args: &[&str]) -> String {
     String::from_utf8(output.stdout).unwrap()
 }
 
-/// A process table a test sets.
+/// A process table a test sets. It lists every process with all its facts, whatever the query.
 #[derive(Clone, Default)]
-pub struct FixedProcesses(pub Arc<Mutex<Vec<Process>>>);
+pub struct FixedProcesses(pub Arc<Mutex<Vec<RunningProcess>>>);
 
 impl FixedProcesses {
-    pub fn new(processes: Vec<Process>) -> Self {
+    pub fn new(processes: Vec<RunningProcess>) -> Self {
         Self(Arc::new(Mutex::new(processes)))
     }
 
-    pub fn set(&self, processes: Vec<Process>) {
+    pub fn set(&self, processes: Vec<RunningProcess>) {
         *self.0.lock().unwrap() = processes;
     }
 }
 
 impl ListProcesses for FixedProcesses {
-    fn processes(&self) -> Vec<Process> {
+    fn list(&self, _: &ProcessQuery<'_>) -> Vec<RunningProcess> {
         self.0.lock().unwrap().clone()
     }
 }
@@ -108,11 +108,12 @@ impl Fixture {
         }
     }
 
-    pub fn must_load(&self, processes: Vec<Process>) -> PoolState {
+    pub fn must_load(&self, processes: Vec<RunningProcess>) -> PoolState {
         PoolState::load(
             self.config(),
             self.common.clone(),
             &FixedProcesses::new(processes),
+            "machine".to_owned(),
         )
         .unwrap()
     }
@@ -127,8 +128,8 @@ impl Fixture {
     }
 
     /// A process called `name` working in `folder` below the pool's root.
-    pub fn process(&self, pid: u32, name: &str, folder: &str) -> Process {
-        Process {
+    pub fn process(&self, pid: u32, name: &str, folder: &str) -> RunningProcess {
+        RunningProcess {
             pid,
             parent: None,
             started: None,

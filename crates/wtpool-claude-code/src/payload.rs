@@ -1,4 +1,4 @@
-//! The fields of a Claude Code hook payload that `wtpool hook` reads (H5). Everything else, the
+//! The fields of a Claude Code hook payload that `wtpool hook` reads. Everything else, the
 //! prompt, notification text and call results included, is never parsed into a string.
 
 use std::fmt;
@@ -11,7 +11,7 @@ use wtpool_core::hook::CallInput;
 
 use crate::events::HookEvent;
 
-/// A parsed payload. Its ids match their patterns, or it does not parse (H17).
+/// A parsed payload. Its ids match their patterns, or it does not parse.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Payload {
     pub session_id: ActorId,
@@ -42,7 +42,7 @@ pub struct Payload {
     pub error: Option<Value>,
     #[serde(default)]
     pub new_cwd: Option<String>,
-    /// The background work a Stop or SubagentStop lists in flight (H27).
+    /// The background work a Stop or SubagentStop lists in flight.
     #[serde(default)]
     pub background_tasks: Option<Value>,
 }
@@ -59,10 +59,10 @@ pub struct BatchCall {
     pub tool_input: CallInput,
 }
 
-/// The fields of a call's `tool_response` that `wtpool hook` reads: the `agentId` of the subagent an
-/// Agent call started (H16), and the `backgroundTaskId` of a Bash call that went to the
-/// background (H27). A response of any other shape, or a field that is no string, reads as none,
-/// never as a payload that does not parse.
+/// The fields of a call's `tool_response` that `wtpool hook` reads: the `agentId` of the subagent
+/// an Agent call started, and the `backgroundTaskId` of a Bash call that went to the background.
+/// A response of any other shape, or a field that is no string, reads as none, never as a payload
+/// that does not parse.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ToolResponse {
     pub agent_id: Option<String>,
@@ -75,8 +75,6 @@ impl<'de> Deserialize<'de> for ToolResponse {
     }
 }
 
-/// Reads a `tool_response` of any shape, keeping only an object's `agentId` and
-/// `backgroundTaskId`.
 struct ResponseVisitor;
 
 impl<'de> Visitor<'de> for ResponseVisitor {
@@ -161,7 +159,7 @@ mod tests {
 
     use super::*;
 
-    /// Writes what a visitor expects.
+    /// The `expecting` text of a visitor, as [`fmt::Display`].
     struct Expecting<'a>(&'a ResponseVisitor);
 
     impl fmt::Display for Expecting<'_> {

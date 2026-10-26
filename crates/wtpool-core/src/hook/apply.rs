@@ -4,7 +4,7 @@
 use super::adapter::WaitingTools;
 use super::input::{CallFacts, Event};
 use super::record::{
-    Action, Call, Ended, MAX_DONE_IDS, MAX_IN_FLIGHT, MAX_SUBAGENTS, Process, Record,
+    Action, Call, Ended, HarnessProcess, MAX_DONE_IDS, MAX_IN_FLIGHT, MAX_SUBAGENTS, Record,
     SubagentTitle, Title, TitleBy, Wait,
 };
 use crate::activity::{CallId, Harness, PlacedBy, RECORD_VERSION, State, WaitReason};
@@ -18,7 +18,7 @@ pub struct Change {
     pub waiting_tools: WaitingTools,
     pub now: String,
     pub started_micros: i64,
-    pub process: Option<Process>,
+    pub process: Option<HarnessProcess>,
     /// Where a new record goes and how it got there.
     pub first_place: (String, PlacedBy),
     /// The working folder of the session's first event.

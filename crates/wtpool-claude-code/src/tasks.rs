@@ -1,11 +1,10 @@
-//! Claude Code's background tasks (H27). A Bash call that runs in the background ends with a
-//! PostToolUse whose `tool_response` names the task (`backgroundTaskId`), and Claude Code writes
-//! its output to `<base>/claude-<uid>/<project>/<session_id>/tasks/<id>.output`: `<base>` is
-//! `CLAUDE_CODE_TMPDIR`, else `/tmp`, with its symlinks resolved, and `<project>` the folder that
-//! holds the session's transcript, `<config>/projects/<project>/<session_id>.jsonl`. A Stop or
-//! SubagentStop lists the tasks still in flight in the whole session (`background_tasks`), its
-//! subagents' included, and TaskStop (KillShell before it) stops one. The hook never opens an
-//! output file.
+//! Claude Code's background tasks. A Bash call that runs in the background ends with a
+//! PostToolUse whose `tool_response` names the task (`backgroundTaskId`). Claude Code writes the
+//! task's output to `<base>/claude-<uid>/<project>/<session_id>/tasks/<id>.output`, with `<base>`
+//! `CLAUDE_CODE_TMPDIR`, else `/tmp`, its symlinks resolved, and `<project>` the folder of the
+//! session's transcript, `<config>/projects/<project>/<session_id>.jsonl`. A Stop or SubagentStop
+//! lists the tasks still in flight in the whole session (`background_tasks`), its subagents'
+//! included. TaskStop, and KillShell before it, stops one. The hook never opens an output file.
 
 use std::ffi::OsStr;
 use std::path::{Component, Path};
@@ -18,7 +17,7 @@ use wtpool_core::hook::text;
 use crate::events::HookEvent;
 use crate::payload::Payload;
 
-/// The longest output path a record keeps (H27).
+/// The longest output path a record keeps, in bytes.
 pub const MAX_TASK_PATH: usize = 1024;
 /// The longest project folder name.
 const MAX_PROJECT: usize = 255;
@@ -35,11 +34,9 @@ pub fn task_start(payload: &Payload) -> Option<TaskId> {
     TaskId::try_from(id).ok()
 }
 
-/// The ids a Stop or SubagentStop lists in flight in its whole session; `None` without the
-/// list, so nothing ends. Claude Code 2.1.310 sends the list on every Stop and SubagentStop, `[]`
-/// when nothing is in flight, and lists only tasks whose `status` is `running` or `pending`; an
-/// entry with another `status` text names a task that is no longer in flight, and one without
-/// a `status` text still counts.
+/// The ids a Stop or SubagentStop lists in flight in its whole session, `None` without the list,
+/// so nothing ends. Claude Code 2.1.310 sends the list on every Stop and SubagentStop, `[]` when
+/// nothing is in flight.
 #[must_use]
 pub fn tasks_running(payload: &Payload) -> Option<Vec<TaskId>> {
     if !matches!(
@@ -59,15 +56,15 @@ pub fn tasks_running(payload: &Payload) -> Option<Vec<TaskId>> {
     )
 }
 
-/// Whether a listed task's `status` keeps it in flight: `running`, `pending`, or no text.
+/// Claude Code 2.1.310 lists only `running` and `pending` tasks, but a listed task without a
+/// `status` text still counts as in flight.
 fn in_flight(status: Option<&Value>) -> bool {
     status
         .and_then(Value::as_str)
         .is_none_or(|status| matches!(status, "running" | "pending"))
 }
 
-/// The task a PostToolUse of TaskStop (`task_id`, else `shell_id`) or KillShell (`shell_id`)
-/// stopped.
+/// The task a PostToolUse of TaskStop or KillShell stopped.
 #[must_use]
 pub fn task_stopped(payload: &Payload) -> Option<TaskId> {
     if payload.event() != Some(HookEvent::PostToolUse) {
@@ -83,9 +80,8 @@ pub fn task_stopped(payload: &Payload) -> Option<TaskId> {
     TaskId::try_from(id).ok()
 }
 
-/// The project folder of a transcript `<config>/projects/<project>/<session>.jsonl`: only for
-/// an absolute path whose file is the session's, and a folder name of letters, digits, `.`,
-/// `_` and `-` that is not `.` or `..`.
+/// The `<project>` of the session's own transcript `<config>/projects/<project>/<session>.jsonl`,
+/// `None` for a name that is not safe to join into a path.
 fn project_of(transcript: &str, session: &str) -> Option<String> {
     let path = Path::new(transcript);
     let file = format!("{session}.jsonl");
@@ -102,10 +98,9 @@ fn project_of(transcript: &str, session: &str) -> Option<String> {
     named.then(|| project.to_owned())
 }
 
-/// The output file of `task`, which the call of `input` started (H27): under `claude_tmp`, else
-/// `/tmp`, with its symlinks resolved, then `claude-<uid>/<project>/<session>/tasks/<id>.output`,
-/// `<project>` the folder of the session's transcript. `None` without that folder, when the base
-/// folder cannot be resolved, or when the path fails [`is_task_file`].
+/// The output file of `task`, a task the call of `input` started, with `claude_tmp`, else `/tmp`,
+/// as `<base>`. `None` without the project folder or a base folder that resolves, or for a path
+/// that fails [`is_task_file`].
 #[must_use]
 pub fn task_file(
     claude_tmp: Option<&Path>,
@@ -128,9 +123,8 @@ pub fn task_file(
     is_task_file(&path, &folder, task.as_str()).then_some(text)
 }
 
-/// Whether `path` is the output file of task `id` in the task folder `folder`: absolute, only
-/// normal components after its root, text without control, bidi or zero width characters
-/// (H15), directly in `folder`, named `<id>.output`, and at most [`MAX_TASK_PATH`] bytes.
+/// `true` when `path` is `<folder>/<id>.output`, absolute, without `.` or `..` components or
+/// invisible characters, and at most [`MAX_TASK_PATH`] bytes long.
 #[must_use]
 pub fn is_task_file(path: &Path, folder: &Path, id: &str) -> bool {
     let normal = path.components().all(|component| {

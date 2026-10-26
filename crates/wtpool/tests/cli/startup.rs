@@ -1,4 +1,4 @@
-//! What `wtpool` does before it touches the pool: its arguments and its configuration.
+//! The checks `wtpool` makes before it touches the pool: its arguments and its configuration.
 
 use std::ffi::OsString;
 use std::process::Command;

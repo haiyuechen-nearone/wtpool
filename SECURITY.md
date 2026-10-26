@@ -69,18 +69,27 @@ your `on_new_slot`, can use the network, as
 
 But the hook resolves the paths that the model writes in tool calls, such as a Read's `file_path`
 or a path word of a Bash command, to find their worktree (H7 to H9). It does that from PreToolUse
-on, so before you approve the call. Resolving a path can make the system contact another
-machine:
+on, so before you approve the call. Opening a UNC path such as `\\host\share\file` makes Windows
+connect to that host over SMB. Windows may then try to sign in there with your account, which
+gives the host an NTLM hash that it can try to crack.
 
-- On Windows, a UNC path such as `\\host\share\file` makes Windows connect to that host over SMB.
-  Windows may then try to sign in there with your account, which gives the host an NTLM hash
-  that it can try to crack.
+So the hook never stats, opens or resolves a path of these shapes that it reads from a tool
+call, from the session's folders, or from a worktree's `.git` file and git directory (H7):
+
+- on Windows, a path with a UNC, device or verbatim prefix, such as `\\host\share`,
+  `\\?\UNC\host\share`, `\\.\pipe\name` or `\\?\GLOBALROOT\…`. A drive's prefix, `C:` or
+  `\\?\C:`, is the only prefix it reads;
+- on Windows, a path with a root but no drive, such as `\file` or `\??\UNC\host\share`;
+- elsewhere, a path that starts with exactly two slashes, such as `//host/share/file`, which
+  Windows and Cygwin read as a UNC share.
+
+Such a path lies outside every pool. Two cases still make the system contact another machine:
+
 - Where autofs serves `/net`, as on many Linux systems, a path under `/net/<host>` makes the
-  system contact that host.
-
-So text that the model reads, such as a file in a repository, can lead it to write such a path,
-and the hook then makes the system contact that host. A fix is planned with the hook's platform
-work.
+  system contact that host. Text that the model reads, such as a file in a repository, can lead
+  it to write such a path.
+- A local path that goes through a symlink whose target is a UNC path: the hook resolves
+  symlinks, so Windows then connects to that host.
 
 ### `on_new_slot` is a shell command
 
@@ -109,35 +118,51 @@ the only shell wtpool starts.
 - `copy` copies only files that git ignores in the main worktree, and never through a symlink.
   Those files, such as `.env`, then exist in every slot your agents work in.
 
+### The CLI's output
+
+A branch name can hold characters that a terminal acts on, such as a C1 control that starts an
+OSC 52 sequence, which writes your clipboard.
+
+- The CLI shows each control, bidi, zero width or other invisible format character of a branch,
+  path or other string from git, a record or a setting as `\u{XXXX}`, in every line it writes
+  itself (R2).
+- Two outputs keep such strings as they are: its JSON, and the path that `fg`, `bg` or `path`
+  prints when its standard output is not a terminal, so that `cd "$(wtpool bg <ref>)"` names the
+  real folder.
+- The output of the `git` commands it runs and of `on_new_slot` passes through as it is.
+
 ### The VS Code extension
 
-- Its manifest does not declare support for untrusted workspaces, and VS Code disables such an
-  extension in Restricted Mode. So it runs `wtpool`, and through it git, only in a workspace you
-  trust.
+- Its manifest declares untrusted workspaces unsupported, so VS Code keeps it disabled in
+  Restricted Mode, and it runs `wtpool`, and through it git, only in a workspace you trust.
 - The tab's page runs under a strict Content Security Policy (X8): `default-src 'none'`, scripts
   only with a nonce made for each load, styles and fonts only from the extension, and Trusted
   Types required. It has no inline styles.
 - Every string from git, records or command output reaches the page only through `textContent`
-  or `setAttribute` (X10). The page has no links and builds no HTML from data. Control, bidi and
-  zero width characters show as `\u{XXXX}`. The output tail and Follow show a tab as spaces.
+  or `setAttribute` (X10). The page has no links and builds no HTML from data. Control and format
+  characters, the bidi and zero width ones among them, the line and paragraph separators and the
+  tag block show as `\u{XXXX}`, also those that the output tail keeps. The output tail and Follow
+  show a tab as spaces.
 - Command URIs and forms are off, and the page loads resources only from the extension's
   `media/` folder (X9).
 - The extension accepts only a fixed set of messages from the page, and each must name a row or
   output path of the last status document (X11).
 - It runs only the binary that `wtpool.path` names, with an argument array and no shell (X4).
   That setting has application scope, so a workspace's `.vscode/settings.json` cannot change it.
-  Its default, `wtpool`, is looked up on the `PATH`. On Windows the workspace folder is searched
-  first, so set `wtpool.path` to a full path there.
+  A bare name, such as the default `wtpool`, runs the first match in an absolute folder of the
+  `PATH`. The workspace folder and relative `PATH` entries are never searched.
 - It loads no networking module and runs no server (X17).
 - The output tail and Follow read only paths that the status document lists, never through a
   symlink, and only regular files (R12). `wtpool status` lists a record's output path only when
-  it is absolute, with no `.` or `..` part. It does not check where that path points. So a record
-  that the hook did not write, such as one in a copied `.git`, can name any file you can read, and
+  it is absolute, with no `.` or `..` part, and the extension reads it only when it ends in
+  `tasks/<id>.output`. Neither checks where that path points. So a record that the hook did not
+  write, such as one in a copied `.git`, can name any file you can read whose path ends so, and
   the panel then shows its last lines.
 - The output tail drops every escape sequence and C1 control (R12). Follow drops them too, keeps
   only SGR colour sequences, and drops every other control character but tab, line feed and
   carriage return (X19). So a build log cannot write your clipboard (OSC 52) or show a disguised
-  link (OSC 8).
+  link (OSC 8). Follow passes bidi, zero width and other format characters to the terminal as
+  they are. The terminal's name leaves out every invisible character.
 
 ### What wtpool stores
 
@@ -158,12 +183,25 @@ with the description that its parent agent wrote in the Agent call.
 ### Test runs
 
 The live contract run of the verify harness, `cargo xtask verify --phase 3 --part cc --contract`,
-starts real Claude Code sessions on your login, and their model calls cost money. A script
-answers their permission prompts and allows only the calls each session's script names. Claude
-Code's sandbox runs their Bash commands: they write only inside the run folder and Claude Code's
-temporary folder, and reach no host but localhost. They see your home folder, as macOS finds your
-login keychain through it, but only an allowlist of your environment variables, so no
-`GH_TOKEN`, SSH agent or cloud token. No other part needs a login. [CONTRIBUTING](CONTRIBUTING.md#the-verify-harness) says when
-you need that run, and the spec's
+starts real Claude Code sessions on your login, and their model calls cost money. It runs the
+`claude` on your `PATH`, and the harness supports only the latest installed Claude Code. The
+sessions are locked down:
+
+- A script answers their permission prompts and allows only the calls each session's script
+  names. Calls that Claude Code allows without a prompt, such as a Read inside the session's
+  pool, never reach it. The contract turn has no tools.
+- Claude Code's sandbox runs their Bash commands: they write only inside the run folder and
+  Claude Code's temporary folder, and reach no host but localhost. WebFetch and WebSearch are
+  denied.
+- They see your home folder, as macOS finds your login keychain through it, but only an
+  allowlist of your environment variables, so no `GH_TOKEN`, SSH agent or cloud token. No
+  claude.ai connector of your account loads.
+- They load only the run's settings file. Claude Code's configuration, data, cache and state
+  folders are in the run folder, and its auto-updater is off.
+- `contract__should_run_in_the_sandbox` fails when your Claude Code install changed during the
+  run.
+
+No other part needs a login. [CONTRIBUTING](CONTRIBUTING.md#the-verify-harness) says when you
+need that run, and the spec's
 [Contract test](docs/design/status-panel/verification.md#contract-test) says how its sessions are
 kept apart from your own setup.

@@ -1,7 +1,6 @@
-//! The note `wtpool hook install` prints on stderr (H22, H28): whether Claude Code runs
-//! `wtpool hook` through the plugin `wtpool@wtpool`, the printed block, or both, and else exactly
-//! what is missing. Its first line starts with `hooks present:`, `hooks present twice:` or
-//! `hooks missing:`.
+//! The note `wtpool hook install` prints on standard error. It says if Claude Code runs
+//! `wtpool hook` through the plugin, the printed block or both, and else names each missing part.
+//! Its first line starts with `hooks present:`, `hooks present twice:` or `hooks missing:`.
 
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
@@ -12,7 +11,7 @@ use serde_json::{Value, json};
 use super::plugin::PLUGIN_ID;
 use crate::events::HookEvent;
 
-/// Where the plugin comes from, for the hint.
+/// The marketplace that publishes the plugin.
 const MARKETPLACE: &str = "haiyuechen-nearone/wtpool";
 
 /// The `wtpool` that a hook with the bare command `wtpool` starts: the first file of that name in
@@ -25,13 +24,13 @@ pub(super) fn on_path(path: Option<&OsStr>) -> Option<PathBuf> {
         .find(|file| file.is_file())
 }
 
-/// What `settings`, the text of the settings file named `shown`, does for each event.
+/// The `wtpool hook` entries of a settings file, by event.
 struct Hooks<'a> {
     /// The events with no `wtpool hook` entry at all.
     missing: Vec<&'static str>,
     /// Another `wtpool` that an event runs instead of `binary`, with those events.
     others: BTreeMap<&'a str, Vec<&'static str>>,
-    /// Whether any event runs some `wtpool hook`, this one or another.
+    /// `true` when an event runs some `wtpool hook`, this one or another.
     any: bool,
 }
 
@@ -50,7 +49,6 @@ fn hook_commands<'a>(settings: &'a Value, event: &str) -> Vec<&'a str> {
         .collect()
 }
 
-/// Whether `command` names a `wtpool`, by its file name.
 fn is_wtpool(command: &str) -> bool {
     Path::new(command)
         .file_stem()
@@ -81,7 +79,6 @@ fn hooks<'a>(settings: &'a Value, binary: &str) -> Hooks<'a> {
     found
 }
 
-/// The events, by name, or "every event".
 fn events(events: &[&str]) -> String {
     if events.len() == HookEvent::ALL.len() {
         "every event".to_owned()
@@ -156,7 +153,7 @@ pub(super) fn note(
     missing(shown, &lines)
 }
 
-/// A `hooks missing:` note: `lines`, then how to add the hooks.
+/// A `hooks missing:` note: `lines`, then the ways to add the hooks.
 fn missing(shown: &str, lines: &[String]) -> String {
     let mut note = format!("hooks missing: {}\n", lines.join("\n"));
     note.push_str(&format!(

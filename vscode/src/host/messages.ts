@@ -1,9 +1,3 @@
-// The messages a webview may send (X11), read into the requests a tab acts on. A message counts
-// only as a plain object of exactly `type` and `id`, with `id` a string. A row action and a
-// `select` name a row of the tab's last document, a `select` the empty string for none (R12), and
-// a `follow` an output path that document lists, of the shape R12 reads (X19). A missing worktree
-// offers only `copyPath`, and `free` and `fg` need a slot that is there and holds a branch (U4,
-// X12). Any other message makes no request.
 import type { Output, StatusDocument, Worktree } from '../generated/status';
 import type { ConfirmedActionType } from '../shared/confirmation';
 import {
@@ -16,7 +10,6 @@ import {
 } from '../shared/protocol';
 import { isTaskOutputPath } from './outputs';
 
-/** The row actions that run at once. */
 type DirectActionType = Exclude<ActionType, ConfirmedActionType>;
 
 /** Asks for `open`, `terminal` or `copyPath` on a row. */
@@ -31,14 +24,13 @@ interface ConfirmedAction {
   worktree: BranchSlot;
 }
 
-/** Names the selected row, whose outputs the tab then reads (R12). */
 interface Selection {
   type: 'select';
   /** The row's path, or null when no row is selected. */
   row: string | null;
 }
 
-/** Asks for a Follow terminal of an output the document lists (X19). */
+/** Asks for a Follow terminal of an output the document lists. */
 interface FollowRequest {
   type: 'follow';
   output: Output;
@@ -49,20 +41,15 @@ interface FollowRequest {
 /** A request of the webview, by its message's `type`. */
 export type WebviewRequest = DirectAction | ConfirmedAction | Selection | FollowRequest;
 
-/**
- * Finds the worktree at `path` of the tab's pool: the document's first, the only one it shows
- * (U8).
- */
+/** Finds the worktree at `path` in the document's first pool, the only one the tab shows. */
 export function worktreeAt(document: StatusDocument | null, path: unknown): Worktree | undefined {
   return document?.pools[0].worktrees.find((row) => row.path === path);
 }
 
-/** Tells a row action that asks before it runs. */
 function isConfirmed(type: ActionType): type is ConfirmedActionType {
   return type === 'free' || type === 'fg';
 }
 
-/** Reads the row action `type` on row `id`, if that row offers it. */
 function actionOf(
   type: ActionType,
   id: string,
@@ -78,7 +65,6 @@ function actionOf(
   return offeredActions(worktree).includes(type) ? { type, worktree } : undefined;
 }
 
-/** Reads a `select` of row `id`, or of no row for the empty id. */
 function selectionOf(id: string, document: StatusDocument | null): Selection | undefined {
   if (id === '') {
     return { type: 'select', row: null };
@@ -86,7 +72,6 @@ function selectionOf(id: string, document: StatusDocument | null): Selection | u
   return worktreeAt(document, id) ? { type: 'select', row: id } : undefined;
 }
 
-/** Reads a `follow` of the output at `id`, with the label of the actor that lists it. */
 function followOf(id: string, document: StatusDocument | null): FollowRequest | undefined {
   if (!isTaskOutputPath(id)) {
     return undefined;
@@ -102,7 +87,7 @@ function followOf(id: string, document: StatusDocument | null): FollowRequest | 
   return undefined;
 }
 
-/** Reads `message` as the request it makes of the tab with `document`, if it is one (X11). */
+/** Reads `message` as a request to the tab with `document`, if it is a valid one. */
 export function readRequest(
   message: unknown,
   document: StatusDocument | null,

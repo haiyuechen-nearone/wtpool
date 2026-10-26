@@ -3,9 +3,9 @@
 //! functions of the record and what the harness's adapter read from the event. The adapter
 //! names the file each task's output goes to; the hook never opens it.
 
-use super::clock;
 use super::record::{Record, Task};
 use crate::activity::TaskId;
+use crate::clock::Timestamp;
 
 /// Tasks kept per actor (H27).
 pub const MAX_TASKS: usize = 5;
@@ -76,13 +76,13 @@ pub fn update(record: &mut Record, event: &TaskEvent, now: &str) {
 /// at least [`LISTED_AFTER`] seconds before `now`. Whether a task ended. A task or a time that
 /// does not parse never ends.
 pub fn end_unlisted(record: &mut Record, running: &[TaskId], now: &str) -> bool {
-    let Some(now_seconds) = clock::parse_seconds(now) else {
+    let Some(now_at) = Timestamp::parse(now) else {
         return false;
     };
     let mut ended = false;
     for task in record.tasks.iter_mut().filter(|task| task.ended.is_none()) {
-        let old = clock::parse_seconds(&task.started)
-            .is_some_and(|started| now_seconds - started >= LISTED_AFTER);
+        let old = Timestamp::parse(&task.started)
+            .is_some_and(|started| now_at.seconds_since(started) >= LISTED_AFTER);
         if old && !lists(running, &task.id) {
             task.ended = Some(now.to_owned());
             ended = true;

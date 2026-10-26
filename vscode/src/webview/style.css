@@ -1,12 +1,12 @@
 /*
- * The Worktrees tab (status-panel.md, "Panel layout" and "UI mockups"). Colours come only from
- * --vscode-* variables (X13). Each activity group has one token (U6), chosen so its text reads at
- * 4.5:1 on plain, hovered and selected rows in the light, dark and high contrast themes:
- * attention list-warningForeground, active textLink-foreground, quiet descriptionForeground,
- * problem list-errorForeground. The build puts icons.css, the glyphs, in front of this sheet.
+ * The Worktrees tab. Colours come only from --vscode-* variables. Each activity group has one
+ * token, chosen so its text reads at 4.5:1 on plain, hovered and selected rows in the light, dark
+ * and high contrast themes: attention list-warningForeground, active textLink-foreground, quiet
+ * descriptionForeground, problem list-errorForeground. The build puts icons.css in front of this
+ * sheet.
  */
 
-/* The page is a column as tall as the tab (U1): the header and notes keep their height at the
+/* The page is a column as tall as the tab: the header and notes keep their height at the
  * top, and the box that scrolls the table takes the rest, down to the tab's bottom edge. */
 html {
   height: 100%;
@@ -31,8 +31,8 @@ body {
   white-space: nowrap;
 }
 
-/* Header: title, chips, connection, and wtpool's error while paused (U3, X6, R10). It stays put while
- * the table scrolls sideways or down, and wraps in a narrow tab rather than cut anything. */
+/* Header: title, chips, connection, and wtpool's error while paused. It stays put while the table
+ * scrolls sideways or down, and wraps in a narrow tab rather than cut anything. */
 
 .header {
   display: flex;
@@ -57,7 +57,7 @@ body {
 }
 
 /* Each chip shows its count in the colour of the group it counts, inside a 1 px border of that
- * colour, which keeps its shape at 3:1 in every theme where a fill would not (U6). */
+ * colour. The border keeps its shape at 3:1 in every theme where a fill would not. */
 .chip {
   display: inline-flex;
   align-items: center;
@@ -109,8 +109,8 @@ body {
 }
 
 /* wtpool's last stderr line, on a line of its own under the connection and aligned with it. It wraps
- * anywhere, a long path too, so none of it is cut (U1). The problem token reads at 4.5:1 on the
- * page in every theme (U6). */
+ * anywhere, a long path too, so none of it is cut. The problem token reads at 4.5:1 on the page in
+ * every theme. */
 .wtpool-error {
   flex-basis: 100%;
   min-width: 0;
@@ -130,9 +130,9 @@ body {
   color: var(--vscode-descriptionForeground);
 }
 
-/* The table (U1). Every column is as wide as its content; nothing is cut or ends in an ellipsis.
+/* The table. Every column is as wide as its content, and nothing is cut or ends in an ellipsis.
  * A tab narrower than the table scrolls it sideways inside .scroller. The px widths are minimums
- * that keep the columns still while words and ages change; Agent · doing takes the rest. */
+ * that keep the columns still while words and ages change. The agent column takes the rest. */
 
 /* .scroller fills the page's column to the tab's bottom edge, so its horizontal scrollbar sits
  * there at any tab height, never under a short table, and rows that do not fit scroll down inside
@@ -199,8 +199,8 @@ td {
   white-space: nowrap;
 }
 
-/* The pool's heading row (U8): the repository in the text colour, then ` · <machine>` muted, both
- * at 4.5:1 on the page in every theme (U6). */
+/* The pool's heading row: the repository in the text colour, then the machine muted, both at 4.5:1
+ * on the page in every theme. */
 .pool-heading td {
   padding-top: 10px;
   font-weight: 600;
@@ -276,7 +276,7 @@ body.vscode-high-contrast .row:hover:not(:focus) {
   text-align: right;
 }
 
-/* Activity: an icon and a word per value, coloured by group (U6). */
+/* Activity: an icon and a word per value, coloured by group. */
 
 .group-attention .activity {
   color: var(--vscode-list-warningForeground);
@@ -318,8 +318,8 @@ body.vscode-high-contrast .row:hover:not(:focus) {
   color: inherit;
 }
 
-/* Row actions: shown on hover and focus (U4), in a column of their own that fits all five (X12),
- * so a shown action never covers another column's text. */
+/* Row actions: shown on hover and focus, in a column of their own that fits all five, so a shown
+ * action never covers another column's text. */
 
 .actions {
   padding-top: 4px;
@@ -373,7 +373,7 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
-/* focusBorder is under 3:1 on Dark Modern's selection; VS Code's focusAndSelectionOutline, or the
+/* focusBorder is under 3:1 on Dark Modern's selection. VS Code's focusAndSelectionOutline, or the
  * selection foreground where a theme has none, is not. The high contrast themes keep focusBorder. */
 .row[aria-selected="true"]:focus,
 .row[aria-selected="true"] button:focus-visible {
@@ -385,9 +385,9 @@ body.vscode-high-contrast .row[aria-selected="true"] button:focus-visible {
   outline-color: var(--vscode-focusBorder);
 }
 
-/* The detail strip (U5): a boxed panel, its 1 px descriptionForeground border at 3:1 against the
- * page in every theme (U6). It keeps to the visible width of the scroller and stays in view while
- * a wide table scrolls sideways. */
+/* The detail strip: a boxed panel, its 1 px descriptionForeground border at 3:1 against the page in
+ * every theme. It keeps to the visible width of the scroller and stays in view while a wide table
+ * scrolls sideways. */
 
 .detail-cell {
   padding: 0 0 0 4px;
@@ -452,10 +452,10 @@ body.vscode-high-contrast .row[aria-selected="true"] button:focus-visible {
   color: var(--vscode-list-warningForeground);
 }
 
-/* The Output section (U9): under both columns of the strip, per agent, each task's heading and
- * Follow button over its tail in a monospace block. Lines wrap anywhere, so nothing is clipped
- * (U1); a tail taller than the block scrolls inside it. Text and border meet U6 in every theme:
- * the foreground on the editor background, and a descriptionForeground border at 3:1. */
+/* The Output section: under both columns of the strip, per agent, each task's heading and Follow
+ * button over its tail in a monospace block. Lines wrap anywhere, so nothing is clipped, and a tail
+ * taller than the block scrolls inside it. In every theme the text is the foreground on the editor
+ * background, and the border a descriptionForeground one at 3:1. */
 
 .output-area {
   grid-column: 1 / -1;
@@ -498,7 +498,7 @@ body.vscode-high-contrast .row[aria-selected="true"] button:focus-visible {
   color: var(--vscode-descriptionForeground);
 }
 
-/* A text button with a 1 px border in the link colour, which meets 3:1 on the strip. */
+/* A text button with a 1 px border in the link colour, at 3:1 on the strip. */
 .follow {
   flex: none;
   min-height: 24px;
@@ -549,7 +549,7 @@ body.vscode-high-contrast .follow:hover:not(:focus-visible) {
   font-style: italic;
 }
 
-/* A narrow tab: tighter padding and minimums; the table scrolls sideways when it still does not fit. */
+/* A narrow tab: tighter padding and minimums. The table scrolls sideways when it still does not fit. */
 
 @media (width <= 760px) {
   body {

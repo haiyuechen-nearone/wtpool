@@ -6,10 +6,10 @@ use std::path::Path;
 
 use super::document::{Action, Actor, ActorKind, ActorState};
 use super::outputs;
-use super::procs::Process;
 use super::records::{Record, RecordState};
-use super::time::Timestamp;
 use crate::activity::{CallKind, WaitReason};
+use crate::clock::Timestamp;
+use crate::processes::{Liveness, RunningProcess};
 
 /// A working actor without an event for this long shows as quiet (A1).
 const QUIET_AFTER: i64 = 120;
@@ -25,7 +25,7 @@ pub const BACKGROUND_TOOL: &str = "background:";
 /// What the rules of A1 need besides the record itself.
 pub struct Context<'a> {
     pub now: Timestamp,
-    pub processes: &'a [Process],
+    pub processes: &'a [RunningProcess],
     /// Every record that counts, for the subagents of a session.
     pub records: &'a [&'a Record],
     /// Whether a build works in a worktree (S4).
@@ -33,23 +33,8 @@ pub struct Context<'a> {
     /// The sessions a newer main session of their process replaced, from [`superseded`].
     pub superseded: &'a BTreeSet<String>,
     /// The outermost build below each process, by pid (A1), from
-    /// [`builds_below`](super::procs::builds_below).
+    /// [`builds_below`](super::builds::builds_below).
     pub builds_below: &'a BTreeMap<u32, String>,
-}
-
-/// Whether the process of `record` still runs: its pid with its start time. A record that
-/// names no process cannot be found dead.
-#[must_use]
-pub fn is_alive(record: &Record, processes: &[Process]) -> bool {
-    let Some(process) = record.process else {
-        return true;
-    };
-    processes.iter().any(|running| {
-        running.pid == process.pid
-            && (process.started.is_none()
-                || running.started.is_none()
-                || running.started == process.started)
-    })
 }
 
 /// The actor `record` shows as, `None` when it is hidden (A1 to A3).
@@ -120,7 +105,7 @@ pub fn actor(record: &Record, context: &Context<'_>) -> Option<Actor> {
 fn shown_state(record: &Record, context: &Context<'_>) -> Option<ActorState> {
     let session = record.key.split('.').next().unwrap_or_default();
     if record.state == RecordState::Ended
-        || !is_alive(record, context.processes)
+        || !Liveness::UnlessGone.runs(record.process, context.processes)
         || context.superseded.contains(session)
     {
         return None;
@@ -193,7 +178,7 @@ fn waits_for_a_subagent(record: &Record, context: &Context<'_>) -> bool {
         && context.records.iter().any(|other| {
             other.key.starts_with(&prefix)
                 && matches!(other.state, RecordState::Working | RecordState::Waiting)
-                && is_alive(other, context.processes)
+                && Liveness::UnlessGone.runs(other.process, context.processes)
         })
 }
 

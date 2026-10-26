@@ -1,9 +1,3 @@
-// The live tails of one tab (R12): for the actors of the selected row only, the tail of each
-// output file the last document lists there (S13), read again when the file changes, through
-// fs.watch with a {@link POLL_MS} poll for changes the watch misses, and posted at most once per
-// {@link POST_EVERY_MS}, only while the tab is visible. It reads no path the document does not
-// list, and of those only a task's output file (H27), and stops watching when the row is
-// deselected, a task leaves the document, or the tab is hidden or closed.
 import { promises as fs, watch, type FSWatcher } from 'node:fs';
 
 import type { Output, StatusDocument } from '../generated/status';
@@ -11,28 +5,24 @@ import type { OutputMessage, Tail } from '../shared/protocol';
 import { systemClock, type Cancel, type Clock } from './clock';
 import { readTail } from './tail';
 
-/** The fewest milliseconds between two posts of one tab's tails: at most 4 a second. */
+/** The fewest milliseconds between two posts of one tab's tails. */
 const POST_EVERY_MS = 250;
 /** The interval between two checks of a watched file for a change the watch missed. */
 export const POLL_MS = 1000;
 
 /** The path separators of this system: Windows takes `\` and `/` alike. */
 const SEPARATOR = process.platform === 'win32' ? '[\\\\/]' : '/';
-/** The end of a task's output path (H27): `tasks/<id>.output`, the id as the hook accepts it. */
+/** The end of a task's output path, `tasks/<id>.output`, with the ids the hook accepts. */
 const TASK_OUTPUT = new RegExp(`${SEPARATOR}tasks${SEPARATOR}[A-Za-z0-9_-]{1,64}\\.output$`);
-/** The tail of a listed path that is not a task's output file: the tab never reads it (R12). */
+/** The error of a listed path that is not a task's output file. The tab never reads one. */
 const NOT_A_TASK_OUTPUT =
   'the output path does not end in tasks/<id>.output, so the panel does not read it';
 
-/** Tells a path of the shape of a task's output file, the only paths the tab reads (R12, X19). */
+/** Tells a path of the shape of a task's output file, the only kind of path the tab reads. */
 export function isTaskOutputPath(path: string): boolean {
   return TASK_OUTPUT.test(path);
 }
 
-/**
- * Lists the outputs that the actors of row `id` list in `document`, each path once, in the
- * document's order.
- */
 function listedOutputs(document: StatusDocument | null, id: string | null): Output[] {
   const row = document?.pools[0].worktrees.find((worktree) => worktree.path === id);
   const seen = new Set<string>();
@@ -48,7 +38,6 @@ function listedOutputs(document: StatusDocument | null, id: string | null): Outp
   return outputs;
 }
 
-/** One watched file: its watch, its poll, the state it was last read at and its last tail. */
 interface Watched {
   /** False for a path {@link isTaskOutputPath} refuses, whose tail says so and is never read. */
   readable: boolean;
@@ -60,7 +49,7 @@ interface Watched {
   again: boolean;
 }
 
-/** Reads and posts the tails of the selected row's outputs while the tab is visible (R12). */
+/** Reads and posts the tails of the selected row's outputs while the tab is visible. */
 export class OutputWatch {
   private row: string | null = null;
   /** The watched paths in the document's order, the order of the tails. */
@@ -99,13 +88,13 @@ export class OutputWatch {
     for (const path of added) {
       this.watch(path);
     }
-    // New files post once read; a webview that asks again gets the tails it has not seen.
+    // Added files post once read, so only an unchanged set needs a post for a fresh webview.
     if (fresh && !added.length) this.schedule();
     this.cancelPoll?.();
     this.cancelPoll = this.clock.after(POLL_MS, () => this.poll());
   }
 
-  /** Stops every watch and timer: no row, a hidden tab, or a closed one. */
+  /** Stops every watch and timer. */
   stop(): void {
     for (const [path, file] of this.files) {
       this.unwatch(path, file);
@@ -117,7 +106,6 @@ export class OutputWatch {
     this.cancelPost?.();
   }
 
-  /** Starts on a newly listed path: reads it, or gives a path of another shape its refusal. */
   private watch(path: string): void {
     const readable = isTaskOutputPath(path);
     const file: Watched = { readable, size: -1, modified: -1, reading: false, again: false };
@@ -130,7 +118,7 @@ export class OutputWatch {
     this.schedule();
   }
 
-  /** Watches a file once a read found it a regular file; the poll covers the rest. */
+  /** Watches a file once a read found it a regular file. The poll covers a file without a watch. */
   private watchFile(path: string, file: Watched): void {
     try {
       file.watcher = watch(path, { persistent: false }, () => this.read(path));
@@ -143,13 +131,11 @@ export class OutputWatch {
     }
   }
 
-  /** Stops watching `path` and forgets it. */
   private unwatch(path: string, file: Watched): void {
     file.watcher?.close();
     this.files.delete(path);
   }
 
-  /** Checks each file for a change in size or time that its watch did not report. */
   private poll(): void {
     for (const [path, file] of this.files) {
       if (!file.readable) {
@@ -178,7 +164,7 @@ export class OutputWatch {
       return;
     }
     file.reading = true;
-    // readTail gives an `error` tail for every failure; it never rejects.
+    // readTail never rejects: every failure gives a tail with `error`.
     void readTail(path).then((read) => {
       file.reading = false;
       if (this.files.get(path) !== file) return;
@@ -199,7 +185,7 @@ export class OutputWatch {
     });
   }
 
-  /** Posts the row's tails now, or once POST_EVERY_MS has passed since the last post. */
+  /** Posts the row's tails now, or once {@link POST_EVERY_MS} has passed since the last post. */
   private schedule(): void {
     if (this.pending) return;
     this.pending = true;
@@ -217,7 +203,6 @@ export class OutputWatch {
     const tails: Tail[] = [];
     for (const path of this.paths) {
       const tail = this.files.get(path)?.tail;
-      // Each listed file posts once it has been read; until then the others wait for it.
       if (tail === undefined) return;
       tails.push(tail);
     }

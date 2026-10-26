@@ -1,7 +1,7 @@
-//! The Claude Code plugin of this repository (H28): its id, and its hook file
-//! `plugins/wtpool/hooks/hooks.json`, generated from the event table of H1 that the block of
-//! `wtpool hook install` comes from. The unit test below keeps the file byte for byte what
-//! `hooks_file` makes, and writes it when `WTPOOL_WRITE_PLUGIN_HOOKS=1`.
+//! The Claude Code plugin of this repository: its id, and a test that keeps its hook file
+//! `plugins/wtpool/hooks/hooks.json` equal to the [`block`](super::block::block) for the bare
+//! command `wtpool` plus a description. With `WTPOOL_WRITE_PLUGIN_HOOKS=1` that test writes the
+//! file.
 
 /// The plugin's key in `enabledPlugins`: plugin `wtpool` of the marketplace `wtpool`.
 pub(super) const PLUGIN_ID: &str = "wtpool@wtpool";
@@ -14,16 +14,13 @@ mod tests {
 
     use super::super::block::block;
 
-    /// The command each hook of the plugin runs: `wtpool`, which Claude Code finds on the `PATH`
-    /// its hooks see, as no plugin can know where `wtpool` was installed.
+    /// The command each hook of the plugin runs, found on the `PATH` of Claude Code: a plugin
+    /// cannot know where `wtpool` was installed.
     const COMMAND: &str = "wtpool";
 
-    /// What the plugin's hooks do, as the plugin listing shows it.
     const DESCRIPTION: &str =
         "Runs wtpool hook on each Claude Code event that wtpool status reads.";
 
-    /// The text of the hook file: the block of H1 for the bare command `wtpool` plus a
-    /// description, so its 14 events, async flags, timeouts and `onFailure` are the block's.
     fn hooks_file() -> String {
         let mut file = block(COMMAND);
         if let Value::Object(map) = &mut file {
@@ -32,7 +29,6 @@ mod tests {
         format!("{}\n", serde_json::to_string_pretty(&file).unwrap())
     }
 
-    /// The hook file in the tree: `plugins/wtpool/hooks/hooks.json` from the workspace root.
     fn tracked_file() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../plugins/wtpool/hooks/hooks.json")
     }

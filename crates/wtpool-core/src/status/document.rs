@@ -3,8 +3,9 @@
 
 use serde::Serialize;
 
-use super::time::{RecordTime, Timestamp};
+use super::record_time::RecordTime;
 use crate::activity::{PlacedBy, WaitReason};
+use crate::clock::Timestamp;
 use crate::worktree_state::Role;
 
 /// One `wtpool status` document, `"type": "status"`, version 1.

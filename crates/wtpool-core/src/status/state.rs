@@ -7,19 +7,20 @@ use std::path::{Path, PathBuf};
 use std::thread;
 
 use super::agents::{self, Context};
+use super::builds::{self, builds_below, builds_by_worktree};
 use super::document::{
     Actor, ActorState, Agents, Build, Document, DocumentKind, DocumentVersion, Machine, PoolStatus,
     Repository, WorktreeStatus,
 };
 use super::facts::{self, Busy, Facts, RefFacts};
-use super::procs::{ListProcesses, Process, builds_below, builds_by_worktree};
 use super::records::{Record, RecordState, Records};
 use super::repository::repository;
-use super::time::Timestamp;
 use crate::activity::ACTIVITY_DIR;
+use crate::clock::Timestamp;
 use crate::config::Config;
 use crate::error::Error;
 use crate::paths::comparable;
+use crate::processes::{ListProcesses, Liveness, RunningProcess};
 use crate::report::Discard;
 use crate::worktree::{Head, Worktree};
 
@@ -31,7 +32,7 @@ pub struct PoolState {
     machine: String,
     repository: Repository,
     worktrees: Vec<Tracked>,
-    processes: Vec<Process>,
+    processes: Vec<RunningProcess>,
     records: Records,
 }
 
@@ -48,17 +49,19 @@ struct Tracked {
 }
 
 impl PoolState {
-    /// Reads everything about the pool of `config`, whose common git directory is `common`.
+    /// Reads everything about the pool of `config`, whose common git directory is `common`, on
+    /// the machine called `machine`.
     pub fn load(
         config: Config,
         common: PathBuf,
-        processes: &dyn ListProcesses,
+        processes: &impl ListProcesses,
+        machine: String,
     ) -> Result<Self, Error> {
         let records = Records::new(common.join(ACTIVITY_DIR));
         let mut state = Self {
             config,
             common,
-            machine: machine_name(),
+            machine,
             repository: Repository {
                 name: String::new(),
                 github: None,
@@ -73,14 +76,14 @@ impl PoolState {
 
     /// Lists the worktrees again and reads every fact, the process table, the repository and
     /// the records.
-    pub fn refresh_all(&mut self, processes: &dyn ListProcesses) -> Result<(), Error> {
+    pub fn refresh_all(&mut self, processes: &impl ListProcesses) -> Result<(), Error> {
         let listed = Worktree::list(&self.config.foreground, &mut Discard)?;
         // git lists the main worktree first.
         let name = listed.first().map(Worktree::name).unwrap_or_default();
         let (common, foreground) = (self.common.as_path(), &self.config.foreground);
         let remote = self.config.remote.as_str();
         let (worktrees, table, repository) = thread::scope(|scope| {
-            let table = scope.spawn(|| processes.processes());
+            let table = scope.spawn(|| processes.list(&builds::query()));
             let repository = scope.spawn(|| repository(name, foreground, remote));
             let worktrees = track_all(listed, common);
             (
@@ -144,16 +147,16 @@ impl PoolState {
     pub fn refresh_record(
         &mut self,
         name: &OsStr,
-        processes: &dyn ListProcesses,
+        processes: &impl ListProcesses,
     ) -> Option<PathBuf> {
         let edited = self.records.refresh(name);
         let key = Path::new(name).file_stem().unwrap_or_default();
         let unknown = self
             .records
             .get(&key.to_string_lossy())
-            .is_some_and(|record| !agents::is_alive(record, &self.processes));
+            .is_some_and(|record| !Liveness::UnlessGone.runs(record.process, &self.processes));
         if unknown {
-            self.processes = processes.processes();
+            self.processes = processes.list(&builds::query());
         }
         edited
     }
@@ -177,7 +180,8 @@ impl PoolState {
 
     fn counted_records(&self) -> Vec<&Record> {
         self.records.counted(|record| {
-            record.state != RecordState::Ended && agents::is_alive(record, &self.processes)
+            record.state != RecordState::Ended
+                && Liveness::UnlessGone.runs(record.process, &self.processes)
         })
     }
 
@@ -386,12 +390,6 @@ fn last_change(git_dir: &Path) -> Option<Timestamp> {
         .filter_map(|name| git_dir.join(name).symlink_metadata().ok()?.modified().ok())
         .map(Timestamp::from_system_time)
         .max()
-}
-
-fn machine_name() -> String {
-    sysinfo::System::host_name()
-        .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| "localhost".to_owned())
 }
 
 #[cfg(test)]

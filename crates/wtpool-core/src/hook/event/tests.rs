@@ -3,9 +3,10 @@ use rstest::rstest;
 use super::super::adapter::{TranscriptTitles, WaitingTools};
 use super::super::install::Printed;
 use super::super::place::tests::must_pool;
-use super::super::procs::ProcessTable;
 use super::*;
 use crate::activity::{ActorId, CallId, CallKind, Harness, TaskId, WaitReason};
+use crate::clock::Clock;
+use crate::processes::ProcessTable;
 
 /// An adapter that reads every input as the hook input it holds, finds `titles` in every
 /// transcript and names each task's output file in `tasks`.
@@ -67,8 +68,8 @@ impl Pool {
         );
         std::fs::write(&procs, format!("{harness}\n{own}\n")).unwrap();
         let env = HookEnv {
-            clock: Some(clock),
-            processes: ProcessTable::File(procs),
+            clock: Clock::from_file(Some(clock)),
+            processes: ProcessTable::from_file(Some(procs)),
             sandbox: true,
             home: Some(root.clone()),
             tz: Some("UTC".to_owned()),

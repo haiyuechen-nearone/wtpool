@@ -7,7 +7,7 @@ use std::path::{Component, Path};
 use serde::Deserialize;
 
 use super::document::Output;
-use super::time::RecordTime;
+use super::record_time::RecordTime;
 
 /// A task as a record holds it.
 #[derive(Debug, Clone, Default, Deserialize)]

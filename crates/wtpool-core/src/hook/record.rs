@@ -41,7 +41,7 @@ pub struct Record {
     pub updated: String,
     /// The start time of the hook process that wrote `state`, in microseconds (H24).
     pub writer_started: i64,
-    pub process: Option<Process>,
+    pub process: Option<HarnessProcess>,
     /// The folder the session started in, so a `CwdChanged` back to it moves nothing (H10).
     #[serde(default)]
     pub first_cwd: Option<String>,
@@ -146,7 +146,7 @@ pub struct Call {
 
 /// The agent harness process that ran the hook (H19).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Process {
+pub struct HarnessProcess {
     pub pid: u32,
     pub started: String,
 }

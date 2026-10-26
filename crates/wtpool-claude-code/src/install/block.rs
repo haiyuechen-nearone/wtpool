@@ -1,11 +1,10 @@
-//! The hook block of H1, from the event table.
+//! The hook block of `wtpool hook install`, built from [`HookEvent::ALL`].
 
 use serde_json::{Map, Value, json};
 
 use crate::events::HookEvent;
 
-/// The `{"hooks": {...}}` block that runs `binary` for each event: exec form, `onFailure`
-/// `continue`, async for the five events of H1, else a 2 s timeout, none for `SessionEnd`.
+/// The `{"hooks": {...}}` block that runs `binary hook` on each event.
 #[must_use]
 pub fn block(binary: &str) -> Value {
     let mut hooks = Map::new();

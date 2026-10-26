@@ -9,22 +9,24 @@ use super::Sources;
 use super::document::Document;
 use super::state::PoolState;
 use super::watch::{Pending, Track};
+use crate::clock::ReadClock;
+use crate::processes::ListProcesses;
 
 /// The git facts of a worktree refresh after edits at most this often (W4).
 const EDIT_REFRESH: Duration = Duration::from_secs(1);
 
 /// A [`PoolState`] refreshed with the process table and clock of `sources`.
-pub struct Live<'a> {
+pub struct Live<'a, C, P> {
     state: PoolState,
-    sources: &'a Sources,
+    sources: &'a Sources<C, P>,
     /// When each worktree's git last refreshed after an edit.
     edited: BTreeMap<PathBuf, Instant>,
     /// Worktrees whose refresh after an edit waits until the time given.
     waiting: BTreeMap<PathBuf, Instant>,
 }
 
-impl<'a> Live<'a> {
-    pub fn new(state: PoolState, sources: &'a Sources) -> Self {
+impl<'a, C, P> Live<'a, C, P> {
+    pub fn new(state: PoolState, sources: &'a Sources<C, P>) -> Self {
         Self {
             state,
             sources,
@@ -33,10 +35,9 @@ impl<'a> Live<'a> {
         }
     }
 
-    /// Refreshes the git facts of `worktree` after an edit, or schedules it a second after
-    /// the last such refresh.
-    fn edit(&mut self, worktree: PathBuf) {
-        let now = Instant::now();
+    /// Refreshes the git facts of `worktree` after an edit at `now`, or schedules it a second
+    /// after the last such refresh.
+    fn edit(&mut self, worktree: PathBuf, now: Instant) {
         match self.edited.get(&worktree) {
             Some(last) if now < *last + EDIT_REFRESH => {
                 self.waiting.insert(worktree, *last + EDIT_REFRESH);
@@ -50,10 +51,10 @@ impl<'a> Live<'a> {
     }
 }
 
-impl Track for Live<'_> {
+impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
     /// A failed listing keeps what was known, and the next heartbeat tries again.
     fn refresh_all(&mut self) {
-        let _ = self.state.refresh_all(self.sources.processes.as_ref());
+        let _ = self.state.refresh_all(&self.sources.processes);
     }
 
     fn refresh(&mut self, pending: &Pending) {
@@ -76,11 +77,9 @@ impl Track for Live<'_> {
             self.state.rescan_records();
         } else {
             for name in &pending.records {
-                let edited = self
-                    .state
-                    .refresh_record(name, self.sources.processes.as_ref());
+                let edited = self.state.refresh_record(name, &self.sources.processes);
                 if let Some(worktree) = edited {
-                    self.edit(worktree);
+                    self.edit(worktree, Instant::now());
                 }
             }
         }
@@ -99,8 +98,7 @@ impl Track for Live<'_> {
         self.waiting.values().copied().chain(timer).min()
     }
 
-    fn tick(&mut self) {
-        let now = Instant::now();
+    fn tick(&mut self, now: Instant) {
         let due: Vec<PathBuf> = self
             .waiting
             .iter()
@@ -108,7 +106,7 @@ impl Track for Live<'_> {
             .map(|(worktree, _)| worktree.clone())
             .collect();
         for worktree in due {
-            self.edit(worktree);
+            self.edit(worktree, now);
         }
     }
 }

@@ -4,7 +4,7 @@ use wtpool_core::{Role, Row, State, Uncommitted, Unreferenced, Upstream};
 
 use crate::text::visible;
 
-/// How [`render`] lays the table out.
+/// The layout options of [`render`].
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Style {
     pub colour: bool,
@@ -69,9 +69,9 @@ impl Span {
     }
 }
 
-/// Renders the `wtpool ls` table. Column widths come from the data, so colour codes
-/// never shift a column. With `max_width`, only the branch column is shortened. Worktree and
-/// branch names show as [`visible`] shows them, measured after.
+/// Renders the `wtpool ls` table. Column widths come from the data, so colour codes never shift a
+/// column. With [`Style::max_width`], only the branch column is shortened. Worktree and branch
+/// names show as [`visible`] shows them, measured after.
 #[must_use]
 pub fn render(rows: &[Row], style: Style) -> String {
     let cells: Vec<[Cell; 4]> = rows.iter().map(row_cells).collect();
@@ -93,7 +93,7 @@ pub fn render(rows: &[Row], style: Style) -> String {
     if style.colour {
         out.push_str(BOLD);
     }
-    render_line(&header, &widths, /* colour */ false, &mut out);
+    render_line(&header, &widths, style.colour, &mut out);
     if style.colour {
         out.push_str(RESET);
     }

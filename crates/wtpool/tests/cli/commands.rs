@@ -9,9 +9,6 @@ use crate::support::{Outcome, Sandbox, must_git, must_outcome};
 
 const LONG: &str = "1234-check-widget-cache-health-before-each-deploy";
 
-// ---------------------------------------------------------------------------
-// One run of each command
-
 #[test]
 fn ls__should_print_the_table_with_full_branch_names_when_piped() {
     // Given
@@ -233,8 +230,8 @@ fn ls__should_print_the_error_of_git_before_its_own() {
     );
 }
 
-/// What `wtpool` printed on a terminal of `size` columns, if any, with `COLUMNS`
-/// set to `columns`, if any.
+/// The output of `wtpool` on a terminal of `size` columns, if any, with `COLUMNS` set to
+/// `columns`, if any.
 #[cfg(target_os = "macos")]
 fn must_run_on_a_terminal(
     sandbox: &Sandbox,

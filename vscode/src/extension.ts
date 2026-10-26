@@ -1,9 +1,3 @@
-// The Worktrees extension (status-panel.md, section 3): one command, one webview tab per window
-// fed by `wtpool status --watch`, and nothing else: no view, no status bar item, no popup (D1, D3),
-// no networking module and no server (X17).
-//
-// With WTPOOL_VERIFY=1, `activate` returns the test interface of verification.md, "Test interfaces",
-// item 3: `fromWebview(message)`, `toWebview()` and `advance(ms)` on a fake clock.
 import * as vscode from 'vscode';
 
 import { FakeClock, systemClock } from './host/clock';
@@ -21,7 +15,7 @@ interface VerifyApi {
   advance(ms: number): Promise<void>;
 }
 
-/** Activates the extension, and under WTPOOL_VERIFY=1 gives the verify API. */
+/** Activates the extension. Under WTPOOL_VERIFY=1 it gives the {@link VerifyApi}. */
 export function activate(context: vscode.ExtensionContext): VerifyApi | undefined {
   const verify = process.env.WTPOOL_VERIFY === '1';
   const fake = new FakeClock(Date.now());
@@ -40,7 +34,6 @@ export function activate(context: vscode.ExtensionContext): VerifyApi | undefine
       channel.info(message);
     },
   });
-  // The tabs, and with them their watches, end with the context's subscriptions.
   context.subscriptions.push(
     channel,
     tabs,

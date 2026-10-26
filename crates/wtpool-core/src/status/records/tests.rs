@@ -429,7 +429,7 @@ fn read_record__should_read_every_field() {
         since: RecordTime::parse("2026-10-20T12:00:01.5Z").unwrap(),
         updated: RecordTime::parse("2026-10-20T12:00:02Z").unwrap(),
         writer_started: 1,
-        process: Some(ProcessId {
+        process: Some(RecordedProcess {
             pid: 7001,
             started: Timestamp::parse("2026-10-20T11:00:00Z"),
         }),

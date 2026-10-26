@@ -1,6 +1,6 @@
-//! What `wtpool --version` prints: the version, the commit and the cargo features of this build.
+//! The text of `wtpool --version`: the version, the commit and the cargo features of this build.
 
-/// What build.rs recorded about this binary.
+/// This binary's build, as build.rs records it.
 pub(crate) const BUILD: Build<'static> = Build {
     version: env!("CARGO_PKG_VERSION"),
     commit: env!("WTPOOL_BUILD_COMMIT"),

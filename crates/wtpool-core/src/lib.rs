@@ -6,9 +6,11 @@
 //! writes only activity records and its log, and [`status`] writes its
 //! documents to the writer it is given. Both work on the records through
 //! [`activity`], and neither knows any one coding agent harness: each
-//! harness's [`hook::Adapter`] lives in a crate of its own.
+//! harness's [`hook::Adapter`] lives in a crate of its own. Both read the
+//! time through [`clock`] and the process table through [`processes`].
 
 pub mod activity;
+pub mod clock;
 mod config;
 mod config_file;
 mod error;
@@ -18,6 +20,7 @@ pub mod hook;
 mod names;
 mod paths;
 mod pool;
+pub mod processes;
 mod refs;
 mod report;
 mod repository;

@@ -1,4 +1,6 @@
-//! Strings a record stores (H15).
+//! Strings a record stores (H15), and the label of a session without a title (H16).
+
+use crate::clock::{self, Timestamp};
 
 /// Stored strings keep this many characters.
 pub const MAX_TEXT: usize = 80;
@@ -29,6 +31,16 @@ fn is_invisible(c: char) -> bool {
         )
 }
 
+/// `session HH:MM`, the label of a session without a title, at `at` in the local time zone, `TZ`
+/// being `tz` (H16).
+#[must_use]
+pub fn session_label(at: Timestamp, tz: Option<&str>) -> String {
+    match clock::local_time(at, tz) {
+        Some(time) => format!("session {:02}:{:02}", time.hour(), time.minute()),
+        None => "session".to_owned(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
@@ -52,5 +64,21 @@ mod tests {
 
         // Then
         assert_eq!(cleaned, expected);
+    }
+
+    #[rstest]
+    #[case::utc(1_792_497_600, Some("UTC"), "session 12:00")]
+    #[case::kolkata(1_792_497_600, Some("Asia/Kolkata"), "session 17:30")]
+    #[case::past_the_last_date(i64::MAX, Some("UTC"), "session")]
+    fn session_label__should_use_the_local_time(
+        #[case] seconds: i64,
+        #[case] tz: Option<&str>,
+        #[case] expected: &str,
+    ) {
+        // When
+        let label = session_label(Timestamp::from_seconds(seconds), tz);
+
+        // Then
+        assert_eq!(label, expected);
     }
 }

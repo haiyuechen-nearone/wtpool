@@ -1,5 +1,5 @@
-//! What other programs read from `wtpool`: the schema of the status document (S12) and the hook
-//! block for Claude Code's settings (H22, A11). Every run gets a temporary `HOME` and pool.
+//! The output other programs read from `wtpool`: the schema of the status document and the hook
+//! block for Claude Code's settings. Every run gets a temporary `HOME` and pool.
 #![cfg(unix)]
 // Always true here. It lets clippy's `*-in-tests` settings cover the helpers too.
 #![cfg(test)]
@@ -31,14 +31,14 @@ impl Sandbox {
             .env("HOME", &self.root)
             .env("WTPOOL_FOREGROUND", self.root.join("app"))
             .env("WTPOOL_SLOT_DIR", &self.root)
-            // A coverage run counts what the spawned binary executes too.
+            // A coverage run also counts the lines the spawned binary runs.
             .envs(std::env::var_os("LLVM_PROFILE_FILE").map(|file| ("LLVM_PROFILE_FILE", file)))
             .envs(env.iter().copied())
             .output()
             .unwrap()
     }
 
-    /// A copy of `wtpool` outside `target`, which `wtpool hook install` accepts.
+    /// A copy of `wtpool` outside `target`, where `wtpool hook install` accepts it.
     fn must_install_wtpool(&self) -> PathBuf {
         let bin = self.root.join("bin");
         std::fs::create_dir(&bin).unwrap();

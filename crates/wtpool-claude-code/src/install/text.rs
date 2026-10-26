@@ -1,15 +1,14 @@
-//! What `wtpool hook install` prints for Claude Code (H22).
+//! The output of `wtpool hook install` for Claude Code.
 
 use wtpool_core::hook::Printed;
 
 use super::block::block;
 use super::presence;
 
-/// What `wtpool hook install` prints: the block on standard output, valid JSON, so that
-/// `wtpool hook install > hooks.json` is a settings file that `claude --settings` loads, as
-/// Claude Code skips a malformed one without a word. On standard error, whether `settings`, the
-/// text of the settings file named `shown`, enables the plugin or holds the block, and which
-/// `wtpool` the plugin's hooks find on this process's `PATH`.
+/// The output of `wtpool hook install`. Standard output holds only the block, as valid JSON, so
+/// `wtpool hook install > hooks.json` is a settings file that `claude --settings` loads: Claude
+/// Code skips a malformed one without a word. Standard error holds the [`presence::note`] on
+/// `settings`, the text of the settings file named `shown`.
 #[must_use]
 pub fn text(binary: &str, shown: &str, settings: Option<&str>) -> Printed {
     let block = serde_json::to_string_pretty(&block(binary)).unwrap_or_default();

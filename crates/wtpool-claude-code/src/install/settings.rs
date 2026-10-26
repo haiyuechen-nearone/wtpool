@@ -1,4 +1,4 @@
-//! Claude Code's user settings file (A11). `wtpool hook install` reads it and never writes it.
+//! Claude Code's user settings file. `wtpool hook install` reads it and never writes it.
 
 use std::path::{Path, PathBuf};
 
@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 pub struct SettingsFile {
     /// `None` when neither `CLAUDE_CONFIG_DIR` nor `HOME` is set.
     pub path: Option<PathBuf>,
-    /// The file as the hints name it.
+    /// The file as messages name it.
     pub shown: String,
 }
 

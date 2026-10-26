@@ -25,7 +25,7 @@ fn change(now: &str) -> Change {
         waiting_tools: WAITING,
         now: now.to_owned(),
         started_micros: 10,
-        process: Some(Process {
+        process: Some(HarnessProcess {
             pid: 7001,
             started: "2026-10-20T11:00:00Z".to_owned(),
         }),

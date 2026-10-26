@@ -7,9 +7,9 @@ use std::thread;
 use rstest::rstest;
 
 use super::*;
+use crate::clock::Timestamp;
 use crate::status::document::GitStatus;
 use crate::status::fixture::{FixedProcesses, must_fixture, must_git};
-use crate::status::time::Timestamp;
 use crate::status::watch::run_tests::{SharedOutput, must_wait};
 use crate::status::watch::{Message, message_of, watch};
 
@@ -46,7 +46,7 @@ fn message_of__should_pass_paths_and_ask_for_a_rescan_when_events_were_lost() {
 /// A clock that always reads the same time.
 struct FixedClock;
 
-impl crate::status::ReadClock for FixedClock {
+impl crate::clock::ReadClock for FixedClock {
     fn now(&self) -> Timestamp {
         Timestamp::from_seconds(42)
     }
@@ -114,10 +114,17 @@ fn live_refresh__should_read_again_only_what_changed(
     let fixture = must_fixture();
     let processes = FixedProcesses::default();
     let sources = Sources {
-        clock: Box::new(FixedClock),
-        processes: Box::new(processes.clone()),
+        clock: FixedClock,
+        processes: processes.clone(),
+        machine: "machine".to_owned(),
     };
-    let state = PoolState::load(fixture.config(), fixture.common.clone(), &processes).unwrap();
+    let state = PoolState::load(
+        fixture.config(),
+        fixture.common.clone(),
+        &processes,
+        "machine".to_owned(),
+    )
+    .unwrap();
     let mut live = Live::new(state, &sources);
     let git = must_git;
     git(
@@ -164,12 +171,19 @@ fn live_refresh_all__should_keep_what_was_known_when_listing_fails() {
     let fixture = must_fixture();
     let processes = FixedProcesses::default();
     let sources = Sources {
-        clock: Box::new(FixedClock),
-        processes: Box::new(processes.clone()),
+        clock: FixedClock,
+        processes: processes.clone(),
+        machine: "machine".to_owned(),
     };
-    let state = PoolState::load(fixture.config(), fixture.common.clone(), &processes).unwrap();
+    let state = PoolState::load(
+        fixture.config(),
+        fixture.common.clone(),
+        &processes,
+        "machine".to_owned(),
+    )
+    .unwrap();
     let mut live = Live::new(state, &sources);
-    let git = |live: &Live<'_>| -> Vec<GitStatus> {
+    let git = |live: &Live<'_, FixedClock, FixedProcesses>| -> Vec<GitStatus> {
         live.document().pools[0]
             .worktrees
             .iter()
@@ -207,8 +221,9 @@ fn watch__should_print_a_document_per_change_until_input_closes() {
         let mut output = output.clone();
         move || {
             let sources = Sources {
-                clock: Box::new(FixedClock),
-                processes: Box::new(FixedProcesses::default()),
+                clock: FixedClock,
+                processes: FixedProcesses::default(),
+                machine: "machine".to_owned(),
             };
             done.send(watch(config, common, &sources, reader, &mut output))
         }
@@ -296,7 +311,7 @@ fn write_call(fixture: &crate::status::fixture::Fixture, ended: Option<&str>, up
     .unwrap();
 }
 
-fn dirty(live: &Live<'_>) -> Option<u64> {
+fn dirty(live: &Live<'_, FixedClock, FixedProcesses>) -> Option<u64> {
     live.document().pools[0]
         .worktrees
         .iter()
@@ -316,11 +331,18 @@ fn live_refresh__should_refresh_git_after_an_edit_at_most_once_a_second() {
     let fixture = must_fixture();
     let processes = FixedProcesses::default();
     let sources = Sources {
-        clock: Box::new(FixedClock),
-        processes: Box::new(processes.clone()),
+        clock: FixedClock,
+        processes: processes.clone(),
+        machine: "machine".to_owned(),
     };
     write_call(&fixture, None, "2026-10-20T12:00:00Z");
-    let state = PoolState::load(fixture.config(), fixture.common.clone(), &processes).unwrap();
+    let state = PoolState::load(
+        fixture.config(),
+        fixture.common.clone(),
+        &processes,
+        "machine".to_owned(),
+    )
+    .unwrap();
     let mut live = Live::new(state, &sources);
     let wt1 = fixture.root.join("wt1");
 
@@ -334,10 +356,9 @@ fn live_refresh__should_refresh_git_after_an_edit_at_most_once_a_second() {
     live.refresh(&records("s1.json"));
     let held = dirty(&live);
     let due = live.waiting.get(&wt1).copied();
-    live.tick();
+    live.tick(Instant::now());
     let early = dirty(&live);
-    thread::sleep(due.unwrap().saturating_duration_since(Instant::now()));
-    live.tick();
+    live.tick(due.unwrap());
     let later = dirty(&live);
 
     // Then
@@ -356,10 +377,17 @@ fn live_deadline__should_be_the_next_timer_or_waiting_refresh() {
     let fixture = must_fixture();
     let processes = FixedProcesses::default();
     let sources = Sources {
-        clock: Box::new(FixedClock),
-        processes: Box::new(processes.clone()),
+        clock: FixedClock,
+        processes: processes.clone(),
+        machine: "machine".to_owned(),
     };
-    let state = PoolState::load(fixture.config(), fixture.common.clone(), &processes).unwrap();
+    let state = PoolState::load(
+        fixture.config(),
+        fixture.common.clone(),
+        &processes,
+        "machine".to_owned(),
+    )
+    .unwrap();
     let mut live = Live::new(state, &sources);
     let none = live.deadline();
     write_call(&fixture, None, "1970-01-01T00:00:30Z");
@@ -419,8 +447,9 @@ fn watch__should_fire_a_timer_when_the_clock_file_moves() {
         let clock = clock.clone();
         move || {
             let sources = Sources {
-                clock: Box::new(crate::status::FileClock::new(clock)),
-                processes: Box::new(FixedProcesses::default()),
+                clock: crate::clock::FileClock::new(clock),
+                processes: FixedProcesses::default(),
+                machine: "machine".to_owned(),
             };
             done.send(watch(config, common, &sources, reader, &mut output))
         }

@@ -1,5 +1,3 @@
-// The Worktrees tabs of this window (D1, X1, X2): "Worktrees: Open Status" reveals the tab where
-// it is, or opens one beside the active group; the serializer adopts a tab VS Code restores.
 import * as vscode from 'vscode';
 
 import { TITLE } from '../shared/view';
@@ -44,7 +42,6 @@ export class Tabs implements vscode.Disposable {
     }
   }
 
-  /** Makes `panel` a Worktrees tab and the current one. */
   private adopt(panel: vscode.WebviewPanel): void {
     const tab = new StatusPanel(panel, this.context, () => {
       this.panels.delete(tab);

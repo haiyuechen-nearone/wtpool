@@ -7,18 +7,17 @@ use std::path::{Path, PathBuf};
 use super::adapter::Adapter;
 use super::apply::{self, Change, Titles};
 use super::bash;
-use super::clock;
-use super::env::HookEnv;
+use super::env::{HookEnv, Me};
 use super::gc;
 use super::input::{CallFacts, Event, HookInput};
 use super::log;
 use super::place::{self, Shell, ToolPath, Worktree};
-use super::procs::Me;
 use super::record::{Record, SubagentTitle};
 use super::store::Activity;
 use super::tasks::{self, Started, TaskEvent};
 use super::text::{self, MAX_LABEL, MAX_TEXT};
 use crate::activity::{ActorKey, PlacedBy, State};
+use crate::clock::{ReadClock, Timestamp};
 use crate::paths::comparable;
 
 /// One event's facts that need the file system, worked out before any lock is taken.
@@ -33,7 +32,7 @@ struct Context<'a, A> {
     cwd_worktree: Worktree,
     me: Me,
     now: String,
-    now_seconds: i64,
+    now_time: Timestamp,
 }
 
 /// Handles one raw hook input of the harness `adapter` reads. Malformed input, an id outside
@@ -59,7 +58,7 @@ fn handle_input<A: Adapter>(adapter: &A, input: &HookInput, env: &HookEnv) {
     if activity.is_sandbox() && !env.sandbox {
         return;
     }
-    let now_seconds = clock::now_seconds(env.clock.as_deref());
+    let now = env.clock.now();
     let context = Context {
         adapter,
         input,
@@ -72,13 +71,13 @@ fn handle_input<A: Adapter>(adapter: &A, input: &HookInput, env: &HookEnv) {
         },
         cwd,
         cwd_worktree,
-        me: env.processes.me(env.entered_micros),
-        now: clock::rfc3339(now_seconds),
-        now_seconds,
+        me: env.me(),
+        now: now.to_rfc3339(),
+        now_time: now,
     };
     if context.run(&input.event).is_some() && input.event == Event::SessionEnd {
         let deadline = env.entered_micros.saturating_add(gc::HOOK_BUDGET_MICROS);
-        let _ = gc::after_session_end(&context.activity, now_seconds, &env.processes, deadline);
+        let _ = gc::after_session_end(&context.activity, now, &env.processes, deadline);
     }
 }
 
@@ -293,7 +292,7 @@ impl<A: Adapter> Context<'_, A> {
         });
         let new_label = match &agent {
             Some((_, kind)) => kind.clone().unwrap_or_else(|| "subagent".to_owned()),
-            None => clock::session_label(self.now_seconds, self.env.tz.as_deref()),
+            None => text::session_label(self.now_time, self.env.tz.as_deref()),
         };
         let first_place = match (&agent, current) {
             (Some(_), None) => self.parent_place(),

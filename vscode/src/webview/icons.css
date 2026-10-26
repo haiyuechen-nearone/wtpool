@@ -1,6 +1,6 @@
 /*
- * The icons of the Worktrees tab (U6): ::before glyphs of the codicon font, which the build copies
- * into media/ beside the sheet. The build appends style.css, which places and colours them.
+ * The tab's icons: codicon glyphs in ::before. The build copies codicon.ttf beside this sheet and
+ * appends style.css to it.
  */
 
 @font-face {
@@ -71,15 +71,15 @@
   margin-right: 6px;
 }
 
-/* A pool's heading (U8): the repo glyph. */
+/* A pool's heading: the repo glyph. */
 .repo-icon::before {
   content: "\ea62";
 }
 
-/* Activity: one icon per value (U6), each about 14.5 px of ink on its longer side. The font draws
+/* Activity: one icon per value, each about 14.5 px of ink on its longer side. The font draws
  * home (12 x 13) and the loading dial (12 x 7, half a ring) off that size, so `scale` brings them
- * to it without moving the layout; it composes with the dial's rotation. Working is wtpool's own robot
- * (html.ts), 13.5 x 14.5 at rest, below. Idle, free and unused share the large circle and differ by
+ * to it without moving the layout, and composes with the dial's rotation. Working is wtpool's own
+ * robot, 13.5 x 14.5 at rest, below. Idle, free and unused share the large circle and differ by
  * its fill: a dot in the ring (record), a plain ring (circle-large) and a dashed ring
  * (issue-draft). */
 
@@ -122,7 +122,7 @@
 }
 
 /* Working: the robot, an inline SVG in the colour of its cell. Each arm turns about its shoulder,
- * the centre of its top end; at rest both hang 30 degrees out from the body. */
+ * the centre of its top end. At rest both hang 30 degrees out from the body. */
 .icon .robot {
   display: inline-block;
   width: 16px;
@@ -144,7 +144,7 @@
 }
 
 /* The building dial turns and the robot's arms swing in turn, 25 degrees each way of rest, half a
- * loop apart, unless VS Code reduces motion, which follows the system on auto (X14). */
+ * loop apart, unless VS Code reduces motion. On auto, VS Code follows the system. */
 body:not(.vscode-reduce-motion) .activity-building .icon::before {
   animation: spin 1.6s linear infinite;
 }
@@ -186,7 +186,7 @@ body:not(.vscode-reduce-motion) .robot-arm-right {
 }
 
 /* Row actions. The button centres its glyph's 16 px box, so the glyph sits in the middle of the
- * 24 px square whatever the font's baseline (U4). */
+ * 24 px square whatever the font's baseline. */
 
 .action::before {
   display: block;

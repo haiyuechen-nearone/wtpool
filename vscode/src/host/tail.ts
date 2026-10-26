@@ -1,6 +1,3 @@
-// The tail of a background task's output file (R12), and the filters of its text that Follow
-// shares (X19). The output is the harness's own file on this machine, and wtpool keeps only its
-// path (H27).
 import { constants, promises as fs, type Stats } from 'node:fs';
 
 import type { Tail } from '../shared/protocol';
@@ -10,7 +7,7 @@ import { assertIsError } from './errors';
 const TAIL_BYTES = 64 * 1024;
 /** The number of lines a tail keeps. */
 const TAIL_LINES = 15;
-/** The columns from one tab stop to the next (R12, X19). */
+/** The columns from one tab stop to the next. */
 const TAB_COLUMNS = 8;
 
 /** A tail and the file state it was read at, for a later read to compare with. */
@@ -68,17 +65,17 @@ const ESCAPES = [
 const TAIL_DROPS = new RegExp(ESCAPES, 'g');
 const FOLLOW_DROPS = new RegExp(`${ESCAPES}|[${FOLLOW_C0}]`, 'g');
 
-/** Removes every escape sequence and C1 control from `text` (R12). */
+/** Removes every escape sequence and C1 control from `text`. */
 function stripEscapes(text: string): string {
   return text.replace(TAIL_DROPS, '');
 }
 
-/** An SGR (colour) sequence in its 7-bit form, the only escape Follow keeps (X19). */
+/** An SGR (colour) sequence in its 7-bit form, the only escape Follow keeps. */
 const SGR = new RegExp(`^${ESC}\\[[0-9;:]*m$`);
 
 /**
  * Removes from `text` every escape sequence but a 7-bit SGR and every control character but tab,
- * line feed and carriage return, so a terminal gets nothing it acts on but colours (X19).
+ * line feed and carriage return, so a terminal gets nothing it acts on but colours.
  */
 export function keepColours(text: string): string {
   return text.replace(FOLLOW_DROPS, (found) => (SGR.test(found) ? found : ''));
@@ -94,8 +91,7 @@ function lastDraw(line: string): string {
 /** The text that counts other than one column per character: an SGR sequence, a tab, a line start. */
 const COLUMN_MARKS = new RegExp(`${ESC}\\[[0-9;:]*m|[\\t\\r\\n]`, 'g');
 
-/** Counts the characters of `text` by code point. */
-function characters(text: string): number {
+function codePointCount(text: string): number {
   return [...text].length;
 }
 
@@ -109,7 +105,7 @@ export function expandTabs(text: string, column = 0): { text: string; column: nu
   let at = column;
   let from = 0;
   const expanded = text.replace(COLUMN_MARKS, (found: string, offset: number) => {
-    at += characters(text.slice(from, offset));
+    at += codePointCount(text.slice(from, offset));
     from = offset + found.length;
     if (found === '\t') {
       const spaces = TAB_COLUMNS - (at % TAB_COLUMNS);
@@ -119,7 +115,7 @@ export function expandTabs(text: string, column = 0): { text: string; column: nu
     if (found === '\r' || found === '\n') at = 0;
     return found;
   });
-  return { text: expanded, column: at + characters(text.slice(from)) };
+  return { text: expanded, column: at + codePointCount(text.slice(from)) };
 }
 
 /**
@@ -139,7 +135,6 @@ const SYMLINK_REFUSED = 'the output is a symlink, which the panel does not follo
 /** A refusal of a file that is not a regular one, with the reason as its message. */
 class OutputRefusedError extends Error {}
 
-/** Throws an {@link OutputRefusedError} unless `stat` is of a regular file. */
 function requireRegularFile(stat: Stats): void {
   if (stat.isSymbolicLink()) throw new OutputRefusedError(SYMLINK_REFUSED);
   if (!stat.isFile()) throw new OutputRefusedError('the output is not a regular file');
@@ -162,7 +157,7 @@ export async function openOutput(path: string): Promise<fs.FileHandle> {
   return file;
 }
 
-/** The lines of the read errors that have their own, by error code. */
+/** The reasons of the read errors that have a wording of their own, by error code. */
 const CODE_LINES = new Map<unknown, string>([
   ['ENOENT', 'the output file is gone'],
   ['ELOOP', SYMLINK_REFUSED],
@@ -191,7 +186,7 @@ export async function readLastBytes(path: string): Promise<LastBytes> {
   }
 }
 
-/** Reads the tail of `path` (R12). A file it refuses or cannot read gives a tail with `error`. */
+/** Reads the tail of `path`. A file it refuses or cannot read gives a tail with `error`. */
 export async function readTail(path: string): Promise<TailRead> {
   try {
     const last = await readLastBytes(path);

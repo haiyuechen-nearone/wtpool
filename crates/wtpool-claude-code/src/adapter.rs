@@ -10,9 +10,9 @@ use crate::{events, install, tasks, tools, transcript};
 /// The Claude Code adapter, with the environment of the process that runs it.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ClaudeCode {
-    /// `CLAUDE_CODE_TMPDIR`, the temporary folder Claude Code was told to use (H27).
+    /// `CLAUDE_CODE_TMPDIR`, the temporary folder Claude Code was told to use.
     tmp: Option<PathBuf>,
-    /// `CLAUDE_CONFIG_DIR`, the folder of Claude Code's user settings (A11).
+    /// `CLAUDE_CONFIG_DIR`, the folder of Claude Code's user settings.
     config_dir: Option<PathBuf>,
     home: Option<PathBuf>,
 }
@@ -52,7 +52,7 @@ impl Adapter for ClaudeCode {
     }
 
     /// The block for Claude Code's user `settings.json`, with a note on the hooks that file has
-    /// Claude Code run (A11).
+    /// Claude Code run.
     fn install(&self, binary: &str) -> Printed {
         let file = install::settings_file(self.config_dir.as_deref(), self.home.as_deref());
         let settings = file

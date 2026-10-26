@@ -1,5 +1,5 @@
 //! Session titles from Claude Code's transcript, the JSON lines file a payload's
-//! `transcript_path` names (H16). Claude Code appends `{"type":"custom-title","customTitle":…}`
+//! `transcript_path` names. Claude Code appends `{"type":"custom-title","customTitle":…}`
 //! when the user names the session (`/rename`) and `{"type":"ai-title","aiTitle":…}` with the
 //! title it generates, and writes both again as the session goes on. Only lines with a JSON
 //! string that ends in `-title` are parsed, and only the title of a title entry is kept: no
@@ -16,8 +16,8 @@ use wtpool_core::hook::{TranscriptTitles, open_without_following};
 /// A read takes at most this many bytes, the last ones: Claude Code writes the titles again on
 /// every turn, so the newest are near the end.
 pub const MAX_READ: u64 = 1024 * 1024;
-/// What every title entry holds, its `type` ending in `-title`; a JSON string inside another
-/// string has its quotes escaped, so only JSON text matches.
+/// The end of a title entry's `type`. Inside another JSON string its quote is escaped, so a title
+/// entry quoted in a message never matches.
 const TITLE_MARK: &[u8] = br#"-title""#;
 
 /// The fields of a title entry: `custom-title`, a title the user gave, or `ai-title`, one
@@ -71,7 +71,7 @@ pub fn titles(path: &Path, offset: u64) -> Option<TranscriptTitles> {
     Some(found)
 }
 
-/// The byte before `offset`, `\n` for the start of the file, which no line precedes.
+/// The byte before `offset`, `\n` at the start of the file, as if a line ended there.
 fn byte_before(file: &mut File, offset: u64) -> Option<u8> {
     let Some(at) = offset.checked_sub(1) else {
         return Some(b'\n');
@@ -83,8 +83,8 @@ fn byte_before(file: &mut File, offset: u64) -> Option<u8> {
     Some(byte)
 }
 
-/// Takes the titles of the title entries among the lines of `bytes`, which ends with a newline,
-/// into `found`, the later ones over the earlier. Only lines with [`TITLE_MARK`] are parsed.
+/// Takes the titles among the whole lines of `bytes` into `found`, a later title over an earlier
+/// one. Only lines with [`TITLE_MARK`] are parsed.
 fn read_lines(bytes: &[u8], found: &mut TranscriptTitles) {
     let mut read_to = 0;
     for mark in memchr::memmem::find_iter(bytes, TITLE_MARK) {

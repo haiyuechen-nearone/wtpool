@@ -1,4 +1,4 @@
-//! `wtpool hook`, `wtpool hook gc` and `wtpool hook install` (status-panel.md, section 1).
+//! `wtpool hook`, `wtpool hook gc` and `wtpool hook install`.
 
 use std::path::Path;
 use std::time::Duration;
@@ -8,18 +8,16 @@ use wtpool_core::hook::{self, Adapter as _, HookEnv};
 
 use crate::verify_files;
 
-/// How long a hook may run before its watchdog ends it (H4).
+/// The time a hook may run before its watchdog ends it.
 const WATCHDOG: Duration = Duration::from_secs(1);
 
-/// The harness adapters of this wtpool. `wtpool hook` reads Claude Code's. `--harness <name>`
-/// is reserved for another (status-panel.md, section 1).
+/// An adapter `wtpool hook` can run, one variant per harness.
 #[derive(Debug)]
 enum Adapter {
     ClaudeCode(ClaudeCode),
 }
 
 impl Adapter {
-    /// The adapter `wtpool hook` runs without `--harness`, with this process's environment.
     fn from_process() -> Self {
         Self::ClaudeCode(ClaudeCode::from_process())
     }
@@ -45,8 +43,8 @@ impl Adapter {
     }
 }
 
-/// `wtpool hook`: reads the payload on stdin and writes its record. Prints nothing and always
-/// returns, so the process exits 0, panics included (H2, H3, H4).
+/// `wtpool hook`: reads the payload on stdin and writes its record. Prints nothing and exits 0 on
+/// every path, a panic or a hang included.
 pub fn run_hook() {
     let env = hook_env();
     let log = env.log.clone();
@@ -74,7 +72,8 @@ pub fn run_hook() {
     });
 }
 
-/// `wtpool hook gc` on the pool whose common git directory is `common`: what it kept and deleted.
+/// Runs `wtpool hook gc` on the pool whose common git directory is `common`, and returns the
+/// line it prints.
 #[must_use]
 pub fn gc_line(common: &Path) -> String {
     let collected = hook::collect_pool(common, &hook_env());
@@ -84,9 +83,8 @@ pub fn gc_line(common: &Path) -> String {
     )
 }
 
-/// `wtpool hook install`: the block to paste into Claude Code's `settings.json`, in
-/// `$CLAUDE_CONFIG_DIR` or `~/.claude` (A11), and whether it is there, or why this binary cannot
-/// be the one hooks run.
+/// `wtpool hook install`: the hook block for Claude Code's settings and a note on the hooks they
+/// run, or the reason this binary cannot be the one the hooks run.
 pub fn install_text() -> Result<hook::Printed, String> {
     let binary = std::env::current_exe()
         .and_then(|path| path.canonicalize())

@@ -15,5 +15,5 @@ index 2b6f7f8..54f68ff 100644
 -    let commit = git(&["rev-parse", "--verify", "HEAD"]).unwrap_or_default();
 +    let commit = git(&["rev-parse", "--short", "HEAD"]).unwrap_or_default();
      // The whole tree but the files cargo itself writes there: `cargo install --git` marks its
-     // checkout ready with `.cargo-ok` at the top, which would make every such build dirty.
+     // checkout ready with `.cargo-ok` at the top, a file that would make every such build dirty.
      let dirty = git(&[

@@ -20,7 +20,7 @@ git common directory, which `git rev-parse --git-common-dir` prints, is `~/code/
 | Backup refs | `refs/wtpool-backup/<branch>/<sha>` in the repository | `wtpool bg` and `wtpool fg` with `--reset` |
 | Slots | `~/code/app-wt1` to `app-wt3`, or in `slot_dir`, each a git worktree | `wtpool setup`, `wtpool bg`, `wtpool new` |
 | Files in new slots | the `copy` files, and whatever `on_new_slot` writes | wtpool, when it creates a slot |
-| Hook log | `~/.local/state/wtpool/hook.log` and `hook.log.1`, or `$XDG_STATE_HOME/wtpool/` | `wtpool hook`, only on a panic or a watchdog stop |
+| Hook log | `~/.local/state/wtpool/hook.log` and `hook.log.1`, or `$XDG_STATE_HOME/wtpool/` | `wtpool hook`, only on a panic, a watchdog stop, or an event it skipped because it could not lock or write its record |
 | The extension | VS Code's extensions folder | you, with `code --install-extension` |
 | The `wtpool.path` setting | your VS Code user `settings.json` | you, if you set it |
 | The tab's state | VS Code's own storage: the path of the selected row, to restore the tab after a reload | VS Code |
@@ -35,8 +35,9 @@ your machine unless you share the output, for example in a bug report.
 ## What a record holds
 
 One record per session or subagent. The hook keeps it within 16 KiB by dropping the oldest ids
-of ended calls, then the oldest calls in flight, and wtpool ignores a record that is larger. It
-holds:
+of ended calls, then the oldest calls in flight. A record that still does not fit is not
+written: the record on disk stays as it was, and the hook's log notes the skipped event. wtpool
+ignores a record that is larger. It holds:
 
 - the session and agent ids, the agent type, and the harness (`claude-code`);
 - the label: the session's title, or `session HH:MM`. A subagent's label is its agent type;
@@ -92,13 +93,16 @@ Only `git` and `gh` use the network on purpose, for PR and remote branch feature
 `wtpool hook`, `wtpool status` and the extension open no network connection themselves. The
 lints `lint__no_socket_apis` and `lint__no_network_modules` enforce that in the code.
 
-The hook can still make the system contact another machine. It resolves the paths that the model
-writes in tool calls, before you approve the call:
+The hook resolves the paths that the model writes in tool calls, before you approve the call. On
+Windows it never reads such a path with a UNC, device or verbatim prefix other than a drive's,
+or with a root but no drive. Elsewhere it never reads one that starts with exactly two slashes.
+Two cases can still make the system contact another machine:
 
-- on Windows, a UNC path such as `\\host\share\file` makes Windows connect to that host over SMB;
-- where autofs serves `/net`, a path under `/net/<host>` makes the system contact that host.
+- where autofs serves `/net`, a path under `/net/<host>` makes the system contact that host;
+- a local path that goes through a symlink whose target is a UNC path, such as `\\host\share`,
+  makes Windows connect to that host over SMB when the hook resolves it.
 
-A fix is planned. [Security](../SECURITY.md#paths-can-reach-the-network) has the details.
+[Security](../SECURITY.md#paths-can-reach-the-network) has the details.
 
 When you install the plugin, Claude Code itself fetches this repository from GitHub.
 
@@ -162,7 +166,8 @@ The verify harness keeps two folders outside the clone:
 - `~/.cache/wtpool-verify/` (or `$XDG_CACHE_HOME/wtpool-verify/`): clean clones, the short links
   for VS Code's sockets, a downloaded VS Code, and the lock that keeps the budgets alone;
 - `~/.local/share/wtpool-verify/` (or `$XDG_DATA_HOME/wtpool-verify/`): the build copy of
-  `wtpool` that the contract sessions run, and recordings of live contract runs.
+  `wtpool` that the contract sessions run, and recordings of live contract runs in
+  `recordings/` and `recordings-backup/`.
 
 Delete both with `rm -r ~/.cache/wtpool-verify ~/.local/share/wtpool-verify`. In the clone,
 `verify/out/` holds each run's sandboxes and reports, and `target/` the builds. Playwright keeps

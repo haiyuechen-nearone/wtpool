@@ -1,5 +1,5 @@
-//! Records what `wtpool --version` reports: the commit the binary is built from, whether the tree
-//! had uncommitted changes, and the enabled cargo features.
+//! Records for `wtpool --version` the commit the binary is built from, any uncommitted change in
+//! the tree, and the enabled cargo features.
 
 use std::process::Command;
 
@@ -10,7 +10,7 @@ fn main() {
 
     let commit = git(&["rev-parse", "--verify", "HEAD"]).unwrap_or_default();
     // The whole tree but the files cargo itself writes there: `cargo install --git` marks its
-    // checkout ready with `.cargo-ok` at the top, which would make every such build dirty.
+    // checkout ready with `.cargo-ok` at the top, a file that would make every such build dirty.
     let dirty = git(&[
         "--no-optional-locks",
         "status",

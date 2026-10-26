@@ -7,12 +7,12 @@ mod stamp;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use super::clock;
 use super::env::HookEnv;
-use super::procs::{ProcessTable, is_alive};
-use super::record::Record;
+use super::record::{HarnessProcess, Record};
 use super::store::Activity;
 use crate::activity::State;
+use crate::clock::{self, ReadClock, Timestamp};
+use crate::processes::{ListProcesses, Liveness, ProcessQuery, RecordedProcess, RunningProcess};
 
 const WEEK: i64 = 7 * 86_400;
 const QUARTER_HOUR: i64 = 15 * 60;
@@ -33,18 +33,14 @@ pub struct Collected {
 #[must_use]
 pub fn collect_pool(common: &Path, env: &HookEnv) -> Collected {
     match Activity::open(common) {
-        Some(activity) => collect_now(
-            &activity,
-            clock::now_seconds(env.clock.as_deref()),
-            &env.processes,
-        ),
+        Some(activity) => collect_now(&activity, env.clock.now(), &env.processes),
         None => Collected::default(),
     }
 }
 
-/// `wtpool hook gc`: stamps the pool and collects every record at `now` (seconds).
+/// `wtpool hook gc`: stamps the pool and collects every record at `now`.
 #[must_use]
-pub fn collect_now(activity: &Activity, now: i64, table: &ProcessTable) -> Collected {
+pub fn collect_now(activity: &Activity, now: Timestamp, table: &impl ListProcesses) -> Collected {
     stamp::mark(activity, now);
     collect(activity, now, table, None)
 }
@@ -54,8 +50,8 @@ pub fn collect_now(activity: &Activity, now: i64, table: &ProcessTable) -> Colle
 /// the stamp, so the next session's end goes on.
 pub fn after_session_end(
     activity: &Activity,
-    now: i64,
-    table: &ProcessTable,
+    now: Timestamp,
+    table: &impl ListProcesses,
     deadline: i64,
 ) -> Option<Collected> {
     if !stamp::claim(activity, now) {
@@ -68,13 +64,13 @@ pub fn after_session_end(
     Some(collected)
 }
 
-/// Collects the records of `activity` at `now` (seconds), stopping once the system clock reaches
+/// Collects the records of `activity` at `now`, stopping once the system clock reaches
 /// `deadline` (microseconds).
 #[must_use]
 pub fn collect(
     activity: &Activity,
-    now: i64,
-    table: &ProcessTable,
+    now: Timestamp,
+    table: &impl ListProcesses,
     deadline: Option<i64>,
 ) -> Collected {
     let late = || deadline.is_some_and(|deadline| clock::system_micros() >= deadline);
@@ -96,15 +92,16 @@ pub fn collect(
         .iter()
         .filter_map(|(_, record)| record.process.as_ref().map(|process| process.pid))
         .collect();
-    let living = table.living(&pids);
+    let living = living(table, &pids);
     for (stem, record) in &records {
         if late() {
             collected.stopped = true;
             break;
         }
         let doomed = |record: &Record| {
-            let age = clock::parse_seconds(&record.updated).map_or(i64::MAX, |t| now - t);
-            let gone = record.state == State::Ended || !is_alive(record.process.as_ref(), &living);
+            let age = Timestamp::parse(&record.updated).map_or(i64::MAX, |t| now.seconds_since(t));
+            let process = record.process.as_ref().map(recorded);
+            let gone = record.state == State::Ended || !Liveness::SameStart.runs(process, &living);
             let stale_done = record.is_subagent()
                 && record.state == State::Done
                 && age > QUARTER_HOUR
@@ -142,24 +139,52 @@ pub fn collect(
     collected
 }
 
+/// The processes among `pids` that the table lists with their start, the last line of a pid
+/// counting when a table lists it more than once.
+fn living(table: &impl ListProcesses, pids: &[u32]) -> Vec<RunningProcess> {
+    let listed = table.list(&ProcessQuery::only(pids).with_started());
+    let by_pid: BTreeMap<u32, RunningProcess> = listed
+        .into_iter()
+        .map(|process| (process.pid, process))
+        .collect();
+    by_pid.into_values().collect()
+}
+
+/// The process `process` names. A start spelled otherwise than the hook writes one, such as with
+/// a fraction, names no start the table confirms.
+fn recorded(process: &HarnessProcess) -> RecordedProcess {
+    let started =
+        Timestamp::parse(&process.started).filter(|at| at.to_rfc3339() == process.started);
+    RecordedProcess {
+        pid: process.pid,
+        started,
+    }
+}
+
+/// The newest `done` subagent of a worktree so far.
+struct NewestDone<'a> {
+    updated: Timestamp,
+    stem: &'a str,
+}
+
 /// The stem of the newest `done` subagent of each worktree, by `updated`.
 fn newest_done_by_worktree(records: &[(String, Record)]) -> BTreeMap<String, String> {
-    let mut newest: BTreeMap<String, (i64, String)> = BTreeMap::new();
+    let mut newest: BTreeMap<&str, NewestDone<'_>> = BTreeMap::new();
     for (stem, record) in records {
         if !(record.is_subagent() && record.state == State::Done) {
             continue;
         }
-        let updated = clock::parse_seconds(&record.updated).unwrap_or(i64::MIN);
-        let entry = newest
-            .entry(record.worktree.clone())
-            .or_insert((updated, stem.clone()));
-        if updated > entry.0 {
-            *entry = (updated, stem.clone());
+        let updated =
+            Timestamp::parse(&record.updated).unwrap_or(Timestamp::from_seconds(i64::MIN));
+        let candidate = NewestDone { updated, stem };
+        let entry = newest.entry(&record.worktree).or_insert(candidate);
+        if updated > entry.updated {
+            *entry = NewestDone { updated, stem };
         }
     }
     newest
         .into_iter()
-        .map(|(worktree, (_, stem))| (worktree, stem))
+        .map(|(worktree, done)| (worktree.to_owned(), done.stem.to_owned()))
         .collect()
 }
 

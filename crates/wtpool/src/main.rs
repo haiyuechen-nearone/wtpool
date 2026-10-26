@@ -125,8 +125,8 @@ struct Rest {
 }
 
 impl Rest {
-    /// The subcommand's arguments as typed. clap drops a `--`, which [`RefArgs::parse`]
-    /// must see to reject it as an unknown flag, so they are read from the raw command line.
+    /// The subcommand's arguments as typed, read from the command line itself: clap drops a
+    /// `--` that [`RefArgs::parse`] must see to reject it as an unknown flag.
     fn raw(&self) -> Vec<String> {
         std::env::args_os()
             .skip(2)
@@ -186,7 +186,6 @@ enum Action {
     HookGc,
 }
 
-/// How `wtpool status` prints the pool.
 #[derive(Debug, Clone, Copy)]
 enum StatusMode {
     /// One document.
@@ -281,9 +280,9 @@ impl From<Error> for Failure {
     }
 }
 
-/// Writes to the real streams. Colour follows standard output, also for messages on standard error.
-/// wtpool's own lines show as [`visible`] shows them; `out` and `err` pass the output of git and
-/// `on_new_slot` on as is.
+/// Writes to the real streams. Its `wtpool:` tags are coloured when standard output is a
+/// terminal, on standard error too. wtpool's own lines pass through [`visible`]. [`Report::out`]
+/// and [`Report::err`] pass the output of git and `on_new_slot` on as is.
 #[derive(Debug)]
 struct Terminal {
     colour: bool,
@@ -328,7 +327,7 @@ impl Report for Terminal {
 
 fn main() -> ExitCode {
     use std::io::IsTerminal;
-    // `wtpool hook` prints nothing and exits 0 on every path (H2, H3), so it skips the rest.
+    // `wtpool hook` prints nothing and exits 0 on every path, so it skips the argument checks.
     let mut args = std::env::args_os().skip(1);
     if let (Some(first), None) = (args.next(), args.next())
         && first == "hook"
@@ -384,7 +383,6 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
         && !cli.version
         && rest.raw() == ["--schema"]
     {
-        // The text `cargo run -q -p wtpool-core --example status_schema` prints (S12).
         terminal.out(&status::status_schema_text());
         return Ok(());
     }
@@ -530,7 +528,7 @@ fn print_path(terminal: &mut Terminal, path: &Path) {
     terminal.out(&format!("{shown}\n"));
 }
 
-/// Colour and shortening only on a terminal; piped output keeps full branch names.
+/// Piped output keeps full branch names and no colour codes, for the scripts that read it.
 fn table_style(on_terminal: bool) -> Style {
     Style {
         colour: on_terminal,

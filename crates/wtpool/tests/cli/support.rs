@@ -51,7 +51,7 @@ pub(crate) fn must_write_script(path: &Path, script: &str) {
     std::fs::set_permissions(path, Permissions::from_mode(0o755)).unwrap();
 }
 
-/// What one run of `wtpool` printed and how it exited.
+/// The output and exit code of one run of `wtpool`.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Outcome {
     pub(crate) code: Option<i32>,
@@ -155,7 +155,7 @@ impl Sandbox {
             .env("WTPOOL_SLOT_DIR", &self.root)
             .env("WTPOOL_SLOT_PREFIX", "app-wt")
             .env("WTPOOL_SLOT_COUNT", "2")
-            // A coverage run counts what the spawned binary executes too.
+            // A coverage run also counts the lines the spawned binary runs.
             .envs(std::env::var_os("LLVM_PROFILE_FILE").map(|file| ("LLVM_PROFILE_FILE", file)))
             .envs(env.iter().cloned());
         command
@@ -212,7 +212,7 @@ impl Sandbox {
         must_git(&self.foreground, &["rev-parse", "--short", "HEAD"])
     }
 
-    /// Writes the repository's `wtpool.toml`, which every worktree of the pool finds.
+    /// Writes the repository's `wtpool.toml`, shared by every worktree of the pool.
     pub(crate) fn must_write_repo_file(&self, text: &str) -> PathBuf {
         let file = self.foreground.join(".git/wtpool.toml");
         std::fs::write(&file, text).unwrap();

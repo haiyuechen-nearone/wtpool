@@ -8,8 +8,8 @@ use rstest::rstest;
 
 use super::tests::{CLOCK, ROOT, watched};
 use super::*;
+use crate::clock::Timestamp;
 use crate::status::document::{DocumentKind, DocumentVersion, Machine};
-use crate::status::time::Timestamp;
 
 /// What the loop asked a [`FakeTracker`] to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,7 +68,7 @@ impl Track for FakeTracker {
         *self.deadline.lock().unwrap()
     }
 
-    fn tick(&mut self) {
+    fn tick(&mut self, _: Instant) {
         *self.deadline.lock().unwrap() = None;
         self.record(Call::Tick);
     }

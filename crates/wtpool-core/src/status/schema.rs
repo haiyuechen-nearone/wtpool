@@ -12,8 +12,9 @@ use super::document::{
     Activity, Actor, ActorKind, ActorState, Agents, Build, Document, GitStatus, OperationName,
     Output, PoolStatus, Reason, Repository, WorktreeStatus,
 };
-use super::time::{RecordTime, Timestamp};
+use super::record_time::RecordTime;
 use crate::activity::{PlacedBy, WaitReason};
+use crate::clock::Timestamp;
 use crate::worktree_state::Role;
 
 /// A type whose JSON form a JSON Schema describes.

@@ -14,9 +14,11 @@ use super::live::Live;
 use super::records::is_record_name;
 use super::state::PoolState;
 use crate::activity::ACTIVITY_DIR;
+use crate::clock::ReadClock;
 use crate::config::Config;
 use crate::error::Error;
 use crate::paths::comparable;
+use crate::processes::ListProcesses;
 
 /// What the watch loop hears: changed paths from the folder watch, or the end of its input.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,8 +69,8 @@ pub trait Track {
     fn document(&self) -> Document;
     /// When the tracker next has work of its own: a timer (W6) or a refresh that waits (W4).
     fn deadline(&self) -> Option<Instant>;
-    /// Does the work due by now.
-    fn tick(&mut self);
+    /// Does the work due by `now`.
+    fn tick(&mut self, now: Instant);
 }
 
 /// The paths the loop hears about: spellings of the common git directory, and the clock's
@@ -113,10 +115,10 @@ const GIT_DIR_FILES: [&str; 9] = [
 /// Runs `wtpool status --watch` on the pool of `config`, whose common git directory is `common`,
 /// until `input` ends or `output` fails, which both end it cleanly (W8). The folder watch
 /// starts before the first read, so no change slips between them.
-pub fn watch(
+pub fn watch<C: ReadClock, P: ListProcesses>(
     config: Config,
     common: PathBuf,
-    sources: &Sources,
+    sources: &Sources<C, P>,
     input: impl Read + Send + 'static,
     output: &mut impl Write,
 ) -> Result<(), Error> {
@@ -128,7 +130,7 @@ pub fn watch(
         roots: vec![comparable(&common), common.clone()],
         clock: clock.as_deref().map(comparable),
     };
-    let state = PoolState::load(config, common, sources.processes.as_ref())?;
+    let state = PoolState::load(config, common, &sources.processes, sources.machine.clone())?;
     let mut live = Live::new(state, sources);
     run(&mut live, &messages, output, &watched, TIMING);
     Ok(())
@@ -217,7 +219,7 @@ pub fn run(
                 return;
             }
         } else if tracker.deadline().is_some_and(|due| now >= due) {
-            tracker.tick();
+            tracker.tick(now);
             if !print_changes(tracker, &mut shown, output) {
                 return;
             }

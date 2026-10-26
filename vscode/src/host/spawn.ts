@@ -1,13 +1,10 @@
-// Every start of `wtpool` (X4): the binary {@link resolveBinary} finds, with an argument array and
-// no shell, in the tab's folder (R9). The watch (stream.ts) and `free` and `fg` (confirm.ts) start
-// it here, and both learn its end the same way: it did not start, or it exited.
 import { spawn, type ChildProcess, type ChildProcessByStdio } from 'node:child_process';
 import type { Readable, Writable } from 'node:stream';
 
 import { resolveBinary } from './binary';
 import { assertIsError } from './errors';
 
-/** The characters of a run's stderr kept: its tail, with the last line (R10). */
+/** The number of characters kept from the end of a run's stderr. */
 const STDERR_TAIL = 4096;
 
 /** Holds a `wtpool` that did not start: spawn threw or reported an error. */
@@ -27,13 +24,10 @@ interface Exited {
 /** The end of one run of `wtpool`. */
 export type RunEnd = NotStarted | Exited;
 
-/** A running watch: stdin stays open (W8), stdout carries the lines, stderr the error (R10). */
+/** A running watch. Its stdin stays open, as `wtpool status --watch` exits at EOF. */
 export type WatchProcess = ChildProcessByStdio<Writable, Readable, Readable>;
 
-/**
- * Describes an exit that left no error text, in R10's words: `wtpool exited with code N`, or
- * `wtpool was stopped by <signal>`.
- */
+/** Describes an exit that left no error text. */
 export function describeExit(code: number | null, signal: NodeJS.Signals | null): string {
   return code === null ? `wtpool was stopped by ${signal}` : `wtpool exited with code ${code}`;
 }
@@ -74,7 +68,10 @@ function track<T extends ChildProcess & { stderr: Readable }>(
   return child;
 }
 
-/** Starts `binary` with `args` as a watch, or gives undefined when spawn threw; `ended` follows. */
+/**
+ * Starts `binary` with `args` as a watch, or gives undefined when spawn threw. `ended` runs in
+ * both cases.
+ */
 export function spawnWatch(
   binary: string,
   args: string[],

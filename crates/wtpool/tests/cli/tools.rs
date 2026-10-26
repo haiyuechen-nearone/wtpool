@@ -1,13 +1,10 @@
-//! The tools `wtpool` finds on `PATH`: git, gh, and what `on_new_slot` runs.
+//! The tools `wtpool` finds on `PATH`: git, gh, and the command of `on_new_slot`.
 
 use std::ffi::OsString;
 
 use rstest::rstest;
 
 use crate::support::{Outcome, Sandbox, must_find_git, must_git, must_write_script};
-
-// ---------------------------------------------------------------------------
-// The tools `wtpool` finds on `PATH`
 
 /// A `git` for `PATH` that runs the real one, then, after any fetch of `feature`,
 /// fetches `main` in `foreground` as an editor's autofetch might.
@@ -80,7 +77,7 @@ const NOT_INSTALLED: &str = "wtpool: gh is not installed, so PR #42 cannot be lo
     "#!/nonexistent/sh\n",
     "wtpool: could not run gh: No such file or directory (os error 2)\n"
 )]
-// What gh 2.98 prints without a login, and its exit status 4.
+// The output and exit status 4 of gh 2.98 without a login.
 #[case::not_logged_in(
     "script",
     "#!/bin/sh\n\
@@ -197,7 +194,7 @@ fn bg__should_park_the_head_branch_gh_names(
     );
 }
 
-/// A pool that copies `.envrc`, which git ignores, and runs `direnv allow` in each new slot.
+/// A pool that copies the git ignored `.envrc` and runs `direnv allow` in each new slot.
 fn must_set_up_direnv(sandbox: &Sandbox, script: &str) {
     std::fs::write(sandbox.foreground.join(".git/info/exclude"), ".envrc\n").unwrap();
     std::fs::write(sandbox.foreground.join(".envrc"), "use flake\n").unwrap();

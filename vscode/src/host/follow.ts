@@ -1,9 +1,7 @@
-// Follow (X19): a terminal that shows an output file live through a Pseudoterminal that reads the
-// file itself, with no shell and no `tail`, so it works on every OS.
 import { watch, type FSWatcher } from 'node:fs';
 import * as vscode from 'vscode';
 
-import { plain } from './actions';
+import { plain } from '../shared/invisible';
 import { systemClock, type Cancel, type Clock } from './clock';
 import { POLL_MS } from './outputs';
 import { expandTabs, keepColours, openOutput, readError, readLastBytes, tailLines, type LastBytes } from './tail';
@@ -16,7 +14,6 @@ const FOLLOW_LINES = 40;
  */
 const TICK_BYTES = 1024 * 1024;
 
-/** Names a Follow terminal after the agent's label and the task's summary, as plain text. */
 function followName(label: string, summary: string): string {
   return `${plain(label)} · ${plain(summary) || 'background task'}`;
 }
@@ -61,28 +58,24 @@ class FollowTerminal implements vscode.Pseudoterminal {
     if (!this.closed && text) this.written.fire(text);
   }
 
-  /** Converts `text` for the terminal: tabs as spaces, each line end a carriage return and a line feed. */
   private terminalText(text: string): string {
     const expanded = expandTabs(keepColours(text), this.column);
     this.column = expanded.column;
     return expanded.text.replace(/\r?\n/g, '\r\n');
   }
 
-  /** Moves the next read to `offset`, with the cursor at a line start. */
   private moveTo(offset: number): void {
     this.offset = offset;
     this.column = 0;
     this.decoder = new TextDecoder('utf-8');
   }
 
-  /** Writes the last {@link FOLLOW_LINES} lines of `last` and goes on after them. */
   private writeLast(last: LastBytes): void {
     this.moveTo(last.end);
     const lines = tailLines(last, FOLLOW_LINES, keepColours);
     this.write(lines.map((line) => `${line}\r\n`).join(''));
   }
 
-  /** Writes the file's last lines, then watches and polls it for growth. */
   private async start(): Promise<void> {
     let last: LastBytes;
     try {
@@ -132,7 +125,6 @@ class FollowTerminal implements vscode.Pseudoterminal {
     }
   }
 
-  /** Starts a tick of {@link TICK_BYTES} once the last one has ended. */
   private startTick(): void {
     const now = this.clock.now();
     if (now < this.tickEnd) return;
@@ -141,9 +133,8 @@ class FollowTerminal implements vscode.Pseudoterminal {
   }
 
   /**
-   * Writes the file's gain if the tick can take it. A file that shrank starts over. A gain that
-   * the rest of a tick cannot take waits for the next tick's poll, and one that a whole tick
-   * cannot take skips ahead.
+   * Writes the file's gain since the last read. A gain that the rest of a tick cannot take waits
+   * for the next poll, and one that a whole tick cannot take skips ahead.
    */
   private async readGain(): Promise<void> {
     const file = await openOutput(this.path);
@@ -170,7 +161,6 @@ class FollowTerminal implements vscode.Pseudoterminal {
     }
   }
 
-  /** Skips to the file's last lines, after one line that says so. */
   private async skip(): Promise<void> {
     const last = await readLastBytes(this.path);
     this.tickLeft -= last.end - last.start;

@@ -5,8 +5,8 @@
 use std::fs::File;
 use std::io::{self, Read, Seek, Write};
 
-use super::super::clock;
 use super::super::store::Activity;
+use crate::clock::Timestamp;
 
 pub const STAMP: &str = "gc.stamp";
 const DAY: i64 = 86_400;
@@ -18,17 +18,17 @@ const MAX_BYTES: u64 = 64;
 /// any record is read. `false` when the stamp is fresh, another process holds its lock or it
 /// cannot be written.
 #[must_use]
-pub fn claim(activity: &Activity, now: i64) -> bool {
+pub fn claim(activity: &Activity, now: Timestamp) -> bool {
     let Some(mut file) = locked(activity) else {
         return false;
     };
-    let due = read_time(&mut file).is_none_or(|last| now < last || now - last >= DAY);
+    let due = read_time(&mut file).is_none_or(|last| now < last || now.seconds_since(last) >= DAY);
     due && write_time(&mut file, now).is_ok()
 }
 
 /// Sets the stamp to `now`, as `wtpool hook gc` does before it runs. A process that holds the
 /// lock is writing it already.
-pub fn mark(activity: &Activity, now: i64) {
+pub fn mark(activity: &Activity, now: Timestamp) {
     if let Some(mut file) = locked(activity) {
         let _ = write_time(&mut file, now);
     }
@@ -48,19 +48,19 @@ fn locked(activity: &Activity) -> Option<File> {
     Some(file)
 }
 
-fn read_time(file: &mut File) -> Option<i64> {
+fn read_time(file: &mut File) -> Option<Timestamp> {
     let mut text = String::new();
     file.take(MAX_BYTES.saturating_add(1))
         .read_to_string(&mut text)
         .ok()?;
     let fits = u64::try_from(text.len()).is_ok_and(|len| len <= MAX_BYTES);
-    fits.then(|| clock::parse_seconds(text.trim())).flatten()
+    fits.then(|| Timestamp::parse(text.trim())).flatten()
 }
 
-fn write_time(file: &mut File, now: i64) -> io::Result<()> {
+fn write_time(file: &mut File, now: Timestamp) -> io::Result<()> {
     file.set_len(0)?;
     file.rewind()?;
-    file.write_all(format!("{}\n", clock::rfc3339(now)).as_bytes())
+    file.write_all(format!("{}\n", now.to_rfc3339()).as_bytes())
 }
 
 #[cfg(test)]

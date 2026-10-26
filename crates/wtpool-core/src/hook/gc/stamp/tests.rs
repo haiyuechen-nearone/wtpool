@@ -5,7 +5,12 @@ use rstest::rstest;
 use super::super::super::store::tests::eventually;
 use super::*;
 
-const NOW: i64 = 1_792_497_600;
+const NOW: Timestamp = Timestamp::from_seconds(1_792_497_600);
+
+/// The time `seconds` after [`NOW`], before it when negative.
+fn later(seconds: i64) -> Timestamp {
+    Timestamp::from_seconds(NOW.seconds() + seconds)
+}
 
 fn must_activity() -> (tempfile::TempDir, Activity) {
     let dir = tempfile::tempdir().unwrap();
@@ -20,14 +25,14 @@ fn stamp_text(activity: &Activity) -> Option<String> {
 
 #[rstest]
 #[case::missing(None, true)]
-#[case::an_hour_ago(Some(clock::rfc3339(NOW - 3600)), false)]
-#[case::a_second_short_of_a_day(Some(clock::rfc3339(NOW - DAY + 1)), false)]
-#[case::a_day_ago(Some(clock::rfc3339(NOW - DAY)), true)]
-#[case::a_week_ago(Some(clock::rfc3339(NOW - 7 * DAY)), true)]
-#[case::now(Some(clock::rfc3339(NOW)), false)]
-#[case::later_than_now(Some(clock::rfc3339(NOW + 60)), true)]
+#[case::an_hour_ago(Some(later(-3600).to_rfc3339()), false)]
+#[case::a_second_short_of_a_day(Some(later(1 - DAY).to_rfc3339()), false)]
+#[case::a_day_ago(Some(later(-DAY).to_rfc3339()), true)]
+#[case::a_week_ago(Some(later(-(7 * DAY)).to_rfc3339()), true)]
+#[case::now(Some(NOW.to_rfc3339()), false)]
+#[case::later_than_now(Some(later(60).to_rfc3339()), true)]
 #[case::garbage(Some("soon".to_owned()), true)]
-#[case::too_long(Some(format!("{}{}", clock::rfc3339(NOW), " ".repeat(64))), true)]
+#[case::too_long(Some(format!("{}{}", NOW.to_rfc3339(), " ".repeat(64))), true)]
 fn claim__should_run_once_a_day(#[case] stamp: Option<String>, #[case] due: bool) {
     // Given
     let (_dir, activity) = must_activity();
@@ -41,7 +46,7 @@ fn claim__should_run_once_a_day(#[case] stamp: Option<String>, #[case] due: bool
     // Then
     assert_eq!(claimed, due);
     let expected = if due {
-        Some(format!("{}\n", clock::rfc3339(NOW)))
+        Some(format!("{}\n", NOW.to_rfc3339()))
     } else {
         stamp
     };
@@ -92,25 +97,25 @@ fn claim__should_give_the_day_to_one_claimant_of_many() {
 
     // Then
     assert_eq!(won, 1);
-    assert!(!claim(&activity, NOW + DAY - 1));
+    assert!(!claim(&activity, later(DAY - 1)));
 }
 
 #[test]
 fn mark_and_clear__should_set_and_remove_the_stamp() {
     // Given
     let (_dir, activity) = must_activity();
-    std::fs::write(activity.file_path(STAMP), clock::rfc3339(NOW - 2 * DAY)).unwrap();
+    std::fs::write(activity.file_path(STAMP), later(-(2 * DAY)).to_rfc3339()).unwrap();
 
     // When
     mark(&activity, NOW);
     let marked = stamp_text(&activity);
-    let fresh = claim(&activity, NOW + 60);
+    let fresh = claim(&activity, later(60));
     clear(&activity);
     let cleared = stamp_text(&activity);
 
     // Then
-    assert_eq!(marked, Some(format!("{}\n", clock::rfc3339(NOW))));
+    assert_eq!(marked, Some(format!("{}\n", NOW.to_rfc3339())));
     assert!(!fresh);
     assert_eq!(cleared, None);
-    assert!(claim(&activity, NOW + 60));
+    assert!(claim(&activity, later(60)));
 }

@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use rstest::rstest;
 use serde_json::{Value, json};
-use wtpool_core::hook::{HookEnv, ProcessTable, handle};
+use wtpool_core::clock::Clock;
+use wtpool_core::hook::{HookEnv, handle};
+use wtpool_core::processes::ProcessTable;
 
 use super::*;
 
@@ -54,8 +56,8 @@ impl Pool {
         );
         std::fs::write(&procs, format!("{CLAUDE}\n{own}\n")).unwrap();
         let env = HookEnv {
-            clock: Some(clock),
-            processes: ProcessTable::File(procs),
+            clock: Clock::from_file(Some(clock)),
+            processes: ProcessTable::from_file(Some(procs)),
             sandbox: true,
             home: Some(root.clone()),
             tz: Some("UTC".to_owned()),
@@ -462,7 +464,7 @@ fn hook_parent(pool: &Pool, ppid: u32) {
 
 #[test]
 fn handle__should_end_old_tasks_the_sessions_list_leaves_out() {
-    // Given: a1 and a2 end their turns while b1 and b2 run, then a3 starts b3 ten minutes later.
+    // Given
     let pool = Pool::must_new();
     let listed = |ids: &[&str]| -> Value {
         ids.iter()
@@ -482,7 +484,7 @@ fn handle__should_end_old_tasks_the_sessions_list_leaves_out() {
     pool.send(background_call(&pool, "s1", Some("a3"), "b3"));
     let a2_before = pool.record("s1.a2").unwrap();
 
-    // When: the session's Stop lists only b2, then one from another process lists nothing.
+    // When
     pool.send(pool.event("Stop", json!({"background_tasks": listed(&["b2"])})));
     let first = (
         task_ends(&pool, "s1.a1"),

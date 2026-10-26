@@ -1,9 +1,4 @@
-// The clock behind every time the extension keeps: the stale and restart deadlines and the
-// restart backoff of the watch stream (X5, X6). Outside WTPOOL_VERIFY it is the system clock; under
-// WTPOOL_VERIFY=1 it is a fake that moves only through `advance` (verification.md, "Test
-// interfaces", item 3).
-
-/** Cancels a timer; a second call does nothing. */
+/** Cancels a timer. A second call does nothing. */
 export type Cancel = () => void;
 
 /** Tells the time and runs timers, on the system clock or a fake one. */
@@ -23,7 +18,6 @@ export const systemClock: Clock = {
   },
 };
 
-/** One pending timer of a {@link FakeClock}. */
 interface Timer {
   at: number;
   /** The order the timer was set in, the tie break between timers due at once. */
@@ -31,7 +25,7 @@ interface Timer {
   run: () => void;
 }
 
-/** A clock that stands still until `advance` moves it, firing due timers in time order. */
+/** A clock that stands still until {@link FakeClock.advance} moves it, firing due timers in time order. */
 export class FakeClock implements Clock {
   private order = 0;
   private readonly timers = new Set<Timer>();
@@ -49,7 +43,7 @@ export class FakeClock implements Clock {
     return () => this.timers.delete(timer);
   }
 
-  /** Moves the clock `ms` forward; each timer due by then fires at its own time. */
+  /** Moves the clock `ms` forward. Each timer due by then fires at its own time. */
   advance(ms: number): void {
     const target = this.time + ms;
     for (let next = this.due(target); next; next = this.due(target)) {
@@ -60,7 +54,6 @@ export class FakeClock implements Clock {
     this.time = target;
   }
 
-  /** Finds the timer to fire next by `target`: the earliest, the first set among equals. */
   private due(target: number): Timer | undefined {
     let first: Timer | undefined;
     for (const timer of this.timers) {

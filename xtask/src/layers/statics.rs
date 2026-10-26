@@ -200,6 +200,21 @@ pub fn listen_call(line: &str) -> Option<String> {
     None
 }
 
+/// The first character of a line outside ASCII, by code point and column. The coverage converter
+/// needs each bundle's size in bytes to equal its length in UTF-16 units, as V8 measures it.
+fn non_ascii(line: &str) -> Option<String> {
+    line.chars()
+        .enumerate()
+        .find(|(_, character)| !character.is_ascii())
+        .map(|(index, character)| {
+            format!(
+                "U+{:04X} at column {}",
+                u32::from(character),
+                index.saturating_add(1)
+            )
+        })
+}
+
 /// The first HTML sink a line of a webview bundle names.
 fn html_sink(line: &str) -> Option<String> {
     HTML_SINKS
@@ -231,6 +246,10 @@ pub(super) fn static_checks(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
             "bundle__should_contain_no_listen_call",
             &found,
         ));
+    }
+    if wanted.check("static:ascii_bundles") {
+        let found = findings_in(&built_bundles(ctx), non_ascii);
+        results.push(findings_result("static:ascii_bundles", &found));
     }
     if wanted.check("schema__generated_files_current") {
         results.push(super::product::schema_current(ctx));
@@ -326,6 +345,24 @@ mod tests {
 
         // When
         let found = network_import(text);
+
+        // Then
+        assert_eq!(found.as_deref(), expected);
+    }
+
+    #[rstest]
+    #[case::ascii("const dot = \"\\u00b7\";", None)]
+    #[case::middle_dot("/** a \u{b7} b */", Some("U+00B7 at column 7"))]
+    #[case::astral("x = '\u{1f600}'", Some("U+1F600 at column 6"))]
+    fn non_ascii__should_name_the_first_character_outside_ascii(
+        #[case] line: &str,
+        #[case] expected: Option<&str>,
+    ) {
+        // Given
+        let text = line;
+
+        // When
+        let found = non_ascii(text);
 
         // Then
         assert_eq!(found.as_deref(), expected);

@@ -1,5 +1,4 @@
-//! Claude Code's hook events (H11): the one table of the events `wtpool hook` reads, the source
-//! of the hook block of H1 too, and each payload as the neutral [`HookInput`].
+//! The Claude Code hook events `wtpool hook` reads, and each payload as a [`HookInput`].
 
 use wtpool_core::activity::{ActorId, CallId, WaitReason};
 use wtpool_core::hook::text::{self, MAX_TEXT};
@@ -28,7 +27,6 @@ pub enum HookEvent {
 }
 
 impl HookEvent {
-    /// Every event, in the order of the event table.
     pub const ALL: [Self; 14] = [
         Self::UserPromptSubmit,
         Self::PreToolUse,
@@ -73,7 +71,7 @@ impl HookEvent {
         Self::ALL.into_iter().find(|event| event.name() == name)
     }
 
-    /// `true` for the five events whose hook Claude Code need not wait for (H1).
+    /// `true` for an event whose hook Claude Code need not wait for.
     #[must_use]
     pub fn is_async(self) -> bool {
         matches!(
@@ -88,7 +86,7 @@ impl HookEvent {
 }
 
 /// The event of the Claude Code payload in `input`. `None` when the payload does not parse,
-/// names an id outside its pattern (H17), or names an event the hook ignores.
+/// names an id outside its pattern, or names an event the hook ignores.
 #[must_use]
 pub fn parse(input: &[u8]) -> Option<HookInput> {
     let payload = Payload::parse(input)?;
@@ -126,8 +124,8 @@ pub fn parse(input: &[u8]) -> Option<HookInput> {
     })
 }
 
-/// The subagent an ended Agent call started, by the `agentId` of its `tool_response`, which is
-/// the `agent_id` of the subagent's own events, and the call's `description` (H16).
+/// The subagent an ended Agent call started, from the `agentId` of its `tool_response` and the
+/// call's `description`.
 fn spawned(payload: &Payload) -> Option<Spawned> {
     if payload.tool_name.as_deref() != Some("Agent") {
         return None;
@@ -140,13 +138,13 @@ fn spawned(payload: &Payload) -> Option<Spawned> {
     })
 }
 
-/// The event name of `input`, if it parses: what `WTPOOL_VERIFY_PANIC` compares with.
+/// The `hook_event_name` of `input`, if it parses.
 #[must_use]
 pub fn event_name(input: &[u8]) -> Option<String> {
     Payload::parse(input).map(|payload| payload.hook_event_name)
 }
 
-/// The neutral event of a payload, `None` for events the hook ignores (H11).
+/// The [`Event`] of a payload, `None` for one the hook ignores.
 fn event_of(payload: &Payload) -> Option<Event> {
     let call = || {
         call_facts(
@@ -194,7 +192,7 @@ fn event_of(payload: &Payload) -> Option<Event> {
     })
 }
 
-/// The id, tool, kind and input hash of a call; the target comes with its place.
+/// The facts of a call, with an empty [`CallFacts::target`].
 fn call_facts(id: Option<&CallId>, tool: Option<&str>, input: &CallInput) -> CallFacts {
     let tool = text::clean(tool.unwrap_or_default(), MAX_TEXT);
     CallFacts {

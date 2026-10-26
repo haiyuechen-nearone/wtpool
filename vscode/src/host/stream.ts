@@ -1,9 +1,3 @@
-// The `wtpool status --watch` stream of one tab (D2, X4 to X6): one spawned process in the tab's
-// folder (R9) with stdin kept open, its lines read as they come, and a restart with backoff on
-// every fault: an exit, a line over 1 MiB, a parse or schema error, an unknown version, or
-// {@link RESTART_MS} without a line. A document may hold properties the schema does not list
-// (R11). When `wtpool` exits with an error, the stream keeps its last non-empty stderr line for
-// the paused tab (R10).
 import type { StatusDocument } from '../generated/status';
 import type { Connection } from '../shared/protocol';
 import { systemClock, type Cancel, type Clock } from './clock';
@@ -14,7 +8,7 @@ import { describeExit, spawnWatch, type RunEnd, type WatchProcess } from './spaw
 const STALE_MS = 15_000;
 /** The silence that makes the stream start `wtpool` again. */
 const RESTART_MS = 30_000;
-/** The wait before the first restart after a fault; each further fault doubles it. */
+/** The wait before the first restart after a fault. Each further fault doubles it. */
 const FIRST_BACKOFF_MS = 1_000;
 /** The longest wait between two starts. */
 const MAX_BACKOFF_MS = 30_000;
@@ -23,7 +17,7 @@ const KILL_AFTER_MS = 1_000;
 
 const WATCH_ARGS = ['status', '--watch'];
 
-/** Carries a status document that arrived; {@link WatchStream.lastLine} gives its time. */
+/** Carries a status document that arrived. {@link WatchStream.lastLine} gives its time. */
 export interface DocumentUpdate {
   document: StatusDocument;
 }
@@ -39,7 +33,6 @@ interface StreamEvents {
   log(message: string): void;
 }
 
-/** Finds the last non-empty line of `text`, trimmed. */
 function lastErrorLine(text: string): string | undefined {
   return text
     .split(/\r?\n|\r/)
@@ -47,7 +40,7 @@ function lastErrorLine(text: string): string | undefined {
     .findLast((line) => line !== '');
 }
 
-/** Describes the end of a start for the tab: wtpool's error, or none after a clean exit (R10). */
+/** Gives wtpool's error at the end of a start, or undefined after a clean exit. */
 function endError(end: RunEnd): string | undefined {
   if (!end.started) {
     return `wtpool did not start: ${end.error.message}`;
@@ -56,7 +49,7 @@ function endError(end: RunEnd): string | undefined {
   return lastErrorLine(end.stderr) ?? describeExit(end.code, end.signal);
 }
 
-/** Ends a `wtpool`: EOF on stdin (W8), SIGTERM, and SIGKILL for one that ignores both. */
+/** Ends a `wtpool`: EOF on stdin, SIGTERM, and SIGKILL for one that ignores both. */
 function stopProcess(child: WatchProcess): void {
   child.stdin.end();
   child.kill('SIGTERM');
@@ -64,14 +57,14 @@ function stopProcess(child: WatchProcess): void {
   systemClock.after(KILL_AFTER_MS, () => child.kill('SIGKILL'));
 }
 
-/** Runs one tab's watch and restarts it after each fault (X5, X6). */
+/** Runs one tab's `wtpool status --watch` and restarts it, with backoff, after each fault. */
 export class WatchStream {
   private state: Connection = 'starting';
   private lastLineAt?: number;
   private nextStartAt = 0;
   private failure?: string;
   private child?: WatchProcess;
-  /** The current start; the events of an earlier `wtpool` no longer count. */
+  /** The current start. The events of an earlier `wtpool` no longer count. */
   private attempt?: object;
   private backoff = FIRST_BACKOFF_MS;
   private silentSince = 0;
@@ -80,13 +73,12 @@ export class WatchStream {
   constructor(
     private readonly clock: Clock,
     private readonly binary: () => string,
-    /** The folder `wtpool` runs in (R9). */
     private readonly cwd: string,
     private readonly events: StreamEvents,
   ) {}
 
   /**
-   * Gives the connection: `starting` from each start until wtpool's first line (X6). With no line
+   * Gives the connection: `starting` from each start until wtpool's first line. With no line
    * to count from it never turns stale: a fault, or {@link RESTART_MS} without a line, pauses it as
    * it would any start.
    */
@@ -99,14 +91,14 @@ export class WatchStream {
     return this.lastLineAt;
   }
 
-  /** Gives the time the next start is due; the panel shows it while paused. */
+  /** Gives the time the next start is due. */
   get retryAt(): number {
     return this.nextStartAt;
   }
 
   /**
    * Gives, while paused after a start that failed, wtpool's last non-empty stderr line, or the
-   * reason it did not start (R10). Any line from `wtpool` clears it.
+   * reason it did not start. Any line from `wtpool` clears it.
    */
   get error(): string | undefined {
     return this.failure;
@@ -114,8 +106,8 @@ export class WatchStream {
 
   /** Starts `wtpool`, now and after each fault. */
   start(): void {
-    // A restart begins a new watch, which is starting until its first line (X6), so the header
-    // never counts down past the time the restart was due.
+    // A restart turns the watch back to starting, so the header never counts down past the time
+    // the restart was due.
     const restarting = this.state === 'paused';
     this.state = 'starting';
     const splitter = new LineSplitter();
@@ -159,7 +151,7 @@ export class WatchStream {
     }
   }
 
-  /** Takes the lines of a chunk: each document, alive line or fault (X5). */
+  /** Takes the lines of a chunk: each document, alive line or fault. */
   private read(lines: string[] | 'oversize'): void {
     if (lines === 'oversize') {
       this.fail('a line over 1 MiB');

@@ -118,7 +118,7 @@ A slot is free only when it is detached and shows none of these.
 - `free` and `fg` also refuse while an agent works or waits in a worktree they would detach or
   move: the slot `free` names, and for `fg` the foreground and the slot that holds the branch. An
   agent that went quiet while working counts, an idle or done one does not. The refusal names
-  each agent. `--force` skips this check.
+  the worktree and each such agent there. `--force` skips this check.
 - A failed git command means unknown, and unknown means refuse.
 - `wtpool` reads `git status` without optional locks, so it never takes `index.lock` from an agent's
   git in the same worktree.

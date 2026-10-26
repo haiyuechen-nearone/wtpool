@@ -1,42 +1,42 @@
-// One worktree row (U1, U4, U6, X12): six data cells, then the row actions. A row is made once per
-// worktree and updated in place, so focus and selection survive every document (X15).
 import type { Worktree } from '../generated/status';
 import { visible } from '../shared/invisible';
 import { offeredActions, type ActionType } from '../shared/protocol';
 import { bdi, cell, line, setText, span } from './dom';
 import { GROUPS, WORDS, age, agentLines, gitText, lastTimes, shownActors } from './text';
 
-/** Holds a row action's button: the action it posts as `{type, id}` (X11), its label and class. */
 interface ActionButton {
   type: ActionType;
   label: string;
-  name: string;
+  classSuffix: string;
 }
 
 /** The buttons of the row actions, in the order a row shows them. */
 const ACTIONS: readonly ActionButton[] = [
-  { type: 'open', label: 'Open in new window', name: 'open' },
-  { type: 'terminal', label: 'Open terminal', name: 'terminal' },
-  { type: 'copyPath', label: 'Copy path', name: 'copy-path' },
-  { type: 'free', label: 'Free this worktree…', name: 'free' },
-  { type: 'fg', label: 'Bring its branch to the foreground…', name: 'fg' },
+  { type: 'open', label: 'Open in new window', classSuffix: 'open' },
+  { type: 'terminal', label: 'Open terminal', classSuffix: 'terminal' },
+  { type: 'copyPath', label: 'Copy path', classSuffix: 'copy-path' },
+  { type: 'free', label: 'Free this worktree…', classSuffix: 'free' },
+  { type: 'fg', label: 'Bring its branch to the foreground…', classSuffix: 'fg' },
 ];
 
-/** The tag after a worktree's name, by its role (U1); a slot has none. */
+/** The tag after a worktree's name, by its role. */
 const ROLE_TAGS: Readonly<Record<Worktree['role'], string>> = {
   foreground: 'fg',
   slot: '',
   unmanaged: 'unmanaged',
 };
 
-/** Copies the working robot of the page's <template id="robot"> (html.ts, U6), if it has one. */
+/** Copies the robot of the page's `<template id="robot">`, if it has one. */
 function robot(): Node | null {
   const template = document.getElementById('robot');
   const drawn = template instanceof HTMLTemplateElement ? template.content.firstElementChild : null;
   return drawn ? document.importNode(drawn, true) : null;
 }
 
-/** Shows one worktree as a row of the table, updated in place for each document. */
+/**
+ * Shows one worktree as a row of the table. It is made once and updated in place, so focus and
+ * selection survive every document.
+ */
 export class RowView {
   readonly element: HTMLTableRowElement;
   private current: Worktree;
@@ -62,14 +62,13 @@ export class RowView {
     this.icon.setAttribute('aria-hidden', 'true');
     const activity = cell('activity');
     activity.append(this.icon, this.word);
-    // The tag follows the name inside the cell, as wide as both (U1).
     const name = cell('worktree');
     name.append(this.name, document.createTextNode(' '), this.role);
     const branch = cell('branch');
     branch.append(this.branch);
     const git = cell('git');
     git.append(this.git);
-    // Each text cell is a left to right isolate; each string in it is a <bdi> of its own (X10).
+    // Each text cell is a left to right isolate, and each string in it a <bdi> of its own.
     for (const text of [name, branch, git, this.agent]) {
       text.setAttribute('dir', 'ltr');
     }
@@ -82,7 +81,6 @@ export class RowView {
     return this.current.path;
   }
 
-  /** Gives the worktree the row shows. */
   get worktree(): Worktree {
     return this.current;
   }
@@ -106,12 +104,12 @@ export class RowView {
     this.updateActions(offeredActions(worktree));
   }
 
-  /** Recomputes the ages of the Last cell; nothing else changes (U7, B7). */
+  /** Recomputes the ages of the Last cell, nothing else. */
   tick(nowMs: number): void {
     this.times.forEach((time, index) => setText(this.last.children[index], age(time, nowMs)));
   }
 
-  /** Shows the robot while working, else the codicon glyph of the icon's ::before (U6). */
+  /** Shows the robot while working, else the codicon glyph of the icon's ::before. */
   private updateIcon(working: boolean): void {
     const shown = this.icon.firstChild;
     if (!working) {
@@ -149,12 +147,11 @@ export class RowView {
     const key = actions.join();
     if (key === this.actionKey) return;
     this.actionKey = key;
-    // The buttons sit in their own column, wide enough for all five, so they cover no text (U4).
     this.actions.replaceChildren(
-      ...ACTIONS.filter((action) => actions.includes(action.type)).map(({ type, label, name }) => {
+      ...ACTIONS.filter((action) => actions.includes(action.type)).map(({ type, label, classSuffix }) => {
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = `action action-${name}`;
+        button.className = `action action-${classSuffix}`;
         button.setAttribute('data-action', type);
         button.setAttribute('aria-label', label);
         button.setAttribute('title', label);

@@ -1,8 +1,9 @@
 use super::*;
 use crate::names::RemoteName;
+use crate::processes::StartTime;
 use crate::status::document::{Activity, Reason};
 use crate::status::fixture::{FixedProcesses, must_fixture, must_git};
-use crate::status::time::RecordTime;
+use crate::status::record_time::RecordTime;
 use crate::worktree_state::Role;
 
 fn worktree<'a>(document: &'a Document, name: &str) -> &'a WorktreeStatus {
@@ -36,7 +37,7 @@ fn document__should_describe_each_worktree_of_the_pool() {
 
     // Then
     assert_eq!(document.generated, Timestamp::from_seconds(60));
-    assert!(!document.machine.name.is_empty());
+    assert_eq!(document.machine.name, "machine");
     let pool = &document.pools[0];
     assert_eq!(pool.common_dir, fixture.common.to_string_lossy());
     assert_eq!((pool.agents, pool.skipped_records), (Agents::On, 1));
@@ -270,19 +271,6 @@ fn last_change__should_take_the_newer_of_head_and_index() {
     assert_eq!((change, none), (Some(Timestamp::from_seconds(200)), None));
 }
 
-#[test]
-fn machine_name__should_be_the_host_name() {
-    // Given
-    let output = std::process::Command::new("hostname").output().unwrap();
-    let host = String::from_utf8(output.stdout).unwrap();
-
-    // When
-    let name = machine_name();
-
-    // Then
-    assert_eq!(name, host.trim());
-}
-
 /// Writes the record `key` of a live `claude` placed in `worktree`, its pid 7001 plus the
 /// number in the key.
 fn live_record(fixture: &crate::status::fixture::Fixture, key: &str, worktree: &str, state: &str) {
@@ -301,15 +289,15 @@ fn live_record(fixture: &crate::status::fixture::Fixture, key: &str, worktree: &
     .unwrap();
 }
 
-fn claude() -> Process {
+fn claude() -> RunningProcess {
     claude_at(7001)
 }
 
-fn claude_at(pid: u32) -> Process {
-    Process {
+fn claude_at(pid: u32) -> RunningProcess {
+    RunningProcess {
         pid,
         parent: Some(1),
-        started: Timestamp::parse("2026-10-20T11:00:00Z"),
+        started: StartTime::parse("2026-10-20T11:00:00Z"),
         name: "claude".to_owned(),
         cwd: PathBuf::from("/"),
     }
@@ -435,7 +423,7 @@ fn document__should_keep_an_actor_working_by_the_kind_of_its_call() {
         7004,
         r#""harness":"other-harness","in_flight":[{"id":"t1","tool":"Bash"}],"#,
     );
-    let mut processes: Vec<Process> = (7001..=7004).map(claude_at).collect();
+    let mut processes: Vec<RunningProcess> = (7001..=7004).map(claude_at).collect();
     processes.push(fixture.process(9, "make", "wt1"));
     let state = fixture.must_load(processes);
 
@@ -515,7 +503,8 @@ fn document__should_read_the_url_of_the_configured_remote() {
     let processes = FixedProcesses::new(Vec::new());
 
     // When
-    let state = PoolState::load(config, fixture.common.clone(), &processes).unwrap();
+    let state =
+        PoolState::load(config, fixture.common.clone(), &processes, "m".to_owned()).unwrap();
 
     // Then
     let document = state.document(Timestamp::from_seconds(0));

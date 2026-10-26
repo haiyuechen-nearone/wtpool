@@ -1,6 +1,5 @@
-//! The Claude Code adapter of `wtpool hook` (status-panel.md, section 1): Claude Code's hook
-//! payload (H5), its event table (H11), what its tools do (H8, H13, H26), the titles of its
-//! transcript (H16), its background tasks (H27) and `wtpool hook install` (H1, H22, H28).
+//! The Claude Code adapter of `wtpool hook`. It reads Claude Code's hook payloads, tools,
+//! transcript titles and background tasks, and its settings for `wtpool hook install`.
 //! [`ClaudeCode`] is the [`Adapter`](wtpool_core::hook::Adapter) that `wtpool hook` runs.
 
 mod adapter;

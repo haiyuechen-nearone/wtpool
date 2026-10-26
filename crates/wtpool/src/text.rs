@@ -1,30 +1,23 @@
-//! Strings from git, records and settings as the terminal shows them. A branch name may carry C1
-//! controls such as OSC 52 that a terminal runs, so every line wtpool prints from such a string
-//! follows X10's rule for the webview.
+//! Strings from git, records and settings as the terminal shows them. A branch name may carry
+//! controls such as OSC 52 that a terminal runs, or bidi overrides that reorder the line.
 
-use std::fmt::Write as _;
-
-/// Control, bidi, zero width and other invisible format characters, as inclusive ranges: the set
-/// of the webview's `visible()` (X10). C0 and C1 controls, the soft hyphen, the Arabic letter mark,
-/// the Mongolian vowel separator, zero width spaces and joiners with the LRM and RLM, the bidi
-/// embeddings and overrides, the word joiner and invisible operators, the bidi isolates, the BOM,
-/// and the tags.
+/// The control, bidi, zero width and other invisible characters, as inclusive ranges.
 const INVISIBLE: [(char, char); 11] = [
-    ('\u{0}', '\u{1f}'),
-    ('\u{7f}', '\u{9f}'),
-    ('\u{ad}', '\u{ad}'),
-    ('\u{61c}', '\u{61c}'),
-    ('\u{180e}', '\u{180e}'),
-    ('\u{200b}', '\u{200f}'),
-    ('\u{202a}', '\u{202e}'),
-    ('\u{2060}', '\u{2064}'),
-    ('\u{2066}', '\u{2069}'),
-    ('\u{feff}', '\u{feff}'),
-    ('\u{e0000}', '\u{e007f}'),
+    ('\u{0}', '\u{1f}'),        // C0 controls
+    ('\u{7f}', '\u{9f}'),       // DEL and C1 controls
+    ('\u{ad}', '\u{ad}'),       // soft hyphen
+    ('\u{61c}', '\u{61c}'),     // Arabic letter mark
+    ('\u{180e}', '\u{180e}'),   // Mongolian vowel separator
+    ('\u{200b}', '\u{200f}'),   // zero width space and joiners, LRM, RLM
+    ('\u{202a}', '\u{202e}'),   // bidi embeddings and overrides
+    ('\u{2060}', '\u{2064}'),   // word joiner and invisible operators
+    ('\u{2066}', '\u{2069}'),   // bidi isolates
+    ('\u{feff}', '\u{feff}'),   // byte order mark
+    ('\u{e0000}', '\u{e007f}'), // tags
 ];
 
 /// `text` with each control, bidi and zero width character as `\u{XXXX}`, in upper case hex of at
-/// least four digits (X10).
+/// least four digits.
 #[must_use]
 pub fn visible(text: &str) -> String {
     let mut shown = String::with_capacity(text.len());
@@ -33,8 +26,7 @@ pub fn visible(text: &str) -> String {
             .iter()
             .any(|&(low, high)| (low..=high).contains(&c))
         {
-            // Writing to a `String` cannot fail.
-            let _ = write!(shown, "\\u{{{:04X}}}", u32::from(c));
+            shown.push_str(&format!("\\u{{{:04X}}}", u32::from(c)));
         } else {
             shown.push(c);
         }

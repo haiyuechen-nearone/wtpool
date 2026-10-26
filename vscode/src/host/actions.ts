@@ -1,18 +1,11 @@
-// The row actions that run at once (X11, U4): `open`, `terminal` and `copyPath`. messages.ts
-// reads the webview's request for one, and confirm.ts runs `free` and `fg`, as they ask first (X12).
-// Text from the document reaches a terminal name, a dialog or a notification only as plain text.
 import * as vscode from 'vscode';
 
 import { plain } from '../shared/invisible';
 import type { DirectAction } from './messages';
 
-// follow.ts takes plain text from here.
-export { plain };
-
 /**
- * Turns text into plain text for a notification. VS Code renders `[label](command:…)` in a toast
- * as a link, so `[` and `]` from the document or from wtpool become fullwidth brackets (a
- * backslash would stay visible and still leave the link pattern intact). Plain text otherwise (R8).
+ * VS Code renders `[label](command:...)` in a notification as a link, so brackets become fullwidth
+ * ones. A backslash escape would stay visible and still leave the link pattern intact.
  */
 function toast(text: string): string {
   return plain(text).replace(/\[/g, '［').replace(/\]/g, '］');
@@ -36,6 +29,5 @@ export async function run({ type, worktree }: DirectAction): Promise<void> {
       await vscode.env.clipboard.writeText(worktree.path);
       break;
     default:
-    // A DirectAction has no other type.
   }
 }

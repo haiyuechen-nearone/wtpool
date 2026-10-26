@@ -1,9 +1,3 @@
-// The page of the tab: the header (header.ts), the no folder note (R9), the agents off note (S8),
-// the table with the pool's heading row and one row per worktree (U1, U2, U8), the detail strip
-// (U5) with the Output section of its agents (U9), the live region for new waits (X14), and the
-// selection that getState keeps (X2) and `select` tells the extension, so it posts the selected
-// row's output tails (R12). The tab shows one pool, the document's first: wtpool sends
-// exactly one (S1), and any later pool is ignored.
 import type { StatusDocument, Worktree } from '../generated/status';
 import {
   isActionType,
@@ -25,7 +19,7 @@ const AGENTS_OFF =
   'No agents shown: agent activity is off for this pool. To turn it on, run wtpool setup in the pool, ' +
   'then add the hooks: in Claude Code, run /plugin marketplace add haiyuechen-nearone/wtpool and ' +
   '/plugin install wtpool@wtpool, or add the block that wtpool hook install prints to your Claude Code settings.';
-/** The longest selected row id a saved state may hold; anything longer is not a path. */
+/** The longest selected row id a saved state may hold. Anything longer is not a path. */
 const MAX_ID = 4096;
 
 /** Holds the webview API of VS Code that the page uses. */
@@ -42,18 +36,25 @@ function savedSelection(state: unknown): string | null {
   return typeof selected === 'string' && selected.length <= MAX_ID ? selected : null;
 }
 
+function hiddenNote(className: string, text: string): HTMLParagraphElement {
+  const note = document.createElement('p');
+  note.className = className;
+  note.textContent = text;
+  note.hidden = true;
+  return note;
+}
+
 /** Shows the tab's page: made once, then updated by each view, output message and tick. */
 export class Page {
   private readonly header = new Header(() => this.focusFirstWaiting());
-  private readonly noFolder = document.createElement('p');
-  private readonly note = document.createElement('p');
+  private readonly noFolder = hiddenNote('no-folder', NO_FOLDER);
+  private readonly agentsOff = hiddenNote('agents-off', AGENTS_OFF);
   private readonly scroller = div('scroller');
   private readonly tbody = document.createElement('tbody');
-  /** The pool's heading row (U8), hidden until the first document. */
+  /** The pool's heading row, hidden until the first document. */
   private readonly heading = new PoolHeading(COLUMNS.length + 1);
   private readonly detail = document.createElement('tr');
   private readonly detailCell = cell('detail-cell');
-  /** The strip in the detail row, made once and updated in place (U5, X15). */
   private readonly strip = new DetailStrip();
   private readonly announcer = div('visually-hidden');
   private readonly rows = new Map<string, RowView>();
@@ -62,7 +63,7 @@ export class Page {
   private view: ViewMessage | null = null;
   private waiting: Set<string> | null = null;
   private selected: string | null;
-  /** The selection the extension last heard of: none at first, as a new tab's host has none (R12). */
+  /** The selection the extension last heard of: none at first, as a new tab's host has none. */
   private told: string | null = null;
 
   constructor(private readonly host: Host) {
@@ -73,23 +74,7 @@ export class Page {
     this.detail.append(this.detailCell);
     this.announcer.setAttribute('role', 'status');
     this.announcer.setAttribute('aria-live', 'polite');
-    document.body.append(this.header.element, this.notes(), this.agentsOff(), this.table(), this.announcer);
-  }
-
-  /** Makes the no folder note (R9), hidden until a view says no folder is open. */
-  private notes(): HTMLElement {
-    this.noFolder.className = 'no-folder';
-    this.noFolder.textContent = NO_FOLDER;
-    this.noFolder.hidden = true;
-    return this.noFolder;
-  }
-
-  /** Makes the agents off note (S8), hidden until a pool has agent activity off. */
-  private agentsOff(): HTMLElement {
-    this.note.className = 'agents-off';
-    this.note.textContent = AGENTS_OFF;
-    this.note.hidden = true;
-    return this.note;
+    document.body.append(this.header.element, this.noFolder, this.agentsOff, this.table(), this.announcer);
   }
 
   /** Makes the table with its columns, header row and the pool's heading row, in its scroller. */
@@ -122,15 +107,14 @@ export class Page {
       if (event.target instanceof Element) this.reveal(event.target);
     });
     table.append(colgroup, thead, this.tbody);
-    // A tab narrower than the table scrolls it sideways here, so no cell is cut (U1).
+    // A tab narrower than the table scrolls it sideways here, so no cell is cut.
     this.scroller.append(table);
     return this.scroller;
   }
 
   /**
-   * Shows a view message: the header with wtpool's error while paused, and with a document the note,
-   * chips, rows in place, detail strip and live region. Without a document only the header shows,
-   * over the empty table, and with no folder open the no folder note instead of the table.
+   * Shows a view message. Without a document only the header shows, over the empty table, and with
+   * no folder open the no folder note replaces the table.
    */
   render(view: ViewMessage, nowMs: number): void {
     this.view = view;
@@ -143,18 +127,18 @@ export class Page {
     this.tick(nowMs);
   }
 
-  /** Shows a document: the pool's heading, note, chips, rows in place and live region. */
+  /** Shows the document's first pool, the one pool wtpool sends. */
   private renderStatus(status: StatusDocument, nowMs: number): void {
     const [pool] = status.pools;
     this.heading.update(pool, status.machine.name);
     this.heading.element.hidden = false;
-    this.note.hidden = pool.agents !== 'off';
+    this.agentsOff.hidden = pool.agents !== 'off';
     this.header.count(pool);
     this.renderRows(rowOrder(pool.worktrees), nowMs);
     this.announce(pool.worktrees);
   }
 
-  /** Clears the document from the page: its folder changed or none is open (R9). */
+  /** Clears the document from the page. */
   private clear(): void {
     this.rows.forEach((row) => row.element.remove());
     this.rows.clear();
@@ -162,18 +146,18 @@ export class Page {
     this.order = [];
     this.detail.remove();
     this.waiting = null;
-    this.note.hidden = true;
+    this.agentsOff.hidden = true;
     this.header.count();
   }
 
-  /** Moves the clock: ages and the stale or paused header, nothing else (U7, B7). */
+  /** Moves the clock: ages and the stale or paused header, nothing else. */
   tick(nowMs: number): void {
     this.rows.forEach((row) => row.tick(nowMs));
     if (!this.view || this.view.no_folder) return;
     this.header.tick(this.view, nowMs);
   }
 
-  /** Shows the pool's rows in U2 order after its heading, kept and moved, never remade (X15). */
+  /** Shows the pool's rows after its heading, kept and moved, never remade, so focus survives. */
   private renderRows(ordered: Worktree[], nowMs: number): void {
     const ids = new Set(ordered.map((w) => w.path));
     for (const [id, row] of this.rows) {
@@ -203,7 +187,7 @@ export class Page {
     this.select(this.selected !== null && this.rows.has(this.selected) ? this.selected : null);
   }
 
-  /** Announces the worktrees that started to wait since the last document (X14). */
+  /** Announces the worktrees that started to wait since the last document. */
   private announce(worktrees: Worktree[]): void {
     const waiting = worktrees.filter((w) => w.activity === 'waiting');
     const fresh = waiting.filter((w) => this.waiting !== null && !this.waiting.has(w.path));
@@ -234,7 +218,7 @@ export class Page {
     }
   }
 
-  /** Shows the tails the extension read for the selected row's outputs (R12, U9). */
+  /** Shows the tails the extension read for the selected row's outputs. */
   showOutput(message: OutputMessage): void {
     if (message.row === this.selected) this.strip.showTails(message.row, message.tails);
   }
@@ -246,7 +230,7 @@ export class Page {
   }
 
   /**
-   * Handles a click, and Enter or Space on a focused row, the same way (X14): a row action posts
+   * Handles a click, and Enter or Space on a focused row, the same way: a row action posts
    * `{type, id}`, a row toggles its detail strip. A key on a button is left to the button,
    * whose own click follows.
    */
@@ -284,7 +268,6 @@ export class Page {
     if (target.matches('button[data-action]')) target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 
-  /** Focuses the first waiting row and scrolls it into view (U3). */
   private focusFirstWaiting(): void {
     const first = this.order.find((row) => row.worktree.activity === 'waiting');
     first?.element.focus();

@@ -1,100 +1,20 @@
 //! Build processes, the worktrees they work in (S4) and the processes they descend from (A1).
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
-
-use serde::Deserialize;
+use std::path::PathBuf;
 
 use super::document::Build;
-use super::time::Timestamp;
+use crate::processes::{ProcessQuery, RunningProcess};
 
-/// A running process: its pid, parent, start time, name and working folder.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Process {
-    pub pid: u32,
-    /// The parent's pid, `None` when the table does not say.
-    pub parent: Option<u32>,
-    /// `None` when the table does not say.
-    pub started: Option<Timestamp>,
-    pub name: String,
-    pub cwd: PathBuf,
-}
-
-/// Lists the running processes.
-pub trait ListProcesses: Send + Sync {
-    fn processes(&self) -> Vec<Process>;
-}
-
-/// The system's process table, read through the `sysinfo` crate, which asks each platform's own
-/// interface.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct SystemProcesses;
-
-/// A process table read from a file of JSON lines with `pid`, `name`, `cwd` and an optional
-/// `ppid` and `started`, read again on every listing. Lines that do not parse are left out.
-#[derive(Debug, Clone)]
-pub struct ProcessFile {
-    path: PathBuf,
-}
-
-#[derive(Debug, Deserialize)]
-struct ProcessLine {
-    pid: u32,
-    #[serde(default)]
-    ppid: Option<u32>,
-    #[serde(default)]
-    started: Option<String>,
-    name: String,
-    cwd: PathBuf,
-}
-
-impl ListProcesses for SystemProcesses {
-    fn processes(&self) -> Vec<Process> {
-        use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
-        // Name, parent and start time come with every refresh; the working folder is asked
-        // for. Threads are left out: on Linux they would list as processes of their own.
-        let refresh = ProcessRefreshKind::nothing()
-            .with_cwd(UpdateKind::Always)
-            .without_tasks();
-        let mut system = System::new();
-        system.refresh_processes_specifics(ProcessesToUpdate::All, true, refresh);
-        system
-            .processes()
-            .values()
-            .map(|process| Process {
-                pid: process.pid().as_u32(),
-                parent: process.parent().map(sysinfo::Pid::as_u32),
-                started: i64::try_from(process.start_time())
-                    .ok()
-                    .map(Timestamp::from_seconds),
-                name: process.name().to_string_lossy().into_owned(),
-                cwd: process.cwd().map(Path::to_path_buf).unwrap_or_default(),
-            })
-            .collect()
-    }
-}
-
-impl ProcessFile {
-    #[must_use]
-    pub fn new(path: PathBuf) -> Self {
-        Self { path }
-    }
-}
-
-impl ListProcesses for ProcessFile {
-    fn processes(&self) -> Vec<Process> {
-        let text = std::fs::read_to_string(&self.path).unwrap_or_default();
-        text.lines()
-            .filter_map(|line| serde_json::from_str::<ProcessLine>(line).ok())
-            .map(|line| Process {
-                pid: line.pid,
-                parent: line.ppid,
-                started: line.started.as_deref().and_then(Timestamp::parse),
-                name: line.name,
-                cwd: line.cwd,
-            })
-            .collect()
-    }
+/// The facts `wtpool status` reads of every process: names and folders for the builds (S4),
+/// parents for the builds below an actor (A1), and start times for liveness (A1).
+#[must_use]
+pub fn query() -> ProcessQuery<'static> {
+    ProcessQuery::all()
+        .with_parent()
+        .with_started()
+        .with_name()
+        .with_cwd()
 }
 
 /// Whether a process called `name` builds: `cargo`, `cargo-*`, `rustc` or a name the
@@ -111,7 +31,7 @@ pub fn is_build(name: &str, build_processes: &[String]) -> bool {
 /// the worktree that holds its working folder, the deepest one when worktrees nest.
 #[must_use]
 pub fn builds_by_worktree(
-    processes: &[Process],
+    processes: &[RunningProcess],
     worktrees: &[PathBuf],
     build_processes: &[String],
 ) -> Vec<Vec<Build>> {
@@ -145,12 +65,15 @@ pub fn builds_by_worktree(
 /// lowest pid. A chain that comes back to a pid it passed, as a table read while pids are reused
 /// can give, stops there.
 #[must_use]
-pub fn builds_below(processes: &[Process], build_processes: &[String]) -> BTreeMap<u32, String> {
+pub fn builds_below(
+    processes: &[RunningProcess],
+    build_processes: &[String],
+) -> BTreeMap<u32, String> {
     let parents: BTreeMap<u32, u32> = processes
         .iter()
         .filter_map(|process| Some((process.pid, process.parent?)))
         .collect();
-    let mut nearest: BTreeMap<u32, (usize, u32, &str)> = BTreeMap::new();
+    let mut nearest: BTreeMap<u32, Below<'_>> = BTreeMap::new();
     for build in processes
         .iter()
         .filter(|process| is_build(&process.name, build_processes))
@@ -161,9 +84,13 @@ pub fn builds_below(processes: &[Process], build_processes: &[String]) -> BTreeM
             && passed.insert(parent)
         {
             depth = depth.saturating_add(1);
-            let candidate = (depth, build.pid, build.name.as_str());
+            let candidate = Below {
+                depth,
+                pid: build.pid,
+                name: &build.name,
+            };
             let best = nearest.entry(parent).or_insert(candidate);
-            if (candidate.0, candidate.1) < (best.0, best.1) {
+            if (candidate.depth, candidate.pid) < (best.depth, best.pid) {
                 *best = candidate;
             }
             at = parent;
@@ -171,8 +98,16 @@ pub fn builds_below(processes: &[Process], build_processes: &[String]) -> BTreeM
     }
     nearest
         .into_iter()
-        .map(|(pid, (_, _, name))| (pid, name.to_owned()))
+        .map(|(pid, below)| (pid, below.name.to_owned()))
         .collect()
+}
+
+/// A build below a process, `depth` parents down.
+#[derive(Debug, Clone, Copy)]
+struct Below<'a> {
+    depth: usize,
+    pid: u32,
+    name: &'a str,
 }
 
 #[cfg(test)]
@@ -180,8 +115,6 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::paths::comparable;
-    use crate::status::time::{ReadClock, SystemClock};
 
     #[rstest]
     #[case::cargo("cargo", true)]
@@ -205,8 +138,8 @@ mod tests {
         assert_eq!(build, expected);
     }
 
-    fn process(pid: u32, name: &str, cwd: &str) -> Process {
-        Process {
+    fn process(pid: u32, name: &str, cwd: &str) -> RunningProcess {
+        RunningProcess {
             pid,
             parent: None,
             started: None,
@@ -245,8 +178,8 @@ mod tests {
         assert_eq!(builds[2][0].name, "rustc");
     }
 
-    fn child(pid: u32, parent: u32, name: &str) -> Process {
-        Process {
+    fn child(pid: u32, parent: u32, name: &str) -> RunningProcess {
+        RunningProcess {
             parent: Some(parent),
             ..process(pid, name, "/p/wt1")
         }
@@ -302,49 +235,5 @@ mod tests {
         // Then
         let expected = BTreeMap::from([(6, "cargo".to_owned()), (7, "cargo".to_owned())]);
         assert_eq!(below, expected);
-    }
-
-    #[test]
-    fn process_file__should_read_each_json_line_that_parses() {
-        // Given
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("procs.jsonl");
-        std::fs::write(
-            &path,
-            "{\"pid\":7,\"ppid\":1,\"started\":\"2026-10-20T11:00:00Z\",\"name\":\"cargo\",\"cwd\":\"/p/wt1\"}\n\
-             not json\n\
-             {\"pid\":8,\"name\":\"rustc\",\"cwd\":\"/p\"}\n",
-        )
-        .unwrap();
-
-        // When
-        let processes = ProcessFile::new(path).processes();
-        let missing = ProcessFile::new(dir.path().join("none")).processes();
-
-        // Then
-        let started = Process {
-            parent: Some(1),
-            started: Timestamp::parse("2026-10-20T11:00:00Z"),
-            ..process(7, "cargo", "/p/wt1")
-        };
-        assert_eq!(processes, vec![started, process(8, "rustc", "/p")]);
-        assert!(missing.is_empty());
-    }
-
-    #[test]
-    fn system_processes__should_list_this_process_and_its_folder() {
-        // Given
-        let pid = std::process::id();
-
-        // When
-        let processes = SystemProcesses.processes();
-
-        // Then
-        let me = processes.iter().find(|process| process.pid == pid).unwrap();
-        assert_eq!(me.cwd, comparable(&std::env::current_dir().unwrap()));
-        assert!(me.parent.is_some_and(|parent| parent != pid));
-        assert!(!me.name.is_empty());
-        let started = me.started.unwrap();
-        assert!(started <= SystemClock.now() && started.seconds() > 1_700_000_000);
     }
 }

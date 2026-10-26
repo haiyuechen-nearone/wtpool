@@ -1,19 +1,25 @@
 use rstest::rstest;
 
-use super::super::record::{Process, Record};
+use super::super::record::{HarnessProcess, Record};
 use super::super::store::tests::{eventually, must_record};
 use super::*;
+use crate::processes::ProcessFile;
 
-const NOW: i64 = 1_792_497_600;
+const NOW: Timestamp = Timestamp::from_seconds(1_792_497_600);
 const CLAUDE: &str =
     r#"{"pid":7001,"ppid":1,"started":"2026-10-20T11:00:00Z","name":"claude","cwd":"/"}"#;
+
+/// The time `seconds` after [`NOW`], before it when negative.
+fn later(seconds: i64) -> Timestamp {
+    Timestamp::from_seconds(NOW.seconds() + seconds)
+}
 
 fn record(session: &str, agent: Option<&str>, state: State, age: i64, alive: bool) -> Record {
     let mut record = must_record(session);
     record.agent_id = agent.map(str::to_owned);
     record.state = state;
-    record.updated = clock::rfc3339(NOW - age);
-    record.process = Some(Process {
+    record.updated = later(-age).to_rfc3339();
+    record.process = Some(HarnessProcess {
         pid: if alive { 7001 } else { 7099 },
         started: "2026-10-20T11:00:00Z".to_owned(),
     });
@@ -44,7 +50,7 @@ fn collect__should_delete_only_old_dead_or_ended_records(
     std::fs::write(dir.path().join("wtpool-activity/orphan.json.lock"), "").unwrap();
 
     // When
-    let collected = collect(&activity, NOW, &ProcessTable::File(procs), None);
+    let collected = collect(&activity, NOW, &ProcessFile::new(procs), None);
 
     // Then
     assert_eq!(activity.read(&stem).is_some(), kept);
@@ -71,7 +77,7 @@ fn collect__should_keep_the_newest_done_subagent_of_each_worktree() {
     }
 
     // When
-    let collected = collect(&activity, NOW, &ProcessTable::File(procs), None);
+    let collected = collect(&activity, NOW, &ProcessFile::new(procs), None);
 
     // Then
     assert_eq!(
@@ -89,7 +95,7 @@ fn collect__should_keep_the_newest_done_subagent_of_each_worktree() {
 }
 
 /// A pool of `count` sessions that ended 8 days ago, and the table of their live claude.
-fn ended_week_old(count: usize) -> (tempfile::TempDir, Activity, ProcessTable) {
+fn ended_week_old(count: usize) -> (tempfile::TempDir, Activity, ProcessFile) {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("wtpool-activity")).unwrap();
     let procs = dir.path().join("procs");
@@ -100,7 +106,7 @@ fn ended_week_old(count: usize) -> (tempfile::TempDir, Activity, ProcessTable) {
         let ended = record(&session, None, State::Ended, 8 * 86_400, true);
         activity.write(&session, &ended).unwrap();
     }
-    (dir, activity, ProcessTable::File(procs))
+    (dir, activity, ProcessFile::new(procs))
 }
 
 #[rstest]
@@ -139,10 +145,10 @@ fn after_session_end__should_collect_once_a_day() {
     let first = after_session_end(&activity, NOW, &table, i64::MAX);
     let ended = record("s9", None, State::Ended, 8 * 86_400, true);
     activity.write("s9", &ended).unwrap();
-    let same_day = after_session_end(&activity, NOW + 23 * 3600, &table, i64::MAX);
+    let same_day = after_session_end(&activity, later(23 * 3600), &table, i64::MAX);
     let mut next_day = None;
     let ran = eventually(|| {
-        next_day = after_session_end(&activity, NOW + 24 * 3600, &table, i64::MAX);
+        next_day = after_session_end(&activity, later(24 * 3600), &table, i64::MAX);
         next_day.is_some()
     });
 
@@ -161,7 +167,7 @@ fn after_session_end__should_leave_the_day_open_when_stopped() {
 
     // When
     let stopped = after_session_end(&activity, NOW, &table, 0);
-    let again = after_session_end(&activity, NOW + 60, &table, i64::MAX);
+    let again = after_session_end(&activity, later(60), &table, i64::MAX);
 
     // Then
     assert_eq!(
@@ -179,7 +185,7 @@ fn after_session_end__should_leave_the_day_open_when_stopped() {
 fn collect_now__should_run_on_a_fresh_stamp_and_stamp_the_pool() {
     // Given
     let (_dir, activity, table) = ended_week_old(1);
-    assert!(after_session_end(&activity, NOW - 60, &table, i64::MAX).is_some());
+    assert!(after_session_end(&activity, later(-60), &table, i64::MAX).is_some());
     let ended = record("s9", None, State::Ended, 8 * 86_400, true);
     activity.write("s9", &ended).unwrap();
 
@@ -189,7 +195,7 @@ fn collect_now__should_run_on_a_fresh_stamp_and_stamp_the_pool() {
     let collected = collect_now(&activity, NOW, &table);
     let stamped = eventually(|| {
         let _ = collect_now(&activity, NOW, &table);
-        stamp() == format!("{}\n", clock::rfc3339(NOW))
+        stamp() == format!("{}\n", NOW.to_rfc3339())
     });
 
     // Then

@@ -1,18 +1,15 @@
-//! Claude Code's tools: the field that names a call's path (H8), the tools that wait for the
-//! user (H13) and the kind of each call (H26).
+//! Claude Code's tools: the field that names a call's path, the tools that wait for the user and
+//! the kind of each call.
 
 use wtpool_core::activity::{CallKind, WaitReason};
 use wtpool_core::hook::{CallInput, Shell, ToolPath, WaitingTools};
 
-/// The tools whose calls wait for the user (H13): `AskUserQuestion` asks a question,
-/// `ExitPlanMode` for a plan's approval.
+/// The tools whose calls wait for the user.
 pub const WAITING: WaitingTools = WaitingTools(&[
     ("AskUserQuestion", WaitReason::Question),
     ("ExitPlanMode", WaitReason::Plan),
 ]);
 
-/// The kind of a call of `tool` (H26): Bash runs a shell, Edit, Write and NotebookEdit edit a
-/// file, Agent starts a subagent.
 #[must_use]
 pub fn kind_of(tool: &str) -> CallKind {
     match tool {
@@ -23,9 +20,8 @@ pub fn kind_of(tool: &str) -> CallKind {
     }
 }
 
-/// The path field of `tool` in `input` (H8): `file_path` (Read, Edit, Write), `path` (Grep,
-/// Glob, EnterWorktree), `notebook_path` (NotebookEdit), `command` (Bash, PowerShell, Monitor).
-/// Every command reads as a POSIX shell's, PowerShell's included.
+/// The path field of `tool` in `input`. Every command reads as a POSIX shell's, PowerShell's
+/// included.
 #[must_use]
 pub fn tool_path(tool: &str, input: &CallInput) -> ToolPath {
     let field = |name: &str| input.string(name).map(str::to_owned);

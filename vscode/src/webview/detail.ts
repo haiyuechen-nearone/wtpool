@@ -1,37 +1,19 @@
-// The detail strip of the selected row (U5): exact path, upstream, git facts, the S9 reasons, and
-// per actor its state, action, placement and the local time of its `since`, then the Output
-// section of its background tasks (U9). The strip is made once and updated in place on every
-// document, each part only when its text changed, so focus, text selection and the scroll of an
-// output block survive while the facts stay current (X15).
 import type { Actor, Worktree } from '../generated/status';
 import { visible } from '../shared/invisible';
 import type { Tail } from '../shared/protocol';
 import { bdi, div, line, pieceNodes, setText, span } from './dom';
 import { OutputArea } from './tasks';
-import { DOT, actorFacts, gitFacts, shownActors, stateText, type Piece } from './text';
-
-/** Makes the label of a fact. */
-function label(text: string): HTMLElement {
-  const name = span('fact-label');
-  name.textContent = text;
-  return name;
-}
-
-/** Gives the text of pieces, to tell a changed line. */
-function textOf(pieces: Piece[]): string {
-  return JSON.stringify(pieces);
-}
+import { DOT, actorFacts, gitFacts, shownActors, stateText } from './text';
 
 /** Shows one fact of the grid: a label and a value, isolated when it comes from the document. */
 class Fact {
-  readonly label = label('');
+  readonly label = span('fact-label');
   readonly value: HTMLElement;
 
   constructor(isolated: boolean) {
     this.value = isolated ? bdi('', 'fact-value') : span('fact-value');
   }
 
-  /** Shows `name` and `value`. */
   set(name: string, value: string): void {
     setText(this.label, name);
     setText(this.value, value);
@@ -55,7 +37,7 @@ class ActorLines {
     if (this.element.className !== className) this.element.className = className;
     const state = stateText(actor);
     const facts = actorFacts(actor);
-    const key = JSON.stringify([actor.label, textOf(state), textOf(facts)]);
+    const key = JSON.stringify([actor.label, state, facts]);
     if (key === this.key) return;
     this.key = key;
     this.first.replaceChildren(bdi(visible(actor.label), 'actor-label'), document.createTextNode(DOT), ...pieceNodes(state));
@@ -63,7 +45,10 @@ class ActorLines {
   }
 }
 
-/** Shows the detail strip of the selected row, made once and updated in place (U5, X15). */
+/**
+ * Shows the detail strip of the selected row. It is made once and updated in place, each part only
+ * when its text changed, so focus, text selection and the scroll of an output block survive.
+ */
 export class DetailStrip {
   readonly element = div('strip');
   private readonly path = new Fact(true);
@@ -74,7 +59,7 @@ export class DetailStrip {
   private readonly noAgent = line([{ text: 'no agent' }], 'actor-state');
   private readonly actors = new Map<string, ActorLines>();
   private readonly outputs = new OutputArea();
-  /** The row the strip shows; a strip moved to another row forgets its tails. */
+  /** The row the strip shows. A strip moved to another row forgets its tails. */
   private row: string | null = null;
 
   constructor() {
@@ -105,7 +90,7 @@ export class DetailStrip {
     this.updateActors(shownActors(worktree));
   }
 
-  /** Shows the tails the extension read for row `row`, when that is the strip's row (R12). */
+  /** Shows the tails the extension read for row `row`, when that is the strip's row. */
   showTails(row: string, tails: Tail[]): void {
     if (row === this.row) this.outputs.showTails(tails);
   }

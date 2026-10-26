@@ -95,10 +95,12 @@ The hook writes its diagnostics to `$XDG_STATE_HOME/wtpool/hook.log`, by default
 `%USERPROFILE%\.local\state\wtpool\hook.log`. On Unix the file is created with mode 0600. It
 grows to 1 MiB, then rotates once to `hook.log.1`. The hook never writes it inside a git directory.
 
-It holds two kinds of line only:
+It holds three kinds of line only:
 
 - `wtpool hook: panicked at <file>:<line>`, when the hook panics;
-- `wtpool hook: the watchdog ended a run after 1 s`, when a run took too long.
+- `wtpool hook: the watchdog ended a run after 1 s`, when a run took too long;
+- `wtpool hook: skipped an event: <reason>`, when the hook could not take a record's lock or
+  write the record, for example one that does not fit in 16 KiB.
 
 The hook logs nothing for input it ignores on purpose, such as malformed JSON, an event outside
 any pool, or a pool without `wtpool-activity/`. So an empty or missing log is normal. No line

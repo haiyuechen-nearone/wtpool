@@ -1,12 +1,8 @@
-// The judgement of `free` and `fg` on a row (X12) and the words of their dialogs; host/confirm.ts
-// shows them. Both refuse while an actor in the slot works or waits (for `fg`, the slot that
-// holds the branch: the row itself), ask with a warning when one is idle (quiet counts as idle),
-// and judge the row again, from the latest document, at the answer.
 import type { Worktree } from '../generated/status';
 import { plain } from './invisible';
 import { holdsBranch, type BranchSlot } from './protocol';
 
-/** The row actions that ask in a modal dialog before they run (X12). */
+/** The row actions that ask in a modal dialog before they run. */
 export type ConfirmedActionType = 'free' | 'fg';
 
 /** Holds the modal question to ask before a `free` or `fg`. */
@@ -19,12 +15,10 @@ export interface Question {
   confirm: string;
 }
 
-/** Tells a worktree where an actor works or waits, the cases where `free` and `fg` refuse. */
 function busy(worktree: Worktree): boolean {
   return worktree.actors.some((actor) => actor.state === 'working' || actor.state === 'waiting');
 }
 
-/** Tells a worktree where an actor is idle or quiet, the cases where the dialog warns. */
 function idle(worktree: Worktree): boolean {
   return worktree.actors.some((actor) => actor.state === 'idle' || actor.state === 'quiet');
 }
@@ -68,10 +62,7 @@ export function question(type: ConfirmedActionType, worktree: BranchSlot): Quest
   };
 }
 
-/**
- * Judges the row again at the answer: tells a row `now`, the latest state of `asked`, that still
- * holds the branch the user was asked about.
- */
+/** Tells that `now`, the latest state of `asked`, still holds the branch the user was asked about. */
 export function stillHolds(asked: BranchSlot, now: Worktree | undefined): now is BranchSlot {
   return now !== undefined && holdsBranch(now) && now.branch === asked.branch;
 }

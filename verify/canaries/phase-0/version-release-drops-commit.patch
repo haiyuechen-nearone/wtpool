@@ -9,7 +9,7 @@ diff --git a/crates/wtpool/src/version.rs b/crates/wtpool/src/version.rs
 --- a/crates/wtpool/src/version.rs
 +++ b/crates/wtpool/src/version.rs
 @@ -3,7 +3,11 @@
- /// What build.rs recorded about this binary.
+ /// This binary's build, as build.rs records it.
  pub(crate) const BUILD: Build<'static> = Build {
      version: env!("CARGO_PKG_VERSION"),
 -    commit: env!("WTPOOL_BUILD_COMMIT"),

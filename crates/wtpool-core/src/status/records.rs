@@ -9,11 +9,13 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use super::outputs::{self, Task, TaskFields};
-use super::time::{RecordTime, Timestamp};
+use super::record_time::RecordTime;
 pub use crate::activity::State as RecordState;
 use crate::activity::{
     CallKind, Harness, PlacedBy, RECORD_VERSION, Stem, legacy_kind, read_record_file,
 };
+use crate::clock::Timestamp;
+use crate::processes::RecordedProcess;
 
 /// Only the newest records by modification time count, and older ones of live sessions (S5).
 const MAX_RECORDS: usize = 512;
@@ -64,7 +66,7 @@ pub struct Record {
     /// When the hook that wrote the state started, in microseconds: orders writes within a
     /// second.
     pub writer_started: i64,
-    pub process: Option<ProcessId>,
+    pub process: Option<RecordedProcess>,
     /// A session's titles of its subagents by agent id, the newest last (H16).
     pub subagents: Vec<SubagentTitle>,
     /// The background tasks the actor started (H27).
@@ -108,13 +110,6 @@ struct CallFields {
     id: String,
     tool: String,
     kind: Option<CallKind>,
-}
-
-/// The process an actor runs in: the agent harness process.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ProcessId {
-    pub pid: u32,
-    pub started: Option<Timestamp>,
 }
 
 /// The file state a record was read at. A change of mode alone keeps the stamp.
@@ -387,7 +382,7 @@ fn record_of(key: String, fields: RecordFields) -> Option<Record> {
         since,
         updated,
         writer_started: fields.writer_started,
-        process: fields.process.map(|process| ProcessId {
+        process: fields.process.map(|process| RecordedProcess {
             pid: process.pid,
             started: process.started.as_deref().and_then(Timestamp::parse),
         }),

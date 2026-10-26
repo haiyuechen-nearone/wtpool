@@ -1010,3 +1010,16 @@ reason = "Status lines, eight row sentences that state behaviour already built, 
 "docs/design/status-panel/status-panel.md" = "5eba885c979b7b905f5f397838002d9e329c331fee08362d40607f22e9b96e7c"
 "docs/design/status-panel/verification.md" = "880f35b20a25d8e1cc9b59e4328ee5c8fbfdc6f01e431bbeee46a54c2205c8f7"
 "verify/trace.toml" = "8d60fa5eb1250e7ddee4c4ada6cc1ed9e81d17ce593b6d9ac8860919f9437428"
+
+[[change]]
+id = "comments-bin"
+reason = "A comment cleanup of the wtpool and wtpool-claude-code crates touches two lines that canary patches carry as context: the doc of BUILD in crates/wtpool/src/version.rs and the .cargo-ok comment in crates/wtpool/build.rs. version-release-drops-commit.patch and version-short-commit.patch carry the new text of those lines, so they apply as before. Their changes and the checks they break are the same."
+[change.files]
+"verify/canaries/phase-0/version-release-drops-commit.patch" = "74728eac12b42047f0620d444b7be7cb0a5e9aece3efbe628b238aa7c9b6b576"
+"verify/canaries/phase-0/version-short-commit.patch" = "d56617de91e6b77260eefe9fc81f2a311235ead1ca7d7b5c91038f7b29aa9c52"
+
+[[change]]
+id = "comments-ts"
+reason = "The static layer of the quick part gains static:ascii_bundles: every line of the built bundles, out/*.js and media/*.js, holds only ASCII characters, and a finding names the file, the line, the first other character as U+XXXX and its column. The coverage converter of render and host stops when a bundle's size in bytes differs from the length V8 measured in UTF-16 units, as a raw U+00B7 in a JSDoc that esbuild keeps once made it, so the check names the cause in the quick part instead. A unit test of the static layer covers an ASCII line, a U+00B7 and a character outside the BMP."
+[change.files]
+"xtask/src/layers/statics.rs" = "75313b8cb362bda9e1c6a05a1c5782fa1a3837e34c6aa22ab97da47e4b8d9532"

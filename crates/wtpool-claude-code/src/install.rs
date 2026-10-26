@@ -1,6 +1,6 @@
-//! `wtpool hook install` (H1, H22, D5): the hook block for Claude Code's user `settings.json`,
-//! which `wtpool` prints and never writes, and whether Claude Code runs the hooks, through that
-//! block or the plugin of H28.
+//! `wtpool hook install`: the hook block for Claude Code's user `settings.json`, and a note on the
+//! hooks Claude Code runs through that block or the wtpool plugin. wtpool prints the block and
+//! never writes the file.
 
 mod block;
 mod plugin;
