@@ -4,11 +4,11 @@ Check: fixtures__should_match_a_fresh_scrub
 
 Edits a scrubbed fixture by hand, so it no longer matches a fresh scrub of its recording.
 
-diff --git a/verify/fixtures/claude-2.1.306/cc_idle_prompt.jsonl b/verify/fixtures/claude-2.1.306/cc_idle_prompt.jsonl
---- a/verify/fixtures/claude-2.1.306/cc_idle_prompt.jsonl
-+++ b/verify/fixtures/claude-2.1.306/cc_idle_prompt.jsonl
+diff --git a/verify/fixtures/claude-2.1.310/cc_idle_prompt.jsonl b/verify/fixtures/claude-2.1.310/cc_idle_prompt.jsonl
+--- a/verify/fixtures/claude-2.1.310/cc_idle_prompt.jsonl
++++ b/verify/fixtures/claude-2.1.310/cc_idle_prompt.jsonl
 @@ -1,3 +1,3 @@
--{"cwd":"{pool}/fg","hook_event_name":"UserPromptSubmit","permission_mode":"default","prompt":"Reply with the single word ok. Use no tool.","prompt_id":"90377509-73cb-4a6b-b291-dda52664adc6","scratchpad_dir":"{tmp}/claude/-verify-pool-fg/s1/scratchpad","session_id":"s1","transcript_path":"/Users/verify/.claude/projects/-verify-pool-fg/s1.jsonl"}
-+{"cwd":"{pool}/fg","hook_event_name":"UserPromptSubmit","permission_mode":"auto","prompt":"Reply with the single word ok. Use no tool.","prompt_id":"90377509-73cb-4a6b-b291-dda52664adc6","scratchpad_dir":"{tmp}/claude/-verify-pool-fg/s1/scratchpad","session_id":"s1","transcript_path":"/Users/verify/.claude/projects/-verify-pool-fg/s1.jsonl"}
- {"background_tasks":[],"cwd":"{pool}/fg","effort":{"level":"medium"},"hook_event_name":"Stop","last_assistant_message":"ok","permission_mode":"default","prompt_id":"90377509-73cb-4a6b-b291-dda52664adc6","scratchpad_dir":"{tmp}/claude/-verify-pool-fg/s1/scratchpad","session_crons":[],"session_id":"s1","stop_hook_active":false,"transcript_path":"/Users/verify/.claude/projects/-verify-pool-fg/s1.jsonl"}
- {"cwd":"{pool}/fg","hook_event_name":"SessionEnd","prompt_id":"90377509-73cb-4a6b-b291-dda52664adc6","reason":"other","scratchpad_dir":"{tmp}/claude/-verify-pool-fg/s1/scratchpad","session_id":"s1","transcript_path":"/Users/verify/.claude/projects/-verify-pool-fg/s1.jsonl"}
+-{"cwd":"{pool}/fg","hook_event_name":"UserPromptSubmit","permission_mode":"default","prompt":"Reply with the single word ok. Use no tool.","prompt_id":"dd7867f3-16a1-46f4-8898-0e80937b65f8","session_id":"s1","transcript_path":"/Users/verify/.claude/projects/-verify-pool-fg/s1.jsonl"}
++{"cwd":"{pool}/fg","hook_event_name":"UserPromptSubmit","permission_mode":"auto","prompt":"Reply with the single word ok. Use no tool.","prompt_id":"dd7867f3-16a1-46f4-8898-0e80937b65f8","session_id":"s1","transcript_path":"/Users/verify/.claude/projects/-verify-pool-fg/s1.jsonl"}
+ {"background_tasks":[],"cwd":"{pool}/fg","effort":{"level":"medium"},"hook_event_name":"Stop","last_assistant_message":"ok","permission_mode":"default","prompt_id":"dd7867f3-16a1-46f4-8898-0e80937b65f8","session_crons":[],"session_id":"s1","stop_hook_active":false,"transcript_path":"/Users/verify/.claude/projects/-verify-pool-fg/s1.jsonl"}
+ {"cwd":"{pool}/fg","hook_event_name":"SessionEnd","prompt_id":"dd7867f3-16a1-46f4-8898-0e80937b65f8","reason":"other","session_id":"s1","transcript_path":"/Users/verify/.claude/projects/-verify-pool-fg/s1.jsonl"}

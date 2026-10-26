@@ -166,3 +166,5 @@ accept hook-hardening d6fadfb9d77a914bf1cefb61f642112c4576374814828fe44dcdd71832
 accept cli-agent-guard af20038de504d21022708c044fd68cddfa1d81ee5421a0ee1bf8d2f9c6ea0adc
 # verify/trace.toml pinned after merging hook-hardening and cli-agent-guard, which both add trace rows.
 accept merge-guard-hook 8b15aee44feac6a6e394db4e3e7085dd1d78e8d03dc8d2c647c9f87c552e9897
+# The cc fixtures follow Claude Code 2.1.310: a live record in which every cc check passed retired the 2.1.306 recordings; verify/fixtures/claude-2.1.310/ is scrubbed from the new ones, claude-2.1.306/ deleted, the lock's recordings table hashes the 2.1.310 recordings, and the fixture canary edits the new cc_idle_prompt.jsonl.
+accept cc-record 054ecbd89aa16a1448b08398614a1ba26113668ff8f8f0fc9783c236b8bdbd24

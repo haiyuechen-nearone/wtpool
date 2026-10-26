@@ -62,7 +62,7 @@ are in [Orchestration](design/status-panel/verification.md#orchestration).
 | [verify/accepted.txt](../verify/accepted.txt) | `accept <id> <entry hash>` lines, with dated comments. An entry counts only once accepted at its current content. |
 | `verify/canaries/` | Patches that break the product or the harness on purpose, to show that a check can fail. |
 | `verify/trace.toml`, `verify/checks.toml` | The trace list as data (which checks prove each ID), and the layers that run each check. |
-| `verify/scenarios/`, `verify/fixtures/` | Scenario documents, hand-written hook payloads, and payloads recorded from Claude Code 2.1.306. |
+| `verify/scenarios/`, `verify/fixtures/` | Scenario documents, hand-written hook payloads, and payloads recorded from Claude Code 2.1.310. |
 | `verify/shots/approved/` | The approved screenshots, the visual baseline. |
 | `verify/reviews/` | Per phase: the last verify report (coverage list trimmed), verifier reviews and canary runs; the live contract and PermissionDenied runs. |
 | `verify/standards/` | The copied style guides, with sources in [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md). |

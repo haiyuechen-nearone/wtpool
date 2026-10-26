@@ -61,12 +61,13 @@ or field where its format allows one.
 
 ### Claude Code hook recordings
 
-- Files: `verify/fixtures/claude-2.1.306/*.jsonl`, and the payloads of the live runs in
+- Files: `verify/fixtures/claude-2.1.310/*.jsonl`, and the payloads of the live runs in
   `verify/reviews/live-contract-2026-10-25/fresh-scrub/` and
   `verify/reviews/live-permission-denied-2026-10-25/`.
-- Source: the hook payloads that Claude Code 2.1.306, by Anthropic, sent during this repository's
-  scripted contract sessions. [The fixtures README](verify/fixtures/claude-2.1.306/README.md) says
-  how they were recorded and scrubbed.
+- Source: the hook payloads that Claude Code, by Anthropic, sent during this repository's scripted
+  contract sessions: version 2.1.310 for the fixtures, 2.1.306 for the two live runs.
+  [The fixtures README](verify/fixtures/claude-2.1.310/README.md) says how they were recorded and
+  scrubbed.
 - Licence: none. They are run output, used under Anthropic's terms for Claude Code, and hold no
   Claude Code code. The payload format is Claude Code's.
 - Modified: yes. Paths and ids were scrubbed (`cargo xtask scrub`).
