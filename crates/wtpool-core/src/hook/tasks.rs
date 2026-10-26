@@ -37,61 +37,45 @@ pub struct TaskEvent {
 
 /// Applies `event` at `now` to `record`. A started task joins the end, dropping the oldest past
 /// [`MAX_TASKS`], unless its id is known. A running task ends when the event ends it.
-pub fn update(record: &mut Record, event: &TaskEvent, now: &str) {
+pub fn update(record: &mut Record, event: &TaskEvent, now: Timestamp) {
     if let Some(started) = &event.started
-        && !record
-            .tasks
-            .iter()
-            .any(|task| task.id == started.id.as_str())
+        && !record.tasks.iter().any(|task| task.id == started.id)
     {
         let task = Task {
-            id: started.id.as_str().to_owned(),
+            id: started.id.clone(),
             path: started.path.clone(),
             summary: started.summary.clone(),
-            started: now.to_owned(),
+            started: now,
             ended: None,
         };
         push_bounded(&mut record.tasks, task, MAX_TASKS);
     }
     for task in record.tasks.iter_mut().filter(|task| task.ended.is_none()) {
         let ends = event.all_ended
-            || event
-                .stopped
-                .as_ref()
-                .is_some_and(|id| id.as_str() == task.id)
+            || event.stopped.as_ref() == Some(&task.id)
             || event
                 .running
                 .as_ref()
-                .is_some_and(|ids| !lists(ids, &task.id));
+                .is_some_and(|ids| !ids.contains(&task.id));
         if ends {
-            task.ended = Some(now.to_owned());
+            task.ended = Some(now);
         }
     }
 }
 
 /// Applies `running`, the session's work in flight that another actor's harness lists at `now`,
 /// to `record`: each running task the list does not name ends when it started at least
-/// [`LISTED_AFTER`] seconds before `now`. `true` when a task ended. Nothing ends when `now` or a
-/// task's start does not parse.
-pub fn end_unlisted(record: &mut Record, running: &[TaskId], now: &str) -> bool {
-    let Some(now_at) = Timestamp::parse(now) else {
-        return false;
-    };
+/// [`LISTED_AFTER`] seconds before `now`. `true` when a task ended.
+pub fn end_unlisted(record: &mut Record, running: &[TaskId], now: Timestamp) -> bool {
     let mut ended = false;
     for task in record.tasks.iter_mut().filter(|task| task.ended.is_none()) {
-        let old = Timestamp::parse(&task.started)
-            .is_some_and(|started| now_at.seconds_since(started) >= LISTED_AFTER);
-        if old && !lists(running, &task.id) {
-            task.ended = Some(now.to_owned());
+        let old = now.seconds_since(task.started) >= LISTED_AFTER;
+        if old && !running.contains(&task.id) {
+            task.ended = Some(now);
             ended = true;
         }
     }
     ended
-}
-
-/// `true` when `ids` names the task `id`.
-fn lists(ids: &[TaskId], id: &str) -> bool {
-    ids.iter().any(|listed| listed.as_str() == id)
 }
 
 #[cfg(test)]
@@ -99,17 +83,21 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::hook::fixture;
+    use crate::activity::ActorId;
+    use crate::hook::fixture::{self, later};
 
-    const NOW: &str = "2026-10-20T12:05:00Z";
+    /// Five minutes after every task in these tests started.
+    fn now() -> Timestamp {
+        later(300)
+    }
 
-    fn task(id: &str, ended: Option<&str>) -> Task {
+    fn task(id: &str, ended: Option<Timestamp>) -> Task {
         Task {
-            id: id.to_owned(),
+            id: task_id(id),
             path: format!("/tmp/harness/s1/tasks/{id}.output"),
             summary: "cargo build".to_owned(),
-            started: "2026-10-20T12:00:00Z".to_owned(),
-            ended: ended.map(str::to_owned),
+            started: fixture::NOW,
+            ended,
         }
     }
 
@@ -132,11 +120,11 @@ mod tests {
         }
     }
 
-    fn ends(record: &Record) -> Vec<(&str, Option<&str>)> {
+    fn ends(record: &Record) -> Vec<(&str, Option<Timestamp>)> {
         record
             .tasks
             .iter()
-            .map(|task| (task.id.as_str(), task.ended.as_deref()))
+            .map(|task| (task.id.as_str(), task.ended))
             .collect()
     }
 
@@ -160,12 +148,16 @@ mod tests {
         record.tasks = before.iter().map(|id| task(id, None)).collect();
 
         // When
-        update(&mut record, &started(id), NOW);
+        update(&mut record, &started(id), now());
 
         // Then
         let kept: Vec<&str> = record.tasks.iter().map(|task| task.id.as_str()).collect();
         assert_eq!(kept, after);
-        let new = record.tasks.iter().find(|task| task.id == id).unwrap();
+        let new = record
+            .tasks
+            .iter()
+            .find(|task| task.id.as_str() == id)
+            .unwrap();
         assert_eq!(new.ended, None);
         assert_eq!(new.summary, "cargo build");
     }
@@ -176,117 +168,108 @@ mod tests {
         let mut record = fixture::record("s1");
 
         // When
-        update(&mut record, &started("b1"), NOW);
+        update(&mut record, &started("b1"), now());
 
         // Then
         assert_eq!(
             record.tasks,
             vec![Task {
-                started: NOW.to_owned(),
+                started: now(),
                 ..task("b1", None)
             }]
         );
     }
 
-    const B0_ENDED: &str = "2026-10-20T12:01:00Z";
-
     #[rstest]
     #[case::listed_keeps_running(
         TaskEvent { running: Some(task_ids(&["b1", "b2"])), ..TaskEvent::default() },
-        &[("b1", None), ("b2", None), ("b0", Some(B0_ENDED))]
+        &[("b1", None), ("b2", None), ("b0", Some(later(60)))]
     )]
     #[case::unlisted_ends(
         TaskEvent { running: Some(task_ids(&["b2"])), ..TaskEvent::default() },
-        &[("b1", Some(NOW)), ("b2", None), ("b0", Some(B0_ENDED))]
+        &[("b1", Some(now())), ("b2", None), ("b0", Some(later(60)))]
     )]
     #[case::empty_list_ends_all(
         TaskEvent { running: Some(Vec::new()), ..TaskEvent::default() },
-        &[("b1", Some(NOW)), ("b2", Some(NOW)), ("b0", Some(B0_ENDED))]
+        &[("b1", Some(now())), ("b2", Some(now())), ("b0", Some(later(60)))]
     )]
     #[case::no_list_ends_nothing(
         TaskEvent::default(),
-        &[("b1", None), ("b2", None), ("b0", Some(B0_ENDED))]
+        &[("b1", None), ("b2", None), ("b0", Some(later(60)))]
     )]
     #[case::stopped_ends_one(
         TaskEvent { stopped: Some(task_id("b2")), ..TaskEvent::default() },
-        &[("b1", None), ("b2", Some(NOW)), ("b0", Some(B0_ENDED))]
+        &[("b1", None), ("b2", Some(now())), ("b0", Some(later(60)))]
     )]
     #[case::stopped_unknown(
         TaskEvent { stopped: Some(task_id("b9")), ..TaskEvent::default() },
-        &[("b1", None), ("b2", None), ("b0", Some(B0_ENDED))]
+        &[("b1", None), ("b2", None), ("b0", Some(later(60)))]
     )]
     #[case::session_end_ends_all(
         TaskEvent { all_ended: true, ..TaskEvent::default() },
-        &[("b1", Some(NOW)), ("b2", Some(NOW)), ("b0", Some(B0_ENDED))]
+        &[("b1", Some(now())), ("b2", Some(now())), ("b0", Some(later(60)))]
     )]
     fn update__should_end_the_tasks_the_event_ends(
         #[case] event: TaskEvent,
-        #[case] expected: &[(&str, Option<&str>)],
+        #[case] expected: &[(&str, Option<Timestamp>)],
     ) {
         // Given
         let mut record = fixture::record("s1");
         record.tasks = vec![
             task("b1", None),
             task("b2", None),
-            task("b0", Some(B0_ENDED)),
+            task("b0", Some(later(60))),
         ];
 
         // When
-        update(&mut record, &event, NOW);
+        update(&mut record, &event, now());
 
         // Then
         assert_eq!(ends(&record), expected);
     }
 
-    const B0_ENDED_EARLY: &str = "2026-10-20T12:00:30Z";
-
     #[rstest]
     #[case::unlisted_and_old(
         &["b2"],
-        "2026-10-20T12:01:00Z",
-        &[("b1", Some("2026-10-20T12:01:00Z")), ("b2", None), ("b0", Some(B0_ENDED_EARLY))],
+        later(60),
+        &[("b1", Some(later(60))), ("b2", None), ("b0", Some(later(30)))],
         true
     )]
     #[case::listed(
         &["b1", "b2"],
-        "2026-10-20T12:01:00Z",
-        &[("b1", None), ("b2", None), ("b0", Some(B0_ENDED_EARLY))],
+        later(60),
+        &[("b1", None), ("b2", None), ("b0", Some(later(30)))],
         false
     )]
     #[case::too_young(
         &[],
-        "2026-10-20T12:00:59Z",
-        &[("b1", None), ("b2", None), ("b0", Some(B0_ENDED_EARLY))],
+        later(59),
+        &[("b1", None), ("b2", None), ("b0", Some(later(30)))],
         false
     )]
     #[case::empty_list_ends_all(
         &[],
-        "2026-10-20T13:00:00Z",
+        later(3600),
         &[
-            ("b1", Some("2026-10-20T13:00:00Z")),
-            ("b2", Some("2026-10-20T13:00:00Z")),
-            ("b0", Some(B0_ENDED_EARLY)),
+            ("b1", Some(later(3600))),
+            ("b2", Some(later(3600))),
+            ("b0", Some(later(30))),
         ],
         true
     )]
-    #[case::time_that_does_not_parse(
-        &[],
-        "noon",
-        &[("b1", None), ("b2", None), ("b0", Some(B0_ENDED_EARLY))],
-        false
-    )]
     fn end_unlisted__should_end_old_tasks_the_list_leaves_out(
         #[case] running: &[&str],
-        #[case] now: &str,
-        #[case] expected: &[(&str, Option<&str>)],
+        #[case] now: Timestamp,
+        #[case] expected: &[(&str, Option<Timestamp>)],
         #[case] changed: bool,
     ) {
         // Given
-        let mut record = fixture::record("s1.a1");
+        let mut record = fixture::record("s1");
+        record.agent_id = Some(ActorId::try_from("a1").unwrap());
         record.tasks = vec![
             task("b1", None),
             task("b2", None),
-            task("b0", Some(B0_ENDED_EARLY)),
+            task("b0", Some(later(30))),
         ];
         let before = record.clone();
         let running = task_ids(running);
@@ -302,22 +285,5 @@ mod tests {
             ..record.clone()
         };
         assert_eq!(others, before, "only tasks change");
-    }
-
-    #[test]
-    fn end_unlisted__should_keep_a_task_whose_start_does_not_parse() {
-        // Given
-        let mut record = fixture::record("s1.a1");
-        record.tasks = vec![Task {
-            started: "noon".to_owned(),
-            ..task("b1", None)
-        }];
-
-        // When
-        let ended = end_unlisted(&mut record, &[], "2026-10-20T13:00:00Z");
-
-        // Then
-        assert!(!ended);
-        assert_eq!(record.tasks[0].ended, None);
     }
 }

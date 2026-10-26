@@ -4,6 +4,7 @@ use rstest::rstest;
 
 use super::super::record::{HarnessProcess, Record};
 use super::*;
+use crate::activity::ActorId;
 use crate::clock::SystemClock;
 use crate::hook::fixture::{self, NOW, eventually, later, must_activity};
 use crate::processes::ProcessFile;
@@ -21,9 +22,9 @@ fn must_activity_with_claude() -> (tempfile::TempDir, ActivityDir, ProcessFile) 
 
 fn record(session: &str, agent: Option<&str>, state: State, age: i64, alive: bool) -> Record {
     let mut record = fixture::record(session);
-    record.agent_id = agent.map(str::to_owned);
+    record.agent_id = agent.map(|agent| ActorId::try_from(agent).unwrap());
     record.state = state;
-    record.updated = later(-age).to_rfc3339();
+    record.updated = later(-age);
     record.process = Some(HarnessProcess {
         pid: if alive { 7001 } else { 7099 },
         started: "2026-10-20T11:00:00Z".to_owned(),
@@ -45,7 +46,7 @@ fn collect__should_delete_only_old_dead_or_ended_records(
     let (dir, activity, table) = must_activity_with_claude();
     let stem = match &record.agent_id {
         Some(agent) => format!("{}.{agent}", record.session_id),
-        None => record.session_id.clone(),
+        None => record.session_id.to_string(),
     };
     activity.write(&stem, &record).unwrap();
     std::fs::write(dir.path().join("wtpool-activity/orphan.json.lock"), "").unwrap();

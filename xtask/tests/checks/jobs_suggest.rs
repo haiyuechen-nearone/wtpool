@@ -11,8 +11,8 @@ use rstest::rstest;
 use serde_json::Value;
 use xtask::pool::git_in;
 
-use super::jobs_config::{must_lone_pool, snapshot, stderr_of};
 use super::status::spec;
+use crate::support::jobs::settings::{must_lone_pool, snapshot, stderr_of};
 use crate::support::jobs::{describe, must_job_ls_json, wtpool};
 use crate::support::{Sandbox, must_repo, must_symlink};
 

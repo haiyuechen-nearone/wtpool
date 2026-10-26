@@ -4,6 +4,7 @@
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
 use tempfile::TempDir;
@@ -110,6 +111,8 @@ pub(crate) struct Recorder {
     /// The raw text passed on to standard error, such as the output of git.
     pub(crate) passed_on: Vec<String>,
     pub(crate) warnings: Vec<String>,
+    /// Gets each progress line as it is reported, for a test that must act while the pool runs.
+    pub(crate) notes_to: Option<Sender<String>>,
 }
 
 impl Report for Recorder {
@@ -124,6 +127,10 @@ impl Report for Recorder {
         self.warnings.push(message.to_owned());
     }
     fn note(&mut self, line: &str) {
+        if let Some(notes_to) = &self.notes_to {
+            // A receiver that stopped listening needs no more lines.
+            let _ = notes_to.send(line.to_owned());
+        }
         self.notes.push(line.to_owned());
         self.err.push_str(line);
         self.err.push('\n');

@@ -4,10 +4,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 
-use super::sources::Host;
+use super::sources::{Host, Sources};
 use super::state::PoolState;
 use crate::activity::ACTIVITY_DIR;
+use crate::clock::{ReadClock, Timestamp};
 use crate::config::{Config, SlotCount};
+use crate::jobs::JobPaths;
 use crate::names::SlotPrefix;
 use crate::paths::AbsolutePath;
 use crate::processes::{ListProcesses, ProcessQuery, RunningProcess};
@@ -53,6 +55,34 @@ impl FixedProcesses {
 impl ListProcesses for FixedProcesses {
     fn list(&self, _: &ProcessQuery<'_>) -> Vec<RunningProcess> {
         self.0.lock().unwrap().clone()
+    }
+}
+
+/// A clock that always reads 42 seconds after the epoch.
+pub struct FixedClock;
+
+impl ReadClock for FixedClock {
+    fn now(&self) -> Timestamp {
+        Timestamp::from_seconds(42)
+    }
+}
+
+/// The sources of the machine `machine` with one core and the job settings `jobs`, the
+/// repository named as [`https_path`] names it.
+pub fn fixed_sources<C>(
+    clock: C,
+    processes: FixedProcesses,
+    jobs: Option<JobPaths>,
+) -> Sources<C, FixedProcesses> {
+    Sources {
+        clock,
+        processes,
+        host: Host {
+            name: "machine".to_owned(),
+            jobs,
+            cores: 1,
+        },
+        forge_repository: https_path,
     }
 }
 
@@ -117,18 +147,8 @@ impl Fixture {
     }
 
     pub fn must_load(&self, processes: Vec<RunningProcess>) -> PoolState {
-        PoolState::load(
-            self.config(),
-            self.common.clone(),
-            &FixedProcesses::new(processes),
-            Host {
-                name: "machine".to_owned(),
-                jobs: None,
-                cores: 1,
-            },
-            https_path,
-        )
-        .unwrap()
+        let sources = fixed_sources(FixedClock, FixedProcesses::new(processes), None);
+        PoolState::load(self.config(), self.common.clone(), &sources).unwrap()
     }
 
     /// Writes the record `name` placed in the worktree folder `worktree`.

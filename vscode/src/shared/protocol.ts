@@ -70,8 +70,13 @@ export interface RowMessage {
   id: string;
 }
 
+/** Tells the extension that a page started, so it posts the tab's view to that page. */
+export interface ReadyMessage {
+  type: 'ready';
+}
+
 /** A message a webview may send. */
-export type WebviewMessage = RowMessage | JobSettingsMessage;
+export type WebviewMessage = RowMessage | JobSettingsMessage | ReadyMessage;
 
 /** A worktree that holds a branch, the one kind of row that `free` and `fg` act on. */
 export interface BranchSlot extends Worktree {

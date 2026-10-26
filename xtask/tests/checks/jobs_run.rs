@@ -4,45 +4,17 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 use rstest::rstest;
 use serde_json::{Value, json};
 
-use super::jobs_queue::{HANDOVER, limit_config, must_start, must_wait};
-use crate::support::jobs::{JobSpec, SETTLE, describe, job_records, must_job_ls_json, wtpool};
+use crate::support::jobs::settings::{mode_of, set_mode};
+use crate::support::jobs::{
+    HANDOVER, JobSpec, SETTLE, alive, describe, is_time, job_records, limit_config,
+    must_job_ls_json, must_start, must_wait, wtpool,
+};
 use crate::support::{Sandbox, must_wtpool_bin};
-
-/// The mode bits of `path`, `None` where the system has none.
-fn mode(path: &Path) -> Option<u32> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::symlink_metadata(path)
-            .ok()
-            .map(|meta| meta.permissions().mode() & 0o777)
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = path;
-        None
-    }
-}
-
-#[cfg(unix)]
-fn set_mode(path: &Path, mode: u32) {
-    use std::os::unix::fs::PermissionsExt;
-    fs::set_permissions(path, fs::Permissions::from_mode(mode)).expect("setup: chmod");
-}
-
-pub(super) fn alive(pid: u32) -> bool {
-    Command::new("kill")
-        .args(["-s", "0", &pid.to_string()])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
-}
 
 #[derive(Debug, Clone, Copy)]
 enum Folder {
@@ -108,7 +80,7 @@ fn job__should_refuse_an_unsafe_folder(#[case] folder: Folder) {
                 "a job with no job folder yet never ran"
             );
             assert_eq!(
-                mode(&jobs),
+                mode_of(&jobs),
                 Some(0o700),
                 "the mode of the job folder the first job made"
             );
@@ -145,12 +117,6 @@ fn is_job_id(id: &str, pid: u32) -> bool {
     };
     let rest = rest.strip_prefix(['-', '_', '.']).unwrap_or(rest);
     rest.len() == 8 && rest.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f'))
-}
-
-fn is_time(value: &Value) -> bool {
-    value.as_str().is_some_and(|text| {
-        text.len() >= 20 && text.ends_with('Z') && text.get(10..11) == Some("T")
-    })
 }
 
 /// The path and bytes of each file in `dir`.
@@ -199,8 +165,8 @@ fn job__should_record_only_its_summary() {
     let record = job.wait_record(&sandbox, "running", SETTLE);
     let files = contents(&sandbox.jobs_dir());
     let modes: Vec<(PathBuf, Option<u32>)> =
-        files.iter().map(|(p, _)| (p.clone(), mode(p))).collect();
-    let folder_mode = mode(&sandbox.jobs_dir());
+        files.iter().map(|(p, _)| (p.clone(), mode_of(p))).collect();
+    let folder_mode = mode_of(&sandbox.jobs_dir());
     let code = job.finish(SETTLE).and_then(|s| s.code());
     let after = contents(&sandbox.jobs_dir());
 

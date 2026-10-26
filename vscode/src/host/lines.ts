@@ -3,7 +3,7 @@ import { validate } from '../generated/validate.js';
 import { isRecord } from '../shared/protocol';
 
 /** The longest line the extension reads, newline excluded. */
-const MAX_LINE_BYTES = 1024 * 1024;
+export const MAX_LINE_BYTES = 1024 * 1024;
 
 const NEWLINE = 0x0a;
 

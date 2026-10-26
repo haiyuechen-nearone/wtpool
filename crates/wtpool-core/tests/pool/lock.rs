@@ -2,12 +2,15 @@
 //! tests.
 
 use std::process::Command;
-use std::time::Duration;
+use std::sync::mpsc::{self, Receiver};
+use std::time::{Duration, Instant};
 
 use rstest::rstest;
 use wtpool_core::{AgentGuard, Pool, SyncMode};
 
 use crate::support::{FakePr, Fixture, PoolCommand, Recorder, must_hold_pool_lock};
+
+const WAITING: &str = "waiting for another wtpool command to finish";
 
 #[rstest]
 #[case::fg(
@@ -31,30 +34,45 @@ fn pool_commands__should_wait_for_the_pool_lock(#[case] command: PoolCommand) {
     let held = must_hold_pool_lock(&fixture);
 
     // When
-    let (finished_while_held, (result, report)) = std::thread::scope(|scope| {
-        let (done, finished) = std::sync::mpsc::channel();
+    let (waited_while_held, (result, report)) = std::thread::scope(|scope| {
+        let (notes_to, notes) = mpsc::channel();
         let pool = &pool;
         let run = scope.spawn(move || {
-            let mut report = Recorder::default();
+            let mut report = Recorder {
+                notes_to: Some(notes_to),
+                ..Recorder::default()
+            };
             let result = command(pool, &mut report);
-            done.send(()).unwrap();
+            report.notes_to = None;
             (result, report)
         });
-        let finished_while_held = finished.recv_timeout(Duration::from_millis(300)).is_ok();
+        let waited = saw_note(&notes, WAITING);
+        let waited_while_held = waited && !run.is_finished();
         drop(held);
-        (finished_while_held, run.join().unwrap())
+        (waited_while_held, run.join().unwrap())
     });
 
     // Then
-    assert!(!finished_while_held);
+    assert!(waited_while_held, "{}", report.err);
     assert!(result.is_ok(), "{result:?}");
     assert!(
-        report
-            .err
-            .contains("waiting for another wtpool command to finish\n"),
+        report.err.contains(&format!("{WAITING}\n")),
         "{}",
         report.err
     );
+}
+
+/// `true` once `notes` gives `line`, `false` when the command ends first or a minute passes.
+fn saw_note(notes: &Receiver<String>, line: &str) -> bool {
+    let deadline = Instant::now() + Duration::from_secs(60);
+    loop {
+        let left = deadline.saturating_duration_since(Instant::now());
+        match notes.recv_timeout(left) {
+            Ok(note) if note == line => return true,
+            Ok(_) => {}
+            Err(_) => return false,
+        }
+    }
 }
 
 #[test]

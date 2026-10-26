@@ -4,77 +4,20 @@
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::Path;
 
 use rstest::rstest;
 use serde_json::{Value, json};
 
-use super::hook_policy::{call, decision, machine, policy};
-use crate::support::hook::{Hooks, Proc, catalog_spec};
-use crate::support::jobs::{Job, JobSpec, ProcLine, SETTLE, jobs_of, must_job_ls_json, wtpool};
+use crate::support::hook::{Hooks, catalog_spec};
+use crate::support::jobs::policy::{
+    call, decision, list_job, machine, must_have, policy, proc, started,
+};
+use crate::support::jobs::settings::add_to_repository;
+use crate::support::jobs::{JobSpec, ProcLine, jobs_of, must_job_ls_json, wtpool};
 use crate::support::{Sandbox, must_status_json, worktree};
 
-/// Starts `spec` and waits until its record reaches `state`: the job and that record, `None` when
-/// no record of its pid reached it.
-pub(super) fn started(hooks: &Hooks, spec: &JobSpec, state: &str) -> (Job, Option<Value>) {
-    let job = hooks.sandbox.must_start_job(spec);
-    let record = job.wait_record(&hooks.sandbox, state, SETTLE);
-    (job, record)
-}
-
-/// The record of a job that must have reached its state. Otherwise panics with the job's stderr.
-pub(super) fn must_have(job: &Job, record: Option<Value>, what: &str) -> Value {
-    record.unwrap_or_else(|| {
-        panic!(
-            "wtpool job of {what} wrote no record of its pid in the expected state within {SETTLE:?}; stderr {:?}",
-            job.stderr()
-        )
-    })
-}
-
-/// Lists `job`'s own process in the fake process table, a child of `parent`, started as its
-/// record says, with the command line `wtpool job -- <command>`.
-pub(super) fn list_job(
-    hooks: &mut Hooks,
-    job: &Job,
-    record: &Value,
-    parent: u32,
-    cwd: &Path,
-    command: &[&str],
-) {
-    let mut cmd = vec!["wtpool".to_owned(), "job".to_owned(), "--".to_owned()];
-    cmd.extend(command.iter().map(|word| (*word).to_owned()));
-    hooks.start_proc(Proc {
-        pid: job.pid(),
-        ppid: parent,
-        name: "wtpool".to_owned(),
-        cwd: cwd.to_path_buf(),
-        started: record["started"]
-            .as_str()
-            .unwrap_or("2026-10-20T11:00:00Z")
-            .to_owned(),
-        cmd: Some(cmd),
-    });
-}
-
-/// A process of the fake table with its arguments.
-pub(super) fn proc(pid: u32, ppid: u32, cmd: &[&str], cwd: &Path, started: &str) -> Proc {
-    let name = cmd
-        .first()
-        .and_then(|program| Path::new(program).file_name())
-        .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
-    Proc {
-        pid,
-        ppid,
-        name,
-        cwd: cwd.to_path_buf(),
-        started: started.to_owned(),
-        cmd: Some(cmd.iter().map(|word| (*word).to_owned()).collect()),
-    }
-}
-
 /// Each build of the worktree `name`: its name, pid and `queued`.
-pub(super) fn builds_of(document: &Value, name: &str) -> BTreeSet<(String, u64, String)> {
+fn builds_of(document: &Value, name: &str) -> BTreeSet<(String, u64, String)> {
     worktree(document, name)["builds"]
         .as_array()
         .into_iter()
@@ -90,7 +33,7 @@ pub(super) fn builds_of(document: &Value, name: &str) -> BTreeSet<(String, u64, 
 }
 
 /// The build set of a worktree as [`builds_of`] gives it.
-pub(super) fn set(builds: &[(&str, u64, bool)]) -> BTreeSet<(String, u64, String)> {
+fn set(builds: &[(&str, u64, bool)]) -> BTreeSet<(String, u64, String)> {
     builds
         .iter()
         .map(|(name, pid, queued)| ((*name).to_owned(), *pid, queued.to_string()))
@@ -101,14 +44,6 @@ pub(super) fn set(builds: &[(&str, u64, bool)]) -> BTreeSet<(String, u64, String
 fn heavy_only(heavy: &[&str]) -> String {
     let list: Vec<String> = heavy.iter().map(|p| format!("\"{p}\"")).collect();
     format!("[jobs]\nheavy = [{}]\n", list.join(", "))
-}
-
-/// Appends `text` to the repository's `<common>/wtpool.toml`.
-pub(super) fn add_to_repository(common: &Path, text: &str) {
-    let path = common.join("wtpool.toml");
-    let mut config = fs::read_to_string(&path).expect("setup: read wtpool.toml");
-    config.push_str(text);
-    fs::write(&path, config).expect("setup: write wtpool.toml");
 }
 
 /// The name of the build each worktree shows for one process, as `(worktree, name)`.

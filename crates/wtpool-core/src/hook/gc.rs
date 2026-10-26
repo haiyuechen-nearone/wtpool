@@ -213,7 +213,7 @@ impl Expiry {
     /// `true` for an `ended` or dead record a week old, and for a `done` subagent a quarter hour
     /// old that is not its worktree's newest.
     fn expired(&self, stem: &str, record: &Record) -> bool {
-        let age = Timestamp::parse(&record.updated).map_or(i64::MAX, |t| self.now.seconds_since(t));
+        let age = self.now.seconds_since(record.updated);
         let process = record.process.as_ref().map(recorded);
         let gone = record.state == State::Ended || !Liveness::SameStart.runs(process, &self.living);
         let newest = self.newest_done.get(&record.worktree).map(String::as_str) == Some(stem);
@@ -258,8 +258,7 @@ fn newest_done_by_worktree(records: &[(String, Record)]) -> BTreeMap<String, Str
         if !(record.is_subagent() && record.state == State::Done) {
             continue;
         }
-        let updated =
-            Timestamp::parse(&record.updated).unwrap_or(Timestamp::from_seconds(i64::MIN));
+        let updated = record.updated;
         let candidate = NewestDone { updated, stem };
         let entry = newest.entry(&record.worktree).or_insert(candidate);
         if updated > entry.updated {

@@ -7,5 +7,4 @@ mod divergence;
 mod guard;
 mod plan;
 
-pub(crate) use divergence::{Divergence, left_right};
 pub use plan::Unresolved;

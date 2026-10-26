@@ -21,8 +21,8 @@ mod record;
 mod sha256;
 mod store;
 mod tasks;
-pub mod text;
 
+pub use crate::activity::text;
 pub(crate) use crate::shell as bash;
 
 pub use adapter::{Adapter, TranscriptTitles, WaitingTools};

@@ -25,7 +25,10 @@ interface Timer {
   run: () => void;
 }
 
-/** A clock that stands still until {@link FakeClock.advance} moves it, firing due timers in time order. */
+/**
+ * A clock that stands still until {@link FakeClock.advance} moves it, firing due timers in time
+ * order.
+ */
 export class FakeClock implements Clock {
   private order = 0;
   private readonly timers = new Set<Timer>();

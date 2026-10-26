@@ -54,12 +54,12 @@ function styleParts(dir) {
 function writeStyleSheet() {
   // The webview page links a single stylesheet.
   const dir = path.join(VSCODE, 'src/webview');
-  const sheets = ['icons.css', ...styleParts(dir)].map((file) => readFileSync(path.join(dir, file), 'utf8'));
+  const sheets = styleParts(dir).map((file) => readFileSync(path.join(dir, file), 'utf8'));
   writeFileSync(path.join(VSCODE, 'media/webview.css'), sheets.join('\n'));
 }
 
 function copyIconFont() {
-  // icons.css declares the font and only the glyphs the webview uses, so codicon.css stays out.
+  // style/icons.css declares the font and only the glyphs the webview uses, so codicon.css stays out.
   copyFileSync(packageFile('@vscode/codicons/dist/codicon.ttf'), path.join(VSCODE, 'media/codicon.ttf'));
 }
 

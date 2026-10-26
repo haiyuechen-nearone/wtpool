@@ -9,6 +9,8 @@ const TAIL_BYTES = 64 * 1024;
 const TAIL_LINES = 15;
 /** The columns from one tab stop to the next. */
 const TAB_COLUMNS = 8;
+/** The interval between two checks of a watched output file for a change the watch missed. */
+export const POLL_MS = 1000;
 
 /** A tail and the file state it was read at, for a later read to compare with. */
 interface TailRead {
@@ -43,7 +45,9 @@ const ST = '\\u009c';
 const STRING_OPENERS = '\\u0090\\u0098\\u009d\\u009e\\u009f';
 /** Every C1 control. */
 const C1 = '\\u0080-\\u009f';
-/** The C0 controls and DEL that only Follow drops: all but tab, line feed, carriage return and ESC. */
+/**
+ * The C0 controls and DEL that only Follow drops: all but tab, line feed, carriage return and ESC.
+ */
 const FOLLOW_C0 = '\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001a\\u001c-\\u001f\\u007f';
 
 /**
@@ -88,7 +92,9 @@ function lastDraw(line: string): string {
   return at < 0 ? trimmed : trimmed.slice(at + 1);
 }
 
-/** The text that counts other than one column per character: an SGR sequence, a tab, a line start. */
+/**
+ * The text that counts other than one column per character: an SGR sequence, a tab, a line start.
+ */
 const COLUMN_MARKS = new RegExp(`${ESC}\\[[0-9;:]*m|[\\t\\r\\n]`, 'g');
 
 function codePointCount(text: string): number {

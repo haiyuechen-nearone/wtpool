@@ -446,4 +446,27 @@ describe('tab', () => {
     const panelOptions = created.filter((c) => c.viewType === 'wtpool.status').at(-1)?.options;
     assert.notEqual(panelOptions?.retainContextWhenHidden, true, 'retainContextWhenHidden must stay off');
   });
+
+  it('ready__should_answer_with_the_view', async () => {
+    // Given
+    await resetFake({ scenario: 'idle_pool', aliveMs: 0 });
+    const from = (await views()).length;
+    await openStatus();
+    const last = JSON.stringify(expectedDocuments('idle_pool').at(-1));
+    const first = await waitFor(async () => (await views()).slice(from).some((v) => JSON.stringify(v.status) === last), 10_000);
+    assert.ok(first, 'setup: the document never reached the webview');
+    // The page's own first messages come and go before the check counts.
+    await sleep(1000);
+    const before = (await posted()).length;
+
+    // When
+    await (await verifyApi()).fromWebview({ type: 'ready' });
+    const answer = await waitFor(async () => {
+      const after = (await posted()).slice(before);
+      return after.find((m) => m.type === 'view' && JSON.stringify(m.status) === last);
+    }, 2_000);
+
+    // Then
+    assert.ok(answer, 'a ready message got no view with the last document');
+  });
 });

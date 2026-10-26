@@ -1,51 +1,21 @@
 //! The settings commands of heavy jobs: `wtpool job limit`, `enforce` and `heavy` print a setting
 //! with its source, set it or reset it, and refuse bad values. [`super::jobs_settings_files`]
-//! checks the files they write. Also the helpers both share.
+//! checks the files they write.
 
 use std::collections::BTreeSet;
-use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
-use std::process::Output;
 
 use rstest::rstest;
 
-use super::jobs_config::{jobs_table, must_lone_pool, snapshot, stdout_of, tokens};
-use crate::support::jobs::{describe, wtpool};
-use crate::support::{FileState, Sandbox, file_state};
+use crate::support::Sandbox;
+use crate::support::jobs::describe;
+use crate::support::jobs::settings::{
+    file, job, jobs_table, must_lone_pool, refused, snapshot, stdout_of, strings, succeeded, table,
+    tokens,
+};
 
-pub(super) const CORES: (&str, &str) = ("WTPOOL_VERIFY_CORES", "16");
-
-/// `wtpool job <args>` from `cwd` on 16 cores, so the default limit is 4.
-pub(super) fn job(sandbox: &Sandbox, cwd: &Path, args: &[&str]) -> Output {
-    let mut all = vec!["job"];
-    all.extend_from_slice(args);
-    wtpool(sandbox, cwd, &all, &[(CORES.0, OsStr::new(CORES.1))])
-}
-
-/// The bytes and state of `path`, `None` when it is missing.
-pub(super) fn file(path: &Path) -> Option<(Vec<u8>, FileState)> {
-    let meta = fs::symlink_metadata(path).ok()?;
-    Some((fs::read(path).unwrap_or_default(), file_state(&meta)))
-}
-
-/// The top level table of the TOML file at `path`.
-pub(super) fn table(path: &Path) -> Option<toml::Table> {
-    toml::from_str(&fs::read_to_string(path).ok()?).ok()
-}
-
-/// The strings of the array `key` of `table`, as a set.
-pub(super) fn strings(table: Option<&toml::Table>, key: &str) -> BTreeSet<String> {
-    table
-        .and_then(|t| t.get(key))
-        .and_then(toml::Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(|v| v.as_str().map(str::to_owned))
-        .collect()
-}
-
-pub(super) fn set_of(items: &[&str]) -> BTreeSet<String> {
+fn set_of(items: &[&str]) -> BTreeSet<String> {
     items.iter().map(|s| (*s).to_owned()).collect()
 }
 
@@ -61,30 +31,6 @@ fn printed_with(text: &str, value: &str, source: &str) -> bool {
         };
         holds && words.contains(source)
     })
-}
-
-/// Notes a run that must exit 125 and leave `path` as it was.
-pub(super) fn refused(
-    wrong: &mut Vec<String>,
-    what: &str,
-    output: &Output,
-    path: &Path,
-    before: &Option<(Vec<u8>, FileState)>,
-) {
-    if output.status.code() != Some(125) {
-        wrong.push(format!("{what}: not exit 125: {}", describe(output)));
-    }
-    if file(path) != *before {
-        wrong.push(format!("{what}: changed {}", path.display()));
-    }
-}
-
-pub(super) fn succeeded(wrong: &mut Vec<String>, what: &str, output: &Output) -> bool {
-    let ok = output.status.success();
-    if !ok {
-        wrong.push(format!("{what}: {}", describe(output)));
-    }
-    ok
 }
 
 enum Setting {

@@ -3,8 +3,8 @@
 use super::harness::Harness;
 use super::ids::ActorId;
 
-/// The longest head of a record stem. A harness's [`Harness::stem_prefix`] counts against it.
-const MAX_HEAD: usize = 64;
+/// The longest head of a record stem: the longest harness prefix and the longest session id.
+const MAX_HEAD: usize = Harness::LONGEST_STEM_PREFIX + ActorId::MAX_LEN;
 
 /// An actor of one harness: a session, or a subagent of one.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,5 +124,25 @@ mod tests {
         );
         let of = |stem: &str| Stem::parse(stem).unwrap().of_session(&subagent);
         assert_eq!((of("s1"), of("s1.a9"), of("s10")), (true, true, false));
+    }
+
+    #[test]
+    fn parse__should_read_the_longest_stem_of_every_harness() {
+        // Given
+        let longest = "a".repeat(ActorId::MAX_LEN);
+        let keys = Harness::ALL.map(|harness| ActorKey {
+            harness,
+            session: ActorId::try_from(longest.as_str()).unwrap(),
+            agent: Some(ActorId::try_from(longest.as_str()).unwrap()),
+        });
+
+        // When
+        let parsed = keys.each_ref().map(|key| {
+            let stem = key.stem();
+            Stem::parse(&stem).is_some_and(|stem| stem.of_session(key))
+        });
+
+        // Then
+        assert!(parsed.iter().all(|read| *read), "{parsed:?}");
     }
 }

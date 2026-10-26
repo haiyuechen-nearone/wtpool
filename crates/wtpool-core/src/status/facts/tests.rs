@@ -390,21 +390,20 @@ fn facts_read__should_find_no_upstream_for_a_branch_without_one() {
 }
 
 #[test]
-fn tracking__should_count_unknown_when_the_branch_has_no_commit() {
+fn ref_facts_read__should_count_unknown_when_the_branch_has_no_commit() {
     // Given
     let root = tempfile::tempdir().unwrap();
     let (main, _) = must_pool(root.path());
     must_git(&main, &["checkout", "--quiet", "--orphan", "unborn"]);
     must_git(&main, &["config", "branch.unborn.remote", "origin"]);
     must_git(&main, &["config", "branch.unborn.merge", "refs/heads/main"]);
-    let git = Git::at(&AbsolutePath::try_new(&main).unwrap());
 
     // When
-    let found = tracking(&git);
+    let found = RefFacts::read(&must_worktree(&main));
 
     // Then
     assert_eq!(
-        found,
+        found.upstream,
         Some(Tracking {
             name: "origin/main".to_owned(),
             counts: Upstream::Unknown,

@@ -561,10 +561,10 @@ fn agent_guard(force: bool, sources: &Sources) -> AgentGuard<'_> {
 /// the names [`GitHub`] gives.
 fn status_sources() -> Sources {
     let (clock, processes) = verify_files();
-    Sources {
-        cores: job::cores(),
-        ..Sources::from_files(clock, processes, |url| GitHub.repository(url))
-    }
+    let var = |name: &str| std::env::var_os(name);
+    let mut sources = Sources::from_files(clock, processes, var, |url| GitHub.repository(url));
+    sources.host.cores = job::cores();
+    sources
 }
 
 /// The clock file and the process table file that `WTPOOL_VERIFY_CLOCK` and `WTPOOL_VERIFY_PROCS`

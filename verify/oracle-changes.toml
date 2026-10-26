@@ -1585,3 +1585,42 @@ reason = "Harness tidy of the JS test helpers, with every check name, assertion 
 "vscode/test/support/jobs-render.mjs" = "2507aff97747c6175722388fae45da88b1288f7f11bd6dc31752d608b0f2b242"
 "vscode/test/support/jobs-shot.mjs" = "496c33dd823ddb48e71ceae283844cde1b049a2f78b71dec4f41540f0ff12a5a"
 "vscode/test/support/measure.mjs" = "26001579e6c620c68c3654b972193ad1033e146fe9cd3d4f78089f9f5ee2aa40"
+
+[[change]]
+id = "flake-fixes-3"
+reason = "isVisuallyHidden in vscode/test/support/webview.mjs reads each style rule once per element instead of once per property, and only the rules that set a property it reads, so seen() no longer matches every selector of the stylesheet ten times for every element. The values it returns are unchanged. The bash_attribution render scenario spent over 95 percent of its time there, about 33 s of 36 s on a loaded machine, and went past its 60 s limit under heavier load; it now takes about 2 s."
+[change.files]
+"vscode/test/support/webview.mjs" = "4f07b6417a900b564924ba852c664ad25f0f7e7a04a5a58373b7a4b0445d2e4c"
+
+[[change]]
+id = "ready-handshake"
+reason = "A page of the Worktrees tab posts ready when it starts, and the extension answers with the tab's view and the selected row's tails, so a page VS Code reloads while the tab stays visible, as on a move to another editor group, no longer waits at starting… until the next document. A new e2e check, move__should_fill_the_table_in_the_new_group in vscode/test/e2e/flows-tab.spec.mjs, opens the tab beside notes.txt, runs View: Move Editor into Next Group, and asserts that the move reloads the page and that the page shows the pool's rows within 2 s, past starting…. A new host check, ready__should_answer_with_the_view in vscode/test/host/tab.test.cjs, sends ready once the tab holds its document and asserts that a view with that document follows within 2 s. Both fail without the answer to ready. budget__b7 in vscode/test/host/budget.test.cjs takes one or two posts on a show, the show's own and the answer to the reloaded page's ready, each the view of the last document, where it took exactly one, and stream__should_post_starting_before_the_first_line in vscode/test/host/stream.test.cjs takes one or two starting views before the first document, the tab's own and the answer to its page's ready, where it took exactly one. verify/checks.toml registers the checks for host and e2e, and verify/trace.toml lists them under X7. What the other checks judge is unchanged."
+[change.files]
+"verify/checks.toml" = "df1a428018fb3f7a467b7c02538630933e6e9b123afd67a6cb9b1ce03e1d4f14"
+"verify/trace.toml" = "ed467ade83b1f6db49e368288086a6e396da34c3ad5fb8272b52f56617763186"
+"vscode/test/e2e/flows-tab.spec.mjs" = "1287f04228059326efb8d451f9864742e7820347306f338e2f35c0118c4fea77"
+"vscode/test/host/budget.test.cjs" = "13868a8d42890db20c22b20780c1aad604bdc7dd3592b08a75332b67f6cce65f"
+"vscode/test/host/stream.test.cjs" = "74ca0d9a46e717bddb20a8ea78b882886a8dad22f73864a4f77dc86665911b46"
+"vscode/test/host/tab.test.cjs" = "b487d28a79df514c080253902a91f88e0af71a546e1e2eb04b4f4268e2f2d912"
+
+[[change]]
+id = "hx-jobs"
+reason = "The helpers the heavy job checks share move out of the check files into xtask/tests/support/jobs.rs and two new modules under it: support/jobs/settings.rs (the lone pool, machine.toml and wtpool.toml readers and writers, the file snapshot and modes, wtpool job <setting> runs and their outcome notes) and support/jobs/policy.rs (the policy machine config, the tool call, one wtpool hook policy run and its deny decision, and jobs in the fake process table), while the queue helpers, wait_state and alive join support/jobs.rs; no check imports another check's helpers for them any more. set_mode and the mode reader exist once. is_time exists once, the stricter form that also needs a dash at index 4, so the queued and since times of job__should_record_only_its_summary must now have the shape the job scenarios already ask of since, a tightened assertion. The machine.toml every int sandbox starts with drops the requirement IDs from its TOML comment, so it is byte-identical to EARLIER_BUILDS of vscode/test/support/code.mjs, and the new int check earlier_builds__should_be_the_machine_config_of_the_js_sandboxes pins the two together. Comments of these files lose design-doc terms and question words. Every other check keeps its name, layer, assertions and messages."
+[change.files]
+"xtask/tests/checks/hook_policy.rs" = "2fdaa18414eccd4832f925283cdb75ddf709ae99773b12e29ab257114764a73f"
+"xtask/tests/checks/hook_policy_waits.rs" = "81006b8c95b33f8a79ecd154be7c04bfd3adbb3621585a7b9f7b738ada52671b"
+"xtask/tests/checks/jobs_config.rs" = "36b6d2a13d81cbcbe73cb5267cfa9832021b1f1aba91997cd8cc3e32c3789a48"
+"xtask/tests/checks/jobs_decay.rs" = "4ddbd173ab306b770cc726a2ccb9177e6e0d7663f9ee085b7316b293cf441bab"
+"xtask/tests/checks/jobs_ls.rs" = "ee4248ea808cd1a89d621c8d3b0f30f23e49bdce79683214387ab1d866cd0688"
+"xtask/tests/checks/jobs_queue.rs" = "656484cddda19892b49202ba6fb28a5b4d7c1b63400717bed6725fac4b805c77"
+"xtask/tests/checks/jobs_run.rs" = "762712336973800bb854cf724851f856d14f067050002c6c921f57d57ce6578e"
+"xtask/tests/checks/jobs_settings.rs" = "611bc049cef9a82ef6826df3c67c10de493072ea619099d7cac99427dd4716d4"
+"xtask/tests/checks/jobs_settings_files.rs" = "e9f05abd7e66ef595d7b761f33386167e48062bf9cd3fdbf1636726fe5340f82"
+"xtask/tests/checks/jobs_signals.rs" = "6e229ac7708a4c63fd5f82362256c48c818ed144a301b56856e0de2646347d04"
+"xtask/tests/checks/jobs_status.rs" = "4e429529f3baae7e425b428d58466e834f082513fc8c88a8d7925fe4a071b098"
+"xtask/tests/checks/jobs_suggest.rs" = "d9683464143fb1bbd7018db130f43783fd69f732aae29d630e7f6b5d75a20738"
+"xtask/tests/checks/jobs_watch.rs" = "0bdd4c211242710e3e12915e36a4f559f23143279cee24b03acec7d64f69c628"
+"xtask/tests/checks/scenarios_jobs.rs" = "c4afd8b103f5785bcc65ca8c33750858075c5f3243c275be366e993825c8a4de"
+"xtask/tests/support/jobs.rs" = "1638eaf2142f7c1ee2024250e4b4502e994ad74ea91033867114f37f0c6209df"
+"xtask/tests/support/jobs/policy.rs" = "424a00c33b060c243325c0e0352235c1c1b6522ce59e04e3647d0ed3a125bf20"
+"xtask/tests/support/jobs/settings.rs" = "c70933af62766261b0c5f0ae8919d2430bf96199922ce2259c0481b0ebcfe61b"

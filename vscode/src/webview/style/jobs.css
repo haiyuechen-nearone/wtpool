@@ -1,7 +1,6 @@
 /* Heavy jobs: the heading's machine button, the machine strip under it, its pattern editor, and a
  * build outside a job on an agent line. The strip shares the detail strip's box. */
 
-/* The machine button: muted like the machine name it holds, its counts in their group colours. */
 .machine-button {
   display: inline-block;
   margin: -2px 0;
@@ -335,51 +334,4 @@ body.vscode-high-contrast .chip-button:hover:not(:focus-visible) {
   display: block;
   margin-bottom: 2px;
   font-size: 12px;
-}
-
-/* The glyphs of heavy jobs, from the codicon font icons.css declares. */
-.machine-button::after,
-.jobs-problem::before,
-.chip-button::before {
-  display: inline-block;
-  font-family: codicon, sans-serif;
-  font-style: normal;
-  font-weight: normal;
-  line-height: 1;
-  -webkit-font-smoothing: antialiased;
-}
-
-.machine-button::after {
-  content: "\eab4";
-  margin-left: 4px;
-  font-size: 14px;
-  vertical-align: -2px;
-}
-
-.machine-button[aria-expanded="true"]::after {
-  content: "\eab7";
-}
-
-.jobs-problem::before {
-  content: "\ea6c";
-  margin-right: 3px;
-  font-size: 14px;
-  vertical-align: -2px;
-}
-
-.chip-button::before {
-  font-size: 12px;
-}
-
-.chip-remove::before {
-  content: "\ea76";
-}
-
-.suggest-add::before {
-  content: "\ea60";
-}
-
-/* The strip's own display rules would otherwise show its hidden parts. */
-.machine-strip [hidden] {
-  display: none;
 }

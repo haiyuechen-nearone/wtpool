@@ -1,32 +1,30 @@
 //! The state `wtpool status` keeps of one pool: the worktrees with their git facts, the build
 //! processes and the activity records, each refreshed on its own, and the document they make.
 
+mod view;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::thread;
 
-use super::agents::{self, Context};
-use super::builds::{self, build_processes, builds_below, builds_by_worktree};
-use super::document::{
-    Actor, ActorState, Agents, Build, Document, DocumentKind, DocumentVersion, Machine, PoolStatus,
-    Repository, WorktreeStatus,
-};
-use super::facts::{self, Busy, Facts, RefFacts};
-use super::jobs::{self, Harnesses, JobsFacts, JobsState, PoolFolders};
-use super::records::{ActorRecord as Record, RecordState, Records};
+use super::agents;
+use super::builds;
+use super::document::{Agents, Repository};
+use super::facts::{Facts, RefFacts};
+use super::jobs::JobsState;
+use super::records::{ActorRecord, RecordState, Records};
 use super::repository::repository;
-use super::sources::Host;
+use super::sources::Sources;
 use crate::activity::ACTIVITY_DIR;
 use crate::clock::Timestamp;
 use crate::config::Config;
 use crate::error::Error;
 use crate::git::{Git, GitMode, layout};
-use crate::jobs::HeavyTable;
 use crate::paths::comparable;
 use crate::processes::{ListProcesses, Liveness, RunningProcess};
 use crate::report::Discard;
-use crate::worktree::{Head, Worktree};
+use crate::worktree::Worktree;
 
 /// One pool as `wtpool status` last read it.
 #[derive(Debug)]
@@ -34,6 +32,7 @@ pub struct PoolState {
     config: Config,
     common: PathBuf,
     git_mode: GitMode,
+    reach: Reach,
     machine: String,
     forge_repository: fn(&str) -> Option<String>,
     repository: Repository,
@@ -44,6 +43,10 @@ pub struct PoolState {
     jobs: JobsState,
 }
 
+/// The actors of a pool, read without the git facts and the repository a document also shows.
+#[derive(Debug)]
+pub struct PoolActors(PoolState);
+
 /// A listed worktree and its facts.
 #[derive(Debug)]
 struct Tracked {
@@ -52,40 +55,44 @@ struct Tracked {
     comparable: PathBuf,
     /// The folder that holds its `HEAD` and index, when known.
     git_dir: Option<PathBuf>,
-    /// `None` when the folder is gone.
+    /// `None` when the folder is gone, and in a state that reads only the actors.
     facts: Option<Facts>,
     last_change: Option<Timestamp>,
 }
 
+/// The reach of a refresh of every worktree beyond the worktree list, the process table, the
+/// records and the jobs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Reach {
+    /// The git facts of each worktree and the repository too.
+    Everything,
+    /// Only the facts the actors need.
+    Actors,
+}
+
 impl PoolState {
-    /// Reads everything about the pool of `config`, whose common git directory is `common`, on
-    /// the machine `host`, through read-only git, with the repository named as
-    /// `forge_repository` names it.
-    pub fn load(
+    /// Reads everything about the pool of `config`, whose common git directory is `common`,
+    /// from `sources`, through read-only git.
+    pub fn load<C, P: ListProcesses>(
         config: Config,
         common: PathBuf,
-        processes: &impl ListProcesses,
-        host: Host,
-        forge_repository: fn(&str) -> Option<String>,
+        sources: &Sources<C, P>,
     ) -> Result<Self, Error> {
-        Self::load_with(
+        Self::read(
+            Reach::Everything,
             GitMode::ReadOnly,
             config,
             common,
-            processes,
-            host,
-            forge_repository,
+            sources,
         )
     }
 
-    /// [`PoolState::load`] through git in `git_mode`.
-    pub fn load_with(
+    fn read<C, P: ListProcesses>(
+        reach: Reach,
         git_mode: GitMode,
         config: Config,
         common: PathBuf,
-        processes: &impl ListProcesses,
-        host: Host,
-        forge_repository: fn(&str) -> Option<String>,
+        sources: &Sources<C, P>,
     ) -> Result<Self, Error> {
         let records = Records::new(common.join(ACTIVITY_DIR));
         let markers = config
@@ -93,13 +100,15 @@ impl PoolState {
             .as_ref()
             .unwrap_or(&config.foreground)
             .to_path_buf();
-        let jobs = JobsState::read(host.jobs, host.cores, &common, markers)?;
+        let host = &sources.host;
+        let jobs = JobsState::read(host.jobs.clone(), host.cores, &common, markers)?;
         let mut state = Self {
             config,
             common,
             git_mode,
-            machine: host.name,
-            forge_repository,
+            reach,
+            machine: host.name.clone(),
+            forge_repository: sources.forge_repository,
             repository: Repository {
                 name: String::new(),
                 github: None,
@@ -110,12 +119,12 @@ impl PoolState {
             agents: Agents::Off,
             jobs,
         };
-        state.refresh_all(processes)?;
+        state.refresh_all(&sources.processes)?;
         Ok(state)
     }
 
-    /// Lists the worktrees again and reads every fact, the process table, the repository and
-    /// the records.
+    /// Lists the worktrees again and reads the process table, the records and the jobs, and the
+    /// facts and the repository unless only the actors are read.
     pub fn refresh_all(&mut self, processes: &impl ListProcesses) -> Result<(), Error> {
         let foreground = Git::at(&self.config.foreground).with_mode(self.git_mode);
         let listed = Worktree::list_with(&foreground, &mut Discard)?;
@@ -123,16 +132,16 @@ impl PoolState {
         let name = listed.first().map(Worktree::name).unwrap_or_default();
         let common = self.common.as_path();
         let remote = self.config.remote.as_str();
-        let forge_repository = self.forge_repository;
+        let (forge_repository, reach) = (self.forge_repository, self.reach);
         let (worktrees, table, repository) = thread::scope(|scope| {
             let table = scope.spawn(|| processes.list(&builds::query()));
-            let repository =
-                scope.spawn(|| repository(name, &foreground, remote, forge_repository));
-            let worktrees = track_all(listed, common);
+            let repository = (reach == Reach::Everything)
+                .then(|| scope.spawn(|| repository(name, &foreground, remote, forge_repository)));
+            let worktrees = track_all(listed, common, reach);
             (
                 worktrees,
                 table.join().unwrap_or_default(),
-                repository.join().ok(),
+                repository.and_then(|repository| repository.join().ok()),
             )
         });
         self.worktrees = worktrees;
@@ -192,9 +201,8 @@ impl PoolState {
         let Some(fresh) = fresh else {
             return false;
         };
-        tracked.facts = read_facts(&fresh);
-        tracked.last_change = tracked.git_dir.as_deref().and_then(last_change);
         tracked.worktree = fresh;
+        tracked.read_facts();
         true
     }
 
@@ -251,7 +259,7 @@ impl PoolState {
         agents::next_change(&self.counted_records(), now)
     }
 
-    fn counted_records(&self) -> Vec<&Record> {
+    fn counted_records(&self) -> Vec<&ActorRecord> {
         self.records.counted(|record| {
             record.state != RecordState::Ended
                 && Liveness::UnlessGone.runs(record.process, &self.processes)
@@ -276,109 +284,6 @@ impl PoolState {
             .collect();
         found != known
     }
-
-    /// The document of the current state, generated at `now`.
-    #[must_use]
-    pub fn document(&self, now: Timestamp) -> Document {
-        let paths: Vec<PathBuf> = self
-            .worktrees
-            .iter()
-            .map(|tracked| tracked.comparable.clone())
-            .collect();
-        let records = self.counted_records();
-        let in_pool: Vec<&Record> = records
-            .iter()
-            .filter(|record| self.worktrees.iter().any(|t| t.holds(&record.worktree)))
-            .copied()
-            .collect();
-        let superseded = agents::superseded(&in_pool);
-        let shown: Vec<&Record> = in_pool
-            .iter()
-            .filter(|record| !superseded.contains(record.key.split('.').next().unwrap_or_default()))
-            .copied()
-            .collect();
-        let heavy = self.jobs.heavy();
-        let job_records = self.jobs.records();
-        let table = HeavyTable::new(
-            &self.processes,
-            &heavy,
-            &self.jobs.build_suggestions(&heavy),
-            &job_records,
-        );
-        let harnesses = Harnesses::new(&shown);
-        let owners: Vec<Option<String>> = job_records
-            .iter()
-            .map(|job| harnesses.actor_of(job.pid, &job.summary, &table))
-            .collect();
-        let build_list = build_processes(&table, &owners);
-        let builds = builds_by_worktree(&build_list, &paths);
-        let building = |path: &Path, key: &str| {
-            self.worktrees.iter().zip(&builds).any(|(tracked, builds)| {
-                tracked.holds(path)
-                    && builds
-                        .iter()
-                        .any(|build| build.owner.is_none_or(|owner| owner == key))
-            })
-        };
-        let below = builds_below(&self.processes, &build_list);
-        let actor_jobs = jobs::actor_jobs(&job_records, &owners);
-        let context = Context {
-            now,
-            processes: &self.processes,
-            records: &records,
-            building: &building,
-            superseded: &superseded,
-            builds_below: &below,
-            jobs: &actor_jobs,
-        };
-        let worktrees = self
-            .worktrees
-            .iter()
-            .zip(&builds)
-            .map(|(tracked, builds)| {
-                let placed: Vec<&Record> = records
-                    .iter()
-                    .filter(|record| tracked.holds(&record.worktree))
-                    .copied()
-                    .collect();
-                let builds = builds.iter().map(|build| builds::shown(build)).collect();
-                tracked.status(&self.config, builds, &placed, &context)
-            })
-            .collect();
-        let folders = PoolFolders(
-            self.worktrees
-                .iter()
-                .map(|tracked| {
-                    let path = tracked.worktree.path().to_string_lossy().into_owned();
-                    (path, tracked.comparable.clone())
-                })
-                .collect(),
-        );
-        let facts = JobsFacts {
-            heavy: &heavy,
-            table: &table,
-            owners: &owners,
-            harnesses: &harnesses,
-            folders: &folders,
-            now,
-        };
-        Document {
-            kind: DocumentKind::Status,
-            version: DocumentVersion,
-            generated: now,
-            machine: Machine {
-                name: self.machine.clone(),
-                jobs: jobs::jobs_document(&self.jobs, &facts),
-            },
-            pools: vec![PoolStatus {
-                common_dir: self.common.to_string_lossy().into_owned(),
-                agents: self.agents,
-                skipped_records: self.records.skipped(),
-                worktrees,
-                repository: self.repository.clone(),
-            }],
-        }
-    }
 }
 
 impl Tracked {
@@ -387,64 +292,14 @@ impl Tracked {
         path == self.worktree.path().as_path() || path == self.comparable
     }
 
-    fn status(
-        &self,
-        config: &Config,
-        builds: Vec<Build>,
-        placed: &[&Record],
-        context: &Context<'_>,
-    ) -> WorktreeStatus {
-        let worktree = &self.worktree;
-        let role = config.role_of(worktree);
-        let missing = self.facts.is_none();
-        let head = worktree.head();
-        let git = facts::git_status(head, self.facts.as_ref());
-        let reasons = facts::reasons(role, missing, head, &git);
-        let free = reasons.is_empty();
-        let mut actors: Vec<Actor> = placed
-            .iter()
-            .filter_map(|record| agents::actor(record, context))
-            .collect();
-        agents::sort(&mut actors);
-        let has = |state: ActorState| actors.iter().any(|actor| actor.state == state);
-        let busy = Busy {
-            waiting: has(ActorState::Waiting),
-            working: has(ActorState::Working),
-            building: !builds.is_empty(),
-            idle: has(ActorState::Idle) || has(ActorState::Quiet),
-        };
-        let activity = facts::activity(role, missing, head, &git, free, busy);
-        WorktreeStatus {
-            path: worktree.path().to_string_lossy().into_owned(),
-            name: worktree.name(),
-            role,
-            missing,
-            branch: match head {
-                Head::Branch(branch) => Some(branch.clone()),
-                Head::Detached | Head::Unknown => None,
-            },
-            upstream: self
-                .facts
-                .as_ref()
-                .and_then(|facts| facts.refs.upstream.as_ref())
-                .map(|tracking| tracking.name.clone()),
-            git,
-            free,
-            reasons,
-            activity,
-            actors,
-            builds,
-            last_event: placed
-                .iter()
-                .map(|record| &record.updated)
-                .max_by_key(|updated| updated.at())
-                .cloned(),
-            last_change: self.last_change,
-        }
+    /// Reads the git facts and the time of the last change again.
+    fn read_facts(&mut self) {
+        self.facts = (!self.worktree.is_gone()).then(|| Facts::read(&self.worktree));
+        self.last_change = self.git_dir.as_deref().and_then(last_change);
     }
 }
 
-fn track_all(listed: Vec<Worktree>, common: &Path) -> Vec<Tracked> {
+fn track_all(listed: Vec<Worktree>, common: &Path, reach: Reach) -> Vec<Tracked> {
     let linked = linked_git_dirs(common);
     thread::scope(|scope| {
         let readers: Vec<_> = listed
@@ -458,12 +313,18 @@ fn track_all(listed: Vec<Worktree>, common: &Path) -> Vec<Tracked> {
                 } else {
                     linked.get(&comparable).cloned()
                 };
-                scope.spawn(move || Tracked {
-                    facts: read_facts(&worktree),
-                    last_change: git_dir.as_deref().and_then(last_change),
-                    worktree,
-                    comparable,
-                    git_dir,
+                scope.spawn(move || {
+                    let mut tracked = Tracked {
+                        worktree,
+                        comparable,
+                        git_dir,
+                        facts: None,
+                        last_change: None,
+                    };
+                    if reach == Reach::Everything {
+                        tracked.read_facts();
+                    }
+                    tracked
                 })
             })
             .collect();
@@ -472,10 +333,6 @@ fn track_all(listed: Vec<Worktree>, common: &Path) -> Vec<Tracked> {
             .filter_map(|reader| reader.join().ok())
             .collect()
     })
-}
-
-fn read_facts(worktree: &Worktree) -> Option<Facts> {
-    (!worktree.is_gone()).then(|| Facts::read(worktree))
 }
 
 fn agents_of(records: &Records) -> Agents {

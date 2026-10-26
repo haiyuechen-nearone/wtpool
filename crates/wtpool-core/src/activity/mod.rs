@@ -1,12 +1,13 @@
 //! The activity records in `<git-common-dir>/wtpool-activity/` that `wtpool hook` writes and
 //! `wtpool status` reads: their folder and files, the [`ActorKey`] each file is named after, the
-//! ids an adapter checks and the values a record holds.
+//! ids an adapter checks, the values a record holds and the [`text`] it stores.
 
 mod files;
 mod harness;
 mod ids;
 mod key;
 mod legacy;
+pub mod text;
 mod values;
 
 pub use files::{

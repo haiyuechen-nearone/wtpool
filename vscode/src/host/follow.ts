@@ -3,8 +3,16 @@ import * as vscode from 'vscode';
 
 import { plain } from '../shared/invisible';
 import { systemClock, type Cancel, type Clock } from './clock';
-import { POLL_MS } from './outputs';
-import { expandTabs, keepColours, openOutput, readError, readLastBytes, tailLines, type LastBytes } from './tail';
+import {
+  expandTabs,
+  keepColours,
+  openOutput,
+  POLL_MS,
+  readError,
+  readLastBytes,
+  tailLines,
+  type LastBytes,
+} from './tail';
 
 /** The number of lines a Follow terminal starts with, and shows again after it skips ahead. */
 const FOLLOW_LINES = 40;
@@ -18,7 +26,9 @@ function followName(label: string, summary: string): string {
   return `${plain(label)} · ${plain(summary) || 'background task'}`;
 }
 
-/** Streams the output file at `path` into a terminal, from its last {@link FOLLOW_LINES} lines on. */
+/**
+ * Streams the output file at `path` into a terminal, from its last {@link FOLLOW_LINES} lines on.
+ */
 class FollowTerminal implements vscode.Pseudoterminal {
   private readonly written = new vscode.EventEmitter<string>();
   readonly onDidWrite = this.written.event;
@@ -155,7 +165,8 @@ class FollowTerminal implements vscode.Pseudoterminal {
       const { bytesRead } = await file.read(buffer, 0, gain, this.offset);
       this.offset += bytesRead;
       this.tickLeft -= bytesRead;
-      this.write(this.terminalText(this.decoder.decode(buffer.subarray(0, bytesRead), { stream: true })));
+      const text = this.decoder.decode(buffer.subarray(0, bytesRead), { stream: true });
+      this.write(this.terminalText(text));
     } finally {
       await file.close();
     }
@@ -164,14 +175,20 @@ class FollowTerminal implements vscode.Pseudoterminal {
   private async skip(): Promise<void> {
     const last = await readLastBytes(this.path);
     this.tickLeft -= last.end - last.start;
-    this.write(`\r\nwtpool: the output grows faster than Follow shows it; skipped to its last ${FOLLOW_LINES} lines\r\n`);
+    this.write(
+      '\r\nwtpool: the output grows faster than Follow shows it; ' +
+        `skipped to its last ${FOLLOW_LINES} lines\r\n`,
+    );
     this.writeLast(last);
   }
 }
 
 /** Opens and shows a Follow terminal for the output at `path`. */
 export function follow(path: string, label: string, summary: string): vscode.Terminal {
-  const terminal = vscode.window.createTerminal({ name: followName(label, summary), pty: new FollowTerminal(path) });
+  const terminal = vscode.window.createTerminal({
+    name: followName(label, summary),
+    pty: new FollowTerminal(path),
+  });
   terminal.show();
   return terminal;
 }

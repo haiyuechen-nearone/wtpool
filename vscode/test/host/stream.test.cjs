@@ -266,10 +266,11 @@ describe('stream', () => {
     assert.ok(Number.isFinite(Date.parse(atOnce.last_line)), `the starting view has no last_line: ${JSON.stringify(atOnce)}`);
     assert.ok(started, 'wtpool did not start');
     assert.ok(live, 'the first document of the slow start never reached the webview');
-    assert.deepEqual(
-      views.slice(0, views.indexOf(live)).map((v) => v.connection),
-      ['starting'],
-      '20 s without a first line posted more than the starting view',
+    // The tab posts the starting view, and its page asks for it once more when it starts.
+    const beforeLive = views.slice(0, views.indexOf(live)).map((v) => v.connection);
+    assert.ok(
+      beforeLive.length <= 2 && beforeLive.every((connection) => connection === 'starting'),
+      `20 s without a first line posted more than the starting view: ${JSON.stringify(beforeLive)}`,
     );
     assert.equal(starts().length, 1, 'a slow start restarted the stream');
   });

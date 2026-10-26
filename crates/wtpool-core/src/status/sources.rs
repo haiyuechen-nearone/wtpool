@@ -1,6 +1,7 @@
 //! [`Sources`]: where `wtpool status` reads the time, the process table, the machine's name,
 //! this user's heavy jobs and the name of the repository on its forge.
 
+use std::ffi::OsString;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
@@ -13,12 +14,7 @@ use crate::processes::{self, ProcessTable, SystemProcesses};
 pub struct Sources<C = Clock, P = ProcessTable> {
     pub clock: C,
     pub processes: P,
-    /// The host name, `localhost` when the system does not tell it.
-    pub machine: String,
-    /// `None` without a folder for this user's job settings.
-    pub jobs: Option<JobPaths>,
-    /// The cores the default limit of heavy jobs is a quarter of.
-    pub cores: usize,
+    pub host: Host,
     /// The repository a remote's URL names on the forge, as
     /// [`Forge::repository`](crate::Forge::repository) reads it.
     pub forge_repository: fn(&str) -> Option<String>,
@@ -27,35 +23,41 @@ pub struct Sources<C = Clock, P = ProcessTable> {
 /// The machine a document describes, and where this user's heavy jobs are on it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Host {
+    /// The host name, `localhost` when the system does not tell it.
     pub name: String,
+    /// `None` without a folder for this user's job settings.
     pub jobs: Option<JobPaths>,
+    /// The cores the default limit of heavy jobs is a quarter of.
     pub cores: usize,
 }
 
-impl<C, P> Sources<C, P> {
+impl Host {
+    /// The system's host name and cores, and the job settings of the user `var`'s environment
+    /// names.
     #[must_use]
-    pub fn host(&self) -> Host {
-        Host {
-            name: self.machine.clone(),
-            jobs: self.jobs.clone(),
-            cores: self.cores,
+    pub fn system(var: impl Fn(&str) -> Option<OsString>) -> Self {
+        Self {
+            name: processes::host_name()
+                .filter(|name| !name.is_empty())
+                .unwrap_or_else(|| "localhost".to_owned()),
+            jobs: JobPaths::from_env(var).ok(),
+            cores: std::thread::available_parallelism().map_or(1, NonZeroUsize::get),
         }
     }
 }
 
 impl Sources {
-    /// The system clock, process table, host name and cores, the job settings of the user this
-    /// process's environment names, and the forge's names of `forge_repository`.
+    /// The system clock and process table, the [`Host::system`] of `var`, and the forge's names
+    /// of `forge_repository`.
     #[must_use]
-    pub fn system(forge_repository: fn(&str) -> Option<String>) -> Self {
+    pub fn system(
+        var: impl Fn(&str) -> Option<OsString>,
+        forge_repository: fn(&str) -> Option<String>,
+    ) -> Self {
         Self {
             clock: Clock::System(SystemClock),
             processes: ProcessTable::System(SystemProcesses),
-            machine: processes::host_name()
-                .filter(|name| !name.is_empty())
-                .unwrap_or_else(|| "localhost".to_owned()),
-            jobs: JobPaths::from_env(|name| std::env::var_os(name)).ok(),
-            cores: std::thread::available_parallelism().map_or(1, NonZeroUsize::get),
+            host: Host::system(var),
             forge_repository,
         }
     }
@@ -66,12 +68,13 @@ impl Sources {
     pub fn from_files(
         clock: Option<PathBuf>,
         processes: Option<PathBuf>,
+        var: impl Fn(&str) -> Option<OsString>,
         forge_repository: fn(&str) -> Option<String>,
     ) -> Self {
         Self {
             clock: Clock::from_file(clock),
             processes: ProcessTable::from_file(processes),
-            ..Self::system(forge_repository)
+            ..Self::system(var, forge_repository)
         }
     }
 }
@@ -95,10 +98,13 @@ mod tests {
         .unwrap();
         let before = SystemClock.now();
         let query = ProcessQuery::all().with_name().with_cwd();
+        let unset = |_: &str| None;
 
         // When
-        let files = Sources::from_files(Some(clock), Some(processes), |url| Some(url.to_owned()));
-        let system = Sources::from_files(None, None, |_| None);
+        let files = Sources::from_files(Some(clock), Some(processes), unset, |url| {
+            Some(url.to_owned())
+        });
+        let system = Sources::from_files(None, None, unset, |_| None);
 
         // Then
         assert_eq!(files.clock.now(), Timestamp::from_seconds(1_792_497_600));
@@ -106,16 +112,28 @@ mod tests {
         assert!(system.clock.now() >= before);
         let pid = std::process::id();
         assert!(system.processes.list(&query).iter().any(|p| p.pid == pid));
-        let host = processes::host_name().filter(|name| !name.is_empty());
-        assert_eq!(
-            files.machine,
-            host.unwrap_or_else(|| "localhost".to_owned())
-        );
-        assert_eq!(system.machine, files.machine);
+        assert_eq!(system.host, files.host);
         assert_eq!(
             (files.forge_repository)("acme/app").as_deref(),
             Some("acme/app")
         );
         assert_eq!((system.forge_repository)("acme/app"), None);
+    }
+
+    #[test]
+    fn host_system__should_read_the_job_settings_from_var() {
+        // Given
+        let home = std::env::temp_dir().join("home");
+        let var = |name: &str| (name == "HOME").then(|| home.clone().into_os_string());
+
+        // When
+        let host = Host::system(var);
+
+        // Then
+        let name = processes::host_name().filter(|name| !name.is_empty());
+        assert_eq!(host.name, name.unwrap_or_else(|| "localhost".to_owned()));
+        assert_eq!(host.jobs, JobPaths::from_env(var).ok());
+        assert!(host.jobs.is_some_and(|jobs| jobs.config.starts_with(&home)));
+        assert!(host.cores >= 1);
     }
 }

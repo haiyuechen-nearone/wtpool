@@ -8,8 +8,13 @@ function fileNames(name: string): string[] {
   if (process.platform !== 'win32') {
     return [name];
   }
-  const extensions = (process.env.PATHEXT ?? DEFAULT_PATHEXT).split(';').filter((extension) => extension !== '');
-  return [...(path.extname(name) === '' ? [] : [name]), ...extensions.map((extension) => `${name}${extension}`)];
+  const extensions = (process.env.PATHEXT ?? DEFAULT_PATHEXT)
+    .split(';')
+    .filter((extension) => extension !== '');
+  return [
+    ...(path.extname(name) === '' ? [] : [name]),
+    ...extensions.map((extension) => `${name}${extension}`),
+  ];
 }
 
 function isRunnable(file: string): boolean {

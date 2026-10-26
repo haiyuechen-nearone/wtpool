@@ -8,46 +8,11 @@ use std::time::{Duration, Instant};
 use rstest::rstest;
 use serde_json::Value;
 
-use crate::support::jobs::{Job, JobSpec, SETTLE, describe, job_records, must_job_ls_json, wtpool};
+use crate::support::jobs::{
+    HANDOVER, Job, JobSpec, SETTLE, describe, job_records, limit_config, must_job_ls_json,
+    must_start, must_wait, wtpool,
+};
 use crate::support::{Sandbox, must_wtpool_bin, set_executable};
-
-/// The machine config with `limit` and no heavy pattern.
-pub(super) fn limit_config(limit: u32) -> String {
-    format!("[jobs]\nlimit = {limit}\n")
-}
-
-/// The longest wait from a freed place to the next start: the first in line checks every 250 ms,
-/// plus the start of a process.
-pub(super) const HANDOVER: Duration = Duration::from_millis(1500);
-
-/// The probe's start mark once `job`'s command ran, else an assertion naming `what`.
-pub(super) fn must_start(job: &Job, what: &str) -> Value {
-    job.wait_start(SETTLE).unwrap_or_else(|| {
-        panic!(
-            "{what}: the command of wtpool job never ran within {SETTLE:?}; stderr {:?}",
-            job.stderr()
-        )
-    })
-}
-
-/// `job`'s record once it waits, its command not run, else an assertion naming `what`.
-pub(super) fn must_wait(job: &Job, sandbox: &Sandbox, what: &str) -> Value {
-    let record = job
-        .wait_record(sandbox, "waiting", SETTLE)
-        .unwrap_or_else(|| {
-            panic!(
-                "{what}: no record of pid {} in state waiting within {SETTLE:?}; the job folder holds {:?}; stderr {:?}",
-                job.pid(),
-                job_records(sandbox),
-                job.stderr()
-            )
-        });
-    assert!(
-        job.start_mark().is_none(),
-        "{what}: the command ran although the job waits: {record}"
-    );
-    record
-}
 
 /// The exit code `job` ends with once its command was let go, for a message.
 fn must_finish(job: &mut Job, what: &str) -> Option<i32> {

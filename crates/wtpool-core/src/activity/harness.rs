@@ -18,6 +18,22 @@ pub enum Harness {
 pub struct UnknownHarness(pub String);
 
 impl Harness {
+    pub const ALL: [Self; 1] = [Self::ClaudeCode];
+
+    /// The length of the longest [`Harness::stem_prefix`].
+    pub(super) const LONGEST_STEM_PREFIX: usize = {
+        let mut longest = 0;
+        let mut rest: &[Self] = &Self::ALL;
+        while let [harness, others @ ..] = rest {
+            let length = harness.stem_prefix().len();
+            if length > longest {
+                longest = length;
+            }
+            rest = others;
+        }
+        longest
+    };
+
     /// The name records and documents carry.
     #[must_use]
     pub fn name(self) -> &'static str {
@@ -29,7 +45,7 @@ impl Harness {
     /// The prefix of the file stem of each of the harness's records: none for Claude Code,
     /// `<harness>-` for every other harness, so two harnesses never share a file.
     #[must_use]
-    pub(super) fn stem_prefix(self) -> &'static str {
+    pub(super) const fn stem_prefix(self) -> &'static str {
         match self {
             Self::ClaudeCode => "",
         }

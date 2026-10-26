@@ -7,15 +7,15 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use super::hook_policy::{decision, machine, policy};
 use crate::support::hook::{Hooks, event, with};
+use crate::support::jobs::policy::{decision, machine, policy};
 
-/// Why a wait loop that runs `pgrep -f` or `pkill -f` is refused.
+/// The reason a wait loop that runs `pgrep -f` or `pkill -f` is refused.
 const MATCHES_ITSELF: &str = "pgrep -f and pkill -f in this wait loop also match the loop's own \
                               shell, whose command line holds the pattern, so they always find a \
                               process.";
 
-/// Why a background wait loop without a time limit is refused.
+/// The reason a background wait loop without a time limit is refused.
 const NO_TIME_LIMIT: &str = "this background wait loop has no time limit, so it can outlive its \
                              agent and keep its worktree working, where wtpool free and fg refuse.";
 
@@ -88,7 +88,7 @@ fn wait_call(hooks: &Hooks, tool: &str, command: &str, cwd: &Path, background: V
     )
 }
 
-/// What the policy printed for each case against what it had to print.
+/// The policy's output for each case against the output it had to print.
 struct Said {
     what: String,
     found: Result<Option<String>, String>,

@@ -2,10 +2,8 @@
 //! into `free`, `reasons` and `activity`.
 
 use super::document::{Activity, GitStatus, OperationName, Reason};
-use crate::git::Git;
-use crate::resolve::{self, Divergence};
 use crate::worktree::{Head, Worktree};
-use crate::worktree_state::{Operation, Role, Uncommitted, Unreferenced, Upstream};
+use crate::worktree_state::{Operation, Role, Tracking, Uncommitted, Unreferenced, Upstream};
 
 /// The git facts of a worktree whose folder exists.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,13 +24,6 @@ pub struct LocalFacts {
 pub struct RefFacts {
     pub unreferenced: Unreferenced,
     pub upstream: Option<Tracking>,
-}
-
-/// The upstream of a branch and the branch's ahead and behind counts.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Tracking {
-    pub name: String,
-    pub counts: Upstream,
 }
 
 impl Facts {
@@ -60,22 +51,11 @@ impl RefFacts {
         Self {
             unreferenced: worktree.unreferenced(&git).unwrap_or(Unreferenced::Unknown),
             upstream: match worktree.head() {
-                Head::Branch(_) => tracking(&git),
+                Head::Branch(_) => worktree.upstream().ok().flatten(),
                 Head::Detached | Head::Unknown => None,
             },
         }
     }
-}
-
-/// The upstream of the branch checked out in `git`'s worktree, `None` without one.
-fn tracking(git: &Git) -> Option<Tracking> {
-    let ran = git.run(["rev-parse", "--abbrev-ref", "@{upstream}"]).ok()?;
-    let name = ran.line().filter(|name| !name.is_empty())?.to_owned();
-    let counts = match resolve::left_right(git, &format!("HEAD...{name}")) {
-        Ok(Some(Divergence { ahead, behind })) => Upstream::Counted { ahead, behind },
-        Ok(None) | Err(_) => Upstream::Unknown,
-    };
-    Some(Tracking { name, counts })
 }
 
 /// The `git` object of the document. A worktree without facts has a missing folder.

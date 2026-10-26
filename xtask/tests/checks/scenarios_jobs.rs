@@ -1,5 +1,5 @@
-//! The job steps of the scenario catalog in the `int` layer: real `wtpool job` runs in the
-//! sandbox, their processes in the fake process table, and `machine.jobs` of the expected
+//! The job steps of the scenarios of verify/scenarios in the `int` layer: real `wtpool job` runs
+//! in the sandbox, their processes in the fake process table, and `machine.jobs` of the expected
 //! documents, with `{job:<name>}` and `{config}` resolved.
 
 use std::collections::BTreeMap;
@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 use xtask::scenario::{JobAwait, JobStart};
 
 use crate::support::hook::{CLAUDE_STARTED, Hooks, Proc};
-use crate::support::jobs::{Job, JobSpec, SETTLE};
+use crate::support::jobs::{Job, JobSpec, SETTLE, is_time};
 
 /// The jobs a scenario started, by the step's name for each.
 #[derive(Default)]
@@ -169,15 +169,6 @@ fn walk_strings(value: &mut Value, replace: &impl Fn(&str) -> String) {
             .for_each(|item| walk_strings(item, replace)),
         _ => {}
     }
-}
-
-fn is_time(value: &Value) -> bool {
-    value.as_str().is_some_and(|text| {
-        text.len() >= 20
-            && text.ends_with('Z')
-            && text.get(4..5) == Some("-")
-            && text.get(10..11) == Some("T")
-    })
 }
 
 /// The compared part of one job or process of `machine.jobs`: every field, but `since` only has

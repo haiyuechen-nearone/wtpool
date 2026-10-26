@@ -7,9 +7,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Output, Stdio};
 
-use super::jobs_config::{jobs_table, mode_of, must_lone_pool, names_path, set_mode, stderr_of};
-use super::jobs_settings::{file, job, refused, strings, succeeded, table};
 use crate::support::jobs::describe;
+use crate::support::jobs::settings::{
+    file, job, jobs_table, mode_of, must_lone_pool, names_path, refused, set_mode, stderr_of,
+    strings, succeeded, table,
+};
 use crate::support::{Sandbox, must_symlink, must_wtpool_bin};
 
 /// Starts `wtpool job <args>` once per item of `patterns` at the same time and waits for each.

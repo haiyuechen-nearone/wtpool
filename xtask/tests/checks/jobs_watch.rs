@@ -7,8 +7,8 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
-use super::jobs_status::add_to_repository;
 use super::watch::{MISSED_CHANGE, must_setup};
+use crate::support::jobs::settings::add_to_repository;
 use crate::support::jobs::{JobSpec, SETTLE, jobs_of};
 
 /// The longest time a change of the job folder or of `machine.toml` takes to show.

@@ -1,9 +1,10 @@
-//! The ids of a hook input, checked against their patterns before any use. An id names a record
-//! file or a task's output file, so only a checked id reaches a path.
+//! The ids of a hook input and of the records it writes, checked against their patterns before
+//! any use. An id names a record file or a task's output file, so only a checked id reaches a
+//! path.
 
 use std::fmt;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize, Serializer};
 
 /// An id that does not match its pattern.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -30,9 +31,18 @@ macro_rules! id_type {
         pub struct $name(String);
 
         impl $name {
+            /// The longest id the pattern allows.
+            pub const MAX_LEN: usize = $max_len;
+
             #[must_use]
             pub fn as_str(&self) -> &str {
                 &self.0
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.serialize_str(&self.0)
             }
         }
 
@@ -40,7 +50,7 @@ macro_rules! id_type {
             type Error = InvalidId;
 
             fn try_from(id: String) -> Result<Self, InvalidId> {
-                if is_valid(&id, $max_len, $allow_underscore) {
+                if is_valid(&id, Self::MAX_LEN, $allow_underscore) {
                     Ok(Self(id))
                 } else {
                     Err(InvalidId {
@@ -131,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn ids__should_read_only_a_valid_string_and_keep_it() {
+    fn ids__should_read_only_a_valid_string_and_write_it_back() {
         // When
         let read: Result<ActorId, _> = serde_json::from_str(r#""s1""#);
         let invalid = serde_json::from_str::<ActorId>(r#""../x""#);
@@ -140,6 +150,7 @@ mod tests {
         // Then
         let read = read.unwrap();
         assert_eq!((read.as_str(), read.to_string()), ("s1", "s1".to_owned()));
+        assert_eq!(serde_json::to_string(&read).unwrap(), r#""s1""#);
         assert!(invalid.is_err());
         assert_eq!(
             error,

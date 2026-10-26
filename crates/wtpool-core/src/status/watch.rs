@@ -152,15 +152,14 @@ pub fn watch<C: ReadClock, P: ListProcesses>(
     let (sender, messages) = std::sync::mpsc::channel();
     let clock = sources.clock.file().map(Path::to_path_buf);
     let watcher = start_watcher(&common, clock.as_deref(), sender.clone())?;
-    let mut folders = JobFolders::new(watcher, sources.jobs.as_ref());
+    let mut folders = JobFolders::new(watcher, sources.host.jobs.as_ref());
     folders.watch_new();
     std::thread::spawn(move || read_to_end(input, &sender));
     let watched = Watched {
         roots: vec![comparable(&common), common.clone()],
         clock: clock.as_deref().map(comparable),
     };
-    let (processes, forge) = (&sources.processes, sources.forge_repository);
-    let state = PoolState::load(config, common, processes, sources.host(), forge)?;
+    let state = PoolState::load(config, common, sources)?;
     let mut live = Live::new(state, sources).with_folders(folders);
     run(&mut live, &messages, output, &watched, TIMING, &SystemTimer);
     Ok(())

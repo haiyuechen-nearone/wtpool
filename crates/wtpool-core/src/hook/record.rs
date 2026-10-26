@@ -6,8 +6,10 @@ use std::io;
 use serde::{Deserialize, Serialize};
 
 use crate::activity::{
-    CallKind, Harness, MAX_RECORD_BYTES, PlacedBy, RECORD_VERSION, State, WaitReason, legacy_kind,
+    ActorId, CallId, CallKind, Harness, MAX_RECORD_BYTES, PlacedBy, RECORD_VERSION, State, TaskId,
+    WaitReason, legacy_kind,
 };
+use crate::clock::Timestamp;
 
 /// Calls in flight a record keeps.
 pub const MAX_IN_FLIGHT: usize = 32;
@@ -23,8 +25,8 @@ pub struct Record {
     /// The harness whose hooks write the record.
     #[serde(default)]
     pub harness: Harness,
-    pub session_id: String,
-    pub agent_id: Option<String>,
+    pub session_id: ActorId,
+    pub agent_id: Option<ActorId>,
     pub agent_type: Option<String>,
     pub label: String,
     pub worktree: String,
@@ -35,10 +37,10 @@ pub struct Record {
     #[serde(default)]
     pub in_flight: Vec<Call>,
     #[serde(default)]
-    pub done_ids: Vec<String>,
+    pub done_ids: Vec<CallId>,
     pub error: Option<String>,
-    pub since: String,
-    pub updated: String,
+    pub since: Timestamp,
+    pub updated: Timestamp,
     /// The start time of the hook process that wrote `state`, in microseconds.
     pub writer_started: i64,
     pub process: Option<HarnessProcess>,
@@ -82,7 +84,7 @@ pub enum TitleBy {
 /// The title of a subagent, kept in its session's record.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SubagentTitle {
-    pub agent_id: String,
+    pub agent_id: ActorId,
     pub title: String,
 }
 
@@ -90,18 +92,18 @@ pub struct SubagentTitle {
 /// record never holds output. `summary` is the target of the call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {
-    pub id: String,
+    pub id: TaskId,
     pub path: String,
     pub summary: String,
-    pub started: String,
+    pub started: Timestamp,
     /// `None` while it runs.
-    pub ended: Option<String>,
+    pub ended: Option<Timestamp>,
 }
 
 /// A call that ended.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ended {
-    pub id: String,
+    pub id: CallId,
     pub tool: String,
     /// `None` only in a record an older wtpool wrote, until [`Record::from_json`] maps its tool.
     #[serde(default)]
@@ -119,7 +121,7 @@ pub struct Wait {
     #[serde(rename = "match")]
     pub input_hash: Option<String>,
     /// The id of the call it is bound to, once known.
-    pub call: Option<String>,
+    pub call: Option<CallId>,
 }
 
 impl Wait {
@@ -143,14 +145,14 @@ impl Wait {
         tool: &str,
         target: &str,
         input_hash: Option<&str>,
-        id: Option<&str>,
+        id: Option<&CallId>,
     ) -> Self {
         Self {
             reason,
             tool: Some(tool.to_owned()),
             target: Some(target.to_owned()),
             input_hash: input_hash.map(str::to_owned),
-            call: id.map(str::to_owned),
+            call: id.cloned(),
         }
     }
 }
@@ -164,13 +166,13 @@ pub struct Action {
 /// A call in flight, with its input hash so a later permission request can bind a wait to it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Call {
-    pub id: String,
+    pub id: CallId,
     pub tool: String,
     /// `None` only in a record an older wtpool wrote, until [`Record::from_json`] maps its tool.
     #[serde(default)]
     pub kind: Option<CallKind>,
     pub target: String,
-    pub since: String,
+    pub since: Timestamp,
     #[serde(rename = "match", default)]
     pub input_hash: Option<String>,
 }
@@ -205,8 +207,9 @@ impl Record {
         }
     }
 
-    /// The record in `bytes`, if it parses and has version [`RECORD_VERSION`]. A call an older
-    /// wtpool wrote without a kind gets the kind [`legacy_kind`] gives its tool.
+    /// The record in `bytes`, if it parses, with ids that match their patterns and RFC 3339 times,
+    /// and has version [`RECORD_VERSION`]. A call an older wtpool wrote without a kind gets the
+    /// kind [`legacy_kind`] gives its tool.
     #[must_use]
     pub fn from_json(bytes: &[u8]) -> Option<Self> {
         let mut record: Self = serde_json::from_slice(bytes).ok()?;
@@ -249,6 +252,10 @@ mod tests {
     use super::*;
     use crate::hook::fixture;
 
+    fn call_id(id: &str) -> CallId {
+        CallId::try_from(id).unwrap()
+    }
+
     #[test]
     fn to_json__should_round_trip() {
         // Given
@@ -259,7 +266,7 @@ mod tests {
         });
         record.transcript_offset = 4096;
         record.subagents = vec![SubagentTitle {
-            agent_id: "a1".to_owned(),
+            agent_id: ActorId::try_from("a1").unwrap(),
             title: "Find the tests".to_owned(),
         }];
         record.waiting = Some(Wait {
@@ -279,11 +286,11 @@ mod tests {
 
     fn call(id: &str) -> Call {
         Call {
-            id: id.to_owned(),
+            id: call_id(id),
             tool: "Read".to_owned(),
             kind: Some(CallKind::Other),
             target: "t".repeat(80),
-            since: "2026-10-20T12:00:00Z".to_owned(),
+            since: fixture::NOW,
             input_hash: Some("h".repeat(64)),
         }
     }
@@ -298,7 +305,7 @@ mod tests {
     ) {
         // Given
         let mut record = fixture::record("s1");
-        record.done_ids = (0..done).map(|n| format!("{n:0>128}")).collect();
+        record.done_ids = (0..done).map(|n| call_id(&format!("{n:0>128}"))).collect();
         record.in_flight = (0..calls).map(|n| call(&format!("{n:0>128}"))).collect();
 
         // When
@@ -315,7 +322,7 @@ mod tests {
     fn to_json__should_write_a_record_that_fits_as_it_is() {
         // Given
         let mut record = fixture::record("s1");
-        record.done_ids = (0..64).map(|n| format!("toolu_{n:02}")).collect();
+        record.done_ids = (0..64).map(|n| call_id(&format!("toolu_{n:02}"))).collect();
 
         // When
         let text = record.to_json().unwrap();
@@ -329,7 +336,7 @@ mod tests {
         // Given
         let mut record = fixture::record("s1");
         record.first_cwd = Some(format!("/p/fg/{}", "d".repeat(MAX_RECORD_BYTES)));
-        record.done_ids = vec!["toolu_1".to_owned()];
+        record.done_ids = vec![call_id("toolu_1")];
         record.in_flight = vec![call("toolu_2")];
 
         // When
@@ -346,7 +353,7 @@ mod tests {
         record.in_flight = (0..3).map(|n| call(&format!("toolu_c{n}"))).collect();
         let without_ids = serde_json::to_vec(&record).unwrap().len();
         record.first_cwd = Some("d".repeat(MAX_RECORD_BYTES - without_ids - 100));
-        record.done_ids = (0..64).map(|n| format!("toolu_{n:02}")).collect();
+        record.done_ids = (0..64).map(|n| call_id(&format!("toolu_{n:02}"))).collect();
 
         // When
         let parsed = Record::from_json(&record.to_json().unwrap()).unwrap();
@@ -376,11 +383,11 @@ mod tests {
         // Given
         let mut record = fixture::record("s1");
         let call = |id: &str, tool: &str, kind: Option<CallKind>| Call {
-            id: id.to_owned(),
+            id: call_id(id),
             tool: tool.to_owned(),
             kind,
             target: String::new(),
-            since: record.since.clone(),
+            since: record.since,
             input_hash: None,
         };
         record.in_flight = vec![
@@ -389,7 +396,7 @@ mod tests {
             call("c3", "Bash", Some(CallKind::Other)),
         ];
         record.ended = Some(Ended {
-            id: "c0".to_owned(),
+            id: call_id("c0"),
             tool: "Agent".to_owned(),
             kind: None,
         });
@@ -427,6 +434,57 @@ mod tests {
         let text = String::from_utf8(fixture::record("s1").to_json().unwrap())
             .unwrap()
             .replace(r#""version":1"#, change);
+
+        // When
+        let parsed = Record::from_json(text.as_bytes());
+
+        // Then
+        assert_eq!(parsed, None);
+    }
+
+    /// A record as a hook writes it, with every id and time field set.
+    const WRITTEN: &str = concat!(
+        r#"{"version":1,"harness":"claude-code","session_id":"s1","agent_id":"a1","#,
+        r#""agent_type":"Explore","label":"Find","worktree":"/p/fg","placed_by":"cwd","#,
+        r#""state":"waiting","waiting":{"reason":"permission","tool":"Bash","target":"git","#,
+        r#""match":"h1","call":"toolu_2"},"action":{"tool":"Bash","target":"git"},"#,
+        r#""in_flight":[{"id":"toolu_2","tool":"Bash","kind":"shell","target":"git","#,
+        r#""since":"2026-10-20T12:00:01Z","match":"h1"}],"done_ids":["toolu_1"],"error":null,"#,
+        r#""since":"2026-10-20T12:00:02Z","updated":"2026-10-20T12:00:03Z","writer_started":7,"#,
+        r#""process":{"pid":7001,"started":"2026-10-20T11:00:00Z"},"first_cwd":"/p/fg","#,
+        r#""ended":{"id":"toolu_1","tool":"Read","kind":"other"},"title":null,"#,
+        r#""transcript_offset":0,"subagents":[{"agent_id":"a2","title":"Test"}],"#,
+        r#""tasks":[{"id":"b1","path":"/tmp/b1.output","summary":"cargo build","#,
+        r#""started":"2026-10-20T12:00:00Z","ended":"2026-10-20T12:00:04Z"}]}"#,
+    );
+
+    #[test]
+    fn to_json__should_write_back_the_bytes_a_hook_wrote() {
+        // Given
+        let record = Record::from_json(WRITTEN.as_bytes()).unwrap();
+
+        // When
+        let text = record.to_json().unwrap();
+
+        // Then
+        assert_eq!(String::from_utf8(text).unwrap(), WRITTEN);
+        assert_eq!(record.updated, fixture::later(3));
+    }
+
+    #[rstest]
+    #[case::session_id(r#""session_id":"s1""#, r#""session_id":"../s1""#)]
+    #[case::done_id(r#""done_ids":["toolu_1"]"#, r#""done_ids":["a b"]"#)]
+    #[case::task_id(r#""id":"b1""#, r#""id":"b.output""#)]
+    #[case::subagent_id(r#""agent_id":"a2""#, r#""agent_id":"a_2""#)]
+    #[case::updated(r#""updated":"2026-10-20T12:00:03Z""#, r#""updated":"noon""#)]
+    #[case::task_end(r#""ended":"2026-10-20T12:00:04Z""#, r#""ended":"2026-10-20""#)]
+    fn from_json__should_refuse_an_id_or_time_outside_its_pattern(
+        #[case] field: &str,
+        #[case] replaced: &str,
+    ) {
+        // Given
+        assert!(WRITTEN.contains(field), "{field}");
+        let text = WRITTEN.replace(field, replaced);
 
         // When
         let parsed = Record::from_json(text.as_bytes());

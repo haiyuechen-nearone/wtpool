@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use super::adapter::Adapter;
-use super::apply::{self, Change, Titles};
+use super::apply::{self, Agent, Change, Found, Fresh, Place, Titles, Writer};
 use super::bash;
 use super::env::{HookEnv, Me};
 use super::gc;
@@ -19,6 +19,7 @@ use super::text::{self, MAX_LABEL, MAX_TEXT};
 use crate::activity::{ActorKey, PlacedBy, State};
 use crate::clock::{ReadClock, Timestamp};
 use crate::paths::comparable;
+use crate::platform::zone;
 
 /// One event's facts that need the file system, worked out before any lock is taken.
 struct Context<'a, A> {
@@ -30,8 +31,7 @@ struct Context<'a, A> {
     cwd: PathBuf,
     cwd_worktree: Worktree,
     me: Me,
-    now: String,
-    now_time: Timestamp,
+    now: Timestamp,
 }
 
 /// Handles one raw hook input of the harness `adapter` reads. Malformed input, an id outside
@@ -71,8 +71,7 @@ fn handle_input<A: Adapter>(adapter: &A, input: &HookInput, env: &HookEnv) {
         cwd,
         cwd_worktree,
         me: env.me(),
-        now: now.to_rfc3339(),
-        now_time: now,
+        now,
     };
     if context.run(&input.event).is_some() && input.event == Event::SessionEnd {
         let micros = env.entered_micros.saturating_add(gc::HOOK_BUDGET_MICROS);
@@ -105,12 +104,10 @@ impl<A: Adapter> Context<'_, A> {
         let change = self.change(current.as_ref(), moved_to);
         let applied = apply::apply(current.as_ref(), &event, &change);
         let mut result = match &current {
-            Some(current) => {
-                apply::settle(current, applied, self.me.started_micros, A::WAITING_TOOLS)
-            }
+            Some(current) => apply::settle(current, applied, &change.writer),
             None => applied,
         };
-        tasks::update(&mut result, &self.task_event(&event), &self.now);
+        tasks::update(&mut result, &self.task_event(&event), self.now);
         if let Err(error) = self.activity.write(&stem, &result) {
             return self.skipped(&format!("its record cannot be written: {error}"));
         }
@@ -128,6 +125,16 @@ impl<A: Adapter> Context<'_, A> {
         None
     }
 
+    /// Notes in the hook's log that a change to the record `stem` was not written, for `reason`.
+    fn dropped(&self, stem: &str, reason: &str) {
+        if let Some(dir) = &self.env.log {
+            log::append(
+                dir,
+                &format!("wtpool hook: skipped a change to the record {stem}: {reason}"),
+            );
+        }
+    }
+
     /// Ends the old running tasks that a turn end's list of work in flight leaves out in the
     /// session's other records on this event's harness process, as the list covers the whole
     /// session. Nothing else in those records changes.
@@ -141,14 +148,19 @@ impl<A: Adapter> Context<'_, A> {
             .into_iter()
             .filter(|stem| stem != own);
         for stem in others {
-            let Ok(lock) = self.activity.lock(&stem) else {
-                continue;
+            let lock = match self.activity.lock(&stem) {
+                Ok(lock) => lock,
+                Err(error) => {
+                    self.dropped(&stem, &format!("its lock cannot be taken: {error}"));
+                    continue;
+                }
             };
             if let Some(mut record) = self.activity.read(&stem)
                 && record.process.as_ref() == Some(process)
-                && tasks::end_unlisted(&mut record, running, &self.now)
+                && tasks::end_unlisted(&mut record, running, self.now)
+                && let Err(error) = self.activity.write(&stem, &record)
             {
-                let _ = self.activity.write(&stem, &record);
+                self.dropped(&stem, &format!("it cannot be written: {error}"));
             }
             drop(lock);
         }
@@ -269,46 +281,58 @@ impl<A: Adapter> Context<'_, A> {
     }
 
     fn change(&self, current: Option<&Record>, moved_to: Option<String>) -> Change {
-        let agent = self
-            .input
-            .agent_id
-            .as_ref()
-            .map(|id| (id.as_str().to_owned(), self.agent_type()));
-        let label = agent.as_ref().and_then(|(_, kind)| kind.clone());
+        let agent = self.input.agent_id.as_ref().map(|id| Agent {
+            id: id.clone(),
+            agent_type: self.agent_type(),
+        });
+        let label = agent.as_ref().and_then(|agent| agent.agent_type.clone());
         let (titles, transcript_offset) = match &agent {
             Some(_) => (Titles::default(), None),
             None => self.titles(current),
         };
         let subagent = self.input.spawned.as_ref().and_then(|spawned| {
             Some(SubagentTitle {
-                agent_id: spawned.agent_id.as_str().to_owned(),
+                agent_id: spawned.agent_id.clone(),
                 title: label_text(&spawned.title)?,
             })
         });
         let new_label = match &agent {
-            Some((_, kind)) => kind.clone().unwrap_or_else(|| "subagent".to_owned()),
-            None => text::session_label(self.now_time, self.env.tz.as_deref()),
+            Some(agent) => agent
+                .agent_type
+                .clone()
+                .unwrap_or_else(|| "subagent".to_owned()),
+            None => text::session_label(zone::local_time(self.now, self.env.tz.as_deref())),
         };
-        let first_place = match (&agent, current) {
+        let place = match (&agent, current) {
             (Some(_), None) => self.parent_place(),
             _ => self.cwd_place(),
         };
         Change {
+            writer: self.writer(),
+            fresh: Fresh {
+                session: self.input.session_id.clone(),
+                agent,
+                place,
+                first_cwd: self.input.cwd.clone(),
+                label: new_label,
+            },
+            found: Found {
+                moved_to,
+                label,
+                titles,
+                transcript_offset,
+                subagent,
+            },
+        }
+    }
+
+    fn writer(&self) -> Writer {
+        Writer {
             harness: A::HARNESS,
             waiting_tools: A::WAITING_TOOLS,
-            now: self.now.clone(),
+            now: self.now,
             started_micros: self.me.started_micros,
             process: self.me.parent.clone(),
-            first_place,
-            first_cwd: self.input.cwd.clone(),
-            moved_to,
-            new_label,
-            label,
-            titles,
-            transcript_offset,
-            subagent,
-            session_id: self.input.session_id.as_str().to_owned(),
-            agent,
         }
     }
 
@@ -338,15 +362,21 @@ impl<A: Adapter> Context<'_, A> {
     }
 
     /// A new subagent starts at its session's worktree with the session's [`PlacedBy`].
-    fn parent_place(&self) -> (String, PlacedBy) {
+    fn parent_place(&self) -> Place {
         match self.activity.read(&self.key.session_key().stem()) {
-            Some(parent) => (parent.worktree, parent.placed_by),
+            Some(parent) => Place {
+                worktree: parent.worktree,
+                placed_by: parent.placed_by,
+            },
             None => self.cwd_place(),
         }
     }
 
-    fn cwd_place(&self) -> (String, PlacedBy) {
-        (path_text(&self.cwd_worktree.root), PlacedBy::Cwd)
+    fn cwd_place(&self) -> Place {
+        Place {
+            worktree: path_text(&self.cwd_worktree.root),
+            placed_by: PlacedBy::Cwd,
+        }
     }
 
     /// The change an event makes to other records: [`Event::Idle`] finishes the subagents, and
@@ -359,7 +389,9 @@ impl<A: Adapter> Context<'_, A> {
         match event {
             Event::Idle => {
                 for stem in self.activity.subagents_of(&self.key) {
-                    let _ = self.update(&stem, |record| apply::finish_subagent(record, change));
+                    self.update(&stem, |record| {
+                        apply::finish_subagent(record, &change.writer)
+                    });
                 }
             }
             Event::SessionEnd => {
@@ -374,18 +406,18 @@ impl<A: Adapter> Context<'_, A> {
     }
 
     /// Rewrites the record `stem` under its lock, keeping a state a later hook wrote.
-    fn update(&self, stem: &str, change: impl Fn(&Record) -> Record) -> Option<()> {
-        let lock = self.activity.lock(stem).ok()?;
-        let current = self.activity.read(stem)?;
-        let result = apply::settle(
-            &current,
-            change(&current),
-            self.me.started_micros,
-            A::WAITING_TOOLS,
-        );
-        self.activity.write(stem, &result).ok()?;
+    fn update(&self, stem: &str, change: impl Fn(&Record) -> Record) {
+        let lock = match self.activity.lock(stem) {
+            Ok(lock) => lock,
+            Err(error) => return self.dropped(stem, &format!("its lock cannot be taken: {error}")),
+        };
+        if let Some(current) = self.activity.read(stem) {
+            let result = apply::settle(&current, change(&current), &self.writer());
+            if let Err(error) = self.activity.write(stem, &result) {
+                self.dropped(stem, &format!("it cannot be written: {error}"));
+            }
+        }
         drop(lock);
-        Some(())
     }
 }
 

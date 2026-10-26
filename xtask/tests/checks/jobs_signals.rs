@@ -6,10 +6,8 @@ use std::time::Duration;
 
 use rstest::rstest;
 
-use super::jobs_queue::{limit_config, must_start, must_wait};
-use super::jobs_run::alive;
 use crate::support::Sandbox;
-use crate::support::jobs::{Job, JobSpec, SETTLE};
+use crate::support::jobs::{Job, JobSpec, SETTLE, alive, limit_config, must_start, must_wait};
 
 #[derive(Debug, Clone, Copy)]
 enum Signal {

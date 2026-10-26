@@ -73,6 +73,8 @@ pub enum Error {
         slot: PathBuf,
         code: Option<i32>,
     },
+    #[error("could not write the status document")]
+    StatusDocument(#[source] serde_json::Error),
 }
 
 /// A setting that cannot be read or used, or a repository that cannot be found.

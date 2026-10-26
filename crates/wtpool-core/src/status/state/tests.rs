@@ -1,8 +1,10 @@
 use super::*;
 use crate::names::RemoteName;
+use crate::processes::RunningProcess;
 use crate::processes::StartTime;
 use crate::status::document::{Activity, Reason};
-use crate::status::fixture::{FixedProcesses, https_path, must_fixture, must_git};
+use crate::status::document::{ActorState, Agents, Build, Document, Repository, WorktreeStatus};
+use crate::status::fixture::{FixedClock, FixedProcesses, fixed_sources, must_fixture, must_git};
 use crate::status::record_time::RecordTime;
 use crate::worktree_state::Role;
 

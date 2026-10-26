@@ -226,3 +226,9 @@ accept ts-jobs-webview f1e7a8bd36bed2e067a391fca49462cd0fe899046392942da9f01762f
 accept hx-small a56fff5c95d5c7078c338d0a0a4320e0eb4c895b4711a689773a0dc2797d5647
 # JS harness tidy: shared expected text, shot helpers and host helpers, every check and assertion unchanged, one setup message naming its document time, and the host scenario helper renamed expectedDocuments.
 accept js-small db4ac1a031830d6f8a9bc02ed24e5645803191d51d0ffc93e684f30cb7868792
+# isVisuallyHidden reads each style rule once per element, and only rules that set a property it reads; same values, so the render scenarios no longer time out under load.
+accept flake-fixes-3 a4d885f0bfffe638078ca05ff86d4da173a920da1cf6775fed6334a225ea3695
+# A page posts ready when it starts and the extension answers with the view, so a tab moved to another editor group fills again; new host and e2e checks under X7, budget__b7 and the starting-view check take the extra view the answer to ready adds.
+accept ready-handshake a88562bd9b1abb1464a435b2c043fe932702450e4ec6b8d7762522f239f58699
+# Heavy job check helpers move into support/jobs.rs, support/jobs/settings.rs and support/jobs/policy.rs; one set_mode, one mode reader and one strict is_time, which tightens the record times of job__should_record_only_its_summary; EARLIER_BUILDS equals and is pinned to the JS copy.
+accept hx-jobs 0b34c3b5e9aab1da809a57a770949ceb5f38a0dbf06987fe4ac4e3543ea6c55e

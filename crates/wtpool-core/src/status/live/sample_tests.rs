@@ -3,17 +3,8 @@
 use rstest::rstest;
 
 use super::*;
-use crate::clock::Timestamp;
 use crate::jobs::JobPaths;
-use crate::status::fixture::{FixedProcesses, Fixture, https_path, must_fixture};
-
-struct FixedClock;
-
-impl crate::clock::ReadClock for FixedClock {
-    fn now(&self) -> Timestamp {
-        Timestamp::from_seconds(42)
-    }
-}
+use crate::status::fixture::{FixedClock, FixedProcesses, Fixture, fixed_sources, must_fixture};
 
 fn building(live: &Live<'_, FixedClock, FixedProcesses>) -> bool {
     live.document().pools[0]
@@ -56,22 +47,8 @@ fn live_tick__should_read_the_process_table_each_second_unless_enforce_is_off(
     // Given
     let fixture = must_fixture();
     let processes = FixedProcesses::default();
-    let sources = Sources {
-        clock: FixedClock,
-        processes: processes.clone(),
-        machine: "machine".to_owned(),
-        jobs: job_paths(&fixture, enforce),
-        cores: 1,
-        forge_repository: https_path,
-    };
-    let state = PoolState::load(
-        fixture.config(),
-        fixture.common.clone(),
-        &processes,
-        sources.host(),
-        https_path,
-    )
-    .unwrap();
+    let sources = fixed_sources(FixedClock, processes.clone(), job_paths(&fixture, enforce));
+    let state = PoolState::load(fixture.config(), fixture.common.clone(), &sources).unwrap();
     let mut live = Live::new(state, &sources);
     let start = Instant::now();
     let since_start = |at: Option<Instant>| at.map(|at| at - start);

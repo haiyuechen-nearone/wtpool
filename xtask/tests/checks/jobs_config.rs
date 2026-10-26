@@ -1,142 +1,22 @@
 //! The machine config of heavy jobs: where `machine.toml` lives, that no repository or variable
 //! sets the limit or the policy, the refusal of an invalid file, the default limit and a symlinked
-//! file. Also the helpers the other settings checks share.
+//! file, and the same machine config in the int and JS sandboxes.
 
-use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsStr;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Output;
-use std::time::Duration;
 
 use rstest::rstest;
 use serde_json::{Value, json};
-use xtask::pool::{Pool, PoolSpec, WorktreeSpec};
 
-use crate::support::jobs::{Job, JobSpec, SETTLE, describe, must_job_ls_json, wtpool};
-use crate::support::{FileState, Sandbox, file_state, must_symlink, must_wtpool_bin};
-
-/// A pool of the main worktree `fg` alone, on `main`: no slot is needed to read settings.
-pub(super) fn must_lone_pool(sandbox: &Sandbox) -> Pool {
-    let spec = PoolSpec {
-        agents: true,
-        worktrees: BTreeMap::from([(
-            "fg".to_owned(),
-            WorktreeSpec {
-                branch: Some("main".into()),
-                ..WorktreeSpec::default()
-            },
-        )]),
-    };
-    sandbox.must_pool(&spec)
-}
-
-/// The words of `text`: runs of letters, digits and `_ . - : * +`.
-pub(super) fn tokens(text: &str) -> BTreeSet<String> {
-    text.split(|c: char| !(c.is_alphanumeric() || matches!(c, '_' | '.' | '-' | ':' | '*' | '+')))
-        .filter(|word| !word.is_empty())
-        .map(str::to_owned)
-        .collect()
-}
-
-/// True when `shown` names `expected` as written or with the symlinks of its parent resolved.
-pub(super) fn same_path(shown: &str, expected: &Path) -> bool {
-    let shown = Path::new(shown);
-    if shown == expected {
-        return true;
-    }
-    let canonical = |path: &Path| -> Option<PathBuf> {
-        let parent = fs::canonicalize(path.parent()?).ok()?;
-        Some(parent.join(path.file_name()?))
-    };
-    canonical(shown).is_some_and(|found| Some(found) == canonical(expected))
-}
-
-/// True when `text` holds `path` as written or with the symlinks of its parent resolved.
-pub(super) fn names_path(text: &str, path: &Path) -> bool {
-    let written = path.to_string_lossy();
-    let resolved = path
-        .parent()
-        .and_then(|parent| fs::canonicalize(parent).ok())
-        .zip(path.file_name())
-        .map(|(parent, name)| parent.join(name).to_string_lossy().into_owned());
-    text.contains(&*written) || resolved.is_some_and(|resolved| text.contains(&resolved))
-}
-
-pub(super) fn stdout_of(output: &Output) -> String {
-    String::from_utf8_lossy(&output.stdout).into_owned()
-}
-
-pub(super) fn stderr_of(output: &Output) -> String {
-    String::from_utf8_lossy(&output.stderr).into_owned()
-}
-
-/// Sets the Unix mode of `path`. Off Unix the setup fails, as Windows has no such mode.
-pub(super) fn set_mode(path: &Path, mode: u32) {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(mode)).expect("setup: chmod");
-    }
-    #[cfg(not(unix))]
-    panic!(
-        "setup: mode {mode:o} of {} needs Unix permissions",
-        path.display()
-    );
-}
-
-/// The permission bits of `path`, without following a symlink. `None` off Unix.
-pub(super) fn mode_of(path: &Path) -> Option<u32> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        fs::symlink_metadata(path)
-            .ok()
-            .map(|meta| meta.mode() & 0o777)
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = path;
-        None
-    }
-}
-
-/// The bytes and state of every entry below `dir`, symlinks not followed, `skip` left out.
-pub(super) fn snapshot(dir: &Path, skip: &[&Path]) -> BTreeMap<PathBuf, (FileState, Vec<u8>)> {
-    let mut found = BTreeMap::new();
-    let mut stack = vec![dir.to_path_buf()];
-    while let Some(current) = stack.pop() {
-        let Ok(entries) = fs::read_dir(&current) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if skip.iter().any(|left_out| path.starts_with(left_out)) {
-                continue;
-            }
-            let Ok(meta) = fs::symlink_metadata(&path) else {
-                continue;
-            };
-            let bytes = if meta.is_file() {
-                fs::read(&path).unwrap_or_default()
-            } else {
-                Vec::new()
-            };
-            if meta.is_dir() {
-                stack.push(path.clone());
-            }
-            found.insert(path, (file_state(&meta), bytes));
-        }
-    }
-    found
-}
-
-/// The `[jobs]` table of the TOML file at `path`, `None` when it is missing or not TOML.
-pub(super) fn jobs_table(path: &Path) -> Option<toml::Table> {
-    let text = fs::read_to_string(path).ok()?;
-    let table: toml::Table = toml::from_str(&text).ok()?;
-    table.get("jobs")?.as_table().cloned()
-}
+use crate::support::jobs::settings::{
+    must_lone_pool, names_path, same_path, set_mode, stderr_of, stdout_of, tokens,
+};
+use crate::support::jobs::{
+    EARLIER_BUILDS, JobSpec, SETTLE, describe, must_job_ls_json, wait_state, wtpool,
+};
+use crate::support::{Sandbox, must_symlink, must_wtpool_bin};
 
 fn cores(count: u32) -> String {
     count.to_string()
@@ -511,18 +391,18 @@ fn machine_config__should_read_through_a_symlink() {
     );
 }
 
-/// The record of `job` once its state is `state`, within [`SETTLE`]. `None` at once when
-/// `wtpool job` ended first.
-pub(super) fn wait_state(sandbox: &Sandbox, job: &mut Job, state: &str) -> Option<Value> {
-    let deadline = std::time::Instant::now() + SETTLE;
-    while std::time::Instant::now() < deadline {
-        if let Some(record) = job.record(sandbox).filter(|r| r["state"] == state) {
-            return Some(record);
-        }
-        if job.try_status().is_some() {
-            return None;
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    None
+#[test]
+fn earlier_builds__should_be_the_machine_config_of_the_js_sandboxes() {
+    // Given
+    let code = Path::new(env!("CARGO_MANIFEST_DIR")).join("../vscode/test/support/code.mjs");
+
+    // When
+    let text = fs::read_to_string(&code).expect("setup: read vscode/test/support/code.mjs");
+
+    // Then
+    let line = format!(
+        "export const EARLIER_BUILDS = '{}';",
+        EARLIER_BUILDS.replace('\n', "\\n")
+    );
+    assert!(text.contains(&line), "code.mjs no longer has {line}");
 }

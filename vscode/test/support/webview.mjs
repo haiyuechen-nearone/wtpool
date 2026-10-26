@@ -237,33 +237,55 @@ export function isShown(window, element) {
   return Boolean(element?.isConnected);
 }
 
+/** The properties {@link isVisuallyHidden} reads. */
+const HIDING = ['position', 'clip', 'clip-path', 'width', 'height', 'overflow', 'left', 'top', 'opacity', 'font-size'];
+
+/** Per sheet: its rule list, that list's length, and the style rules in it that set a {@link HIDING} property. */
+const hidingRules = new WeakMap();
+
+/** The style rules of `sheet` that set any {@link HIDING} property, in order; none when jsdom cannot list them. */
+function rulesSettingHiding(sheet) {
+  let list;
+  try {
+    list = sheet.cssRules;
+  } catch {
+    return [];
+  }
+  const cached = hidingRules.get(sheet);
+  if (cached?.list === list && cached.length === list.length) return cached.rules;
+  const rules = [...list].filter(
+    (rule) => rule.selectorText && rule.style && HIDING.some((property) => rule.style.getPropertyValue(property)),
+  );
+  hidingRules.set(sheet, { list, length: list.length, rules });
+  return rules;
+}
+
 /**
- * The declared value of `property` for `element`: its matching style rules in order, then its
- * style attribute.
+ * The declared value of each {@link HIDING} property for `element`: its matching style rules in
+ * order, then its style attribute. Matching selectors dominates the render checks, so each rule
+ * is matched once for every property, and only rules that set one are matched.
  */
-function declared(window, element, property) {
-  let value = '';
-  const visit = (rules) => {
-    for (const rule of rules) {
-      if (!rule.selectorText || !rule.style) continue;
+function declaredHiding(window, element) {
+  const values = Object.fromEntries(HIDING.map((property) => [property, '']));
+  for (const sheet of window.document.styleSheets) {
+    for (const rule of rulesSettingHiding(sheet)) {
       let matches = false;
       try {
         matches = element.matches(rule.selectorText);
       } catch {
         matches = false;
       }
-      const found = matches ? rule.style.getPropertyValue(property) : '';
-      if (found) value = found;
-    }
-  };
-  for (const sheet of window.document.styleSheets) {
-    try {
-      visit(sheet.cssRules);
-    } catch {
-      // A sheet whose rules jsdom cannot list declares nothing here.
+      if (!matches) continue;
+      for (const property of HIDING) {
+        const found = rule.style.getPropertyValue(property);
+        if (found) values[property] = found;
+      }
     }
   }
-  return element.style?.getPropertyValue(property) || value;
+  for (const property of HIDING) {
+    values[property] = (element.style?.getPropertyValue(property) || values[property]).trim();
+  }
+  return values;
 }
 
 const px = (value) => (/^-?[\d.]+(px)?$/.test(value.trim()) ? parseFloat(value) : Number.NaN);
@@ -274,7 +296,8 @@ const px = (value) => (/^-?[\d.]+(px)?$/.test(value.trim()) ? parseFloat(value) 
  * opacity, or a zero font size.
  */
 export function isVisuallyHidden(window, element) {
-  const get = (property) => declared(window, element, property).trim();
+  const values = declaredHiding(window, element);
+  const get = (property) => values[property];
   const positioned = ['absolute', 'fixed'].includes(get('position'));
   const clip = get('clip');
   const clipValues = [...clip.matchAll(/-?[\d.]+/g)].map((m) => parseFloat(m[0]));

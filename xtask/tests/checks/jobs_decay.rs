@@ -1,5 +1,5 @@
 //! Jobs in `wtpool status`: the lists of `machine.jobs`, each job's worktree and actor, and the
-//! decay table with a job of the actor's own.
+//! cases of `decay__should_match_the_table` with a job of the actor's own.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{OsStr, OsString};
@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use super::jobs_status::{list_job, must_have, proc, started};
 use crate::support::hook::{CLAUDE, Hooks, RunOptions, START, add_seconds, event, with};
+use crate::support::jobs::policy::{list_job, must_have, proc, started};
 use crate::support::jobs::{JobSpec, SETTLE, jobs_of};
 use crate::support::{FileState, file_state, must_repo, must_status_json, phase};
 
@@ -215,14 +215,14 @@ fn status__should_attribute_jobs() {
     );
 }
 
-/// True for the cases of the decay table with a job of s1's own.
+/// True for the cases of `decay__should_match_the_table` with a job of s1's own.
 pub(super) fn is_job_case(case: &str) -> bool {
     case.starts_with("job_")
 }
 
-/// Runs one job case of `decay__should_match_the_table`, from phase 4: s1's job waits or runs, and
-/// s1 shows the state and action of the case 300 s after its events, `None` leaving the action
-/// unchecked.
+/// Runs one job case of `decay__should_match_the_table`: s1's job waits or runs, and s1 shows the
+/// state and action of the case 300 s after its events, `None` leaving the action unchecked. It
+/// returns at once against a wtpool without heavy jobs.
 pub(super) fn must_decay_with_a_job(case: &str) {
     if phase() < 4 {
         return;

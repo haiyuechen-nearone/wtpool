@@ -2,6 +2,9 @@
 //! `<state>/wtpool/jobs/`, and `wtpool job` running xtask's `probe` under a program's name. The
 //! probe marks its start and end.
 
+pub mod policy;
+pub mod settings;
+
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::{Read, Write};
@@ -16,16 +19,20 @@ use serde_json::Value;
 
 use super::{Sandbox, must_repo, must_wtpool_bin, set_executable};
 
-/// The machine config every sandbox starts with. Up to phase 3 a build is a process named
-/// `cargo`, `cargo-*` or `rustc`. From phase 4 a build is a process that matches a heavy pattern,
-/// with none built in, so these patterns keep the builds the checks of earlier phases count on. A
-/// wtpool before phase 4 reads no such file. A job check writes its own or removes it.
-pub const EARLIER_BUILDS: &str = "# The builds of phases 1 to 3 (S4) as heavy patterns (J20).\n\
+/// The machine config every sandbox starts with. wtpool counts a process as a build only when it
+/// matches a heavy pattern, with none built in, so `cargo`, `cargo-*` and `rustc` keep the builds
+/// the checks count on. A wtpool without heavy jobs reads no such file. A job check writes its own
+/// or removes it.
+pub const EARLIER_BUILDS: &str = "# The builds of phases 1 to 3 as heavy patterns.\n\
 [jobs]\n\
 heavy = [\"cargo\", \"cargo-*\", \"rustc\"]\n";
 
 /// The longest a check waits for a job to reach a state that has no time limit of its own.
 pub const SETTLE: Duration = Duration::from_secs(10);
+
+/// The longest wait from a freed place to the next start: the first in line checks every 250 ms,
+/// plus the start of a process.
+pub const HANDOVER: Duration = Duration::from_millis(1500);
 
 /// The time the stream readers of an ended `wtpool job` get to read the rest of its output.
 const READERS_DRAIN: Duration = Duration::from_secs(1);
@@ -401,6 +408,16 @@ pub fn send_signal(name: &str, target: &str) {
         .status();
 }
 
+/// True while a process of `pid` exists, as `kill -s 0` finds it.
+pub fn alive(pid: u32) -> bool {
+    Command::new("kill")
+        .args(["-s", "0", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
 /// The first `Some` of `probe` within `timeout`, polling every 10 ms.
 pub fn wait_until<T>(timeout: Duration, mut probe: impl FnMut() -> Option<T>) -> Option<T> {
     let deadline = Instant::now() + timeout;
@@ -440,6 +457,66 @@ pub fn record_of(sandbox: &Sandbox, pid: u32) -> Option<Value> {
         .into_iter()
         .map(|(_, record)| record)
         .find(|record| record["pid"].as_u64() == Some(u64::from(pid)))
+}
+
+/// The record of `job` once its state is `state`, within [`SETTLE`]. `None` at once when
+/// `wtpool job` ended first.
+pub fn wait_state(sandbox: &Sandbox, job: &mut Job, state: &str) -> Option<Value> {
+    let deadline = std::time::Instant::now() + SETTLE;
+    while std::time::Instant::now() < deadline {
+        if let Some(record) = job.record(sandbox).filter(|r| r["state"] == state) {
+            return Some(record);
+        }
+        if job.try_status().is_some() {
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    None
+}
+
+/// The machine config with `limit` and no heavy pattern.
+pub fn limit_config(limit: u32) -> String {
+    format!("[jobs]\nlimit = {limit}\n")
+}
+
+/// The probe's start mark once `job`'s command ran, else an assertion naming `what`.
+pub fn must_start(job: &Job, what: &str) -> Value {
+    job.wait_start(SETTLE).unwrap_or_else(|| {
+        panic!(
+            "{what}: the command of wtpool job never ran within {SETTLE:?}; stderr {:?}",
+            job.stderr()
+        )
+    })
+}
+
+/// `job`'s record once it waits, its command not run, else an assertion naming `what`.
+pub fn must_wait(job: &Job, sandbox: &Sandbox, what: &str) -> Value {
+    let record = job
+        .wait_record(sandbox, "waiting", SETTLE)
+        .unwrap_or_else(|| {
+            panic!(
+                "{what}: no record of pid {} in state waiting within {SETTLE:?}; the job folder holds {:?}; stderr {:?}",
+                job.pid(),
+                job_records(sandbox),
+                job.stderr()
+            )
+        });
+    assert!(
+        job.start_mark().is_none(),
+        "{what}: the command ran although the job waits: {record}"
+    );
+    record
+}
+
+/// True when `value` is a UTC time as `YYYY-MM-DDThh:mm:ss` with a `Z` at the end.
+pub fn is_time(value: &Value) -> bool {
+    value.as_str().is_some_and(|text| {
+        text.len() >= 20
+            && text.ends_with('Z')
+            && text.get(4..5) == Some("-")
+            && text.get(10..11) == Some("T")
+    })
 }
 
 pub fn wtpool(sandbox: &Sandbox, cwd: &Path, args: &[&str], envs: &[(&str, &OsStr)]) -> Output {

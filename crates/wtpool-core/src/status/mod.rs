@@ -35,9 +35,8 @@ use crate::clock::ReadClock;
 use crate::config::Config;
 use crate::error::Error;
 use crate::git::GitMode;
-use crate::paths;
 use crate::processes::ListProcesses;
-use state::PoolState;
+use state::{PoolActors, PoolState};
 
 /// `wtpool status --json`: the document of the pool of `config`, whose common git directory is
 /// `common`, as one line.
@@ -46,21 +45,15 @@ pub fn status_line<C: ReadClock, P: ListProcesses>(
     common: PathBuf,
     sources: &Sources<C, P>,
 ) -> Result<String, Error> {
-    let state = PoolState::load(
-        config,
-        common,
-        &sources.processes,
-        sources.host(),
-        sources.forge_repository,
-    )?;
+    let state = PoolState::load(config, common, sources)?;
     let document = state.document(sources.clock.now());
-    let mut line = serde_json::to_string(&document).unwrap_or_default();
+    let mut line = serde_json::to_string(&document).map_err(Error::StatusDocument)?;
     line.push('\n');
     Ok(line)
 }
 
 /// The actors of each worktree of `paths`, as the document of the pool of `config` shows them at
-/// the time of `sources`.
+/// the time of `sources`, read without the git facts the document also shows.
 pub(crate) fn actors_at(
     config: Config,
     common: PathBuf,
@@ -68,24 +61,8 @@ pub(crate) fn actors_at(
     paths: &[&Path],
     git_mode: GitMode,
 ) -> Result<Vec<Vec<Actor>>, Error> {
-    let (processes, forge) = (&sources.processes, sources.forge_repository);
-    let state = PoolState::load_with(git_mode, config, common, processes, sources.host(), forge)?;
-    let document = state.document(sources.clock.now());
-    let worktrees: Vec<WorktreeStatus> = document
-        .pools
-        .into_iter()
-        .flat_map(|pool| pool.worktrees)
-        .collect();
-    Ok(paths
-        .iter()
-        .map(|path| {
-            worktrees
-                .iter()
-                .filter(|worktree| paths::same_path(Path::new(&worktree.path), path))
-                .flat_map(|worktree| worktree.actors.iter().cloned())
-                .collect()
-        })
-        .collect())
+    let actors = PoolActors::load(git_mode, config, common, sources)?;
+    Ok(actors.at(paths, sources.clock.now()))
 }
 
 #[cfg(test)]
@@ -103,7 +80,7 @@ mod tests {
         let line = status_line(
             fixture.config(),
             fixture.common.clone(),
-            &Sources::system(https_path),
+            &Sources::system(|_| None, https_path),
         );
 
         // Then
@@ -127,7 +104,11 @@ mod tests {
         config.foreground = AbsolutePath::try_new(&fixture.root).unwrap();
 
         // When
-        let line = status_line(config, fixture.common.clone(), &Sources::system(https_path));
+        let line = status_line(
+            config,
+            fixture.common.clone(),
+            &Sources::system(|_| None, https_path),
+        );
 
         // Then
         assert!(line.is_err());

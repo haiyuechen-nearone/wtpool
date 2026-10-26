@@ -9,7 +9,9 @@ use rstest::rstest;
 use super::*;
 use crate::clock::Timestamp;
 use crate::status::document::GitStatus;
-use crate::status::fixture::{FixedProcesses, https_path, must_fixture, must_git};
+use crate::status::fixture::{
+    FixedClock, FixedProcesses, fixed_sources, https_path, must_fixture, must_git,
+};
 use crate::status::watch::run_tests::{SharedOutput, must_wait};
 use crate::status::watch::{Message, message_of, watch};
 
@@ -41,14 +43,6 @@ fn message_of__should_pass_paths_and_ask_for_a_rescan_when_events_were_lost() {
         rescan,
     ];
     assert_eq!(messages, expected);
-}
-
-struct FixedClock;
-
-impl crate::clock::ReadClock for FixedClock {
-    fn now(&self) -> Timestamp {
-        Timestamp::from_seconds(42)
-    }
 }
 
 /// The facts a refresh may have read again, as the document shows them.
@@ -112,22 +106,8 @@ fn live_refresh__should_read_again_only_what_changed(
     // Given
     let fixture = must_fixture();
     let processes = FixedProcesses::default();
-    let sources = Sources {
-        clock: FixedClock,
-        processes: processes.clone(),
-        machine: "machine".to_owned(),
-        jobs: None,
-        cores: 1,
-        forge_repository: https_path,
-    };
-    let state = PoolState::load(
-        fixture.config(),
-        fixture.common.clone(),
-        &processes,
-        sources.host(),
-        https_path,
-    )
-    .unwrap();
+    let sources = fixed_sources(FixedClock, processes.clone(), None);
+    let state = PoolState::load(fixture.config(), fixture.common.clone(), &sources).unwrap();
     let mut live = Live::new(state, &sources);
     let git = must_git;
     git(
@@ -173,22 +153,8 @@ fn live_refresh_all__should_keep_what_was_known_when_listing_fails() {
     // Given
     let fixture = must_fixture();
     let processes = FixedProcesses::default();
-    let sources = Sources {
-        clock: FixedClock,
-        processes: processes.clone(),
-        machine: "machine".to_owned(),
-        jobs: None,
-        cores: 1,
-        forge_repository: https_path,
-    };
-    let state = PoolState::load(
-        fixture.config(),
-        fixture.common.clone(),
-        &processes,
-        sources.host(),
-        https_path,
-    )
-    .unwrap();
+    let sources = fixed_sources(FixedClock, processes.clone(), None);
+    let state = PoolState::load(fixture.config(), fixture.common.clone(), &sources).unwrap();
     let mut live = Live::new(state, &sources);
     let git = |live: &Live<'_, FixedClock, FixedProcesses>| -> Vec<GitStatus> {
         live.document().pools[0]
@@ -227,14 +193,7 @@ fn watch__should_print_a_document_per_change_until_input_closes() {
     thread::spawn({
         let mut output = output.clone();
         move || {
-            let sources = Sources {
-                clock: FixedClock,
-                processes: FixedProcesses::default(),
-                machine: "machine".to_owned(),
-                jobs: None,
-                cores: 1,
-                forge_repository: https_path,
-            };
+            let sources = fixed_sources(FixedClock, FixedProcesses::default(), None);
             done.send(watch(config, common, &sources, reader, &mut output))
         }
     });
@@ -268,7 +227,7 @@ fn watch__should_fail_without_the_common_git_directory() {
     let result = watch(
         fixture.config(),
         gone.clone(),
-        &Sources::system(https_path),
+        &Sources::system(|_| None, https_path),
         std::io::empty(),
         &mut Vec::new(),
     );
@@ -293,7 +252,7 @@ fn watch__should_fail_when_the_foreground_is_no_worktree() {
     let result = watch(
         config,
         fixture.common.clone(),
-        &Sources::system(https_path),
+        &Sources::system(|_| None, https_path),
         std::io::empty(),
         &mut output,
     );
@@ -340,23 +299,9 @@ fn live_refresh__should_refresh_git_after_an_edit_at_most_once_a_second() {
     // Given
     let fixture = must_fixture();
     let processes = FixedProcesses::default();
-    let sources = Sources {
-        clock: FixedClock,
-        processes: processes.clone(),
-        machine: "machine".to_owned(),
-        jobs: None,
-        cores: 1,
-        forge_repository: https_path,
-    };
+    let sources = fixed_sources(FixedClock, processes.clone(), None);
     write_call(&fixture, None, "2026-10-20T12:00:00Z");
-    let state = PoolState::load(
-        fixture.config(),
-        fixture.common.clone(),
-        &processes,
-        sources.host(),
-        https_path,
-    )
-    .unwrap();
+    let state = PoolState::load(fixture.config(), fixture.common.clone(), &sources).unwrap();
     let mut live = Live::new(state, &sources);
     let wt1 = fixture.root.join("wt1");
     let start = Instant::now();
@@ -392,22 +337,8 @@ fn live_deadline__should_be_the_next_timer_or_waiting_refresh() {
     // Given
     let fixture = must_fixture();
     let processes = FixedProcesses::default();
-    let sources = Sources {
-        clock: FixedClock,
-        processes: processes.clone(),
-        machine: "machine".to_owned(),
-        jobs: None,
-        cores: 1,
-        forge_repository: https_path,
-    };
-    let state = PoolState::load(
-        fixture.config(),
-        fixture.common.clone(),
-        &processes,
-        sources.host(),
-        https_path,
-    )
-    .unwrap();
+    let sources = fixed_sources(FixedClock, processes.clone(), None);
+    let state = PoolState::load(fixture.config(), fixture.common.clone(), &sources).unwrap();
     let mut live = Live::new(state, &sources);
     let now = Instant::now();
     let none = live.deadline(now);
@@ -463,14 +394,11 @@ fn watch__should_fire_a_timer_when_the_clock_file_moves() {
         let mut output = output.clone();
         let clock = clock.clone();
         move || {
-            let sources = Sources {
-                clock: crate::clock::FileClock::new(clock),
-                processes: FixedProcesses::default(),
-                machine: "machine".to_owned(),
-                jobs: None,
-                cores: 1,
-                forge_repository: https_path,
-            };
+            let sources = fixed_sources(
+                crate::clock::FileClock::new(clock),
+                FixedProcesses::default(),
+                None,
+            );
             done.send(watch(config, common, &sources, reader, &mut output))
         }
     });

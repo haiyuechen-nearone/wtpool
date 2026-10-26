@@ -8,7 +8,7 @@ import { assertIsError } from './errors';
 /** The number of characters kept from the end of a run's stderr. */
 const STDERR_TAIL = 4096;
 
-/** The time a stopped `wtpool` gets to leave after SIGTERM before SIGKILL. */
+/** The time a stopped `wtpool` gets to leave after EOF and SIGTERM before SIGKILL. */
 const KILL_AFTER_MS = 1_000;
 
 /** Holds a `wtpool` that did not start: spawn threw or reported an error. */
@@ -32,8 +32,51 @@ export type RunEnd = NotStarted | Exited;
 export type WatchProcess = ChildProcessByStdio<Writable, Readable, Readable>;
 
 /** Describes an exit that left no error text. */
-export function describeExit(code: number | null, signal: NodeJS.Signals | null): string {
+function describeExit(code: number | null, signal: NodeJS.Signals | null): string {
   return code === null ? `wtpool was stopped by ${signal}` : `wtpool exited with code ${code}`;
+}
+
+function lastNonEmptyLine(text: string): string | undefined {
+  return text
+    .split(/\r?\n|\r/)
+    .map((line) => line.trim())
+    .findLast((line) => line !== '');
+}
+
+/**
+ * Gives the error of a run as one line: its last non-empty stderr line, or undefined after a clean
+ * exit. An exit with neither a code nor a signal counts as clean.
+ */
+export function lastErrorLine(end: RunEnd): string | undefined {
+  if (!end.started) {
+    return `wtpool did not start: ${end.error.message}`;
+  }
+  if (end.code === 0 || (end.code === null && end.signal === null)) return undefined;
+  return lastNonEmptyLine(end.stderr) ?? describeExit(end.code, end.signal);
+}
+
+/** Gives the error of a run with all the stderr it kept, or undefined after an exit with code 0. */
+export function wholeError(end: RunEnd): string | undefined {
+  if (!end.started) {
+    return end.error.message;
+  }
+  if (end.code === 0) {
+    return undefined;
+  }
+  return end.stderr.trim() || describeExit(end.code, end.signal);
+}
+
+/**
+ * Ends a `wtpool`: EOF on its stdin when `endStdin` is set, SIGTERM, and SIGKILL for one that
+ * ignores both.
+ */
+export function stopChild(child: ChildProcess, { endStdin }: { endStdin: boolean }): void {
+  if (endStdin) {
+    child.stdin?.end();
+  }
+  child.kill('SIGTERM');
+  // Process cleanup runs on the system clock, also when the caller's clock is a fake.
+  systemClock.after(KILL_AFTER_MS, () => void child.kill('SIGKILL'));
 }
 
 /**
@@ -117,14 +160,18 @@ export function startRun(binary: string, args: string[], cwd: string | undefined
   return {
     ended,
     stop: () => {
-      child?.kill('SIGTERM');
-      // Process cleanup runs on the system clock, also when the caller's clock is a fake.
-      systemClock.after(KILL_AFTER_MS, () => void child?.kill('SIGKILL'));
+      if (child) {
+        stopChild(child, { endStdin: false });
+      }
     },
   };
 }
 
 /** Runs `binary` with `args` to its end, with no stdin or stdout. */
-export function runToEnd(binary: string, args: string[], cwd: string | undefined): Promise<RunEnd> {
+export function runToEnd(
+  binary: string,
+  args: string[],
+  cwd: string | undefined,
+): Promise<RunEnd> {
   return startRun(binary, args, cwd).ended;
 }

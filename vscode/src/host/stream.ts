@@ -1,8 +1,8 @@
 import type { StatusDocument } from '../generated/status';
 import type { Connection } from '../shared/protocol';
-import { systemClock, type Cancel, type Clock } from './clock';
-import { LineSplitter, readLine } from './lines';
-import { describeExit, spawnWatch, type RunEnd, type WatchProcess } from './spawn';
+import type { Cancel, Clock } from './clock';
+import { LineSplitter, MAX_LINE_BYTES, readLine } from './lines';
+import { lastErrorLine, spawnWatch, stopChild, type WatchProcess } from './spawn';
 
 /** The silence that turns a live connection stale. */
 const STALE_MS = 15_000;
@@ -12,10 +12,9 @@ const RESTART_MS = 30_000;
 const FIRST_BACKOFF_MS = 1_000;
 /** The longest wait between two starts. */
 const MAX_BACKOFF_MS = 30_000;
-/** The time a stopped `wtpool` gets to leave after EOF and SIGTERM before SIGKILL. */
-const KILL_AFTER_MS = 1_000;
 
 const WATCH_ARGS = ['status', '--watch'];
+const MIB = 1024 * 1024;
 
 /** Carries a status document that arrived. {@link WatchStream.lastLine} gives its time. */
 export interface DocumentUpdate {
@@ -31,30 +30,6 @@ interface StreamEvents {
   changed(update?: DocumentUpdate): void;
   /** Writes a diagnostic to the tab's output channel. */
   log(message: string): void;
-}
-
-function lastErrorLine(text: string): string | undefined {
-  return text
-    .split(/\r?\n|\r/)
-    .map((line) => line.trim())
-    .findLast((line) => line !== '');
-}
-
-/** Gives wtpool's error at the end of a start, or undefined after a clean exit. */
-export function endError(end: RunEnd): string | undefined {
-  if (!end.started) {
-    return `wtpool did not start: ${end.error.message}`;
-  }
-  if (end.code === 0 || (end.code === null && end.signal === null)) return undefined;
-  return lastErrorLine(end.stderr) ?? describeExit(end.code, end.signal);
-}
-
-/** Ends a `wtpool`: EOF on stdin, SIGTERM, and SIGKILL for one that ignores both. */
-function stopProcess(child: WatchProcess): void {
-  child.stdin.end();
-  child.kill('SIGTERM');
-  // Process cleanup runs on the system clock, also when the stream's clock is a fake.
-  systemClock.after(KILL_AFTER_MS, () => child.kill('SIGKILL'));
 }
 
 /** Runs one tab's `wtpool status --watch` and restarts it, with backoff, after each fault. */
@@ -115,7 +90,7 @@ export class WatchStream {
     this.attempt = attempt;
     const child = spawnWatch(this.binary(), WATCH_ARGS, this.cwd, (ended) => {
       if (this.attempt === attempt) {
-        this.fail('wtpool ended or did not start', endError(ended));
+        this.fail('wtpool ended or did not start', lastErrorLine(ended));
       }
     });
     this.child = child;
@@ -147,14 +122,14 @@ export class WatchStream {
     this.attempt = undefined;
     this.child = undefined;
     if (child) {
-      stopProcess(child);
+      stopChild(child, { endStdin: true });
     }
   }
 
   /** Takes the lines of a chunk: each document, alive line or fault. */
   private read(lines: string[] | 'oversize'): void {
     if (lines === 'oversize') {
-      this.fail('a line over 1 MiB');
+      this.fail(`a line over ${MAX_LINE_BYTES / MIB} MiB`);
       return;
     }
     for (const text of lines) {
@@ -196,7 +171,9 @@ export class WatchStream {
     } else {
       // Also the next restart a paused stream shows, until the restarted `wtpool` prints a line.
       this.nextStartAt = this.clock.now() + RESTART_MS - silent;
-      this.cancelTimer = this.clock.after(RESTART_MS - silent, () => void this.fail('30 s without a line'));
+      this.cancelTimer = this.clock.after(RESTART_MS - silent, () => {
+        this.fail(`${RESTART_MS / 1000} s without a line`);
+      });
     }
   }
 

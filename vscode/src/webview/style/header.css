@@ -39,10 +39,6 @@
   white-space: nowrap;
 }
 
-.chip[hidden] {
-  display: none;
-}
-
 .chip-free {
   color: var(--vscode-descriptionForeground);
 }
@@ -63,10 +59,6 @@
   margin-left: auto;
   color: var(--vscode-descriptionForeground);
   font-size: 12px;
-}
-
-.connection[hidden] {
-  display: none;
 }
 
 .connection-paused {

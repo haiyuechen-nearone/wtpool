@@ -178,3 +178,55 @@ fn document__should_keep_an_actor_working_by_the_kind_of_its_call() {
         ]
     );
 }
+
+#[test]
+fn pool_actors_at__should_give_the_document_actors_without_reading_git_facts() {
+    // Given
+    let fixture = must_fixture();
+    live_record(&fixture, "s1", "wt1", "working");
+    live_record(&fixture, "s2", "x", "waiting");
+    let processes = vec![
+        claude_at(7001),
+        claude_at(7002),
+        fixture.process(9, "make", "wt1"),
+    ];
+    let now = Timestamp::parse("2026-10-20T12:00:10Z").unwrap();
+    let document = fixture.must_load(processes.clone()).document(now);
+    let sources = fixed_sources(FixedClock, FixedProcesses::new(processes), None);
+    let (wt1, x) = (fixture.root.join("wt1"), fixture.root.join("x"));
+
+    // When
+    let actors = PoolActors::load(
+        GitMode::ReadOnly,
+        fixture.config(),
+        fixture.common.clone(),
+        &sources,
+    )
+    .unwrap();
+    let found = actors.at(&[&wt1, &x, &fixture.root], now);
+
+    // Then
+    assert_eq!(
+        found,
+        vec![
+            worktree(&document, "wt1").actors.clone(),
+            worktree(&document, "x").actors.clone(),
+            vec![]
+        ]
+    );
+    assert!(found[0].iter().chain(&found[1]).count() == 2);
+    let state = &actors.0;
+    assert!(
+        state
+            .worktrees
+            .iter()
+            .all(|tracked| tracked.facts.is_none())
+    );
+    assert!(
+        state
+            .worktrees
+            .iter()
+            .all(|tracked| tracked.last_change.is_none())
+    );
+    assert_eq!(state.repository.name, "");
+}

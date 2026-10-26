@@ -33,6 +33,8 @@ mod run;
 mod settings;
 mod shell;
 pub mod status;
+#[cfg(test)]
+mod test_support;
 mod toml_error;
 mod worktree;
 mod worktree_state;

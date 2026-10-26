@@ -4,7 +4,7 @@ use super::super::adapter::{TranscriptTitles, WaitingTools};
 use super::super::install::Printed;
 use super::*;
 use crate::activity::{ActorId, CallId, CallKind, Harness, TaskId, WaitReason};
-use crate::clock::Clock;
+use crate::clock::{Clock, Timestamp};
 use crate::hook::fixture::must_pool;
 use crate::processes::ProcessTable;
 
@@ -197,7 +197,7 @@ fn handle__should_wait_on_a_tool_the_adapter_names() {
     assert_eq!(record.label, "Generated");
     let wait = record.waiting.unwrap();
     assert_eq!(
-        (wait.reason, wait.call.as_deref()),
+        (wait.reason, wait.call.as_ref().map(CallId::as_str)),
         (WaitReason::Question, Some("q1"))
     );
 }
@@ -230,8 +230,8 @@ fn handle__should_record_a_task_in_the_file_the_adapter_names() {
     assert_eq!(running.tasks[0].ended, None);
     let ended = pool.record("s1").unwrap();
     assert_eq!(
-        ended.tasks[0].ended.as_deref(),
-        Some("2026-10-20T12:00:00Z")
+        ended.tasks[0].ended,
+        Timestamp::parse("2026-10-20T12:00:00Z")
     );
 }
 
@@ -272,6 +272,61 @@ fn handle__should_log_a_skip_when_the_record_cannot_fit() {
         log.starts_with("wtpool hook: skipped an event: its record cannot be written: "),
         "{log}"
     );
+}
+
+#[rstest]
+#[case::idle(Event::Idle, None)]
+#[case::task_list(Event::TurnEnd(None), Some(Vec::new()))]
+fn handle__should_log_a_change_to_another_record_it_cannot_write(
+    #[case] event: Event,
+    #[case] tasks_running: Option<Vec<TaskId>>,
+) {
+    // Given
+    let pool = Pool::must_new();
+    let subagent = HookInput {
+        agent_id: Some(ActorId::try_from("a1").unwrap()),
+        task_start: Some(TaskId::try_from("b1").unwrap()),
+        ..pool.input(Event::CallEnd(call("c1", "run", CallKind::Shell)))
+    };
+    pool.send(subagent);
+    let lock = pool.root.join("fg/.git/wtpool-activity/s1.a1.json.lock");
+    let _ = std::fs::remove_file(&lock);
+    std::fs::create_dir(&lock).unwrap();
+
+    // When
+    pool.send(HookInput {
+        tasks_running,
+        ..pool.input(event)
+    });
+
+    // Then
+    let log = pool.log();
+    assert!(
+        log.starts_with(
+            "wtpool hook: skipped a change to the record s1.a1: its lock cannot be taken: "
+        ),
+        "{log}"
+    );
+    assert_eq!(log.lines().count(), 1, "{log}");
+    assert_eq!(pool.record("s1.a1").unwrap().state, State::Working);
+}
+
+#[test]
+fn handle__should_drop_every_invisible_character_from_a_label() {
+    // Given
+    let pool = Pool::must_new();
+    let start = HookInput {
+        session_title: Some(
+            "Fix\u{ad}\u{600}\u{605}\u{fff9}\u{fffb}\u{e0000}\u{e0041}\u{e007f} it".to_owned(),
+        ),
+        ..pool.input(Event::TurnStart)
+    };
+
+    // When
+    pool.send(start);
+
+    // Then
+    assert_eq!(pool.record("s1").unwrap().label, "Fix it");
 }
 
 #[rstest]

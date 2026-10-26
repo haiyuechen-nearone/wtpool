@@ -123,7 +123,8 @@ ISC, Unlicense, Unicode-3.0 or CC0-1.0. A `wtpool` binary given to others should
 
 Everything else in this repository is wtpool's own work under [LICENSE](LICENSE), including the hand
 written hook fixtures in `verify/fixtures/hooks/`, the scenarios, the screenshots and the
-hand-drawn SVGs.
+hand-drawn SVGs. Among those is the robot that marks a working row, the inline SVG of
+`vscode/src/html.ts`: it was drawn for wtpool and holds no third-party material.
 
 ## MIT licence text
 

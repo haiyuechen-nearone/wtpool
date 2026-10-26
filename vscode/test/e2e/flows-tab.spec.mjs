@@ -244,6 +244,30 @@ test('reshow__should_fill_the_table_every_time', async () => {
   });
 });
 
+test('move__should_fill_the_table_in_the_new_group', async () => {
+  await withFlow('move__should_fill_the_table_in_the_new_group', {}, async (session) => {
+    // Given
+    const { window } = session;
+    await openTextFile(window, session.dirs, 'notes.txt');
+    const before = await openStatus(session);
+    const expected = scenarioRows(session);
+    const from = statusTabs(await editorGroups(window));
+
+    // When: the tab leaves its group for a new one and stays visible all along.
+    await runCommand(window, 'View: Move Editor into Next Group');
+    const seen = await watchShow(window, expected, before, Date.now());
+    const to = statusTabs(await editorGroups(window));
+
+    // Then
+    const shown = JSON.stringify({ connection: seen.connection, rows: seen.rows.length, filledMs: seen.filledMs });
+    assert.ok(from.length === 1 && from[0].group === 1, `setup: the tab did not open in a second group: ${JSON.stringify(from)}`);
+    assert.ok(to.length === 1 && to[0].active, `the moved tab is not the one shown tab of its group: ${JSON.stringify(to)}`);
+    assert.notEqual(seen.connection, null, 'setup: the move reloaded no page');
+    assert.notEqual(seen.connection, STARTING, `the moved tab stayed at "${STARTING}": ${shown}`);
+    assert.ok(seen.filledMs !== null && seen.filledMs <= RESHOW_BOUND_MS, `the moved tab did not show the pool within ${RESHOW_BOUND_MS} ms: ${shown}`);
+  });
+});
+
 test('flow__close_stops_watch', async () => {
   await withFlow('flow__close_stops_watch', {}, async (session) => {
     // Given

@@ -13,83 +13,12 @@ use serde_json::{Value, json};
 
 use super::hook_io::malformed;
 use crate::support::hook::{HookRun, Hooks, RunOptions, event, wait_output, with};
+use crate::support::jobs::policy::{call, decision, machine, policy};
 use crate::support::jobs::{JobSpec, SETTLE};
 use crate::support::{FileState, file_state};
 
 /// The watchdog's 1 s plus the start and exit of a process.
 const WATCHDOG: Duration = Duration::from_millis(1500);
-
-/// `machine.toml` of the policy `enforce` with the heavy patterns `heavy`.
-pub(super) fn machine(enforce: &str, heavy: &[&str]) -> String {
-    let list: Vec<String> = heavy.iter().map(|p| format!("\"{p}\"")).collect();
-    format!(
-        "[jobs]\nenforce = \"{enforce}\"\nheavy = [{}]\n",
-        list.join(", ")
-    )
-}
-
-/// A PreToolUse of `tool` (`Bash`, `PowerShell` or `Monitor`) whose `command` is `command`, from a
-/// session in `cwd`.
-pub(super) fn call(hooks: &Hooks, tool: &str, command: &str, cwd: &Path) -> Value {
-    let fixture = format!("PreToolUse-{tool}");
-    with(
-        event(&hooks.pool, &fixture, "s1", cwd),
-        &[(
-            "tool_input",
-            json!({ "command": command, "description": "Run it" }),
-        )],
-    )
-}
-
-/// Runs `wtpool hook policy` once with `payload`, `envs` added to its environment.
-pub(super) fn policy(hooks: &Hooks, payload: &Value, envs: &[(&str, OsString)]) -> HookRun {
-    let options = RunOptions {
-        args: vec!["policy".to_owned()],
-        envs: envs
-            .iter()
-            .map(|(key, value)| ((*key).to_owned(), value.clone()))
-            .collect(),
-        ..RunOptions::default()
-    };
-    hooks.run_with(payload, &options)
-}
-
-/// The deny decision `wtpool hook policy` prints for `reason`.
-fn deny(reason: &str) -> Value {
-    json!({
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
-            "permissionDecisionReason": reason,
-        }
-    })
-}
-
-/// The reason of the deny decision the run printed on one line, `None` for no output, or an error
-/// when its stdout is neither.
-pub(super) fn decision(run: &HookRun) -> Result<Option<String>, String> {
-    if run.code() != Some(0) {
-        return Err(format!("it did not exit 0: {}", run.describe()));
-    }
-    let stdout = String::from_utf8_lossy(&run.output.stdout);
-    if stdout.is_empty() {
-        return Ok(None);
-    }
-    let line = stdout.strip_suffix('\n').unwrap_or(&stdout);
-    if line.contains('\n') {
-        return Err(format!("stdout is more than one line: {stdout:?}"));
-    }
-    let value: Value =
-        serde_json::from_str(line).map_err(|e| format!("stdout is no JSON ({e}): {stdout:?}"))?;
-    let reason = value["hookSpecificOutput"]["permissionDecisionReason"]
-        .as_str()
-        .map(str::to_owned)
-        .ok_or_else(|| format!("stdout is no deny decision: {stdout:?}"))?;
-    if value != deny(&reason) {
-        return Err(format!("stdout is not the decision of H29: {stdout:?}"));
-    }
-    Ok(Some(reason))
-}
 
 /// The reason of the deny decision for `words` and the wrapped `command`.
 pub(super) fn reason(words: &str, command: &str) -> String {

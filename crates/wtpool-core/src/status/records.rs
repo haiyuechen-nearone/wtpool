@@ -4,7 +4,6 @@ use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::Metadata;
-use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Deserializer};
@@ -203,14 +202,6 @@ impl RecordKey {
     #[must_use]
     pub fn agent(&self) -> Option<&str> {
         self.stem.get(self.session_len + 1..)
-    }
-}
-
-impl Deref for RecordKey {
-    type Target = str;
-
-    fn deref(&self) -> &str {
-        &self.stem
     }
 }
 

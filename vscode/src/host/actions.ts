@@ -20,10 +20,14 @@ export function showError(text: string): void {
 export async function run({ type, worktree }: DirectAction): Promise<void> {
   switch (type) {
     case 'open':
-      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(worktree.path), { forceNewWindow: true });
+      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(worktree.path), {
+        forceNewWindow: true,
+      });
       break;
     case 'terminal':
-      vscode.window.createTerminal({ cwd: worktree.path, name: `wtpool ${plain(worktree.name)}` }).show();
+      vscode.window
+        .createTerminal({ cwd: worktree.path, name: `wtpool ${plain(worktree.name)}` })
+        .show();
       break;
     case 'copyPath':
       await vscode.env.clipboard.writeText(worktree.path);

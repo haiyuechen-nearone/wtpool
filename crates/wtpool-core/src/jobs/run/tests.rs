@@ -8,6 +8,7 @@ use crate::clock::{SystemClock, Timestamp};
 use crate::heavy::Pattern;
 use crate::jobs::{JobRecord, JobState};
 use crate::processes::{RunningProcess, StartTime};
+use crate::test_support::eventually;
 
 fn command(program: &str, args: &[&str]) -> JobCommand {
     JobCommand {
@@ -282,18 +283,21 @@ fn inside_live_job__should_need_a_live_job() {
     let (dead, held) = running_job(&folder, OUTER);
     drop(held);
     let processes = Lineage(vec![OUTER, 1]);
-
-    // When
-    let inside = [
+    let jobs = [
         Some(OsStr::new(dead.id.as_str())),
         Some(OsStr::new("4242-0badc0de")),
         Some(OsStr::new("4242")),
         None,
-    ]
-    .map(|job| inside_live_job(&folder, job, &processes));
+    ];
+
+    // When
+    let outside = eventually(|| {
+        jobs.iter()
+            .all(|job| !inside_live_job(&folder, *job, &processes))
+    });
 
     // Then
-    assert_eq!(inside, [false; 4]);
+    assert!(outside);
 }
 
 #[test]

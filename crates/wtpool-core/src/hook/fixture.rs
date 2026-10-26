@@ -1,12 +1,12 @@
 //! Records, activity folders and pools in temporary folders for the tests of the hook modules.
 
 use std::path::PathBuf;
-use std::time::Duration;
 
 use super::record::Record;
 use super::store::ActivityDir;
-use crate::activity::{Harness, PlacedBy, State};
+use crate::activity::{ActorId, Harness, PlacedBy, State};
 use crate::clock::Timestamp;
+pub use crate::test_support::eventually;
 
 /// 2026-10-20T12:00:00Z.
 pub const NOW: Timestamp = Timestamp::from_seconds(1_792_497_600);
@@ -21,7 +21,7 @@ pub fn record(session: &str) -> Record {
     Record {
         version: 1,
         harness: Harness::ClaudeCode,
-        session_id: session.to_owned(),
+        session_id: ActorId::try_from(session).unwrap(),
         agent_id: None,
         agent_type: None,
         label: "l".to_owned(),
@@ -33,8 +33,8 @@ pub fn record(session: &str) -> Record {
         in_flight: Vec::new(),
         done_ids: Vec::new(),
         error: None,
-        since: "2026-10-20T12:00:00Z".to_owned(),
-        updated: "2026-10-20T12:00:00Z".to_owned(),
+        since: NOW,
+        updated: NOW,
         writer_started: 1,
         process: None,
         first_cwd: None,
@@ -44,16 +44,6 @@ pub fn record(session: &str) -> Record {
         subagents: Vec::new(),
         tasks: Vec::new(),
     }
-}
-
-/// `true` once `attempt` succeeds within a second. A process another test spawns holds a copy of
-/// every open file until its exec closes them, so a lock just let go may stay held a moment.
-pub fn eventually(mut attempt: impl FnMut() -> bool) -> bool {
-    const PAUSE: Duration = Duration::from_millis(5);
-    (0..200).any(|round| {
-        std::thread::sleep(PAUSE * u32::from(round > 0));
-        attempt()
-    })
 }
 
 /// An empty `wtpool-activity/` in a temporary folder.

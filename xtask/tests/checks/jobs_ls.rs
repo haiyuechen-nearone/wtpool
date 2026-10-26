@@ -10,9 +10,9 @@ use std::path::Path;
 use rstest::rstest;
 use serde_json::{Value, json};
 
-use super::jobs_config::{jobs_table, must_lone_pool, same_path, stdout_of, wait_state};
+use crate::support::jobs::settings::{jobs_table, must_lone_pool, same_path, stdout_of};
 use crate::support::jobs::{
-    JobSpec, ProcLine, SETTLE, describe, must_job_ls_json, schema_file_errors, wtpool,
+    JobSpec, ProcLine, SETTLE, describe, must_job_ls_json, schema_file_errors, wait_state, wtpool,
 };
 use crate::support::{Sandbox, must_repo};
 

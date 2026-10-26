@@ -3,12 +3,10 @@ import { promises as fs, watch, type FSWatcher } from 'node:fs';
 import type { Output, StatusDocument } from '../generated/status';
 import type { OutputMessage, Tail } from '../shared/protocol';
 import { systemClock, type Cancel, type Clock } from './clock';
-import { readTail } from './tail';
+import { POLL_MS, readTail } from './tail';
 
 /** The fewest milliseconds between two posts of one tab's tails. */
 const POST_EVERY_MS = 250;
-/** The interval between two checks of a watched file for a change the watch missed. */
-export const POLL_MS = 1000;
 
 /** The path separators of this system: Windows takes `\` and `/` alike. */
 const SEPARATOR = process.platform === 'win32' ? '[\\\\/]' : '/';
@@ -71,7 +69,8 @@ export class OutputWatch {
    * webview that just loaded needs them.
    */
   set(document: StatusDocument | null, id: string | null, visible: boolean, fresh = false): void {
-    const paths = visible && id !== null ? listedOutputs(document, id).map((output) => output.path) : [];
+    const paths =
+      visible && id !== null ? listedOutputs(document, id).map((output) => output.path) : [];
     const rowChanged = id !== this.row;
     this.row = paths.length ? id : null;
     this.paths = paths;

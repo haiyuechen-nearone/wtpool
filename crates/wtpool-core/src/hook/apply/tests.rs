@@ -2,6 +2,15 @@ use rstest::rstest;
 
 use super::*;
 use crate::activity::CallKind;
+use crate::hook::fixture::later;
+
+fn at(text: &str) -> Timestamp {
+    Timestamp::parse(text).unwrap()
+}
+
+fn call_id(id: &str) -> CallId {
+    CallId::try_from(id).unwrap()
+}
 
 mod merge;
 mod titles;
@@ -23,25 +32,32 @@ fn kind_of(tool: &str) -> CallKind {
 }
 
 fn change(now: &str) -> Change {
+    change_at(at(now))
+}
+
+fn change_at(now: Timestamp) -> Change {
     Change {
-        harness: Harness::ClaudeCode,
-        waiting_tools: WAITING,
-        now: now.to_owned(),
-        started_micros: 10,
-        process: Some(HarnessProcess {
-            pid: 7001,
-            started: "2026-10-20T11:00:00Z".to_owned(),
-        }),
-        first_place: ("/p/fg".to_owned(), PlacedBy::Cwd),
-        first_cwd: "/p/fg".to_owned(),
-        moved_to: None,
-        new_label: "session 12:00".to_owned(),
-        label: None,
-        titles: Titles::default(),
-        transcript_offset: None,
-        subagent: None,
-        session_id: "s1".to_owned(),
-        agent: None,
+        writer: Writer {
+            harness: Harness::ClaudeCode,
+            waiting_tools: WAITING,
+            now,
+            started_micros: 10,
+            process: Some(HarnessProcess {
+                pid: 7001,
+                started: "2026-10-20T11:00:00Z".to_owned(),
+            }),
+        },
+        fresh: Fresh {
+            session: ActorId::try_from("s1").unwrap(),
+            agent: None,
+            place: Place {
+                worktree: "/p/fg".to_owned(),
+                placed_by: PlacedBy::Cwd,
+            },
+            first_cwd: "/p/fg".to_owned(),
+            label: "session 12:00".to_owned(),
+        },
+        found: Found::default(),
     }
 }
 
@@ -57,9 +73,8 @@ fn call(id: &str, tool: &str, hash: &str) -> CallFacts {
 
 fn run(events: &[Event]) -> Record {
     let mut record: Option<Record> = None;
-    for (second, event) in events.iter().enumerate() {
-        let now = format!("2026-10-20T12:00:{second:02}Z");
-        record = Some(apply(record.as_ref(), event, &change(&now)));
+    for (second, event) in (0..).zip(events) {
+        record = Some(apply(record.as_ref(), event, &change_at(later(second))));
     }
     record.unwrap()
 }
@@ -82,7 +97,7 @@ fn with(mut events: Vec<Event>, more: &[Event]) -> Vec<Event> {
 
 fn subagent(agent: &str, title: &str) -> SubagentTitle {
     SubagentTitle {
-        agent_id: agent.to_owned(),
+        agent_id: ActorId::try_from(agent).unwrap(),
         title: title.to_owned(),
     }
 }
@@ -195,12 +210,12 @@ fn apply__should_name_the_ended_call(#[case] events: Vec<Event>) {
     assert_eq!(
         record.ended,
         Some(Ended {
-            id: "c1".to_owned(),
+            id: call_id("c1"),
             tool: "change".to_owned(),
             kind: Some(CallKind::Edit),
         })
     );
-    assert_eq!(record.done_ids, vec!["c1".to_owned()]);
+    assert_eq!(record.done_ids, vec![call_id("c1")]);
 }
 
 #[test]
@@ -246,8 +261,8 @@ fn apply__should_keep_32_calls_and_64_ended_ids() {
     assert_eq!(record.in_flight.len(), 32);
     assert_eq!(record.in_flight.first().map(|c| c.id.as_str()), Some("p8"));
     assert_eq!(record.done_ids.len(), 64);
-    assert_eq!(record.done_ids.first().map(String::as_str), Some("q6"));
-    assert!(!record.in_flight.iter().any(|c| c.id == "q69"));
+    assert_eq!(record.done_ids.first().map(CallId::as_str), Some("q6"));
+    assert!(!record.in_flight.iter().any(|c| c.id.as_str() == "q69"));
 }
 
 #[test]
@@ -261,9 +276,9 @@ fn apply__should_time_since_from_the_state_change() {
     let working = run(&[Event::TurnStart, Event::CallStart(call("c", "read", "r"))]);
 
     // Then
-    assert_eq!(record.since, "2026-10-20T12:00:02Z");
-    assert_eq!(working.since, "2026-10-20T12:00:00Z");
-    assert_eq!(working.updated, "2026-10-20T12:00:01Z");
+    assert_eq!(record.since, at("2026-10-20T12:00:02Z"));
+    assert_eq!(working.since, at("2026-10-20T12:00:00Z"));
+    assert_eq!(working.updated, at("2026-10-20T12:00:01Z"));
     assert_eq!(
         working.action,
         Some(Action {
@@ -285,9 +300,9 @@ fn apply__should_move_only_to_another_worktree(
     // Given
     let first = apply(None, &Event::TurnStart, &change("2026-10-20T12:00:00Z"));
     let mut next = change("2026-10-20T12:00:01Z");
-    next.moved_to = moved_to.map(str::to_owned);
-    next.process = None;
-    next.label = Some("Fix".to_owned());
+    next.found.moved_to = moved_to.map(str::to_owned);
+    next.writer.process = None;
+    next.found.label = Some("Fix".to_owned());
 
     // When
     let record = apply(Some(&first), &Event::CwdChange, &next);
@@ -368,21 +383,37 @@ fn apply__should_leave_a_standing_wait_and_ended_calls_alone(
     // Then
     assert_eq!(record.state, state);
     assert_eq!(record.waiting.as_ref().map(|w| w.reason), reason);
-    assert_eq!(record.waiting.and_then(|w| w.call).as_deref(), call);
+    assert_eq!(
+        record
+            .waiting
+            .and_then(|w| w.call)
+            .as_ref()
+            .map(CallId::as_str),
+        call
+    );
 }
 
 #[test]
 fn finish_subagent__should_mark_done() {
     // Given
     let mut start = change("2026-10-20T12:00:00Z");
-    start.agent = Some(("a1".to_owned(), Some("Explore".to_owned())));
+    start.fresh.agent = Some(Agent {
+        id: ActorId::try_from("a1").unwrap(),
+        agent_type: Some("Explore".to_owned()),
+    });
     let subagent = apply(None, &Event::SubagentStart, &start);
 
     // When
-    let done = finish_subagent(&subagent, &change("2026-10-20T12:00:05Z"));
+    let done = finish_subagent(&subagent, &change("2026-10-20T12:00:05Z").writer);
 
     // Then
     assert_eq!(done.state, State::Done);
-    assert_eq!(done.since, "2026-10-20T12:00:05Z");
-    assert_eq!(done.agent_id.as_deref(), Some("a1"));
+    assert_eq!(done.since, at("2026-10-20T12:00:05Z"));
+    assert_eq!(
+        (
+            done.agent_id.as_ref().map(ActorId::as_str),
+            done.agent_type.as_deref()
+        ),
+        (Some("a1"), Some("Explore"))
+    );
 }

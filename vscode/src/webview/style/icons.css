@@ -1,7 +1,4 @@
-/*
- * The tab's icons: codicon glyphs in ::before. The build copies codicon.ttf beside this sheet and
- * appends style.css to it.
- */
+/* The build copies codicon.ttf beside the bundled sheet. */
 
 @font-face {
   font-family: codicon;
@@ -9,7 +6,6 @@
   src: url("codicon.ttf") format("truetype");
 }
 
-/* Every icon: a codicon glyph in ::before, in the colour of its element. */
 .icon::before,
 .line-icon::before,
 .chip::before,
@@ -17,7 +13,10 @@
 .repo-icon::before,
 .no-folder::before,
 .agents-off::before,
-.action::before {
+.action::before,
+.machine-button::after,
+.jobs-problem::before,
+.chip-button::before {
   display: inline-block;
   font-family: codicon, sans-serif;
   font-size: 16px;
@@ -29,8 +28,6 @@
   vertical-align: text-bottom;
   -webkit-font-smoothing: antialiased;
 }
-
-/* Header chips and the connection. */
 
 .chip::before {
   font-size: 13px;
@@ -72,7 +69,6 @@
   margin-right: 6px;
 }
 
-/* A pool's heading: the repo glyph. */
 .repo-icon::before {
   content: "\ea62";
 }
@@ -254,4 +250,34 @@ body:not(.vscode-reduce-motion) .icon .robot-arm-right {
 
 .action-fg::before {
   content: "\eb06";
+}
+
+.machine-button::after {
+  content: "\eab4";
+  margin-left: 4px;
+  font-size: 14px;
+  vertical-align: -2px;
+}
+
+.machine-button[aria-expanded="true"]::after {
+  content: "\eab7";
+}
+
+.jobs-problem::before {
+  content: "\ea6c";
+  margin-right: 3px;
+  font-size: 14px;
+  vertical-align: -2px;
+}
+
+.chip-button::before {
+  font-size: 12px;
+}
+
+.chip-remove::before {
+  content: "\ea76";
+}
+
+.suggest-add::before {
+  content: "\ea60";
 }

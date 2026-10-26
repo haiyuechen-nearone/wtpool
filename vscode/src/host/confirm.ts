@@ -12,7 +12,7 @@ import {
 } from '../shared/confirmation';
 import type { BranchSlot } from '../shared/protocol';
 import { showError } from './actions';
-import { describeExit, runToEnd, type RunEnd } from './spawn';
+import { runToEnd, wholeError } from './spawn';
 
 /** The most characters of wtpool's error a notification shows. The log keeps all of it. */
 const SHOWN_REASON_CHARS = 300;
@@ -34,18 +34,8 @@ async function ask(asked: Question): Promise<boolean> {
   return answer === asked.confirm;
 }
 
-function failureOf(end: RunEnd): string | undefined {
-  if (!end.started) {
-    return end.error.message;
-  }
-  if (end.code === 0) {
-    return undefined;
-  }
-  return end.stderr.trim() || describeExit(end.code, end.signal);
-}
-
 async function runWtpool(context: ConfirmContext, args: string[]): Promise<void> {
-  const reason = failureOf(await runToEnd(context.binary(), args, context.cwd()));
+  const reason = wholeError(await runToEnd(context.binary(), args, context.cwd()));
   if (reason === undefined) {
     return;
   }

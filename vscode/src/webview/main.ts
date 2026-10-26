@@ -46,7 +46,8 @@ function isJobSettings(data: unknown): data is JobSettingsAnswer {
   return (error === undefined || typeof error === 'string') && (scope === undefined || scope === 'machine' || scope === 'repository');
 }
 
-const page = new Page(acquireVsCodeApi());
+const host = acquireVsCodeApi();
+const page = new Page(host);
 
 window.wtpoolEarly.attach((data) => {
   if (isView(data)) {
@@ -57,5 +58,6 @@ window.wtpoolEarly.attach((data) => {
     page.showJobSettings(data);
   }
 });
+host.postMessage({ type: 'ready' });
 
 setInterval(() => void page.tick(Date.now()), 1000);

@@ -30,7 +30,12 @@ export interface PanelContext {
 
 /** Gives the webview options of a created and of a restored tab. */
 export function webviewOptions(media: vscode.Uri): vscode.WebviewOptions {
-  return { enableScripts: true, enableCommandUris: false, enableForms: false, localResourceRoots: [media] };
+  return {
+    enableScripts: true,
+    enableCommandUris: false,
+    enableForms: false,
+    localResourceRoots: [media],
+  };
 }
 
 /**
@@ -39,7 +44,10 @@ export function webviewOptions(media: vscode.Uri): vscode.WebviewOptions {
  * contrast.
  */
 function tabIcon(media: vscode.Uri): { light: vscode.Uri; dark: vscode.Uri } {
-  return { light: vscode.Uri.joinPath(media, 'icon-light.svg'), dark: vscode.Uri.joinPath(media, 'icon-dark.svg') };
+  return {
+    light: vscode.Uri.joinPath(media, 'icon-light.svg'),
+    dark: vscode.Uri.joinPath(media, 'icon-dark.svg'),
+  };
 }
 
 /** Gives the `wtpool` binary: the application scoped `wtpool.path`, read at each start. */
@@ -154,13 +162,22 @@ export class StatusPanel {
         this.selected = request.row;
         this.outputs.set(this.document, request.row, this.visible, true);
         break;
+      case 'ready':
+        // VS Code reloads a page that moves to another group, and the tab stays visible, so no
+        // show posts the view to it.
+        this.post();
+        this.outputs.set(this.document, this.selected, this.visible, true);
+        break;
       case 'follow':
         follow(request.output.path, request.label, request.output.summary);
         break;
       case 'free':
       case 'fg':
-        // The modal outlives the message, and confirm shows its own errors, a failed spawn included.
-        void confirm(this.confirmContext, request.type, request.worktree).catch((error: unknown) => void this.report(request, error));
+        // The modal outlives the message, and confirm shows its own errors, a failed spawn
+        // included.
+        void confirm(this.confirmContext, request.type, request.worktree).catch(
+          (error: unknown) => void this.report(request, error),
+        );
         break;
       case 'open':
       case 'terminal':
