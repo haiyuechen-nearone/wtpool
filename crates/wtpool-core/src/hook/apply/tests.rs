@@ -232,6 +232,34 @@ fn apply__should_track_no_call_without_an_id() {
 }
 
 #[test]
+fn apply__should_finish_a_subagent_whose_turn_failed() {
+    // Given
+    let mut start = change("2026-10-20T12:00:00Z");
+    start.fresh.agent = Some(Agent {
+        id: ActorId::try_from("a1").unwrap(),
+        agent_type: Some("Explore".to_owned()),
+    });
+    let subagent = apply(None, &Event::SubagentStart, &start);
+
+    // When
+    let failed = apply(
+        Some(&subagent),
+        &Event::TurnEnd(Some("server_error".to_owned())),
+        &change("2026-10-20T12:00:05Z"),
+    );
+
+    // Then
+    assert_eq!(
+        (failed.state, failed.error.as_deref(), failed.since),
+        (
+            State::Done,
+            Some("server_error"),
+            at("2026-10-20T12:00:05Z")
+        )
+    );
+}
+
+#[test]
 fn apply__should_keep_the_error_of_a_stop_failure() {
     // When
     let failed = run(&[Event::TurnEnd(Some("rate_limit".to_owned()))]);

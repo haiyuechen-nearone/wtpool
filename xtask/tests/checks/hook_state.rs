@@ -219,6 +219,15 @@ fn transition(case: &str) -> (Vec<Step>, &'static str, &'static str, Option<&'st
             steps.extend([prompt(), step("StopFailure", vec![])]);
             ("s1", "idle", None)
         }
+        "subagent_stop_failure" => {
+            steps.extend([
+                prompt(),
+                step("PreToolUse-Agent", vec![]),
+                sub("SubagentStart", vec![]),
+                sub("StopFailure", vec![]),
+            ]);
+            ("s1.a1", "done", None)
+        }
         "subagent_start" => {
             steps.extend([
                 prompt(),
@@ -271,6 +280,7 @@ fn transition(case: &str) -> (Vec<Step>, &'static str, &'static str, Option<&'st
 #[case("other_notification")]
 #[case("stop")]
 #[case("stop_failure")]
+#[case("subagent_stop_failure")]
 #[case("subagent_start")]
 #[case("subagent_stop")]
 #[case("cwd_changed_keeps_idle")]
@@ -305,7 +315,7 @@ fn transitions__should_match_the_event_table(#[case] case: &str) {
             "{case}: the permission wait never bound, so its end proves nothing"
         );
     }
-    if case == "stop_failure" {
+    if ["stop_failure", "subagent_stop_failure"].contains(&case) {
         assert_eq!(record["error"], json!("rate_limit"), "{case}: error");
     }
     if case == "other_notification" {

@@ -5,12 +5,11 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { sleep } from '../support/processes.mjs';
 import { makePool, sessionEnv, wtpoolEnv } from './sandbox.mjs';
 
 export class Inconclusive extends Error {}
 export class AssumptionBroken extends Error {}
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** A Claude Code assert: its failure is assumption_broken. */
 function expectClaude(condition, message) {

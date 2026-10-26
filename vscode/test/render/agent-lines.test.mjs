@@ -4,7 +4,7 @@ import { afterEach, test } from 'vitest';
 import { POOL, actor, ago, document, mustValidate, withActor, worktree } from '../support/docs.mjs';
 import { WORDS } from '../support/grammar.mjs';
 import { agentFacts, agentProblems } from '../support/jobs-render.mjs';
-import { mount, rowById, seen } from '../support/webview.mjs';
+import { mount, rowById, seen, seenLines } from '../support/webview.mjs';
 
 let webview;
 afterEach(() => {
@@ -95,8 +95,13 @@ const STATES = [
   ['idle', { state: 'idle', action: null }],
   ['idle_error', { state: 'idle', action: null, error: 'rate_limit' }],
   ['done', { state: 'done', kind: 'subagent', label: 'Explore' }],
+  ['done_error', { state: 'done', kind: 'subagent', label: 'Explore', action: null, error: 'server_error' }],
   ['queued', { state: 'working', label: 'Design jobs', action: { tool: 'queued:', target: 'cargo test' } }],
 ];
+
+/** The worktrees after those of {@link STATES}: one with a build line, one with no agent. */
+const BUILD_LINE = `wt${STATES.length + 1}`;
+const NO_AGENT = `wt${STATES.length + 2}`;
 
 /** One worktree per case of {@link STATES}, so each line is alone in its row. */
 function iconsDocument() {
@@ -106,8 +111,8 @@ function iconsDocument() {
     const one = withActor(name, overrides);
     worktrees.push(overrides.state === 'done' ? { ...one, activity: 'free' } : one);
   });
-  worktrees.push(worktree('wt8', { branch: 'b', free: false, reasons: ['branch'], activity: 'building', builds: [{ pid: 4242, name: 'cargo-nextest' }] }));
-  worktrees.push(worktree('wt9'));
+  worktrees.push(worktree(BUILD_LINE, { branch: 'b', free: false, reasons: ['branch'], activity: 'building', builds: [{ pid: 4242, name: 'cargo-nextest' }] }));
+  worktrees.push(worktree(NO_AGENT));
   return document(worktrees);
 }
 
@@ -145,7 +150,8 @@ test('line_icons__should_match_each_state', async () => {
   const states = ['working', 'quiet', 'waiting', 'idle', 'idle_error', 'done'];
   assert.equal(new Set(states.map((s) => signatures.get(s))).size, states.length, `states share a line icon (U13): ${JSON.stringify(Object.fromEntries(signatures))}`);
   assert.equal(signatures.get('queued'), signatures.get('working'), "a queued line's icon is not working's (jobs.md Q8)");
-  for (const name of ['wt8', 'wt9']) {
+  assert.equal(signatures.get('done_error'), signatures.get('idle_error'), "a done line with an API error does not take the error icon (U13)");
+  for (const name of [BUILD_LINE, NO_AGENT]) {
     const { line, icon } = firstLine(name);
     assert.ok(line, `${name}: no .line`);
     assert.ok(icon, `${name}: the build or no agent line keeps no empty .line-icon box first (U13)`);
@@ -166,4 +172,21 @@ test('line_icons__should_match_each_state several_lines', async () => {
   // Then
   const subject = status.pools[0].worktrees[1];
   assert.deepEqual(agentProblems(webview.window, row('wt2'), subject, WORDS.working), [], 'the count and each line of five agents (U12, U13)');
+});
+
+test('agent_line__should_read_done_with_its_api_error', async () => {
+  // Given
+  const failed = actor({ key: 's1.a1', kind: 'subagent', label: 'Explore', state: 'done', action: null, error: 'server_error', updated: ago(20) });
+  const status = mustValidate(document([worktree('fg'), crowded([failed], 'unused')]));
+  webview = await mount();
+
+  // When
+  webview.show(status);
+
+  // Then
+  const cell = row('wt2').querySelectorAll(':scope > td')[4];
+  const lines = seenLines(webview.window, cell).map((line) => line.replace(/\s+/g, ' ').trim());
+  assert.deepEqual(lines, ['Explore · done · API error: server_error'], 'the line of a subagent whose turn ended in an API error (A2, U13)');
+  const [facts] = agentFacts(webview.window, row('wt2')).lines;
+  assert.ok(facts.hiddenText.trim().startsWith('done, API error:'), `the hidden state of the line (U13): "${facts.hiddenText}"`);
 });

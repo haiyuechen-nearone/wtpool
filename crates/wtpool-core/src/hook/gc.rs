@@ -133,11 +133,16 @@ pub fn collect(
     deadline: Option<Deadline<'_>>,
 ) -> Collected {
     let budget = Budget::new(deadline);
-    let records = read_records(activity, &budget);
+    let (records, unreadable) = read_records(activity, &budget);
     let expiry = Expiry::new(now, &records, table);
     let mut collected = Collected::default();
     for (stem, record) in records.iter().take_while(|_| budget.in_time()) {
         collected.count(delete_expired(activity, &expiry, stem, record));
+    }
+    for stem in unreadable.iter().take_while(|_| budget.in_time()) {
+        if delete_unreadable(activity, now, stem) {
+            collected.count(true);
+        }
     }
     if !budget.stopped() {
         delete_orphan_locks(activity, &budget);
@@ -146,14 +151,52 @@ pub fn collect(
     collected
 }
 
-/// The records of `activity` that read, with their stems, as many as `budget` gives time for.
-fn read_records(activity: &ActivityDir, budget: &Budget<'_>) -> Vec<(String, Record)> {
-    activity
+/// The records of `activity` that read, with their stems, and the stems of those that do not,
+/// as many as `budget` gives time for.
+fn read_records(
+    activity: &ActivityDir,
+    budget: &Budget<'_>,
+) -> (Vec<(String, Record)>, Vec<String>) {
+    let mut records = Vec::new();
+    let mut unreadable = Vec::new();
+    for stem in activity
         .stems()
         .into_iter()
         .take_while(|_| budget.in_time())
-        .filter_map(|stem| activity.read(&stem).map(|record| (stem, record)))
-        .collect()
+    {
+        match activity.read(&stem) {
+            Some(record) => records.push((stem, record)),
+            None => unreadable.push(stem),
+        }
+    }
+    (records, unreadable)
+}
+
+/// Deletes the record file `stem` that does not read once its last write is a week old, the age
+/// an `ended` record keeps, and tells if it did. A symlink or another entry that is not a regular
+/// file stays.
+fn delete_unreadable(activity: &ActivityDir, now: Timestamp, stem: &str) -> bool {
+    let stale =
+        || file_written(&activity.record_path(stem)).is_some_and(|at| now.seconds_since(at) > WEEK);
+    if !stale() {
+        return false;
+    }
+    let Ok(lock) = activity.lock_now(stem) else {
+        return false;
+    };
+    let still = activity.read(stem).is_none() && stale();
+    if still {
+        activity.delete(stem, lock);
+    }
+    still
+}
+
+/// The last write of the regular file at `path`, `None` for a symlink or any other entry.
+fn file_written(path: &Path) -> Option<Timestamp> {
+    let meta = path.symlink_metadata().ok()?;
+    meta.file_type()
+        .is_file()
+        .then(|| meta.modified().ok().map(Timestamp::from_system_time))?
 }
 
 /// Deletes the record `stem` when it expired, and tells if it did. A hook may have written the

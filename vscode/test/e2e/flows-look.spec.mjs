@@ -5,8 +5,10 @@ import { test } from '@playwright/test';
 import { scenarioDocuments } from '../support/docs.mjs';
 import { GROUP_TOKENS, GROUPS } from '../support/grammar.mjs';
 import { expectedRows, resolved, waitForRows } from './rows.mjs';
+import { PHASE } from '../support/paths.mjs';
 import { openStatus, poll, withFlow, worktreePath } from './flows.mjs';
-import { PHASE, agent, unflaggedCargo } from './jobs.mjs';
+import { agent } from './jobs-process.mjs';
+import { unflaggedCargo } from './jobs-config.mjs';
 import { panelFrame, runCommand, sleep, startProcess, writeSettings } from './vscode.mjs';
 
 /** Each theme with the test of its webview body classes. VS Code sets them per theme kind. */

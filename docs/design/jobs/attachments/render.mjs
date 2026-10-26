@@ -1,7 +1,7 @@
 // Renders the design mockups of docs/design/jobs/ and docs/design/status-panel/ to PNG, through
-// the panel's real stylesheets (vscode/src/webview/icons.css and style.css) and the theme values
-// of verify/themes/, in the Chromium of vscode/test's Playwright, at 1 device pixel per CSS pixel
-// as the approved screenshots are. Each frame takes the theme its `?theme=` names, dark by
+// the panel's real stylesheet (vscode/src/webview/style.css, which imports style/icons.css) and the
+// theme values of verify/themes/, in the Chromium of vscode/test's Playwright, at 1 device pixel
+// per CSS pixel as the approved screenshots are. Each frame takes the theme its `?theme=` names, dark by
 // default, the way the shot layer sets a theme: the variables on <html>, the body classes.
 // Every request is answered from the repository; nothing reaches the network.
 //

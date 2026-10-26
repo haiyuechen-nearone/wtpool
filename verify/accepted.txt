@@ -246,3 +246,11 @@ accept js-launch 31a5358c90ad86895bdc5f8e9655b9e1da9d6dba6e8b46ad4284b623ecb8422
 accept hx-report 769d03942f66064b7e224ed1834aa038ad5f50adef23efdf07cad1578dc31ec0
 # Prettier is a dev dependency with a format script and a format check in npm run lint; the curly rule is off because Prettier moves long if bodies; two header comments are dropped.
 accept ts-prettier 2bca526e2ea7c3d1f46c1d38232dd6d3929f334ecd9e1beffa69886c113e7359
+# Harness tidy: the cc session sleep comes from support/processes.mjs, and e2e/jobs.mjs (a re-export of three modules) is deleted, its importers naming each export's module.
+accept js-leftovers df4ac6d5d2eb4fc38a6041f9f3a23c49a952f937296ab7d00500bd6d8dc5f095
+# The icons.css stylesheet moved to style/icons.css, the X7 flow row notes a reload while visible, and the U15 and X21 rows name their checks.
+accept docs-design-sweep 18ae9cc6e2945714acd3c21928558e8e0d3a743ca1b9d572e0e52869b1056f3b
+# Revision 32: a subagent whose turn ends in a StopFailure is done with its error and ages out after the minute; checks, grammar and trace rows for it.
+accept subagent-error-ages 713e7ba2223ecbabca83a9b58da2f0a534ae87b9c5761db1305dc2f37b6ca316
+# The merge of docs-design-sweep and subagent-error-ages holds both edits of verification.md; no check changed.
+accept merge-verification-md 42bb1c37d19ad5f3ea7eef74199731650312d684528c1c6d6f193e01a447a3ad

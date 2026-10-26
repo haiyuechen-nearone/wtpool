@@ -1,8 +1,8 @@
 /*
  * The proposed styles of the jobs design (docs/design/jobs/jobs.md) and of several agents in one
- * row (status-panel.md U12, U13), layered on the panel's real icons.css and style.css. A mockup
- * only: colours come from --vscode-* variables, as X13 asks of the real sheet. render.mjs sets
- * each theme's variables and body classes from verify/themes/.
+ * row (status-panel.md U12, U13), layered on the panel's real style.css, which imports
+ * icons.css. A mockup only: colours come from --vscode-* variables, as X13 asks of the real
+ * sheet. render.mjs sets each theme's variables and body classes from verify/themes/.
  */
 
 /* Several agents in one row (U12): the count after the Activity word, in the word's colour. */

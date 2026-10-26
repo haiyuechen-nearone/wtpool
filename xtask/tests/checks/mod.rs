@@ -41,6 +41,7 @@ mod status_builds;
 mod status_facts;
 mod status_files;
 mod status_outputs;
+mod status_stop_failure;
 mod watch;
 mod watch_agents;
 mod watch_changes;

@@ -131,7 +131,7 @@ export function doing(actor) {
     case 'idle':
       return actor.error ? `API error: ${visible(actor.error)}` : 'idle';
     case 'done':
-      return 'done';
+      return actor.error ? `done${DOT}API error: ${visible(actor.error)}` : 'done';
     default:
       throw new Error(`setup: unknown actor state ${actor.state}`);
   }
@@ -139,7 +139,8 @@ export function doing(actor) {
 
 /** The visually hidden start of an actor's line. */
 export function statePrefix(actor) {
-  return actor.state === 'idle' && actor.error ? 'idle, API error: ' : `${actor.state}: `;
+  const apiError = (actor.state === 'idle' || actor.state === 'done') && actor.error;
+  return apiError ? `${actor.state}, API error: ` : `${actor.state}: `;
 }
 
 /** A task heading with the run time after `running` taken off, for checks that hold either way. */

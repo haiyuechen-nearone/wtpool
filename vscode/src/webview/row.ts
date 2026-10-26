@@ -2,7 +2,7 @@ import type { Actor, Worktree } from '../generated/status';
 import { visible } from '../shared/invisible';
 import { offeredActions, type ActionType } from '../shared/protocol';
 import { bdi, button, cell, line, setText, span, type RunTime } from './dom';
-import { GROUPS, WORDS, age, agentLines, gitText, lastTimes, runTime, shownActors } from './text';
+import { GROUPS, WORDS, age, agentLines, gitText, hasApiError, lastTimes, runTime, shownActors } from './text';
 
 /** The label and class suffix of the button of each row action. */
 const ACTIONS: Readonly<Record<ActionType, { label: string; classSuffix: string }>> = {
@@ -35,7 +35,7 @@ function lineStart(actor: Actor | undefined): Node[] {
   const icon = span('line-icon');
   icon.setAttribute('aria-hidden', 'true');
   if (!actor) return [icon];
-  const apiError = actor.state === 'idle' && Boolean(actor.error);
+  const apiError = hasApiError(actor);
   if (actor.state === 'working') {
     const drawn = robot();
     if (drawn) icon.append(drawn);
@@ -43,7 +43,7 @@ function lineStart(actor: Actor | undefined): Node[] {
     icon.classList.add(`line-icon-${apiError ? 'error' : actor.state}`);
   }
   const state = span('visually-hidden');
-  state.textContent = apiError ? 'idle, API error: ' : `${actor.state}: `;
+  state.textContent = apiError ? `${actor.state}, API error: ` : `${actor.state}: `;
   return [icon, state];
 }
 

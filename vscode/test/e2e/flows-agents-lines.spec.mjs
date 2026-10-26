@@ -3,7 +3,8 @@ import path from 'node:path';
 import { test } from '@playwright/test';
 
 import { withFlow, poll, worktreePath } from './flows.mjs';
-import { WITHIN_A_SECOND_MS, agent, openTab, stopJobs } from './jobs.mjs';
+import { WITHIN_A_SECOND_MS, agent, stopJobs } from './jobs-process.mjs';
+import { openTab } from './jobs-dom.mjs';
 import { lineFacts } from './rows.mjs';
 import { sleep } from './vscode.mjs';
 

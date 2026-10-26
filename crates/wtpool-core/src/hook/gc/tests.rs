@@ -231,3 +231,48 @@ fn collect_pool__should_find_nothing_without_the_folder() {
     // Then
     assert_eq!(collected, Collected::default());
 }
+
+/// Gives `path` the last write `seconds` before [`NOW`].
+fn written_before(path: &std::path::Path, seconds: i64) {
+    let at = std::time::UNIX_EPOCH
+        + std::time::Duration::from_secs(u64::try_from(later(-seconds).seconds()).unwrap());
+    std::fs::File::open(path).unwrap().set_modified(at).unwrap();
+}
+
+#[cfg(unix)]
+#[rstest]
+#[case::unreadable_8_days("file", 8 * 86_400, false)]
+#[case::unreadable_6_days("file", 6 * 86_400, true)]
+#[case::folder_8_days("folder", 8 * 86_400, true)]
+#[case::symlink_to_an_old_file("symlink", 8 * 86_400, true)]
+fn collect__should_delete_an_unreadable_record_file_a_week_old(
+    #[case] entry: &str,
+    #[case] age: i64,
+    #[case] kept: bool,
+) {
+    // Given
+    let (dir, activity, table) = must_activity_with_claude();
+    let path = activity.record_path("s9");
+    let old = dir.path().join("old.json");
+    std::fs::write(&old, "{").unwrap();
+    written_before(&old, age);
+    match entry {
+        "file" => {
+            std::fs::write(&path, r#"{"version":1,"updated":"noon"}"#).unwrap();
+            written_before(&path, age);
+        }
+        "folder" => {
+            std::fs::create_dir(&path).unwrap();
+            written_before(&path, age);
+        }
+        _ => std::os::unix::fs::symlink(&old, &path).unwrap(),
+    }
+
+    // When
+    let collected = collect(&activity, NOW, &table, None);
+
+    // Then
+    assert_eq!(path.symlink_metadata().is_ok(), kept, "{entry} {age} s old");
+    assert_eq!(collected.deleted, usize::from(!kept));
+    assert!(old.exists(), "the symlink's target was deleted");
+}

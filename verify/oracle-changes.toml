@@ -1706,3 +1706,61 @@ reason = "Prettier is a dev dependency with a format script and a format check i
 "vscode/eslint.config.mjs" = "c0ef8786df56aab7a349a2615d0634fc232d2c4c9d90483a6961bcf84b232521"
 "vscode/package-lock.json" = "aedf201c245fe6e86472c76f1b5cd1f7f1a355d23cd0519831719bb30d953187"
 "vscode/package.json" = "56eaced8b30bf754448959f52e6ed9d49ca79d7abe99a471426a5a1913ec7627"
+
+[[change]]
+id = "js-leftovers"
+reason = "Leftover JS test helpers. vscode/test/e2e/jobs.mjs, a re-export of three modules, is deleted: flows-look.spec.mjs and flows-agents-lines.spec.mjs import each name from the module that exports it, and PHASE from support/paths.mjs. cc/sessions.mjs imports sleep from support/processes.mjs instead of defining it. Every check keeps its name, layer, assertions and messages."
+[change.files]
+"vscode/test/cc/sessions.mjs" = "abdb7bfbe3992fe69d71b97d8294b2bb6032013c71544d7e51d551e29e8e3eba"
+"vscode/test/e2e/flows-look.spec.mjs" = "49b02115632bec7feea99ba440eed8c6082d3a0c071e6f675f808218ed8555c5"
+"vscode/test/e2e/flows-agents-lines.spec.mjs" = "cdea45afc9b995eced925c4d343ca9b9323d1bc5d69bb83319e95fd90858cb2d"
+"vscode/test/e2e/jobs.mjs" = "missing"
+
+[[change]]
+id = "docs-design-sweep"
+reason = "The stylesheet icons.css moved to style/icons.css and style.css imports it, so the mockup pages link style.css alone and the comments and jobs.md name the new path. The X7 flow row of verification.md notes that a reload while the tab stays visible answers with the view at once. The U15 and X21 verification rows name heavy_editor__should_match_answers_in_order and machine_strip__should_save_again_without_an_answer."
+[change.files]
+"docs/design/jobs/attachments/ChipFocus.html" = "412421e838336ce8f5f0c536a470e61fe2020e161e47dc8e9590400d4abb943c"
+"docs/design/jobs/attachments/FirstOpen.html" = "e82af39a550f1cfa173a975df8d2b07232b5c9e813419fa87771572432047335"
+"docs/design/jobs/attachments/HeadingBusy.html" = "2729ccbc4e0b6523193c378163a0354091d609c4d7bad8474c31a4a2747a7895"
+"docs/design/jobs/attachments/HeadingError.html" = "bca1f3e16cbd782577819398996adf784053cdb365209c9883631d60ca98f030"
+"docs/design/jobs/attachments/HeadingFocus.html" = "ad6718b3e8866a26ec3c5ecfe55da978b1bdd2abc030c67e36aaeeb6f00d7534"
+"docs/design/jobs/attachments/HeadingIdle.html" = "cbe07f04037dbd37c18b633ddfdd38798c70cd5a845dd4673d6c45cc235bddb0"
+"docs/design/jobs/attachments/HeadingOld.html" = "7ae5b3dd67333f5c93ed138bbf6be0efbe329ea34324607456ed325689df8154"
+"docs/design/jobs/attachments/Measured.html" = "a8798d39c338882b0e6e4ff4db3168d57391edee5dff2ead08b3b473c776a3ef"
+"docs/design/jobs/attachments/MeasuredDismissed.html" = "9580dc873aaf2c4cf79c3f59ce0da6c8c73d95cd300099ccfd88178638500d1a"
+"docs/design/jobs/attachments/NotQueued.html" = "f4a17296188b18278e36e3895c800ab0c16581d40efbbc07c16ba712af3580a3"
+"docs/design/jobs/attachments/OptionNative.html" = "e520a71555756e028d7526965459c96fa4ee08ff83e20c31cefb1d000dc85b9b"
+"docs/design/jobs/attachments/PatternError.html" = "ea682e2d9a5d48e267e00b29bb628c6057441ec3c4ab764901462dc12f482b99"
+"docs/design/jobs/attachments/Strip.html" = "c9903eb613b90da629333ac0452f5f898e3d0b78e0e2ad729eaca1fdb8b539b8"
+"docs/design/jobs/attachments/StripInvalid.html" = "a5d5357361bf3f6e1986dc02b5243f7ab9fa4829cea8a9d12eb73f560833a67e"
+"docs/design/jobs/attachments/StripLowered.html" = "47ae52c2c9e4dba4d6f9782d97abf05f2cc09ab5f0e1e45f15fa24e0507d4e62"
+"docs/design/jobs/attachments/StripOld.html" = "62e8235a5873801a88f4b82193da8ce45f5bbeb848939ca20418b798c67aaf59"
+"docs/design/jobs/attachments/StripRefused.html" = "61ebea9ff586538bf943435ed256360812cb14ab7bac86dc5252f96a2b6899a5"
+"docs/design/jobs/attachments/StripRemote.html" = "e9edc730412c0e8a2b3ea2a6d6aacdbfc44bbeb2fb71726fbab682f5d21f99f6"
+"docs/design/jobs/attachments/StripRequire.html" = "b14bb147bb420c90715a3272f1fa698b6860ccaac3812626912327bd6dda0c33"
+"docs/design/jobs/attachments/mockup.css" = "7e3642990b0bff443342c2ace9bcb4005b6ca20a4795d46a6af0289141c498c8"
+"docs/design/jobs/attachments/render.mjs" = "b33257671e1def759893a99576dcf25408e0c64642e5233c1b0853c5eacf9818"
+"docs/design/jobs/jobs.md" = "137721dd3472df2cb8d80cab86ad4299c70e73f20ffb69606db8ffb0b0373512"
+"docs/design/status-panel/attachments/SeveralAgents.html" = "8cbbfa2ac9e7e500107e14e0f1264c3260377bc23fd2fc696d405ad3628f4857"
+"docs/design/status-panel/verification.md" = "ef053c2d740a674bf236b247c93b739b9ffa8acd8ee57515420d4dc9de9ee3e4"
+
+[[change]]
+id = "subagent-error-ages"
+reason = "status-panel.md revision 32: a subagent whose turn ends in a StopFailure is done and keeps its error, so it shows done · API error: <error> for A2's minute and then leaves, while a session's StopFailure still leaves it idle with its error. New int check stop_failure__should_finish_a_subagent_and_keep_a_session_idle, a subagent_stop_failure case in transitions__should_match_the_event_table, the render check agent_line__should_read_done_with_its_api_error, a done_error case in line_icons__should_match_each_state, the agent line grammar of a done actor with an error, and their trace rows under A2."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "30aed0d2b65d2b0d0e926501b099aa250a2dc9abbf2a42f9b6933adc70adb11c"
+"docs/design/status-panel/verification.md" = "7c17fc1254fdefab85dd98f041a54e558e1828c2c1f7628f25d66603ff34c5f1"
+"verify/checks.toml" = "7a6569296496b503e2c081b4f7cad770a50f74c67fddf4ac23bf2ddbf8519395"
+"verify/trace.toml" = "9fe7220f2cdd0e17cd8b8ba3cd76cedfdf35522238a96c48cacef8aab68e3450"
+"vscode/test/render/agent-lines.test.mjs" = "0dd3e692c31fc1b606cce3dfbbf4b23d85512824b9f312c638664e1551963d6c"
+"vscode/test/support/grammar.mjs" = "b79d7e96b4d55d7696afba58e7784ae883254ea7a345011c6c9ba236acab4a82"
+"xtask/tests/checks/hook_state.rs" = "89f954c8314a174cd0a5f70f99384aca34a3a5d1e1f2032146f2a5f9f5c399ee"
+"xtask/tests/checks/mod.rs" = "391f089bea504a6150164b8030e0f873f9280fad93061ea35a8b38ddf05e53a6"
+"xtask/tests/checks/status_stop_failure.rs" = "b938dff9689b0e97ed42ec0e23c339d0c1ef407a688fc65ea7b596191561f093"
+
+[[change]]
+id = "merge-verification-md"
+reason = "Two branches of the final review (docs-design-sweep and subagent-error-ages) each edited verification.md; the merge holds both edits, and this entry pins that combined text. No check changed."
+[change.files]
+"docs/design/status-panel/verification.md" = "280f857ed55b798cd6de47d40d794bcf826c3a7c8f494adcfe035a533c91c74b"

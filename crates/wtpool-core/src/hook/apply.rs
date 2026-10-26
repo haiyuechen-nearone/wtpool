@@ -283,13 +283,19 @@ fn idle(record: &mut Record) -> State {
     State::Idle
 }
 
-/// A turn that ended with `error` keeps it until the next turn starts.
+/// A turn that ended with `error` keeps it until the next turn starts. A subagent's error ends
+/// the subagent, as no prompt follows that would start another turn.
 fn turn_end(record: &mut Record, error: Option<&str>) -> State {
     end_turn(record);
-    if let Some(error) = error {
-        record.error = Some(error.to_owned());
+    let Some(error) = error else {
+        return State::Idle;
+    };
+    record.error = Some(error.to_owned());
+    if record.is_subagent() {
+        State::Done
+    } else {
+        State::Idle
     }
-    State::Idle
 }
 
 fn subagent_end(record: &mut Record) -> State {

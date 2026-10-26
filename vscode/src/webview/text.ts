@@ -169,7 +169,7 @@ function doing(actor: Actor): Piece[] {
     case 'idle':
       return actor.error ? [own('API error: '), theirs(actor.error)] : [own('idle')];
     default:
-      return [own('done')];
+      return actor.error ? [own(`done${DOT}API error: `), theirs(actor.error)] : [own('done')];
   }
 }
 
@@ -223,13 +223,18 @@ export function lastTimes(worktree: Worktree): Array<string | null> {
   return [worktree.last_event ?? worktree.last_change];
 }
 
+/** Tells an idle or done actor whose turn ended in an API error. */
+export function hasApiError(actor: Actor): actor is Actor & { error: string } {
+  return (actor.state === 'idle' || actor.state === 'done') && Boolean(actor.error);
+}
+
 /** Gives an actor's state in the detail strip. */
 export function stateText(actor: Actor): Piece[] {
   if (actor.state === 'waiting') {
     return [own(`waiting for ${actor.reason === null ? 'you' : WAITING_FOR[actor.reason]}`)];
   }
-  if (actor.state === 'idle' && actor.error) {
-    return [own(`idle${DOT}API error: `), theirs(actor.error)];
+  if (hasApiError(actor)) {
+    return [own(`${actor.state}${DOT}API error: `), theirs(actor.error)];
   }
   return [own(actor.state)];
 }

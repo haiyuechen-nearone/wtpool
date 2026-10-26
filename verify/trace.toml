@@ -338,9 +338,11 @@ checks = ["plugin__should_hold_the_printed_block", "install__should_report_the_p
 phase = 2
 checks = ["decay__should_match_the_table", "cc_interrupt", "builds__should_keep_the_session_that_started_them_working", "builds__should_keep_no_session_working_through_other_children", "background__should_keep_a_session_working_until_its_task_ends", "background__should_keep_a_subagent_working_until_its_task_ends", "flow__jobs_not_queued"]
 
+# A2 (status-panel.md revision 32): a subagent whose turn ended in an API error is done and
+# leaves after the minute, and its line reads done with the error.
 [ids.A2]
 phase = 2
-checks = []
+checks = ["stop_failure__should_finish_a_subagent_and_keep_a_session_idle", "agent_line__should_read_done_with_its_api_error"]
 
 [ids.A3]
 phase = 2

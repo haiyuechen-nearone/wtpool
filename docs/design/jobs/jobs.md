@@ -144,7 +144,7 @@ answer. Measured suggestions: see [autodetect.md](autodetect.md), approved, plan
 | [EditOptions](attachments/EditOptions.png) | revision 1's two options; the design is 2, the strip |
 
 [render.mjs](attachments/render.mjs) renders them, and those of U12 and U13, through the panel's own
-`icons.css` and `style.css` plus `mockup.css`, with the theme values of `verify/themes/`. Only the
+`style.css`, which imports `style/icons.css`, plus `mockup.css`, with the theme values of `verify/themes/`. Only the
 rows bind.
 
 ## User flows
@@ -344,12 +344,12 @@ U13): four working and one done in wt2 → wt2 `working` with `×5`, then `×4`.
 | W10 | `watch__should_see_jobs_within_a_second`, `watch__should_see_a_dead_job_within_a_heartbeat`, `watch__should_see_new_settings_within_a_second` | | | `jobs_change_settings` |
 | U8, U10 | | `heading__should_offer_the_machine_button` | the contrast and focus checks with the button | `jobs_open_from_heading` |
 | U11 | | `machine_strip__should_show_settings_patterns_and_jobs`, `machine_strip__should_update_in_place` | `machine_strip__should_clip_nothing_in_every_theme` (1100 and 600 px, axe) | `jobs_running_and_queued`, `jobs_old_wtpool`, `jobs_remote_window` |
-| U15 | | `heavy_editor__should_show_each_scope` (empty lists, the repository's, a `build_processes` tag, suggestions grouped by source, inline errors) | `heavy_editor__should_clip_nothing_in_every_theme` (1100 and 600 px, axe, chip outlines at 3:1) | `jobs_edit_patterns` |
+| U15 | | `heavy_editor__should_show_each_scope` (empty lists, the repository's, a `build_processes` tag, suggestions grouped by source, inline errors), `heavy_editor__should_match_answers_in_order` | `heavy_editor__should_clip_nothing_in_every_theme` (1100 and 600 px, axe, chip outlines at 3:1) | `jobs_edit_patterns` |
 | U12 | | `count__should_follow_the_agent_lines` | `count__should_keep_to_the_word_line` | `several_agents_in_one_row` |
 | U13 | | `line_icons__should_match_each_state` | `line_icons__should_align_and_share_one_size`, `line_icons__should_never_move` | `several_agents_in_one_row`, `reduced_motion` |
 | X11 | | `messages__should_ignore_everything_outside_the_set` gains `jobSettings` with extra keys, a string limit, 2.5, 0, 65, an unknown policy, no key, `heavy` beside `limit`, an unknown `op` or `scope`, a pattern outside J18 or with a leading `-`, an `rm` of an unlisted pattern, `add-suggested` with a pattern or the `machine` scope, and a document without `machine.jobs` | | |
 | X20 | | `machine_strip__should_follow_the_keyboard` | the focus checks in the strip | `jobs_invalid_value`, `keyboard_only` |
-| X21 | | `job_settings__should_run_wtpool_once_each_and_report` (argv with `--` before a pattern, `add-suggested` as the last document's suggestions, R9 folder, no shell, in order, 10 s kill, R10 wording, the answer naming its scope) | | `jobs_change_settings`, `jobs_edit_patterns`, `jobs_wtpool_missing` |
+| X21 | | `job_settings__should_run_wtpool_once_each_and_report` (argv with `--` before a pattern, `add-suggested` as the last document's suggestions, R9 folder, no shell, in order, 10 s kill, R10 wording, the answer naming its scope), `machine_strip__should_save_again_without_an_answer` | | `jobs_change_settings`, `jobs_edit_patterns`, `jobs_wtpool_missing` |
 | X22 | | `heavy_editor__should_follow_the_keyboard` (one tab stop per list, arrows, Home, End, Delete and Backspace, focus after a removal, Enter in an input, announcements) | the focus checks of U6 on a chip's remove button | `jobs_edit_patterns`, `keyboard_only` |
 
 The requirements stand for the checks of the rows they name: JR1 J4, J10. JR2 J13, J14, H29. JR3

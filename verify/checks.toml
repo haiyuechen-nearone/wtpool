@@ -258,6 +258,7 @@ heavy_editor__should_match_answers_in_order = ["render"]
 machine_strip__should_save_again_without_an_answer = ["render"]
 count__should_follow_the_agent_lines = ["render"]
 line_icons__should_match_each_state = ["render"]
+agent_line__should_read_done_with_its_api_error = ["render"]
 # host: the extension runs wtpool job limit, enforce and heavy for each jobSettings and answers (X21).
 job_settings__should_run_wtpool_once_each_and_report = ["host"]
 # shot: nothing clipped at 1100 and 600 px, axe, contrast, chip outlines and focus rings at 3:1 in
