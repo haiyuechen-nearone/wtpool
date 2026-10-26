@@ -11,6 +11,7 @@ use super::clock;
 use super::env::HookEnv;
 use super::gc;
 use super::input::{CallFacts, Event, HookInput};
+use super::log;
 use super::place::{self, Shell, ToolPath, Worktree};
 use super::procs::Me;
 use super::record::{Record, SubagentTitle};
@@ -90,7 +91,10 @@ impl<A: Adapter> Context<'_, A> {
         {
             return None;
         }
-        let lock = self.activity.lock(&stem)?;
+        let lock = self
+            .activity
+            .lock(&stem)
+            .or_else(|| self.skipped("its record's lock cannot be taken"))?;
         let current = self.activity.read(&stem);
         if let Event::Notified(_) = event
             && current.as_ref().is_some_and(|r| r.waiting.is_some())
@@ -107,11 +111,22 @@ impl<A: Adapter> Context<'_, A> {
             None => applied,
         };
         tasks::update(&mut result, &self.task_event(&event), &self.now);
-        self.activity.write(&stem, &result).ok()?;
+        if let Err(error) = self.activity.write(&stem, &result) {
+            return self.skipped(&format!("its record cannot be written: {error}"));
+        }
         drop(lock);
         self.end_session_tasks(&stem);
         self.side_effects(&event, &result, &change);
         Some(())
+    }
+
+    /// `None`, once the hook's log notes that the event wrote nothing, for `reason` (H23). The
+    /// hook still prints nothing and exits 0 (H2, H3).
+    fn skipped<T>(&self, reason: &str) -> Option<T> {
+        if let Some(dir) = &self.env.log {
+            log::append(dir, &format!("wtpool hook: skipped an event: {reason}"));
+        }
+        None
     }
 
     /// The list of work in flight a turn's end sends covers its whole session (H27):
@@ -246,14 +261,16 @@ impl<A: Adapter> Context<'_, A> {
 
     /// An [`Event::CwdChange`] moves the actor, unless back to the session's first folder (H10).
     fn cwd_change(&self, current: Option<&Record>) -> Option<String> {
-        let new_cwd = PathBuf::from(self.input.new_cwd.as_deref()?);
+        let new_cwd = place::local(Path::new(self.input.new_cwd.as_deref()?))?;
         let first = current
             .and_then(|r| r.first_cwd.as_deref())
             .map_or_else(|| self.cwd.clone(), PathBuf::from);
-        if place::same_components(&comparable(&new_cwd), &comparable(&first)) {
+        if place::is_local(&first)
+            && place::same_components(&comparable(new_cwd), &comparable(&first))
+        {
             return None;
         }
-        self.in_pool(&new_cwd)
+        self.in_pool(new_cwd)
             .map(|w| w.root.to_string_lossy().into_owned())
     }
 
@@ -393,7 +410,7 @@ fn file_target(text: &str, path: &Path, root: &Path) -> String {
         .and_then(|rest| rest.strip_prefix('/'))
         .map(str::to_owned)
         .or_else(|| {
-            let resolved = resolve(path);
+            let resolved = place::local(path).map(resolve)?;
             resolved
                 .strip_prefix(root)
                 .ok()

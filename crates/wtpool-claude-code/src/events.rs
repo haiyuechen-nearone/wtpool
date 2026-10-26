@@ -1,10 +1,9 @@
 //! Claude Code's hook events (H11): the one table of the events `wtpool hook` reads, the source
 //! of the hook block of H1 too, and each payload as the neutral [`HookInput`].
 
-use serde_json::Value;
 use wtpool_core::activity::{ActorId, CallId, WaitReason};
 use wtpool_core::hook::text::{self, MAX_TEXT};
-use wtpool_core::hook::{CallFacts, Event, HookInput, Spawned, ToolPath};
+use wtpool_core::hook::{CallFacts, CallInput, Event, HookInput, Spawned, ToolPath};
 
 use crate::payload::Payload;
 use crate::{tasks, tools};
@@ -97,7 +96,7 @@ pub fn parse(input: &[u8]) -> Option<HookInput> {
     let tool_path = match event {
         Event::CallStart(_) | Event::PermissionAsked(_) | Event::CallEnd(_) => tools::tool_path(
             payload.tool_name.as_deref().unwrap_or_default(),
-            payload.tool_input.as_ref(),
+            &payload.tool_input,
         ),
         _ => ToolPath::None,
     };
@@ -134,7 +133,7 @@ fn spawned(payload: &Payload) -> Option<Spawned> {
         return None;
     }
     let agent = payload.tool_response.as_ref()?.agent_id.clone()?;
-    let description = payload.tool_input.as_ref()?.get("description")?.as_str()?;
+    let description = payload.tool_input.string("description")?;
     Some(Spawned {
         agent_id: ActorId::try_from(agent).ok()?,
         title: description.to_owned(),
@@ -153,7 +152,7 @@ fn event_of(payload: &Payload) -> Option<Event> {
         call_facts(
             payload.tool_use_id.as_ref(),
             payload.tool_name.as_deref(),
-            payload.tool_input.as_ref(),
+            &payload.tool_input,
         )
     };
     Some(match payload.event()? {
@@ -172,7 +171,7 @@ fn event_of(payload: &Payload) -> Option<Event> {
                     call_facts(
                         call.tool_use_id.as_ref(),
                         call.tool_name.as_deref(),
-                        call.tool_input.as_ref(),
+                        &call.tool_input,
                     )
                 })
                 .collect(),
@@ -196,14 +195,14 @@ fn event_of(payload: &Payload) -> Option<Event> {
 }
 
 /// The id, tool, kind and input hash of a call; the target comes with its place.
-fn call_facts(id: Option<&CallId>, tool: Option<&str>, input: Option<&Value>) -> CallFacts {
+fn call_facts(id: Option<&CallId>, tool: Option<&str>, input: &CallInput) -> CallFacts {
     let tool = text::clean(tool.unwrap_or_default(), MAX_TEXT);
     CallFacts {
         id: id.cloned(),
         kind: tools::kind_of(&tool),
         tool,
         target: String::new(),
-        input_hash: text::input_hash(input.unwrap_or(&Value::Null)),
+        input_hash: input.hash().to_owned(),
     }
 }
 

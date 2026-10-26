@@ -7,6 +7,7 @@ use serde::Deserialize;
 use serde::de::{Deserializer, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde_json::Value;
 use wtpool_core::activity::{ActorId, CallId};
+use wtpool_core::hook::CallInput;
 
 use crate::events::HookEvent;
 
@@ -26,8 +27,9 @@ pub struct Payload {
     pub transcript_path: Option<String>,
     #[serde(default)]
     pub tool_name: Option<String>,
-    #[serde(default)]
-    pub tool_input: Option<Value>,
+    /// The call's input, `null` when the payload sends none.
+    #[serde(default = "CallInput::null")]
+    pub tool_input: CallInput,
     #[serde(default)]
     pub tool_use_id: Option<CallId>,
     #[serde(default)]
@@ -52,8 +54,9 @@ pub struct BatchCall {
     pub tool_use_id: Option<CallId>,
     #[serde(default)]
     pub tool_name: Option<String>,
-    #[serde(default)]
-    pub tool_input: Option<Value>,
+    /// The call's input, `null` when the payload sends none.
+    #[serde(default = "CallInput::null")]
+    pub tool_input: CallInput,
 }
 
 /// The fields of a call's `tool_response` that `wtpool hook` reads: the `agentId` of the subagent an

@@ -73,8 +73,8 @@ pub fn task_stopped(payload: &Payload) -> Option<TaskId> {
     if payload.event() != Some(HookEvent::PostToolUse) {
         return None;
     }
-    let input = payload.tool_input.as_ref()?;
-    let field = |name: &str| input.get(name).and_then(Value::as_str);
+    let input = &payload.tool_input;
+    let field = |name: &str| input.string(name);
     let id = match payload.tool_name.as_deref()? {
         "TaskStop" => field("task_id").or_else(|| field("shell_id")),
         "KillShell" => field("shell_id"),

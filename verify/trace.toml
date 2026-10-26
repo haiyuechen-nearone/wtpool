@@ -215,7 +215,7 @@ checks = ["hook__should_refuse_ids_outside_the_pattern"]
 
 [ids.H18]
 phase = 2
-checks = ["hook__should_not_follow_a_symlinked_record", "hook__should_keep_records_whole_under_parallel_writers"]
+checks = ["hook__should_not_follow_a_symlinked_record", "hook__should_keep_records_whole_under_parallel_writers", "hook__should_keep_a_record_it_can_read"]
 
 [ids.H19]
 phase = 2

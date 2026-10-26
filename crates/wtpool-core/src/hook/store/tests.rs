@@ -148,6 +148,27 @@ fn write__should_remove_its_temp_file_when_the_rename_fails() {
 }
 
 #[test]
+fn write__should_leave_the_record_when_the_next_cannot_fit() {
+    // Given
+    let (_dir, activity) = must_activity();
+    let record = must_record("s1");
+    activity.write("s1", &record).unwrap();
+    let mut large = must_record("s1");
+    large.first_cwd = Some("d".repeat(crate::activity::MAX_RECORD_BYTES));
+
+    // When
+    let written = activity.write("s1", &large);
+
+    // Then
+    assert_eq!(
+        written.map_err(|error| error.kind()),
+        Err(io::ErrorKind::FileTooLarge)
+    );
+    assert_eq!(activity.read("s1"), Some(record));
+    assert_eq!(activity.stems(), vec!["s1".to_owned()]);
+}
+
+#[test]
 fn delete__should_remove_the_record_and_its_lock() {
     // Given
     let (_dir, activity) = must_activity();

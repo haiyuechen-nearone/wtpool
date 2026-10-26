@@ -49,6 +49,7 @@ fn raw_stdin(payload: &Value, input_text: &str) -> Vec<u8> {
 #[rstest]
 #[case::flat("Bash", json!({"command": "git push", "description": "Push", "timeout": 5000}), true)]
 #[case::nested("mcp__srv__deploy", json!({"a": {"z": 1, "b": [{"y": 2, "c": 3}]}, "m": "x"}), true)]
+#[case::every_kind("Bash", json!({"command": "make", "n": -1, "f": 2.5, "z": null, "b": [true, false], "s": "\u{e9}\n"}), true)]
 #[case::other_input("Bash", json!({"command": "git push", "description": "Push"}), false)]
 fn wait__should_hash_input_with_sorted_keys(
     #[case] tool: &str,

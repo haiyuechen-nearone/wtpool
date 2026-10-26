@@ -1,5 +1,4 @@
 use rstest::rstest;
-use serde_json::json;
 use wtpool_core::activity::CallKind;
 use wtpool_core::hook::Shell;
 
@@ -13,7 +12,7 @@ fn must_parse(fields: &str) -> HookInput {
 
 /// The facts of a call event whose payload names no call.
 fn no_call() -> CallFacts {
-    call_facts(None, None, None)
+    call_facts(None, None, &CallInput::null())
 }
 
 #[rstest]
@@ -83,7 +82,7 @@ fn parse__should_give_a_call_its_kind_and_path() {
     assert_eq!((call.tool.as_str(), call.kind), ("Bash", CallKind::Shell));
     assert_eq!(
         call.input_hash,
-        text::input_hash(&json!({"command": "git status"}))
+        "e0d3e391760d0a9b6c24bf66cecfc5a66557784782cbc704052385bf6e9bb287"
     );
     assert_eq!(
         input.tool_path,
@@ -133,7 +132,13 @@ fn parse__should_give_each_batch_call_its_kind_and_no_path() {
             (None, "Agent", CallKind::Agent)
         ]
     );
-    assert_eq!(calls[1].input_hash, text::input_hash(&json!({"x": 1})));
+    assert_eq!(
+        (calls[0].input_hash.as_str(), calls[1].input_hash.as_str()),
+        (
+            "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+        )
+    );
     assert_eq!(input.tool_path, ToolPath::None);
 }
 

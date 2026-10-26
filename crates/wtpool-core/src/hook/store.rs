@@ -143,8 +143,11 @@ impl Activity {
     }
 
     /// Writes `record` as `stem` through a temp file opened `O_CREAT | O_EXCL | O_NOFOLLOW` and
-    /// renamed over the record, which replaces a symlink or FIFO there.
+    /// renamed over the record, which replaces a symlink or FIFO there. A record that cannot fit
+    /// in [`MAX_RECORD_BYTES`](crate::activity::MAX_RECORD_BYTES) leaves the file as it was
+    /// ([`Record::to_json`]).
     pub fn write(&self, stem: &str, record: &Record) -> io::Result<()> {
+        let text = record.to_json()?;
         let temp = self
             .dir
             .join(format!(".{stem}.json.{}.tmp", std::process::id()));
@@ -153,7 +156,7 @@ impl Activity {
         options.write(true).create_new(true);
         let mut file = open_private(&mut options, &temp, false)?;
         let written = file
-            .write_all(&record.to_json())
+            .write_all(&text)
             .and_then(|()| std::fs::rename(&temp, self.record_path(stem)));
         if written.is_err() {
             let _ = std::fs::remove_file(&temp);

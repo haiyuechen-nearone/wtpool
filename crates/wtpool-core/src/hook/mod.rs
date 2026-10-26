@@ -6,6 +6,7 @@
 mod adapter;
 mod apply;
 mod bash;
+mod call_input;
 mod clock;
 mod env;
 mod event;
@@ -23,11 +24,12 @@ pub mod text;
 
 pub use crate::fs::{home_folder, open_without_following};
 pub use adapter::{Adapter, TranscriptTitles, WaitingTools};
+pub use call_input::CallInput;
 pub use env::HookEnv;
 pub use event::handle;
 pub use gc::{Collected, collect_pool};
 pub use input::{CallFacts, Event, HookInput, Spawned, read_input};
 pub use install::{Printed, is_under_target};
-pub use log::{append as log_line, log_dir};
+pub use log::append as log_line;
 pub use place::{Shell, ToolPath};
 pub use procs::ProcessTable;

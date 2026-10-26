@@ -1,9 +1,8 @@
 //! Claude Code's tools: the field that names a call's path (H8), the tools that wait for the
 //! user (H13) and the kind of each call (H26).
 
-use serde_json::Value;
 use wtpool_core::activity::{CallKind, WaitReason};
-use wtpool_core::hook::{Shell, ToolPath, WaitingTools};
+use wtpool_core::hook::{CallInput, Shell, ToolPath, WaitingTools};
 
 /// The tools whose calls wait for the user (H13): `AskUserQuestion` asks a question,
 /// `ExitPlanMode` for a plan's approval.
@@ -28,13 +27,8 @@ pub fn kind_of(tool: &str) -> CallKind {
 /// Glob, EnterWorktree), `notebook_path` (NotebookEdit), `command` (Bash, PowerShell, Monitor).
 /// Every command reads as a POSIX shell's, PowerShell's included.
 #[must_use]
-pub fn tool_path(tool: &str, input: Option<&Value>) -> ToolPath {
-    let field = |name: &str| {
-        input
-            .and_then(|input| input.get(name))
-            .and_then(Value::as_str)
-            .map(str::to_owned)
-    };
+pub fn tool_path(tool: &str, input: &CallInput) -> ToolPath {
+    let field = |name: &str| input.string(name).map(str::to_owned);
     let command = |command| ToolPath::Command {
         command,
         shell: Shell::Posix,
@@ -110,10 +104,10 @@ mod tests {
         #[case] expected: ToolPath,
     ) {
         // Given
-        let input = json!({ field: "/p" });
+        let input: CallInput = serde_json::from_value(json!({ field: "/p" })).unwrap();
 
         // When
-        let found = tool_path(tool, Some(&input));
+        let found = tool_path(tool, &input);
 
         // Then
         assert_eq!(found, expected);

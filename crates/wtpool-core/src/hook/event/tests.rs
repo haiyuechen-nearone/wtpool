@@ -73,6 +73,7 @@ impl Pool {
             home: Some(root.clone()),
             tz: Some("UTC".to_owned()),
             entered_micros: 0,
+            log: Some(root.join("state/wtpool")),
         };
         Self {
             _dir: dir,
@@ -118,6 +119,11 @@ impl Pool {
 
     fn send(&self, input: HookInput) {
         handle(&self.adapter(input), b"", &self.env);
+    }
+
+    /// The hook's log, empty when there is none.
+    fn log(&self) -> String {
+        std::fs::read_to_string(self.root.join("state/wtpool/hook.log")).unwrap_or_default()
     }
 
     fn record(&self, stem: &str) -> Option<Record> {
@@ -225,6 +231,45 @@ fn handle__should_record_a_task_in_the_file_the_adapter_names() {
     );
 }
 
+#[test]
+fn handle__should_log_a_skip_when_the_lock_cannot_be_taken() {
+    // Given
+    let pool = Pool::must_new();
+    std::fs::create_dir(pool.root.join("fg/.git/wtpool-activity/s1.json.lock")).unwrap();
+
+    // When
+    pool.send(pool.input(Event::TurnStart));
+
+    // Then
+    assert!(pool.record("s1").is_none());
+    assert_eq!(
+        pool.log(),
+        "wtpool hook: skipped an event: its record's lock cannot be taken\n"
+    );
+}
+
+#[test]
+fn handle__should_log_a_skip_when_the_record_cannot_fit() {
+    // Given
+    let pool = Pool::must_new();
+    let deep = vec!["d".repeat(200); 90].join("/");
+    let input = HookInput {
+        cwd: format!("{}/{deep}", pool.path("fg")),
+        ..pool.input(Event::TurnStart)
+    };
+
+    // When
+    pool.send(input);
+
+    // Then
+    assert!(pool.record("s1").is_none());
+    let log = pool.log();
+    assert!(
+        log.starts_with("wtpool hook: skipped an event: its record cannot be written: "),
+        "{log}"
+    );
+}
+
 #[rstest]
 #[case::refused_input(None)]
 #[case::relative_folder(Some("relative"))]
@@ -253,6 +298,7 @@ fn handle__should_write_nothing_without_an_input_in_the_pool(#[case] cwd: Option
 #[case::inside("{root}/wt1/a/b.txt", "a/b.txt")]
 #[case::other_spelling("{root}/fg/../wt1/c.txt", "c.txt")]
 #[case::outside("/elsewhere/d.txt", "d.txt")]
+#[case::unc_shaped("/{root}/wt1/a/b.txt", "b.txt")]
 fn file_target__should_name_the_path_inside_the_worktree(
     #[case] text: &str,
     #[case] expected: &str,

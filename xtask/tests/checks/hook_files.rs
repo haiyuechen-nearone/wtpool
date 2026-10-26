@@ -3,6 +3,7 @@
 
 use std::fs;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -116,6 +117,87 @@ fn hook__should_not_follow_a_symlinked_record(#[case] kind: &str) {
     assert!(
         !text.contains("WTPOOL-VERIFY-OLD"),
         "wtpool hook read the record over 16 KiB"
+    );
+}
+
+/// A record's limit: `wtpool status` and the hook refuse to read a larger one (H18).
+const MAX_RECORD: usize = 16 * 1024;
+
+/// A folder below `fg` whose path is `length` bytes longer, in parts of 200 bytes.
+fn deeper(fg: &Path, length: usize) -> PathBuf {
+    let part = format!("/{}", "d".repeat(199));
+    let tail: String = part.chars().cycle().take(length).collect();
+    PathBuf::from(format!("{}{tail}", fg.display()))
+}
+
+#[test]
+fn hook__should_keep_a_record_it_can_read() {
+    // Given
+    let hooks = Hooks::must_new("hook-record-fits");
+    let record_path = |stem: &str| hooks.activity().join(format!("{stem}.json"));
+    hooks.send(&ev(&hooks, "UserPromptSubmit", "s-short", &[]));
+    let short = fs::read(record_path("s-short")).map_or(0, |text| text.len());
+    // The first event's cwd, kept as first_cwd, brings the record within 150 bytes of 16 KiB.
+    let cwd = deeper(&hooks.pool.fg, MAX_RECORD - 150 - short);
+    let full = |fixture: &str, fields: &[(&str, Value)]| {
+        with(event(&hooks.pool, fixture, "s-full", &cwd), fields)
+    };
+    hooks.send(&full("UserPromptSubmit", &[]));
+    let first = fs::read(record_path("s-full")).unwrap_or_default();
+
+    // When
+    hooks.send(&full(
+        "PreToolUse-Read",
+        &[
+            ("tool_use_id", json!("toolu_over")),
+            (
+                "tool_input",
+                json!({ "file_path": hooks.pool.fg.join("f.txt") }),
+            ),
+        ],
+    ));
+    let trimmed = fs::read(record_path("s-full")).unwrap_or_default();
+    hooks.send(&full(
+        "StopFailure",
+        &[("error", json!("\u{1f600}".repeat(80)))],
+    ));
+    let kept = fs::read(record_path("s-full")).unwrap_or_default();
+    let status = hooks.status();
+    let log = fs::read_to_string(hooks.sandbox.root.join("xdg/state/wtpool/hook.log"))
+        .unwrap_or_default();
+
+    // Then
+    assert!(
+        (MAX_RECORD - 200..=MAX_RECORD).contains(&first.len()),
+        "setup: the first record of s-full has {} bytes",
+        first.len()
+    );
+    let record: Value = serde_json::from_slice(&trimmed).unwrap_or_default();
+    assert!(
+        trimmed.len() <= MAX_RECORD,
+        "a call that brings the record past 16 KiB left {} bytes",
+        trimmed.len()
+    );
+    assert_eq!(
+        (&record["action"]["tool"], &record["in_flight"]),
+        (&json!("Read"), &json!([])),
+        "the call past 16 KiB was not dropped from in_flight alone: {:.300}",
+        String::from_utf8_lossy(&trimmed)
+    );
+    assert_eq!(
+        kept, trimmed,
+        "an event whose record cannot fit in 16 KiB changed the record"
+    );
+    let actors = &crate::support::worktree(&status, "fg")["actors"];
+    assert!(
+        actors
+            .as_array()
+            .is_some_and(|a| a.iter().any(|actor| actor["key"] == "s-full")),
+        "wtpool status cannot read s-full after an event too large to record: {actors}"
+    );
+    assert!(
+        log.contains("wtpool hook: skipped an event: its record cannot be written"),
+        "the hook log says nothing of the event it skipped: {log:?}"
     );
 }
 

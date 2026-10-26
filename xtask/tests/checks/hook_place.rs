@@ -404,6 +404,14 @@ fn placement__should_use_the_nearest_existing_ancestor() {
             PathBuf::from("/wtpool-verify-nowhere/x/y.txt"),
             "fg",
         ),
+        (
+            "a UNC-shaped path to wt2, never read",
+            PathBuf::from(format!(
+                "/{}",
+                hooks.pool.worktree("wt2").join("f.txt").display()
+            )),
+            "fg",
+        ),
     ];
 
     // When
@@ -494,6 +502,9 @@ fn hook__should_run_no_git() {
 #[case::bash_file_path("PreToolUse-Bash", "file_path", "{wtpool}/f.txt", false)]
 #[case::search_query("PreToolUse-WebSearch", "query", "{wtpool}/f.txt", false)]
 #[case::cwd_changed("CwdChanged", "new_cwd", "{wtpool}", true)]
+#[case::read_unc_shaped("PreToolUse-Read", "file_path", "/{wtpool}/f.txt", false)]
+#[case::bash_unc_shaped("PreToolUse-Bash", "command", "cat /{wtpool}/f.txt", false)]
+#[case::cwd_changed_unc_shaped("CwdChanged", "new_cwd", "/{wtpool}", false)]
 fn placement__should_read_the_path_field_of_each_tool(
     #[case] fixture: &str,
     #[case] field: &str,

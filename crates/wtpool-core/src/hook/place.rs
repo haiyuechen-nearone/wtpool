@@ -1,6 +1,6 @@
 //! A path's worktree without git (H7), and how a call names its path (H8).
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path, PathBuf, Prefix};
 
 /// A worktree found from a path: its folder and its repository's common git directory, both
 /// with symlinks resolved.
@@ -39,31 +39,85 @@ pub fn worktree_of(path: &Path) -> Option<Worktree> {
     }
 }
 
-/// `path` itself or its nearest ancestor that exists, with symlinks and `..` resolved.
+/// `path` itself or its nearest ancestor that exists, with symlinks and `..` resolved. `None`
+/// for a path the hook may not read ([`is_local`]).
 fn nearest_existing(path: &Path) -> Option<PathBuf> {
-    path.ancestors()
+    local(path)?
+        .ancestors()
         .find_map(|ancestor| ancestor.canonicalize().ok())
 }
 
+/// The worktree of `dir`, whose `.git` file `dot_git` names its git directory. A path these
+/// files hold counts only when the hook may read it ([`is_local`]).
 fn linked_worktree(dir: &Path, dot_git: &Path) -> Option<Worktree> {
     let text = std::fs::read_to_string(dot_git).ok()?;
     let target = text.lines().next()?.strip_prefix("gitdir:")?.trim();
-    let gitdir = dir.join(target).canonicalize().ok()?;
+    let gitdir = dir.join(local(Path::new(target))?).canonicalize().ok()?;
     let back = std::fs::read_to_string(gitdir.join("gitdir")).ok()?;
-    let back = gitdir.join(back.trim());
+    let back = gitdir.join(local(Path::new(back.trim()))?);
     let back = back.canonicalize().unwrap_or(back);
     if !same_components(&back, dot_git) {
         return None;
     }
-    let common = gitdir.join(
-        std::fs::read_to_string(gitdir.join("commondir"))
-            .ok()?
-            .trim(),
-    );
+    let common = std::fs::read_to_string(gitdir.join("commondir")).ok()?;
+    let common = gitdir.join(local(Path::new(common.trim()))?);
     Some(Worktree {
         root: dir.to_path_buf(),
         common: common.canonicalize().ok()?,
     })
+}
+
+/// `true` when the hook may read `path`: stat it, open it or resolve its symlinks (H7). Opening a
+/// path that starts with a UNC share, a device or a verbatim prefix other than a drive's may
+/// reach another host, over SMB with the user's NTLM hash, or a pipe; so may a root without a
+/// drive on Windows, as in `\??\UNC\…` or a `\\server` without a share. Such a path lies
+/// outside every pool.
+#[must_use]
+pub fn is_local(path: &Path) -> bool {
+    (path.is_absolute() || !path.has_root()) && is_local_prefix(prefix_of(path))
+}
+
+/// `path` when the hook may read it ([`is_local`]).
+#[must_use]
+pub fn local(path: &Path) -> Option<&Path> {
+    is_local(path).then_some(path)
+}
+
+/// `true` for no prefix and for a drive's, `C:` or `\\?\C:`: the prefixes whose paths stay on
+/// this machine.
+fn is_local_prefix(prefix: Option<Prefix<'_>>) -> bool {
+    matches!(
+        prefix,
+        None | Some(Prefix::Disk(_) | Prefix::VerbatimDisk(_))
+    )
+}
+
+/// The prefix of `path`, as the standard library reads it here.
+#[cfg(windows)]
+fn prefix_of(path: &Path) -> Option<Prefix<'_>> {
+    match path.components().next()? {
+        Component::Prefix(prefix) => Some(prefix.kind()),
+        _ => None,
+    }
+}
+
+/// No path has a prefix here, but one that starts with exactly two slashes, as `//server/share`
+/// does, reads as a UNC share: POSIX leaves such a path to the system, and Windows and Cygwin
+/// read it so.
+#[cfg(not(windows))]
+fn prefix_of(path: &Path) -> Option<Prefix<'_>> {
+    let text = path.as_os_str().as_encoded_bytes();
+    if !text.starts_with(b"//") || text.starts_with(b"///") {
+        return None;
+    }
+    let mut names = path.components().filter_map(|component| match component {
+        Component::Normal(name) => Some(name),
+        _ => None,
+    });
+    Some(Prefix::UNC(
+        names.next().unwrap_or_default(),
+        names.next().unwrap_or_default(),
+    ))
 }
 
 /// Whether two paths name the same folder component by component.

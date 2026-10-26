@@ -946,3 +946,13 @@ reason = "Publication scrub, data and wording only. The mockups of docs/design/j
 "docs/design/status-panel/attachments/SeveralAgents-600.png" = "f86b4c9ee5ff2193005111f5b3b943ee284d1f24b123ed054c117bc4e9d2c1ff"
 "docs/design/status-panel/attachments/SeveralAgents.html" = "cba198799e87b91ef1f1c295f5807f3a8d96ffaa36d8006f7f86de218f2d2708"
 "docs/design/status-panel/attachments/SeveralAgentsThemes.png" = "aee763d60454be389df0772bb7261af7a16cb667603215c5669ff887ff81cb45"
+
+[[change]]
+id = "hook-hardening"
+reason = "wtpool hook reads no path whose start may reach another host: a path with a UNC, device or verbatim prefix other than a drive's, a root without a drive on Windows, or elsewhere one that starts with exactly two slashes lies outside every pool and is never stat'ed or resolved, the paths a .git file names included. A record that cannot fit in 16 KiB once the oldest ended ids, then the oldest calls in flight, are dropped is not written, so the record stays as it was, and the hook log says it skipped the event, as it does for a lock it cannot take. placement__should_use_the_nearest_existing_ancestor gains a UNC-shaped path to wt2 that leaves the actor in fg, and placement__should_read_the_path_field_of_each_tool gains UNC-shaped Read, Bash and CwdChanged cases that move nothing. The new check hook__should_keep_a_record_it_can_read brings a record within 150 bytes of 16 KiB through the cwd of its first event; a call past the limit is then dropped from in_flight alone, and a StopFailure whose record cannot fit leaves the record byte for byte as it was, readable by wtpool status, with a skip line in the hook log. verify/trace.toml and the H18 entry of the trace list in verification.md name it. The call input is read straight into the sorted text it hashes, with the same hash as before, and wait__should_hash_input_with_sorted_keys gains an input with every kind of JSON value. What the other checks judge is unchanged."
+[change.files]
+"docs/design/status-panel/verification.md" = "77851b397cfc67b4990954f10471df8019a3952775a9c21e3b1c7679fbc1c7f9"
+"verify/trace.toml" = "0558da381c24463f2f86a2cc51e3d7075b059e31124a71ff4994cd78de181a7a"
+"xtask/tests/checks/hook_files.rs" = "ce0fa3b46c2c77ad12a0544bdcf38a43f1770ca6f44c7828be71c5f3091487aa"
+"xtask/tests/checks/hook_place.rs" = "abbb438a3b357b115e9cdfabcb29533254a92578214a99bcc26954b60a6874c0"
+"xtask/tests/checks/hook_wait.rs" = "774057cce2a53d69eeec16c91a7ef5aa95bf45187a75b94244b02e7f206b9d52"

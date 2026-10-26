@@ -1,5 +1,8 @@
 //! The record of one actor in `<git-common-dir>/wtpool-activity/` (status-panel.md, section 1).
 
+use std::borrow::Cow;
+use std::io;
+
 use serde::{Deserialize, Serialize};
 
 use crate::activity::{
@@ -150,20 +153,23 @@ pub struct Process {
 
 impl Record {
     /// The record's JSON, dropping the oldest ended ids, then the oldest calls, until it fits
-    /// in [`MAX_RECORD_BYTES`].
-    #[must_use]
-    pub fn to_json(&self) -> Vec<u8> {
-        let mut record = self.clone();
+    /// in [`MAX_RECORD_BYTES`]. An error when it still does not fit, as a reader would refuse
+    /// it (H18).
+    pub fn to_json(&self) -> io::Result<Vec<u8>> {
+        let mut record = Cow::Borrowed(self);
         loop {
-            let text = serde_json::to_vec(&record).unwrap_or_default();
-            let nothing_to_drop = record.done_ids.is_empty() && record.in_flight.is_empty();
-            if text.len() <= MAX_RECORD_BYTES || nothing_to_drop {
-                return text;
+            let text = serde_json::to_vec(&*record)?;
+            if text.len() <= MAX_RECORD_BYTES {
+                return Ok(text);
             }
-            if record.done_ids.is_empty() {
-                record.in_flight.remove(0);
-            } else {
-                record.done_ids.remove(0);
+            let trimmed = record.to_mut();
+            if !drop_first(&mut trimmed.done_ids) && !drop_first(&mut trimmed.in_flight) {
+                return Err(io::Error::new(
+                    io::ErrorKind::FileTooLarge,
+                    format!(
+                        "the record is over {MAX_RECORD_BYTES} bytes with no ended id or call left to drop"
+                    ),
+                ));
             }
         }
     }
@@ -191,6 +197,12 @@ impl Record {
     pub fn is_subagent(&self) -> bool {
         self.agent_id.is_some()
     }
+}
+
+/// Drops the first of `items`: `false` when there is none.
+fn drop_first<T>(items: &mut Vec<T>) -> bool {
+    let first = items.len().min(1);
+    items.drain(..first).next().is_some()
 }
 
 #[cfg(test)]
@@ -250,10 +262,21 @@ mod tests {
         });
 
         // When
-        let parsed = Record::from_json(&record.to_json());
+        let parsed = Record::from_json(&record.to_json().unwrap());
 
         // Then
         assert_eq!(parsed, Some(record));
+    }
+
+    fn must_call(id: &str) -> Call {
+        Call {
+            id: id.to_owned(),
+            tool: "Read".to_owned(),
+            kind: Some(CallKind::Other),
+            target: "t".repeat(80),
+            since: "2026-10-20T12:00:00Z".to_owned(),
+            input_hash: Some("h".repeat(64)),
+        }
     }
 
     #[rstest]
@@ -268,24 +291,77 @@ mod tests {
         let mut record = must_record();
         record.done_ids = (0..done).map(|n| format!("{n:0>128}")).collect();
         record.in_flight = (0..calls)
-            .map(|n| Call {
-                id: format!("{n:0>128}"),
-                tool: "Read".to_owned(),
-                kind: Some(CallKind::Other),
-                target: "t".repeat(80),
-                since: record.since.clone(),
-                input_hash: Some("h".repeat(64)),
-            })
+            .map(|n| must_call(&format!("{n:0>128}")))
             .collect();
 
         // When
-        let text = record.to_json();
+        let text = record.to_json().unwrap();
 
         // Then
         assert!(text.len() <= MAX_RECORD_BYTES, "{}", text.len());
         let parsed = Record::from_json(&text).unwrap();
         assert_eq!(parsed.in_flight.len() == calls, keeps_every_call);
         assert_eq!(parsed.in_flight.last(), record.in_flight.last());
+    }
+
+    #[test]
+    fn to_json__should_write_a_record_that_fits_as_it_is() {
+        // Given
+        let mut record = must_record();
+        record.done_ids = (0..64).map(|n| format!("toolu_{n:02}")).collect();
+
+        // When
+        let text = record.to_json().unwrap();
+
+        // Then
+        assert_eq!(text, serde_json::to_vec(&record).unwrap());
+    }
+
+    #[test]
+    fn to_json__should_refuse_a_record_that_cannot_fit() {
+        // Given
+        let mut record = must_record();
+        record.first_cwd = Some(format!("/p/fg/{}", "d".repeat(MAX_RECORD_BYTES)));
+        record.done_ids = vec!["toolu_1".to_owned()];
+        record.in_flight = vec![must_call("toolu_2")];
+
+        // When
+        let error = record.to_json().unwrap_err();
+
+        // Then
+        assert_eq!(error.kind(), io::ErrorKind::FileTooLarge);
+    }
+
+    #[test]
+    fn to_json__should_drop_ended_ids_before_calls() {
+        // Given
+        let mut record = must_record();
+        record.in_flight = (0..3).map(|n| must_call(&format!("toolu_c{n}"))).collect();
+        let without_ids = serde_json::to_vec(&record).unwrap().len();
+        record.first_cwd = Some("d".repeat(MAX_RECORD_BYTES - without_ids - 100));
+        record.done_ids = (0..64).map(|n| format!("toolu_{n:02}")).collect();
+
+        // When
+        let parsed = Record::from_json(&record.to_json().unwrap()).unwrap();
+
+        // Then
+        let kept = parsed.done_ids.len();
+        assert!((1..64).contains(&kept), "{kept}");
+        assert_eq!(parsed.done_ids.last(), record.done_ids.last());
+        assert_eq!(parsed.in_flight, record.in_flight);
+    }
+
+    #[test]
+    fn drop_first__should_drop_only_the_first_item() {
+        // Given
+        let mut items = vec![1, 2];
+        let mut empty: Vec<u8> = Vec::new();
+
+        // When
+        let dropped = (drop_first(&mut items), drop_first(&mut empty));
+
+        // Then
+        assert_eq!((dropped, items), ((true, false), vec![2]));
     }
 
     #[test]
@@ -341,7 +417,7 @@ mod tests {
     #[case::not_json("{")]
     fn from_json__should_refuse_other_versions_and_garbage(#[case] change: &str) {
         // Given
-        let text = String::from_utf8(must_record().to_json())
+        let text = String::from_utf8(must_record().to_json().unwrap())
             .unwrap()
             .replace(r#""version":1"#, change);
 

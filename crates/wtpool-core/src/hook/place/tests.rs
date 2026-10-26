@@ -1,3 +1,5 @@
+use std::ffi::OsStr;
+
 use super::*;
 use rstest::rstest;
 
@@ -92,6 +94,132 @@ fn worktree_of__should_resolve_symlinks() {
 
     // Then
     assert_eq!(found.map(|w| w.root), Some(root.join("wt1x")));
+}
+
+/// A linked worktree `unc` of the pool at `root` whose file `unc_shaped`, its `.git` file, the
+/// back link `gitdir` or `commondir`, names its path with a second slash before it.
+#[cfg(not(windows))]
+fn must_unc_shaped_worktree(root: &Path, unc_shaped: &str) -> PathBuf {
+    let gitdir = root.join("fg/.git/worktrees/unc");
+    let dir = root.join("unc");
+    std::fs::create_dir_all(&gitdir).unwrap();
+    std::fs::create_dir_all(&dir).unwrap();
+    let named = |file: &str, path: &Path| {
+        let slash = if file == unc_shaped { "/" } else { "" };
+        format!("{slash}{}\n", path.display())
+    };
+    let dot_git = format!("gitdir: {}", named(".git", &gitdir));
+    std::fs::write(dir.join(".git"), dot_git).unwrap();
+    std::fs::write(gitdir.join("gitdir"), named("gitdir", &dir.join(".git"))).unwrap();
+    std::fs::write(
+        gitdir.join("commondir"),
+        named("commondir", &root.join("fg/.git")),
+    )
+    .unwrap();
+    dir
+}
+
+#[cfg(not(windows))]
+#[rstest]
+#[case::none("", true)]
+#[case::dot_git(".git", false)]
+#[case::back_link("gitdir", false)]
+#[case::commondir("commondir", false)]
+fn worktree_of__should_not_read_a_unc_shaped_path_a_git_file_names(
+    #[case] unc_shaped: &str,
+    #[case] found: bool,
+) {
+    // Given
+    let (_dir, root) = must_pool();
+    let dir = must_unc_shaped_worktree(&root, unc_shaped);
+
+    // When
+    let worktree = worktree_of(&dir.join("f.txt"));
+
+    // Then
+    assert_eq!(worktree.map(|w| w.root), found.then_some(dir));
+}
+
+#[cfg(not(windows))]
+#[test]
+fn worktree_of__should_not_read_a_unc_shaped_path() {
+    // Given
+    let (_dir, root) = must_pool();
+    let unc_shaped = PathBuf::from(format!("/{}", root.join("wt1/f.txt").display()));
+
+    // When
+    let found = worktree_of(&unc_shaped);
+
+    // Then
+    assert_eq!(found, None);
+}
+
+#[rstest]
+#[case::none(None, true)]
+#[case::drive(Some(Prefix::Disk(b'C')), true)]
+#[case::verbatim_drive(Some(Prefix::VerbatimDisk(b'C')), true)]
+#[case::unc(Some(Prefix::UNC(OsStr::new("server"), OsStr::new("share"))), false)]
+#[case::verbatim_unc(
+    Some(Prefix::VerbatimUNC(OsStr::new("server"), OsStr::new("share"))),
+    false
+)]
+#[case::device(Some(Prefix::DeviceNS(OsStr::new("pipe"))), false)]
+#[case::verbatim(Some(Prefix::Verbatim(OsStr::new("GLOBALROOT"))), false)]
+fn is_local_prefix__should_keep_only_drives(
+    #[case] prefix: Option<Prefix<'static>>,
+    #[case] expected: bool,
+) {
+    // When
+    let local = is_local_prefix(prefix);
+
+    // Then
+    assert_eq!(local, expected);
+}
+
+#[cfg(not(windows))]
+#[rstest]
+#[case::absolute("/a/b", true)]
+#[case::relative("a/b", true)]
+#[case::three_slashes("///a/b", true)]
+#[case::double_slash_inside("/a//b", true)]
+#[case::unc_shaped("//server/share/f.txt", false)]
+#[case::server_only("//server", false)]
+#[case::two_slashes_only("//", false)]
+#[case::backslashes(r"\\server\share", true)]
+fn is_local__should_refuse_a_path_that_starts_with_two_slashes(
+    #[case] path: &str,
+    #[case] expected: bool,
+) {
+    // When
+    let local = is_local(Path::new(path));
+
+    // Then
+    assert_eq!(local, expected);
+}
+
+#[cfg(windows)]
+#[rstest]
+#[case::drive(r"C:\a", true)]
+#[case::verbatim_drive(r"\\?\C:\a", true)]
+#[case::relative(r"a\b", true)]
+#[case::drive_relative("C:a", true)]
+#[case::unc(r"\\server\share\a", false)]
+#[case::unc_with_slashes("//server/share/a", false)]
+#[case::verbatim_unc(r"\\?\UNC\server\share\a", false)]
+#[case::device(r"\\.\pipe\a", false)]
+#[case::verbatim(r"\\?\GLOBALROOT\a", false)]
+#[case::nt_object(r"\??\UNC\server\share", false)]
+#[case::server_only(r"\\server", false)]
+#[case::root_without_drive(r"\a", false)]
+fn is_local__should_refuse_shares_devices_and_verbatim_paths(
+    #[case] path: &str,
+    #[case] expected: bool,
+) {
+    // When
+    let local = is_local(Path::new(path));
+
+    // Then
+    assert_eq!(local, expected);
 }
 
 #[rstest]

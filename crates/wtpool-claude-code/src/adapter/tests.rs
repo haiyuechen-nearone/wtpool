@@ -60,6 +60,7 @@ impl Pool {
             home: Some(root.clone()),
             tz: Some("UTC".to_owned()),
             entered_micros: 0,
+            log: None,
         };
         let adapter = ClaudeCode {
             tmp: Some(root.clone()),

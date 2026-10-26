@@ -1,6 +1,6 @@
 //! `wtpool hook`, `wtpool hook gc` and `wtpool hook install` (status-panel.md, section 1).
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use wtpool_claude_code::ClaudeCode;
@@ -49,12 +49,7 @@ impl Adapter {
 /// returns, so the process exits 0, panics included (H2, H3, H4).
 pub fn run_hook() {
     let env = hook_env();
-    let log = hook::log_dir(
-        std::env::var_os("XDG_STATE_HOME")
-            .map(PathBuf::from)
-            .as_deref(),
-        env.home.as_deref(),
-    );
+    let log = env.log.clone();
     let watchdog_log = log.clone();
     std::thread::spawn(move || {
         std::thread::sleep(WATCHDOG);

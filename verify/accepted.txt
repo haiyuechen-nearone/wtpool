@@ -160,3 +160,5 @@ accept cli-presentation 84bc307425673e077bda58baa80dfe2758ecd371592f0c4d1cae4793
 accept ts-webview 436ee842d55ad068edc6e224c2bbf737b4ba8fb4b183ec638b9ba1c90f7fb891
 # Publication scrub, data and wording only: the design mockups show the placeholder pool acme/app, slots app-wt1 to app-wt4 and the machine my-mac, their PNGs rendered again at the same size and layout; design status lines and choice rows state outcomes without attribution; no check changes.
 accept scrub a2cb8d7d0c72b372f5d3cddb3d73a4b08b86cd00e435fae15ef35eea60fef8db
+# wtpool hook never reads a UNC-shaped, device or verbatim path, never writes a record it cannot read back and logs the skip, and hashes call input without building it; UNC-shaped placement cases, an every-kind input for the wait hash, and hook__should_keep_a_record_it_can_read (H18).
+accept hook-hardening d6fadfb9d77a914bf1cefb61f642112c4576374814828fe44dcdd71832c0c278
