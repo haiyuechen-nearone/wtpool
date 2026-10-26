@@ -1,5 +1,5 @@
-//! `wtpool hook install`: the block it prints (H1, B2), where it refuses to run, and what it says
-//! about `~/.claude/settings.json`, which it never writes (H22, D5).
+//! `wtpool hook install`: the block it prints, where it refuses to run, and its note on
+//! `~/.claude/settings.json`. It never writes that file.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -12,7 +12,7 @@ use crate::support::{
     FileState, Sandbox, file_state, must_release_bin, must_wtpool_bin, set_executable,
 };
 
-/// The event table of status-panel.md, section 1.
+/// The events the printed block runs `wtpool hook` on.
 pub(super) const EVENTS: [&str; 14] = [
     "UserPromptSubmit",
     "PreToolUse",
@@ -37,17 +37,16 @@ const ASYNC: [&str; 5] = [
     "PostToolBatch",
 ];
 
-/// The arguments of the policy entry, which the block holds from phase 4 (H1, H29).
+/// The arguments of the policy entry.
 pub(super) const POLICY_ARGS: [&str; 2] = ["hook", "policy"];
-/// The matcher of the policy entry's group (H1).
+/// The matcher of the policy entry's group.
 pub(super) const POLICY_MATCHER: &str = "Bash|PowerShell|Monitor";
 
-/// Whether this run verifies phase 4 or later, whose block also holds the policy entry (H1).
+/// True when this run verifies phase 4 or later, whose block also holds the policy entry.
 pub(super) fn has_policy() -> bool {
     crate::support::phase() >= 4
 }
 
-/// Whether `entry` runs `wtpool hook policy`.
 pub(super) fn is_policy(entry: &Value) -> bool {
     entry["args"] == json!(POLICY_ARGS)
 }
@@ -71,7 +70,7 @@ pub(super) fn policy_matchers(block: &Value) -> Vec<Value> {
         .collect()
 }
 
-/// A copy of the verify build outside any `target` folder, which install may run from.
+/// A copy of the verify build outside any `target` folder, so install may run from it.
 pub(super) fn installed_copy(sandbox: &Sandbox, folder: &str) -> PathBuf {
     copy_of(sandbox, folder, &must_wtpool_bin())
 }
@@ -115,8 +114,8 @@ fn first_object(text: &str) -> Option<Value> {
     })
 }
 
-/// The printed block as a map from event to its hook entries, whether it prints
-/// `{"hooks": {...}}` or the inner object.
+/// The printed block as a map from event to its hook entries, from either `{"hooks": {...}}` or
+/// the inner object.
 pub(super) fn events_of(block: &Value) -> BTreeMap<String, Vec<Value>> {
     let inner = block
         .get("hooks")
@@ -217,8 +216,9 @@ fn install__should_match_the_event_table() {
     assert!(wrong.is_empty(), "the printed block:\n{}", wrong.join("\n"));
 }
 
-/// From phase 4: one sync `PreToolUse` entry running `wtpool hook policy` with the timeout 2, in a
-/// group of the matcher `Bash|PowerShell|Monitor`, and no other event with it (H1, H29).
+/// The faults of the policy entry. It must be one sync `PreToolUse` entry running `wtpool hook
+/// policy` with the timeout 2, in a group of the matcher [`POLICY_MATCHER`], and no other event
+/// may hold it.
 fn policy_problems(
     run: &Install,
     events: &BTreeMap<String, Vec<Value>>,
@@ -285,7 +285,7 @@ fn budget__b2() {
 
     // Then
     let events = must_block(&run);
-    // From phase 4 the policy entry of PreToolUse is sync; the five events' own entries stay async.
+    // From phase 4 the policy entry of PreToolUse is sync. The five events' own entries stay async.
     let hook_entries = |entries: &Vec<Value>| -> Vec<Value> {
         entries
             .iter()
@@ -455,7 +455,7 @@ fn install__should_never_write_settings() {
     );
 }
 
-/// H22: the first line of the note says `hooks present:` exactly when every event runs this
+/// The first line of the note says `hooks present:` exactly when every event runs this
 /// `wtpool hook`, and says the same for the block alone and among other settings.
 #[test]
 fn install__should_report_presence() {
@@ -540,7 +540,7 @@ fn install__should_report_presence() {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
-/// The block of H1 for `command`, as `wtpool hook install` prints it: `{"hooks": {event: [...]}}`.
+/// The block for `command`, as `wtpool hook install` prints it: `{"hooks": {event: [...]}}`.
 fn expected_block(command: &str) -> Value {
     let mut hooks = serde_json::Map::new();
     for event in EVENTS {
@@ -574,8 +574,8 @@ fn expected_block(command: &str) -> Value {
     json!({ "hooks": hooks })
 }
 
-/// `block` with the groups of each event in a fixed order, as the spec fixes no order of the
-/// policy entry's group among `PreToolUse`'s.
+/// `block` with the groups of each event in a fixed order, as the policy entry's group may stand
+/// anywhere among `PreToolUse`'s.
 fn groups_sorted(block: &Value) -> Value {
     let mut sorted = block.clone();
     if let Some(hooks) = sorted["hooks"].as_object_mut() {
@@ -588,9 +588,9 @@ fn groups_sorted(block: &Value) -> Value {
     sorted
 }
 
-/// H22: stdout is the block alone, as one JSON value, so `wtpool hook install > hooks.json` is a
-/// valid settings file (Claude Code skips a malformed `--settings` file without a word); the
-/// presence note is on stderr and holds no JSON. The release wtpool, which users run.
+/// Stdout is the block alone, as one JSON value, so `wtpool hook install > hooks.json` is a valid
+/// settings file. Claude Code skips a malformed `--settings` file without a word. The presence
+/// note is on stderr and holds no JSON. The check runs the release wtpool, as users do.
 #[test]
 fn install__should_print_only_the_block_on_stdout() {
     // Given

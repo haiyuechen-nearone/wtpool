@@ -1,9 +1,5 @@
-// X12 in the extension host, with the fake wtpool (phase 3): `free` and `fg` ask in a modal dialog
-// naming worktree and branch, and run `wtpool free <worktree> --force` or `wtpool fg <branch> --force`
-// only on confirm; `free` refuses while an actor there works or waits, and warns for `idle`, and `fg`
-// does the same for the slot that holds the branch. The webview's messages come in through the
-// verify API's fromWebview, and the dialogs through wrapped `vscode.window.show*Message` calls,
-// so no dialog reaches the screen.
+// The webview's messages come in through the verify API's fromWebview, and the dialogs through
+// wrapped `vscode.window.show*Message` calls, so no dialog reaches the screen.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vscode = require('vscode');
@@ -24,7 +20,7 @@ const {
 const MESSAGE_KINDS = ['showInformationMessage', 'showWarningMessage', 'showErrorMessage'];
 const WT2 = '/Users/verify/pool/wt2';
 const BRANCH = 'feature-a';
-/** How long a check waits for a `wtpool` the extension must not start. */
+/** The time a check waits for a `wtpool` the extension must not start. */
 const QUIET_MS = 1500;
 
 let generation = 0;
@@ -183,8 +179,6 @@ describe('actions', () => {
     });
   }
 
-  // A `wtpool` that fails: the user sees an error naming the command and what wtpool said, and
-  // nothing else runs or asks.
   const STDERR = 'wtpool: wt2 has 2 uncommitted file(s) (wtpool-verify fake)';
   for (const [verb, argv] of [
     ['free', ['free', 'wt2', '--force']],
@@ -215,9 +209,8 @@ describe('actions', () => {
     });
   }
 
-  // `wtpool` cannot even start: Node's spawn throws at once (ERR_INVALID_ARG_VALUE) for a NUL in the
-  // binary path. The user sees one error naming the command, nothing runs or asks again, and the
-  // rows the tab shows stay (R8, X4, X12).
+  // A NUL in the binary path makes Node's spawn throw at once (ERR_INVALID_ARG_VALUE), so `wtpool`
+  // cannot even start.
   for (const [verb, argv] of [
     ['free', ['free', 'wt2', '--force']],
     ['fg', ['fg', BRANCH, '--force']],
@@ -255,7 +248,6 @@ describe('actions', () => {
     });
   }
 
-  // The row changed while the modal was open: confirming tells the user and runs no wtpool.
   const changes = {
     branch_changed: (doc) => {
       doc.pools[0].worktrees.find((w) => w.path === WT2).branch = 'feature-b';
@@ -273,7 +265,7 @@ describe('actions', () => {
         const held = new Promise((resolve) => {
           confirm = resolve;
         });
-        // The first modal stays open until the row changed; any later dialog goes ahead at once.
+        // The first modal stays open until the row changed. Any later dialog goes ahead at once.
         let modals = 0;
         let changedAt;
         const shown = dialogs((call) => {
@@ -306,8 +298,8 @@ describe('actions', () => {
     }
   }
 
-  // `free` guards wt2 by its actors; `fg` of wt2's branch guards wt2, the slot that holds it, the
-  // same way (status-panel.md revision 12, X12). Each case's title, by verb.
+  // `fg` of wt2's branch guards wt2, the slot that holds it, as `free` of wt2 does. Each case's
+  // title, by verb.
   const guarded = {
     free: {
       refuse: (name) => `actions__should_refuse_free_with_a_working_actor ${name}`,
@@ -320,7 +312,7 @@ describe('actions', () => {
       argv: ['fg', BRANCH, '--force'],
     },
   };
-  /** Every free or fg the extension started, whichever the user asked for. */
+  /** Every free and fg the extension started, not only the one the user asked for. */
   const anyAction = () => [...actionStarts('free'), ...actionStarts('fg')];
 
   const refusals = {
@@ -334,7 +326,7 @@ describe('actions', () => {
         // Given
         const doc = poolWith(actors(), actors().some((a) => a.state === 'waiting') ? 'waiting' : 'working');
         await showing(doc);
-        // Whatever a dialog offers, the user takes the first way ahead.
+        // The user takes the first way ahead in every dialog.
         const shown = dialogs((call) => confirmItem(call.args));
 
         // When
@@ -360,7 +352,7 @@ describe('actions', () => {
       const held = new Promise((resolve) => {
         confirm = resolve;
       });
-      // The first modal stays open until the actor works; any later dialog is confirmed at once.
+      // The first modal stays open until the actor works. Any later dialog is confirmed at once.
       let modals = 0;
       const shown = dialogs((call) => {
         if (call.modal) modals += 1;
@@ -438,9 +430,8 @@ describe('actions', () => {
   }
 });
 
-// R9 (status-panel.md revision 16): the watch and every action run in the window's first
-// workspace folder, and the extension sets no WTPOOL_FOREGROUND or WTPOOL_SLOT_DIR of its own: each wtpool
-// sees what the extension host inherited, as the fake logs it.
+// The extension sets no WTPOOL_FOREGROUND or WTPOOL_SLOT_DIR of its own, so each wtpool it runs
+// gets the ones the extension host inherited.
 describe('workspace folder', () => {
   it('spawn__should_run_in_the_workspace_folder', async () => {
     // Given

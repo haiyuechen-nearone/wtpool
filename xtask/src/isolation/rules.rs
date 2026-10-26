@@ -7,7 +7,7 @@ use super::snapshot::{ActivityEntry, Invocation, Places, Snapshot, reflog_email}
 use super::{NAME, VERIFY_EMAIL};
 use crate::results::CheckResult;
 
-/// What one part left behind, judged from the snapshots around it.
+/// The traces one part left behind, judged from the snapshots around it.
 pub fn traces(invocation: &Invocation, sandbox_roots: &[String]) -> Vec<String> {
     let mut found = Vec::new();
     let (before, after) = (&invocation.before, &invocation.after);

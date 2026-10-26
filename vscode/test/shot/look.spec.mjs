@@ -1,24 +1,3 @@
-// U6 in Chromium (status-panel.md revision 14), in Dark Modern, Light Modern, High Contrast and
-// High Contrast Light: WCAG AA contrast, visible hover, chips that keep their shape, and a detail
-// strip that stands out from the page.
-//
-// contrast__ measures every shown text against its composited background (the backgrounds of it
-// and its ancestors over the editor background, with opacity): 4.5:1, or 3:1 for large text. It
-// covers every scenario document, the header stale and paused, and each row of every_activity,
-// the real-names pool and long values hovered, selected while hovered, and selected.
-//
-// hover__ compares pixels with a row hovered and not, outside its actions cell, which hover may
-// fill: at least 1 % of the part in view must change. For the rows fg, wt2 and wt8 of
-// every_activity it scrolls the actions into view and compares each action hovered and not, with
-// its row hovered both times: at least 2 % of the button and 3 px around it must change.
-//
-// icons__ finds each every_activity row's icon by its ink at device scale 2, against the
-// background behind it: the longer side of its ink must be within 1 px of the median icon's
-// (glyph shapes differ, so width and height alone vary: the bell is narrow, the archive flat).
-//
-// chips__ needs each chip's boundary at 3:1 against the header: all four borders, an outline, a
-// box-shadow ring, or its fill. detail__ needs the same of the detail strip against the page: of
-// `tr.detail` or an element in it that holds all the strip's text, for every row of every_activity.
 import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
@@ -29,11 +8,14 @@ import { changedPixels, inkBounds, pixelHelper } from '../support/pixels.mjs';
 import { away, clickRow, hoverActions, hoverRow, inViewport, rowIds, settle, short, showPlain, visualPanel } from '../support/states.mjs';
 import { bigCounts, stateDocuments, visualDocuments } from '../support/visual-docs.mjs';
 
-/** How far, in CSS px, an activity icon's longer ink side may differ from the median icon's (U6). */
+/**
+ * The most, in CSS px, an activity icon's longer ink side may differ from the median icon's. Glyph
+ * shapes differ, so width and height alone vary: the bell is narrow, the archive flat.
+ */
 const ICON_PX = 1;
-/** Share of a hovered row's pixels, outside its actions, that must change (U6). */
+/** Share of a hovered row's pixels, outside its actions, that must change. */
 const ROW_CHANGE = 0.01;
-/** Share of a hovered action's pixels, with 3 px around it, that must change (U6). */
+/** Share of a hovered action's pixels, with 3 px around it, that must change. */
 const ACTION_CHANGE = 0.02;
 
 test.describe.configure({ mode: 'parallel' });

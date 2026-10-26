@@ -1,9 +1,6 @@
-//! The harness's own folders outside the repository, after the XDG base directories:
-//!
-//! - the cache, `$XDG_CACHE_HOME/wtpool-verify`, else `~/.cache/wtpool-verify`: reused clones, short
-//!   links for VS Code sockets;
-//! - the data folder, `$XDG_DATA_HOME/wtpool-verify`, else `~/.local/share/wtpool-verify`: the contract
-//!   run's recordings and its build copy of `wtpool`.
+//! The harness's own folders outside the repository, after the XDG base directories. The
+//! [cache](cache_dir) holds reused clones and short links for VS Code sockets. The
+//! [data folder](data_dir) holds the contract run's recordings and its build copy of `wtpool`.
 //!
 //! A variable that is empty or names a relative path counts as unset, as the XDG specification
 //! says.
@@ -13,7 +10,7 @@ use std::path::PathBuf;
 
 const NAME: &str = "wtpool-verify";
 
-/// The home folder: `HOME`, which every sandbox sets, else the platform's own.
+/// The home folder: `HOME`, set in every sandbox, else the platform's own.
 pub fn home() -> Option<PathBuf> {
     std::env::var_os("HOME")
         .filter(|home| !home.is_empty())
@@ -39,10 +36,10 @@ const SOCKET_LIMIT: usize = if cfg!(target_os = "macos") { 103 } else { 107 };
 /// version, `-`, up to 6 of the socket's type and `.sock`, such as `1.10-main.sock`.
 const SOCKET_NAME: usize = 4 + 1 + 6 + 5;
 
-/// Why VS Code cannot open its main socket in the user data folder the oracle gives it, a short
-/// link `s/<8 hex>/user-data` in [`cache_dir`] (vscode/test/support/code.mjs), or `None` when it
-/// can. It names the variable to shorten. Windows uses named pipes, and Linux with
-/// `XDG_RUNTIME_DIR` puts the socket there, so neither needs the check.
+/// The reason VS Code cannot open its main socket in the user data folder the tests give it, or
+/// `None` when it can. That folder is a short link `s/<8 hex>/user-data` in [`cache_dir`], made by
+/// vscode/test/support/code.mjs. The reason names the variable to shorten. Windows uses named
+/// pipes, and Linux with `XDG_RUNTIME_DIR` puts the socket there, so neither needs the check.
 pub fn socket_problem() -> Option<String> {
     if cfg!(windows) || (cfg!(target_os = "linux") && std::env::var_os("XDG_RUNTIME_DIR").is_some())
     {
@@ -55,7 +52,7 @@ pub fn socket_problem() -> Option<String> {
     socket_problem_in(&cache_dir().ok()?, variable)
 }
 
-/// [`socket_problem`] for the cache folder `cache`, which `variable` sets.
+/// [`socket_problem`] for the cache folder `cache` that `variable` sets.
 fn socket_problem_in(cache: &std::path::Path, variable: &str) -> Option<String> {
     let folder = cache.join("s").join("01234567").join("user-data");
     let length = folder.as_os_str().len() + 1 + SOCKET_NAME;

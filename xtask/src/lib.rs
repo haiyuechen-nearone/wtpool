@@ -1,9 +1,9 @@
-//! The verify harness of docs/design/status-panel/verification.md. The builder never edits it.
+//! The verify harness of wtpool and its VS Code extension.
 //!
 //! # Module map
 //!
 //! Running parts:
-//! - [`parts`]: [`run_part`](parts::run_part) runs one part with its [`Ctx`](parts::Ctx); the
+//! - [`parts`]: [`run_part`](parts::run_part) runs one part with its [`Ctx`](parts::Ctx). The
 //!   quick part's own checks and the int part live below it.
 //! - [`schedule`]: a part list, as one process per part, in waves.
 //! - [`layers`]: the static, render, host, shot, e2e, bench and cc layers, and the web builds.

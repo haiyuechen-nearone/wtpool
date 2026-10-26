@@ -1,16 +1,14 @@
-// R9 in the extension host: a change of the window's first workspace folder. VS Code restarts the
-// extension host for it, unless a debug session, an open custom editor or a running chat request
-// vetoes the restart, and it never restarts it while it runs tests. Then the tab itself stops the
-// old watch, drops the old document, resets the title to `Worktrees` and watches the new folder;
-// with no folder left it runs no wtpool and says so. A change of another folder changes nothing.
-// The host window opens from a workspace file (run.mjs), so the checks can change its folders.
+// VS Code restarts the extension host when the window's first workspace folder changes, unless a
+// debug session, an open custom editor or a running chat request vetoes the restart, and never
+// while it runs tests. So the tab itself must follow the change. The host window opens from a
+// workspace file (run.mjs), so the checks can change its folders.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vscode = require('vscode');
 
 const { created, ended, openStatus, posted, resetFake, scenarioDocuments, sleep, starts, waitFor } = require('./support.cjs');
 
-/** How long a check waits for a `wtpool` the extension must not start or stop. */
+/** The time a check waits for a `wtpool` the extension must not start or stop. */
 const QUIET_MS = 1500;
 
 async function viewsSince(from) {
@@ -42,7 +40,7 @@ async function restoreFolders(home) {
 describe('first folder', () => {
   it('spawn__should_run_in_the_workspace_folder first_folder_changes', async () => {
     // Given: the tab on a pool with one wait, so its title counts it. Every later start of wtpool
-    // prints after 5 s, so the tab shows what it keeps of the old pool before any new document.
+    // prints after 5 s, so the tab shows the part of the old pool it keeps before any new document.
     const folders = vscode.workspace.workspaceFolders ?? [];
     assert.ok(vscode.workspace.workspaceFile, 'setup: the host window has no workspace file, so its first folder cannot change');
     assert.equal(folders.length, 1, 'setup: the host window has not one workspace folder');

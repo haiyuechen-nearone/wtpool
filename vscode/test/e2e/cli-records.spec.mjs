@@ -1,6 +1,3 @@
-// H25, H26 and S11 with the release wtpool, no VS Code window: records name their harness and each
-// call a neutral kind, `wtpool status` reads the kinds and never the tool names, and every actor
-// names its harness, also from a record an older wtpool wrote (status-panel.md revision 16).
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { test } from '@playwright/test';
@@ -42,7 +39,7 @@ test('hook__should_tag_records_with_the_harness', async () => {
   assert.deepEqual(harnesses, { 's1.a1.json': 'claude-code', 's1.json': 'claude-code' }, 'the harness each record names');
 });
 
-/** Each PreToolUse fixture with the kind the Claude Code adapter gives its tool (H26). */
+/** Each PreToolUse fixture with the kind the Claude Code adapter gives its tool. */
 const KINDS = [
   ['PreToolUse-Bash', 'Bash', 'shell'],
   ['PreToolUse-Edit', 'Edit', 'edit'],
@@ -135,7 +132,7 @@ function call(id, tool, kind) {
 
 test('status__should_read_kinds_only', async () => {
   // Given: session s1 in wt1, its record 10 minutes old so only a call in flight keeps it
-  // working (A1), first with a build in wt1, then with a working subagent.
+  // working, first with a build in wt1, then with a working subagent.
   const dirs = cliSandbox('read-kinds');
   const poolInfo = pool('idle_pool', 'read-kinds');
   const wt1 = path.join(poolInfo.dir, 'wt1');
@@ -179,7 +176,7 @@ test('status__should_read_kinds_only', async () => {
     await session.stop();
   }
 
-  // Then: [case, s1's state, wt1's activity] (A1, A4).
+  // Then: [case, s1's state, wt1's activity].
   assert.deepEqual(
     seen,
     [

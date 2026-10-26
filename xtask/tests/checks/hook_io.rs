@@ -1,6 +1,6 @@
-//! `wtpool hook` as a process: no stdout, exit 0, the watchdog, stdin, ids and its log (H2 to H5,
-//! H17, H23). From phase 4 the exit and watchdog checks also run `wtpool hook policy` (H3, H4,
-//! H29), which alone may print a decision; the hook_policy checks judge what it prints.
+//! `wtpool hook` as a process: no stdout, exit 0, the watchdog, stdin, ids and its log. From phase
+//! 4 the exit and watchdog checks also run `wtpool hook policy`. Only the policy may print a
+//! decision, and the checks of [`super::hook_policy`] judge it.
 
 use std::fs;
 use std::io::Write;
@@ -18,7 +18,7 @@ const WATCHDOG: Duration = Duration::from_millis(1500);
 const MIB: usize = 1024 * 1024;
 
 /// Inputs no hook may act on.
-fn malformed() -> Vec<(&'static str, Vec<u8>)> {
+pub(super) fn malformed() -> Vec<(&'static str, Vec<u8>)> {
     vec![
         ("empty", Vec::new()),
         ("open brace", b"{".to_vec()),
@@ -39,12 +39,11 @@ fn malformed() -> Vec<(&'static str, Vec<u8>)> {
     ]
 }
 
-/// A machine config under which `wtpool hook policy` refuses the fixtures' shell calls, so the
-/// exit and watchdog checks reach its decision path too (H29).
+/// A machine config that makes `wtpool hook policy` refuse the fixtures' shell calls, so the exit
+/// and watchdog checks reach its decision path too.
 const REQUIRE: &str =
     "[jobs]\nenforce = \"require\"\nheavy = [\"git status\", \"cargo test\", \"ls\"]\n";
 
-/// Options of a run of `wtpool hook policy`.
 fn policy_options() -> RunOptions {
     RunOptions {
         args: vec!["policy".to_owned()],
@@ -52,7 +51,7 @@ fn policy_options() -> RunOptions {
     }
 }
 
-/// How many records `wtpool-activity/` holds.
+/// The number of records `wtpool-activity/` holds.
 fn records_written(hooks: &Hooks) -> usize {
     hooks
         .files()
@@ -61,8 +60,7 @@ fn records_written(hooks: &Hooks) -> usize {
         .count()
 }
 
-/// H2: `wtpool hook` alone prints nothing; from phase 4 `wtpool hook policy` may print one
-/// decision (H29), so it is not run here.
+/// Only `wtpool hook` runs here, as `wtpool hook policy` may print one decision.
 #[test]
 fn hook__should_print_nothing_for_every_fixture() {
     // Given
@@ -225,8 +223,8 @@ fn hook__should_exit_within_a_second_when_the_record_is_a_fifo() {
     }
 }
 
-/// From phase 4: `wtpool hook policy` whose `machine.toml` is a FIFO no one writes exits 0 within
-/// its watchdog, with no output (H4, H29).
+/// `wtpool hook policy` whose `machine.toml` is a FIFO no one writes exits 0 within its watchdog,
+/// with no output.
 fn policy_with_a_fifo_config(hooks: &Hooks) {
     let config = hooks.sandbox.machine_config();
     let _ = fs::remove_file(&config);
@@ -286,8 +284,8 @@ fn hook__should_exit_within_a_second_when_stdin_stays_open() {
     }
 }
 
-/// From phase 4: `wtpool hook policy` whose stdin stays open exits 0 within its watchdog, with
-/// no output (H4, H29), under a policy that would refuse the call.
+/// `wtpool hook policy` whose stdin stays open exits 0 within its watchdog, with no output, under a
+/// policy that would refuse the call.
 fn policy_with_stdin_open(hooks: &Hooks) {
     hooks.sandbox.write_machine(REQUIRE);
     let payload = with(
@@ -470,7 +468,7 @@ fn log_files(state: &Path) -> Vec<(String, u64)> {
         .unwrap_or_default()
 }
 
-/// Runs a hook that panics, which is a diagnostic.
+/// Runs a hook that panics, so it logs a diagnostic under `state`.
 fn panic_once(hooks: &Hooks, state: &Path) {
     let payload = event(&hooks.pool, "UserPromptSubmit", "s1", &hooks.pool.fg);
     let options = RunOptions {

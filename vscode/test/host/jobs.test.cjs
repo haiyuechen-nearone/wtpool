@@ -1,9 +1,3 @@
-// X21 and X11 in the extension host, with the fake wtpool (phase 4): each `jobSettings` message
-// that X11 accepts runs `wtpool job limit`, `job enforce` or `job heavy` with an argument array,
-// in the window's first folder (R9), one at a time, each killed after 10 s, none after one that
-// failed, and its answer goes back to the webview worded as R10 words errors. Every other
-// `jobSettings` runs nothing and is not answered. The fake logs each start with its argv, folder,
-// parent and pool variables, and answers `job` calls with the code and stderr of its config.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -14,14 +8,14 @@ const { control, ended, fakeLog, openStatus, posted, resetFake, scenarioDocument
 
 const FAKE = path.join(__dirname, '..', 'fake-wtpool.mjs');
 const SHELLS = ['sh', 'bash', 'zsh', 'dash', 'fish', 'ksh', 'tcsh', 'csh'];
-/** How long a check waits for a `wtpool` the extension must not start, or start again. */
+/** The time a check waits for a `wtpool` the extension must not start, or start again. */
 const QUIET_MS = 1500;
-/** X21: a `wtpool job` call is killed after 10 s. */
+/** The extension kills a `wtpool job` call after this long. */
 const KILL_MS = 10_000;
 
 let generation = 0;
 
-/** idle_pool's last document with a new time and, unless `jobs` is null, S14's `machine.jobs`. */
+/** idle_pool's last document with a new time and, unless `jobs` is null, a `machine.jobs`. */
 function documentWith(jobs) {
   const doc = structuredClone(scenarioDocuments('idle_pool').at(-1));
   generation += 1;
@@ -54,7 +48,7 @@ function documentWith(jobs) {
   return doc;
 }
 
-/** Waits until a view of `doc` (by its `generated`) reached the webview after view number `from`. */
+/** Waits until a view of `doc`, by its `generated`, reached the webview after view `from`. */
 async function reached(doc, from) {
   const seen = await waitFor(async () => (await views()).slice(from).some((v) => v.status?.generated === doc.generated), 10_000);
   assert.ok(seen, `setup: the document of ${doc.generated} never reached the webview`);
@@ -90,7 +84,10 @@ function endTime(pid) {
   return end ? end.time : Infinity;
 }
 
-/** What is wrong with where and how a `job` start ran: R9's folder and variables, X4's binary and no shell. */
+/**
+ * Lists the problems of a `job` start: a folder other than the first workspace folder, pool
+ * variables other than the inherited ones, a binary other than wtpool.path, or a shell.
+ */
 function placeProblems(start) {
   const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const real = fs.realpathSync(folder);
@@ -131,8 +128,8 @@ const settings = (fields) => ({ type: 'jobSettings', ...fields });
 const heavy = (op, scope, pattern) => settings({ heavy: { op, scope, pattern } });
 
 /**
- * Sends `messages` once the tab shows `doc`, then waits until `count` job calls started and,
- * unless `hang` says otherwise, ended, and QUIET_MS more for any call that must not come.
+ * Sends `messages` once the tab shows `doc`, then waits until `count` job calls started and
+ * ended, and `settleMs` more for any call that must not come.
  */
 async function run(doc, messages, { count, config = {}, settleMs = QUIET_MS } = {}) {
   await showing(doc, config);
@@ -198,8 +195,8 @@ describe('job settings', () => {
       answers: [{ ...OK, scope: 'machine' }, { ...OK, scope: 'repository' }],
     },
     {
-      // The suggestions as the last document holds them, in its order, one call; one outside J18
-      // is left out, as the CLI would refuse the whole call for it.
+      // The suggestions as the last document holds them, in its order, in one call. A pattern the
+      // CLI refuses is left out, as it would refuse the whole call for it.
       name: 'add_suggested',
       jobs: {
         suggested: [
@@ -308,8 +305,8 @@ describe('job settings', () => {
     await verify.fromWebview(settings({ limit: 6, enforce: 'require' }));
     const first = await waitFor(() => jobStarts()[0], 5_000);
     assert.ok(first, 'the message ran no wtpool job limit');
-    // The kill is due 10 s after the start, on the extension's clock: real time and the verify
-    // API's fake clock both move past it, whichever the extension's timer runs on.
+    // The kill is due 10 s after the start, on the extension's clock. Real time and the verify
+    // API's fake clock both move past it, so the kill comes on either clock.
     for (let waited = 0; waited < KILL_MS + 2000 && !ended(first.pid); waited += 500) {
       await verify.advance(500);
       await sleep(500);
@@ -414,7 +411,7 @@ describe('job settings outside the set', () => {
       JSON.parse('{"type": "jobSettings", "limit": 6, "__proto__": {"x": 1}}'),
       JSON.parse('{"type": "jobSettings", "heavy": {"op": "add", "scope": "machine", "pattern": "go test", "__proto__": {"x": 1}}}'),
     ];
-    // Without machine.jobs a jobSettings counts for nothing, valid or not (X11).
+    // Without machine.jobs a jobSettings counts for nothing, valid or not.
     const withoutJobs = [
       settings({ limit: 6 }),
       settings({ enforce: 'require' }),

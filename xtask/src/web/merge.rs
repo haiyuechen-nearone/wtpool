@@ -70,8 +70,8 @@ pub fn worst_outcomes(results: &[CheckResult]) -> BTreeMap<String, Outcome> {
         .collect()
 }
 
-/// The result of one test of `layer` under its `check`; a message names the test when its title
-/// is more than the check.
+/// The result of one test of `layer` under its `check`. The message names the test when its
+/// title is more than the check.
 pub fn test_result(check: &str, layer: &str, test: TestOutcome) -> CheckResult {
     let message = if test.title == check || test.message.is_empty() {
         test.message
@@ -96,7 +96,7 @@ pub fn test_result(check: &str, layer: &str, test: TestOutcome) -> CheckResult {
 
 /// The results of one layer run: each test under its check, an error for a check the
 /// registry does not give this layer, and for each wanted check of the layer that reported
-/// nothing. A test of a check that `wanted` leaves out, such as one of a later phase, which the
+/// nothing. A test of a check that `wanted` leaves out, such as one of a later phase that the
 /// runner ran all the same, is not counted.
 pub fn layer_results(
     layer: &str,
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn layer_results__should_not_count_a_check_left_out() {
-        // Given: the runner ran a later phase's check, which `wanted` leaves out.
+        // Given
         let tests = vec![
             simple("rows__should_follow_the_grammar", Outcome::Pass),
             failed(

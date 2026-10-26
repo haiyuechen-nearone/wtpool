@@ -1,4 +1,4 @@
-//! `wtpool status --watch` and the heavy jobs (W10): it watches the job folder and the folder of
+//! `wtpool status --watch` and the heavy jobs: it watches the job folder and the folder of
 //! `machine.toml`, so a job or a setting shows within 1 s, and a heartbeat finds a folder made
 //! later and a job that died without deleting its record.
 
@@ -11,7 +11,7 @@ use super::jobs_status::add_to_repository;
 use super::watch::{MISSED_CHANGE, must_setup};
 use crate::support::jobs::{JobSpec, SETTLE, jobs_of};
 
-/// A change of the job folder or of `machine.toml` shows within this (W10, R6).
+/// The longest time a change of the job folder or of `machine.toml` takes to show.
 const JOB_CHANGE: Duration = Duration::from_secs(1);
 
 /// The ids of `machine.jobs.<list>` in `document`.
@@ -24,7 +24,7 @@ fn ids(document: &Value, list: &str) -> Vec<String> {
         .collect()
 }
 
-/// How long after `since` the document `shown` arrived, `None` when none did.
+/// The time from `since` to the arrival of the document `shown`, `None` when none came.
 fn delay(shown: Option<(Instant, Value)>, since: Instant) -> Option<Duration> {
     shown.map(|(at, _)| at.saturating_duration_since(since))
 }
@@ -102,7 +102,7 @@ fn watch__should_see_jobs_within_a_second() {
 
 #[test]
 fn watch__should_see_a_dead_job_within_a_heartbeat() {
-    // Given: neither the job folder nor the folder of machine.toml exists yet.
+    // Given
     let setup = must_setup("watch-dead-job", &[]);
     let config = setup.sandbox.machine_config();
     let folder = config.parent().expect("setup: a parent").to_path_buf();

@@ -48,8 +48,8 @@ pub(super) fn e2e(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
     };
     let _ = fs::remove_dir_all(ctx.run_dir.join("e2e"));
     // Each phase 1 scenario check of the e2e layer runs as a case of flow__every_activity_shows,
-    // `flow__every_activity_shows <scenario>`, which writes its outcome to
-    // e2e/scenarios/<scenario>.json; `--only <scenario>` runs that case.
+    // `flow__every_activity_shows <scenario>`. The case writes its outcome to
+    // e2e/scenarios/<scenario>.json. `--only <scenario>` runs that case.
     // Later scenarios are checks of their own in scenarios-agents.spec.mjs.
     let grep = ctx
         .only
@@ -69,8 +69,8 @@ pub(super) fn e2e(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
         ),
     ];
     let guard = focus::watch(ctx, "e2e");
-    // First every check that may share the machine, in parallel; its outcomes are read with
-    // the exclusive run's. A failure to start shows as checks that reported no result.
+    // First every check that may share the machine, in parallel. Its outcomes are read with the
+    // exclusive run's. A failure to start shows as checks that reported no result.
     let parallel = PlaywrightRun {
         envs,
         grep,
@@ -83,7 +83,7 @@ pub(super) fn e2e(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
         "vscode/test/e2e/playwright.config.mjs",
         &parallel,
     );
-    // Then the checks that need webview focus to themselves, one at a time.
+    // Next, the checks that need webview focus to themselves, one at a time.
     let mut found = playwright(
         ctx,
         wanted,

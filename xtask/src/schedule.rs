@@ -1,15 +1,15 @@
 //! `verify --part a,b,...`: several parts of one run, in parallel where they are independent.
-//! The shared builds come first, once: the release `wtpool` and the web
-//! bundle and .vsix. Then the waves:
-//! 1. `int` alone, first, on an idle machine: its watch checks time file events, and the file
+//! The shared builds come first, once: the release `wtpool` and the web bundle and .vsix. Then
+//! the waves:
+//! 1. `int` alone, first, on an idle machine. Its watch checks time file events, and the file
 //!    churn of other parts (quick's coverage rebuild, VS Code profiles) backs up the system's
-//!    file event service (fseventsd on macOS);
-//! 2. `bench` alone, so nothing skews its timings;
-//! 3. `quick` and `cc`, in parallel: `cc` reads the int part's `cc_replay:<name>`;
-//! 4. `ui` alone, the only part with VS Code windows besides quick's host layer of wave 3;
+//!    file event service (fseventsd on macOS).
+//! 2. `bench` alone, so nothing skews its timings.
+//! 3. `quick` and `cc`, in parallel. `cc` reads the int part's `cc_replay:<name>`.
+//! 4. `ui` alone, the only part with VS Code windows besides quick's host layer of wave 3.
 //!
 //! The shared builds, and the jobs of each part but bench, start at a priority that yields the
-//! processor to the owner's work (crate::priority).
+//! processor to the owner's work ([`crate::priority`]).
 //!
 //! Each part runs as its own `xtask verify --part` process, the cc part with the run's
 //! `--contract` and `--record`. `--only` names a check of one part, so a part list refuses it.
@@ -125,8 +125,8 @@ pub fn run_parts(
     flags: &ListFlags,
 ) -> Result<ExitCode, String> {
     let wanted = list_parts(list, flags)?;
-    // The shared builds, once, before any part starts, holding the machine's verify lock shared
-    // as a part does; released before the waves, whose bench part holds it alone.
+    // The shared builds run once, before any part starts, and hold the machine's verify lock
+    // shared as a part does. They release it before the waves, whose bench part holds it alone.
     let turn = crate::machine_lock::turn();
     let ctx = Ctx::new(
         root.to_path_buf(),

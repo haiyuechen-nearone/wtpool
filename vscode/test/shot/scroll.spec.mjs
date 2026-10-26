@@ -1,20 +1,3 @@
-// U1 and U3 in Chromium (status-panel.md revisions 14 and 18): the panel's sideways scroll at
-// 600 px, in all four themes, on every_activity, the real-names pool and long values.
-//
-// scroll__should_scroll_the_table_inside_the_tab: the table is wider than the tab and a box
-// around it scrolls sideways while the page itself does not; scrolled to its end, every row's
-// Last and actions cells are in view and nothing is clipped (layout__'s measure); the header's
-// chips, connection text and heading keep their place in view; a selected row's detail strip,
-// its text and its box, stays inside the visible width at both ends. In a tab much taller than
-// the table (600 x 900 px), the box that scrolls the table sideways reaches the tab's bottom
-// edge, so its horizontal scrollbar is drawn there and not under the last row: for two short
-// tables (idle_pool with a long branch, the real-names pool) and for a long one whose rows
-// overflow the tab, which scroll down inside that box while the page and the header stay put.
-//
-// scroll__should_bring_focus_and_waits_into_view: Tab from the top through every stop: a focused
-// action (or other control) shows whole with its focus ring, a focused row shows its start.
-// Scrolled to the end, a click on the waiting chip focuses the first waiting row with its start
-// in view.
 import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
@@ -26,9 +9,9 @@ import { clickRow, short, showPlain, visualPanel } from '../support/states.mjs';
 import { realistic, stateDocuments } from '../support/visual-docs.mjs';
 
 const WIDTH = 600;
-/** A tab much taller than a short table (U1): its sideways scrollbar belongs at the bottom. */
+/** A tab much taller than a short table: its sideways scrollbar belongs at the bottom. */
 const TALL = 900;
-/** The first waiting row of each state document (U3). */
+/** The first waiting row of each state document. */
 const FIRST_WAITING = { every_activity: 'wt1', realistic: 'app-wt2', long_values: 'app-wt1' };
 
 test.describe.configure({ mode: 'parallel' });
@@ -37,7 +20,7 @@ const outside = (r, view) => r.left < view.left - 0.5 || r.right > view.right + 
 
 /** Two short tables that still scroll sideways at 600 px, and a long one whose rows overflow 900 px. */
 function tallDocuments() {
-  // idle_pool fits 600 px; with shot__'s long branch it does not.
+  // idle_pool fits 600 px. A long branch makes it scroll sideways.
   const idle = scenarioDocuments('idle_pool').documents.at(-1);
   idle.pools[0].worktrees[2].branch = '1234-check-widget-cache-health-before-each-deploy-and-more';
   const long = everyActivity();

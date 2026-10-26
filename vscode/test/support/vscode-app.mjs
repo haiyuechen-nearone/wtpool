@@ -1,9 +1,7 @@
-// Where the oracle finds VS Code (verification.md, "Portability"), in this order:
-// `WTPOOL_VERIFY_VSCODE` (the binary) and `WTPOOL_VERIFY_VSCODE_CLI` (its `code` CLI); else the
-// platform's default install location; else the pinned version, downloaded once through
-// @vscode/test-electron into `<cache>/wtpool-verify/vscode/`, where `<cache>` is `XDG_CACHE_HOME`
-// when absolute, else ~/.cache. xtask/src/reuse.rs finds the CLI in the same order for the part
-// hashes.
+// A run finds VS Code in this order: `WTPOOL_VERIFY_VSCODE` (the binary) and
+// `WTPOOL_VERIFY_VSCODE_CLI` (its `code` CLI), then the platform's default install location, then
+// the pinned version, downloaded once through @vscode/test-electron into {@link downloadDir}.
+// xtask/src/reuse.rs finds the CLI in the same order for the part hashes.
 import { existsSync, realpathSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -13,8 +11,8 @@ import { downloadAndUnzipVSCode, resolveCliPathFromVSCodeExecutablePath } from '
 export const PINNED_VERSION = '1.140.0';
 
 /**
- * `<cache>/wtpool-verify/`, the harness's cache folder outside the run folder: `XDG_CACHE_HOME` when
- * it is set and absolute, else ~/.cache, as xtask reads it.
+ * `<cache>/wtpool-verify/`, the harness's cache folder outside the run folder. `<cache>` is
+ * `XDG_CACHE_HOME` when it is set and absolute, else ~/.cache, as xtask reads it.
  */
 export function cacheRoot() {
   const xdg = process.env.XDG_CACHE_HOME;
@@ -35,7 +33,7 @@ const isFile = (file) => {
   }
 };
 
-/** The first `name` on PATH, symlinks resolved, or undefined; no `which`, which Windows lacks. */
+/** The first `name` on PATH, symlinks resolved, or undefined. Windows has no `which`. */
 function onPath(name) {
   for (const dir of (process.env.PATH ?? '').split(path.delimiter).filter(Boolean)) {
     const file = path.join(dir, name);
@@ -84,8 +82,8 @@ export function installedVSCode() {
 }
 
 /**
- * The VS Code the oracle runs, {app, cli, source}: {@link installedVSCode}, else the pinned
- * version, downloaded on first use and reused from the cache after.
+ * The VS Code a run uses, {app, cli, source}: {@link installedVSCode}, else the pinned version,
+ * downloaded on first use and reused from the cache after.
  */
 export async function resolveVSCode() {
   const installed = installedVSCode();

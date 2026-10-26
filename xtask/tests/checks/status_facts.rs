@@ -1,4 +1,4 @@
-//! The times, builds and free slots `wtpool status --json` reports: A6, S4 and S9.
+//! The times, builds and free slots `wtpool status --json` reports.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -147,7 +147,7 @@ fn last__should_use_the_newest_known_time(#[case] newest: Newest) {
 }
 
 /// A process that works in a folder relative to the pool, either a line of `WTPOOL_VERIFY_PROCS`
-/// or, when `real`, a running copy of `sleep` under that name.
+/// or, when `real`, a running copy of xtask's `sleeper` under that name.
 struct Proc {
     name: &'static str,
     cwd: &'static str,
@@ -188,7 +188,6 @@ fn builds__should_match_cargo_star_and_rustc(#[case] process: Proc, #[case] owne
     if process.real {
         let program = sandbox.root.join("bin").join(process.name);
         fs::create_dir_all(sandbox.root.join("bin")).expect("setup: create bin");
-        // xtask's own `sleeper` (src/bin), under the build's name.
         fs::copy(env!("CARGO_BIN_EXE_sleeper"), &program).expect("setup: copy the sleeper");
         set_executable(&program);
         let child = std::process::Command::new(&program)
@@ -242,9 +241,9 @@ fn builds__should_match_cargo_star_and_rustc(#[case] process: Proc, #[case] owne
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
-/// `build_processes` and, from phase 4, the repository's `heavy` (J20), each name of the first
-/// read as a one-word pattern then; `cargo` stays a build through the machine's list of every
-/// sandbox (support::jobs::EARLIER_BUILDS).
+/// `build_processes` and, from phase 4, the repository's `heavy`, each name of the first then read
+/// as a one-word pattern. `cargo` stays a build through the machine's list of every sandbox,
+/// [`EARLIER_BUILDS`](crate::support::jobs::EARLIER_BUILDS).
 #[rstest]
 #[case::listed_program(&["make"], &[], "make", true, 1)]
 #[case::other_program(&["make"], &[], "ninja", false, 1)]

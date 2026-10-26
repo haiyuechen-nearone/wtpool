@@ -1,9 +1,8 @@
-// The test runner VS Code loads into the extension host: Mocha with the JSON reporter writing
-// to WTPOOL_VERIFY_RESULTS. A check may take 180 s and is retried twice; the reporter's
-// `currentRetry` of a pass tells the harness it needed a retry, which the report shows as flaky.
+// The test runner VS Code loads into the extension host. A pass with a `currentRetry` above 0 in
+// the JSON report shows as flaky in the harness's report.
 //
-// For order tests, WTPOOL_VERIFY_HOST_RETRIES sets the retries (0 runs each check once) and
-// WTPOOL_VERIFY_HOST_ORDER=reverse runs the files, suites and checks in reverse order.
+// WTPOOL_VERIFY_HOST_ORDER=reverse runs the files, suites and checks in reverse order, so that a
+// run shows a check that depends on an earlier one.
 const fs = require('node:fs');
 const path = require('node:path');
 const Mocha = require('mocha');

@@ -17,13 +17,13 @@ use crate::isolation::VERIFY_EMAIL;
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PoolSpec {
-    /// Whether `<common>/wtpool-activity/` exists, holding the sandbox marker.
+    /// True when `<common>/wtpool-activity/` exists, holding the sandbox marker.
     pub agents: bool,
     pub worktrees: BTreeMap<String, WorktreeSpec>,
 }
 
-/// The state one worktree starts in. `fg` is the main worktree, `wtpool<N>` a slot, any other name
-/// an unmanaged worktree.
+/// The state one worktree starts in. `fg` is the main worktree, `wt<N>` a slot, any other name an
+/// unmanaged worktree.
 #[derive(Deserialize, Debug, Clone, Default, PartialEq, Eq)]
 #[serde(deny_unknown_fields, default)]
 pub struct WorktreeSpec {
@@ -33,9 +33,9 @@ pub struct WorktreeSpec {
     pub upstream: bool,
     pub ahead: u32,
     pub behind: u32,
-    /// Commits made on a detached `HEAD` that no ref holds.
+    /// The number of commits on a detached `HEAD` that no ref holds.
     pub unreferenced: u32,
-    /// Untracked files.
+    /// The number of untracked files.
     pub dirty: u32,
     /// `bisect`, `rebase` or `merge`, the last two stopped at a conflict.
     pub operation: Option<String>,
@@ -88,7 +88,7 @@ impl Pool {
     }
 }
 
-/// Runs git in `dir` with the user's configuration hidden, as the sandbox does.
+/// A git command in `dir` with the user's configuration hidden, as the sandbox does.
 pub fn git_command(dir: &Path) -> Command {
     let mut command = Command::new("git");
     command
@@ -116,7 +116,7 @@ pub fn git_in(dir: &Path, args: &[&str]) -> Result<String, String> {
     cmd::output(git_command(dir).args(args), Duration::from_secs(120))
 }
 
-/// Runs git and returns whether it exited 0, for commands that stop at a conflict on purpose.
+/// Runs git and returns true when it exited 0, for commands that stop at a conflict on purpose.
 fn git_status(dir: &Path, args: &[&str]) -> Result<bool, String> {
     let ran = cmd::run(git_command(dir).args(args), Duration::from_secs(120))?;
     Ok(ran.ok())
@@ -169,7 +169,7 @@ fn conflicting_commit(fg: &Path) -> Result<String, String> {
     Ok(commit.trim().to_owned())
 }
 
-/// Builds the pool `spec` describes in `dir`, which must not exist yet or be empty.
+/// Builds the pool `spec` describes in `dir`. The folder must be new or empty.
 pub fn build(dir: &Path, spec: &PoolSpec) -> Result<Pool, String> {
     fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let dir = fs::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;

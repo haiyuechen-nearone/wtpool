@@ -1,10 +1,3 @@
-// R12, X19 and X15 in the extension host, with the fake wtpool (phase 3). The extension reads the
-// tail of each output file that the last document lists for the selected row's actors, and of no
-// other path; a listed path that does not end in `/tasks/<id>.output` gets a tail that says why,
-// and neither a read nor a Follow. A growing file updates within a second. Escape sequences and C1 controls never reach
-// the webview. A symlink or other non-regular file is refused. Watching stops on deselect and on a
-// hidden tab. Follow opens a terminal whose Pseudoterminal streams the file with no control but SGR
-// colours, and skips ahead of a writer that outruns it. The open strip's row gets every document.
 // The webview's messages come in through the verify API's fromWebview. The files the extension
 // opens, lstats and watches come from wrapped `fs.promises.open`, `fs.promises.lstat`, `fs.lstat`
 // and `fs.watch`. The extension shares these with the checks, as it runs in this extension host.

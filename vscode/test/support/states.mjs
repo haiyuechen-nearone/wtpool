@@ -39,12 +39,11 @@ export async function showPlain(page, panel, doc, { options, ms = SETTLE_MS } = 
   await settle(page, ms);
 }
 
-/** The row ids of the table, in order. */
 export async function rowIds(page) {
   return page.locator('tr[data-row-id]').evaluateAll((rows) => rows.map((r) => r.dataset.rowId));
 }
 
-/** The row of `id`; every character of a hostile id outside `\w/.-` is CSS escaped. */
+/** The row of `id`. Every character of a hostile id outside `\w/.-` is CSS escaped. */
 export function rowLocator(page, id) {
   const escaped = id.replace(/[^\w/.-]/gu, (c) => `\\${c.codePointAt(0).toString(16)} `);
   return page.locator(`tr[data-row-id="${escaped}"]`);
@@ -82,14 +81,16 @@ export function inViewport(page, rect) {
   return { x, y, w: Math.max(0, Math.min(width, rect.x + rect.w) - x), h: Math.max(0, Math.min(height, rect.y + rect.h) - y) };
 }
 
-/** Selects (or, when selected, deselects) the row `id` by a click on its first cell; the mouse stays there. */
+/**
+ * Selects (or, when selected, deselects) the row `id` by a click on its first cell. The mouse stays
+ * there.
+ */
 export async function clickRow(page, id, ms = SETTLE_MS) {
   const cell = rowLocator(page, id).locator(':scope > td').first();
   await cell.click({ position: { x: 4, y: 4 } });
   await settle(page, ms);
 }
 
-/** A short name for a row id. */
 export function short(id) {
   return id.split('/').pop();
 }

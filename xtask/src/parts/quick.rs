@@ -1,5 +1,6 @@
-//! The quick part's own checks, before its web layers (crate::layers::quick): the harness's self
-//! test and lints, the oracle and repository checks, and the static Rust checks of the product.
+//! The quick part's own checks, before its web layers in [`crate::layers::quick`]: the harness's
+//! self test and lints, the oracle and repository checks, and the static Rust checks of the
+//! product.
 
 use std::time::Duration;
 

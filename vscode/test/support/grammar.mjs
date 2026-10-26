@@ -1,7 +1,7 @@
-// The oracle's model of the panel text, written from status-panel.md "Panel layout" (U1, U5,
-// U6) and the normative parts of the mockups. Tests compare the product's DOM with it.
+// The text the panel should show, written apart from the extension's code so that tests can
+// compare the webview's DOM with it.
 
-/** The word of each activity value (U1, legend). */
+/** The word the panel shows for each activity. */
 export const WORDS = {
   foreground: 'foreground',
   waiting: 'waiting',
@@ -15,7 +15,7 @@ export const WORDS = {
   missing: 'missing',
 };
 
-/** The colour group of each activity value (U6). */
+/** The colour group of each activity. */
 export const GROUPS = {
   foreground: 'active',
   waiting: 'attention',
@@ -29,7 +29,7 @@ export const GROUPS = {
   missing: 'problem',
 };
 
-/** The one token of each group (U6, status-panel.md revision 14). */
+/** The theme colour of each colour group. */
 export const GROUP_TOKENS = {
   attention: '--vscode-list-warningForeground',
   active: '--vscode-textLink-foreground',
@@ -37,7 +37,7 @@ export const GROUP_TOKENS = {
   problem: '--vscode-list-errorForeground',
 };
 
-/** How a waiting reason reads (actor state table). */
+/** The text of each waiting reason. */
 export const REASONS = {
   permission: 'permission',
   question: 'question',
@@ -47,10 +47,13 @@ export const REASONS = {
 
 export const DOT = ' · ';
 
-const INVISIBLE =
-  /[\u0000-\u001f\u007f-\u009f؜​-‏‪-‮⁠⁦-⁩﻿]/gu;
+/** The tag block is listed whole, as Cf leaves out its code points that are not assigned yet. */
+const INVISIBLE = /[\p{Cc}\p{Cf}\u2028\u2029\u{E0000}-\u{E007F}]/gu;
 
-/** A string as X10 shows it: control, bidi and zero width characters as `\u{XXXX}`. */
+/**
+ * Gives `text` with each control, format, line separator, paragraph separator and tag character
+ * written as `\u{XXXX}`.
+ */
 export function visible(text) {
   return String(text).replace(
     INVISIBLE,
@@ -66,7 +69,7 @@ export function normalizeEscapes(text) {
   );
 }
 
-/** U1's age of an RFC 3339 time at `nowMs`: `now`, `N s`, `N m`, `N h`, `N d`, or empty. */
+/** The age of an RFC 3339 time at `nowMs`: `now`, `N s`, `N m`, `N h`, `N d`, or empty. */
 export function age(time, nowMs) {
   if (time === null || time === undefined) return '';
   const seconds = Math.floor((nowMs - Date.parse(time)) / 1000);
@@ -106,7 +109,7 @@ function actionText(action) {
   return action.target ? `${visible(action.tool)} ${visible(action.target)}` : visible(action.tool);
 }
 
-/** What follows `<label> · ` on an actor line. */
+/** The text after `<label> · ` on an actor line. */
 export function doing(actor) {
   const action = actionText(actor.action);
   switch (actor.state) {
@@ -127,7 +130,7 @@ export function doing(actor) {
   }
 }
 
-/** The actors of a row in the order the panel lists them: newest `updated` first (R4). */
+/** The actors of a row in the order the panel lists them: newest `updated` first. */
 export function shownActors(worktree) {
   return [...worktree.actors].sort((a, b) => Date.parse(b.updated) - Date.parse(a.updated));
 }
@@ -157,7 +160,7 @@ export function lastLines(worktree, nowMs) {
 
 const ROLE_ORDER = { foreground: 0, slot: 1, unmanaged: 2 };
 
-/** U2: foreground, slots, unmanaged, each by name. */
+/** Sorts worktrees as the panel lists them: the foreground, slots, then unmanaged, each by name. */
 export function rowOrder(worktrees) {
   return [...worktrees].sort(
     (a, b) =>
@@ -167,8 +170,8 @@ export function rowOrder(worktrees) {
 }
 
 /**
- * U8: a pool's heading, `repository.github`, or `repository.name` when that is null, then
- * ` · ` and the machine name.
+ * A pool's heading: `repository.github`, or `repository.name` when that is null, then ` · ` and
+ * the machine name.
  */
 export function headingText(pool, machine) {
   const repository = pool.repository.github ?? pool.repository.name;
@@ -187,7 +190,7 @@ export function expectedRow(worktree, nowMs, jobs) {
   };
 }
 
-/** U3: how many worktrees each chip counts. */
+/** The number of worktrees each chip counts. */
 export function chipCounts(worktrees) {
   const count = (activity) => worktrees.filter((w) => w.activity === activity).length;
   return { free: count('free'), working: count('working'), waiting: count('waiting') };

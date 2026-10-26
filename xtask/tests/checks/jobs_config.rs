@@ -1,6 +1,6 @@
-//! The machine config of heavy jobs (J4, J5): where `machine.toml` lives, that no repository or
-//! variable sets the limit or the policy, what an invalid file does, the default limit and a
-//! symlinked file. Also the helpers the other settings checks share.
+//! The machine config of heavy jobs: where `machine.toml` lives, that no repository or variable
+//! sets the limit or the policy, the refusal of an invalid file, the default limit and a symlinked
+//! file. Also the helpers the other settings checks share.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsStr;
@@ -39,7 +39,7 @@ pub(super) fn tokens(text: &str) -> BTreeSet<String> {
         .collect()
 }
 
-/// Whether the path `shown` names `expected`, as written or after resolving symlinks.
+/// True when `shown` names `expected` as written or with the symlinks of its parent resolved.
 pub(super) fn same_path(shown: &str, expected: &Path) -> bool {
     let shown = Path::new(shown);
     if shown == expected {
@@ -52,7 +52,7 @@ pub(super) fn same_path(shown: &str, expected: &Path) -> bool {
     canonical(shown).is_some_and(|found| Some(found) == canonical(expected))
 }
 
-/// Whether `text` names `path`, as written or resolved.
+/// True when `text` holds `path` as written or with the symlinks of its parent resolved.
 pub(super) fn names_path(text: &str, path: &Path) -> bool {
     let written = path.to_string_lossy();
     let resolved = path
@@ -71,7 +71,7 @@ pub(super) fn stderr_of(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
 
-/// Sets the Unix mode of `path`. Windows has no such mode, so a check that needs it stops there.
+/// Sets the Unix mode of `path`. Off Unix the setup fails, as Windows has no such mode.
 pub(super) fn set_mode(path: &Path, mode: u32) {
     #[cfg(unix)]
     {
@@ -85,7 +85,7 @@ pub(super) fn set_mode(path: &Path, mode: u32) {
     );
 }
 
-/// The permission bits of `path`, without following a symlink; `None` off Unix.
+/// The permission bits of `path`, without following a symlink. `None` off Unix.
 pub(super) fn mode_of(path: &Path) -> Option<u32> {
     #[cfg(unix)]
     {
@@ -323,7 +323,7 @@ fn machine_config__should_ignore_the_repository() {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
-/// How a machine config is invalid.
+/// The fault that makes a machine config invalid.
 enum Fault {
     Text(&'static str),
     Unreadable,
@@ -511,7 +511,7 @@ fn machine_config__should_read_through_a_symlink() {
     );
 }
 
-/// The record of `job` once its state is `state`, within [`SETTLE`]; `None` at once when
+/// The record of `job` once its state is `state`, within [`SETTLE`]. `None` at once when
 /// `wtpool job` ended first.
 pub(super) fn wait_state(sandbox: &Sandbox, job: &mut Job, state: &str) -> Option<Value> {
     let deadline = std::time::Instant::now() + SETTLE;

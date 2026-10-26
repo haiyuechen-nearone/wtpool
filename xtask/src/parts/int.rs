@@ -54,8 +54,8 @@ struct Coverage {
 }
 
 impl Coverage {
-    /// The coverage build in `target/llvm-cov-target`; without its environment the builds write no
-    /// coverage, and `results` gets the error.
+    /// The coverage build. When `cargo llvm-cov show-env` fails, the builds write no coverage and
+    /// `results` gets the error.
     fn new(ctx: &Ctx, results: &mut Vec<CheckResult>) -> Self {
         let target = ctx.root.join("target/llvm-cov-target");
         let env = match coverage_env(ctx, &target) {
@@ -82,7 +82,8 @@ impl Coverage {
         self.target.join("debug/wtpool")
     }
 
-    /// Writes `cover/<name>.lcov` from the coverage so far; the error result when it fails.
+    /// Writes `cover/<name>.lcov` from the coverage so far, and returns the error result when that
+    /// fails.
     fn report(&self, ctx: &Ctx, name: &str) -> Option<CheckResult> {
         let check = format!("int:coverage_{name}");
         lcov_report(ctx, &self.env, name)
@@ -91,7 +92,6 @@ impl Coverage {
     }
 }
 
-/// The environment `cargo llvm-cov show-env` gives, for builds that write coverage.
 fn coverage_env(ctx: &Ctx, target: &Path) -> Result<Vec<(String, String)>, String> {
     let text = cmd::output(
         ctx.command("cargo")
@@ -144,8 +144,9 @@ fn lcov_report(ctx: &Ctx, env: &[(String, String)], name: &str) -> Result<(), St
     if ran.ok() { Ok(()) } else { Err(ran.tail(20)) }
 }
 
-/// How an int check's panic starts when the check's subject does not exist on this machine, such
-/// as a Windows job outside Windows: the check ends `skipped` with the rest as its reason.
+/// The start of an int check's panic message when the check's subject does not exist on this
+/// machine, such as a Windows job outside Windows. The check ends `skipped`, with the rest of the
+/// message as its reason.
 pub const SKIPPED: &str = "skipped on this machine: ";
 
 /// Each check of the nextest JUnit report at `path`, by its first test case that did not pass.
@@ -232,7 +233,7 @@ struct TestEnv {
 }
 
 impl TestEnv {
-    /// The variables, a build the int checks lack left out.
+    /// The variables, without those of the builds that are missing.
     fn vars(&self) -> Vec<(&'static str, String)> {
         let text = |path: &Path| path.to_string_lossy().into_owned();
         let mut vars = vec![
@@ -261,7 +262,7 @@ impl TestEnv {
 }
 
 /// The builds the int checks test: `wtpool` with coverage and the `verify` feature, the release
-/// `wtpool`, and the rebuild steps of the version check; each one that builds goes into `env`.
+/// `wtpool`, and the rebuild steps of the version check. Each one that builds goes into `env`.
 fn builds(ctx: &Ctx, coverage: &Coverage, env: &mut TestEnv) -> Vec<CheckResult> {
     let package = match wtpool_package(ctx) {
         Ok(package) => package,
@@ -284,7 +285,7 @@ fn builds(ctx: &Ctx, coverage: &Coverage, env: &mut TestEnv) -> Vec<CheckResult>
         env.wtpool = Some(coverage.wtpool());
     }
     results.push(built);
-    // The release wtpool is built once per run and shared (layers::release_wtpool).
+    // The release wtpool is built once per run and shared.
     results.push(match crate::layers::release_wtpool(ctx) {
         Ok(path) => {
             env.release = Some(path);
@@ -325,7 +326,7 @@ fn int_tests(ctx: &Ctx, env: &TestEnv) -> Vec<CheckResult> {
     let mut tests = ctx.normal_priority_command("cargo");
     int_tests(&mut tests);
     tests.args(["--profile", "int", "--config-file", NEXTEST_CONFIG]);
-    // The Rust budgets share the binary; only the bench part runs them.
+    // The Rust budgets share the binary, and only the bench part runs them.
     let budgets = format!("test(/^{}/)", crate::layers::BENCH_MODULE);
     let later = crate::trace::nextest_exclusion(&ctx.later);
     let filter = match &ctx.only {
@@ -364,7 +365,7 @@ fn int_tests(ctx: &Ctx, env: &TestEnv) -> Vec<CheckResult> {
     results
 }
 
-/// `cc_replay:<name>`: the recorded contract sessions through the verify build (phase 2 on).
+/// `cc_replay:<name>`: the recorded contract sessions through the verify build, from phase 2.
 fn replays(ctx: &Ctx, coverage: &Coverage) -> Vec<CheckResult> {
     let wanted = ctx.phase >= 2
         && ctx

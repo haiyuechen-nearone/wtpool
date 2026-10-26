@@ -12,7 +12,7 @@ pub enum Outcome {
     NeedsYou,
     NotRun,
     /// The check's input does not exist on this machine (a live contract run, its recordings),
-    /// so it decided nothing. The report lists each with its reason; it fails no verdict.
+    /// so it decided nothing. The report lists each with its reason, and it fails no verdict.
     Skipped,
 }
 
@@ -36,8 +36,8 @@ pub struct CheckResult {
     pub code: Option<String>,
     pub message: String,
     pub seconds: f64,
-    /// The check passed only on a retry of its layer's runner (verification.md, "Outcomes and
-    /// limits"). The report lists it, and fails it when it was flaky in 3 runs in a row.
+    /// The check passed only on a retry of its layer's runner. The report lists it, and fails it
+    /// when it was flaky in [`IN_A_ROW`](crate::flaky::IN_A_ROW) runs in a row.
     #[serde(default)]
     pub flaky: bool,
 }
@@ -99,7 +99,7 @@ impl CheckResult {
     }
 }
 
-/// Where an earlier result came from, when a part reused one (crate::reuse).
+/// Where an earlier result came from, when a part reused one.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Reused {
     pub commit: String,
@@ -114,7 +114,7 @@ pub struct PartFile {
     pub phase: u8,
     pub commit: String,
     pub results: Vec<CheckResult>,
-    /// The hash of the part's inputs (crate::reuse), when it ran without `--only`.
+    /// The [`input_hash`](crate::reuse::input_hash) of the part, when it ran without `--only`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_hash: Option<String>,
     /// The earlier result this one copies, when the part was not run again.

@@ -1,5 +1,4 @@
-//! `trace_complete` (verification.md, "Trace list"): every spec ID of the phase and every harness
-//! check of verify/trace.toml passed.
+//! `trace_complete`: every ID and every harness check of [`TRACE`] up to the run's phase passed.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -66,7 +65,7 @@ pub fn load_scenarios(root: &Path) -> Result<Vec<Scenario>, String> {
 }
 
 impl Trace {
-    /// Every check name the trace list and catalog know, for the phase they run from.
+    /// Every check name the trace and the scenarios know.
     pub fn known_checks(&self, scenarios: &[Scenario]) -> BTreeSet<String> {
         let mut known: BTreeSet<String> = self.harness.keys().cloned().collect();
         for entry in self.ids.values() {
@@ -120,9 +119,9 @@ impl Trace {
         }
     }
 
-    /// The phase each check of the trace list and catalog runs from: for a check an ID names,
-    /// the later of that ID's phase and the check's own in `check_phase`, the earliest over the
-    /// IDs that name it; for a scenario, the later of its phase and its own.
+    /// The phase each check of the trace and the scenarios runs from. A check an ID names runs
+    /// from the later of that ID's phase and its own in [`Trace::check_phase`], the earliest over
+    /// the IDs that name it. A scenario runs from the later of its phase and its own.
     pub fn first_phases(&self, scenarios: &[Scenario]) -> BTreeMap<String, u8> {
         let mut found: BTreeMap<String, u8> = BTreeMap::new();
         let mut note = |check: &str, phase: u8| {
@@ -144,8 +143,8 @@ impl Trace {
         found
     }
 
-    /// The checks of the trace list and catalog that run only from a phase later than `phase`,
-    /// which a part of `phase` leaves out, so a run of an earlier phase never judges a later
+    /// The checks of the trace and the scenarios that run only from a phase later than `phase`.
+    /// A part of `phase` leaves them out, so a run of an earlier phase never judges a later
     /// phase's checks.
     pub fn later_checks(&self, scenarios: &[Scenario], phase: u8) -> BTreeSet<String> {
         self.first_phases(scenarios)
@@ -180,7 +179,7 @@ impl TraceProblem {
 /// The problem of `owner`'s `check` by its outcome, `None` when it passed or was skipped.
 fn judge(check: &str, owner: &str, outcome: Option<Outcome>) -> Option<TraceProblem> {
     match outcome {
-        // A skipped check's subject does not exist on this machine; the report lists it.
+        // A skipped check's subject does not exist on this machine. The report lists it.
         Some(Outcome::Pass | Outcome::Skipped) => None,
         Some(Outcome::NeedsYou) => Some(TraceProblem {
             text: format!("{owner}: {check} needs you"),
@@ -222,9 +221,9 @@ pub fn problems(
     problems
 }
 
-/// The checks of `root`'s trace list and catalog that run only from a phase after `phase`; none
-/// when the trace cannot be read, which `trace_complete` reports. A flow check runs from the
-/// phase of its row in the User flows table, also when an ID of a later phase names it.
+/// The checks of `root`'s trace and scenarios that run only from a phase after `phase`, none when
+/// the trace cannot be read, a fault `trace_complete` reports. A flow check runs from the phase of
+/// its flow in [`crate::flows::load`], also when an ID of a later phase names it.
 pub fn later_in(root: &Path, phase: u8) -> BTreeSet<String> {
     let mut later = load(root)
         .and_then(|trace| Ok(trace.later_checks(&load_scenarios(root)?, phase)))
@@ -466,8 +465,8 @@ mod tests {
         assert_eq!(found, expected);
     }
 
-    /// The harness checks that the trace list of verification.md names, each with the phase
-    /// from its `(phase N` note, else 0.
+    /// The harness checks the paragraph of `text` that starts `Harness checks carry no ID` names,
+    /// each with the phase of its `(phase N` note, else 0.
     fn doc_harness(text: &str) -> BTreeMap<String, u8> {
         let start = text.find("Harness checks carry no ID").unwrap();
         let paragraph = &text[start..];
@@ -507,16 +506,13 @@ mod tests {
         assert_eq!(trace.harness, doc_harness(&doc));
     }
 
-    /// The IDs the scenario catalog of verification.md names in `covers`, with R3 and U1 that
-    /// every scenario covers.
+    /// The IDs the scenario catalog covers, those every scenario covers among them.
     const CATALOG_COVERS: [&str; 26] = [
         "R1", "R2", "R3", "R4", "A1", "A2", "A3", "A4", "A5", "S3", "S4", "S8", "U1", "U3", "X10",
         "H6", "H9", "H10", "H11", "H12", "H13", "H15", "H19", "H20", "H21", "H24",
     ];
 
-    /// The phase verification.md gives an ID: 1, except 2 for R4, D5, H1 to H26, A1 to A4, A7,
-    /// S5, S6, W6, X18, 3 for X12, H27, H28, S13, R12, U9 and X19, and 4 for the IDs of jobs.md,
-    /// J1 to J24, H29, A8, S14, S15, W10, B12 to B14, U10 to U15 and X20 to X22.
+    /// The phase of `id`, kept apart from [`TRACE`] so a misphased entry there fails.
     fn spec_phase(id: &str) -> u8 {
         let later = [
             "R4", "D5", "A1", "A2", "A3", "A4", "A7", "S5", "S6", "W6", "X18",
@@ -549,9 +545,19 @@ mod tests {
         let trace = load(&root).unwrap();
 
         // Then
-        // R, D, H, A, S, W, X, U, B, J, with the phase 4 IDs H29, A8, S14, S15, W10, X20 to X22,
-        // U10 to U15, B12 to B14 and J1 to J24 among them.
-        let expected_ids = 11 + 4 + 29 + 8 + 15 + 10 + 22 + 15 + 14 + 24;
+        let ids_per_letter = [
+            ("R", 11),
+            ("D", 4),
+            ("H", 29),
+            ("A", 8),
+            ("S", 15),
+            ("W", 10),
+            ("X", 22),
+            ("U", 15),
+            ("B", 14),
+            ("J", 24),
+        ];
+        let expected_ids: usize = ids_per_letter.iter().map(|(_, count)| count).sum();
         assert_eq!(trace.ids.len(), expected_ids);
         let ownerless: Vec<&String> = trace
             .ids

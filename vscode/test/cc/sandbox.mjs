@@ -1,17 +1,7 @@
-// The sandbox of the cc layer (verification.md, "Contract test", "Isolation" and "No side
-// effects"). `claude` keeps the real home and the owner's login, as the spec says, but loads no
-// user, project or local settings (`settingSources: []`), only the run's settings file, and keeps
-// its configuration in the run folder: `CLAUDE_CONFIG_DIR` names <run>/cc/claude-config, so
-// transcripts, the session list, project entries, file history and session environments never
-// reach the owner's ~/.claude/ or ~/.claude.json, while `CLAUDE_SECURESTORAGE_CONFIG_DIR` set
-// empty keeps the keychain entry of the owner's login. Only an allowlist of variables reaches
-// `claude`, so none of the session that started the run, such as its messaging socket or VS
-// Code's, nor an SSH agent or a GitHub or cloud token, and no claude.ai connector of the owner's
-// account loads (ENABLE_CLAUDEAI_MCP_SERVERS=false). Bash runs in Claude Code's sandbox, and
-// canUseTool allows only each session's scripted calls (sessions.mjs). Each session gets a fresh
-// pool built by `cargo xtask pool` in the run folder; `wtpool` and the hooks get the sandbox pool,
-// state folder and WTPOOL_VERIFY_SANDBOX=1. The runner deletes the folders its sessions left in
-// Claude Code's temporary folder, and any transcript folder of theirs in ~/.claude/projects/.
+// The sandbox of the cc layer. `claude` keeps the real home and the owner's login, but loads only
+// the run's settings file and keeps its configuration in the run folder, so transcripts, project
+// entries, file history and session environments never reach the owner's ~/.claude/ or
+// ~/.claude.json.
 import { execFileSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -22,7 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export const RECORDER = path.join(here, 'recorder.mjs');
 export const MODEL = 'claude-haiku-5-5';
 
-/** The event table of status-panel.md, section 1, and the async ones of H1. */
+/** The hook events wtpool hooks into. */
 export const EVENTS = [
   'UserPromptSubmit',
   'PreToolUse',
@@ -42,9 +32,9 @@ export const EVENTS = [
 const ASYNC = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionDenied', 'PostToolBatch']);
 
 /**
- * The block `wtpool hook install` printed: stdout parsed whole (H22: the block alone, as valid
- * JSON), or undefined when it printed nothing. Anything else throws, as text after the block
- * makes a malformed settings file, which claude skips without a word and so runs no hook.
+ * Parses the block `wtpool hook install` printed, or gives undefined when it printed nothing.
+ * Anything but one JSON object throws, as text after the block makes a malformed settings file,
+ * and claude skips such a file without a word and so runs no hook.
  */
 function wholeObject(text) {
   if (!text.trim()) return undefined;
@@ -94,7 +84,7 @@ export function makePool(dirs, name) {
  * temporary folder, user, shell and locale, a login by token, git's settings of
  * `.cargo/config.toml`, and the harness's own. No other does, such as a Claude Code session's
  * messaging socket, VS Code's IPC handles, an SSH agent, or a GitHub or cloud token. HOME stays
- * the real one: macOS finds the login keychain, which holds the owner's login, through it.
+ * the real one, as macOS finds the login keychain with the owner's login through it.
  */
 const KEEP = new Set([
   'PATH',
@@ -124,8 +114,8 @@ export function sessionEnv(dirs, pool, extra = {}) {
   return {
     ...env,
     CLAUDE_CONFIG_DIR: dirs.config,
-    // Empty, not absent: the keychain entry of the default configuration, the owner's login,
-    // rather than one named after CLAUDE_CONFIG_DIR, which holds none.
+    // Empty, not absent, so claude reads the keychain entry of the default configuration, the
+    // owner's login, rather than an empty one named after CLAUDE_CONFIG_DIR.
     CLAUDE_SECURESTORAGE_CONFIG_DIR: '',
     // The run's configuration lacks the owner's `autoUpdates: false`, and an update replaces the
     // machine's shared `claude` outside the run folder.
@@ -134,8 +124,7 @@ export function sessionEnv(dirs, pool, extra = {}) {
     ENABLE_CLAUDEAI_MCP_SERVERS: 'false',
     // Claude Code keeps its installed versions in the data folder, their locks in the state
     // folder and its update staging in the cache. Its start-up cleanup prunes the versions it
-    // finds unlocked: with only the state folder here, it pruned the owner's real versions folder
-    // while seeing none of the owner's locks.
+    // finds unlocked, so with only the state folder here it would prune the owner's versions.
     XDG_STATE_HOME: dirs.state,
     XDG_DATA_HOME: dirs.data,
     XDG_CACHE_HOME: dirs.cache,
@@ -167,8 +156,8 @@ export function wtpoolEnv(dirs, pool) {
   };
 }
 
-/** The block H1 describes, for a `wtpool` whose `hook install` prints none yet. */
-function specBlock(wtpool) {
+/** The hook block for a `wtpool` whose `hook install` prints none yet. */
+function fallbackHooks(wtpool) {
   const hooks = {};
   for (const event of EVENTS) {
     const entry = { type: 'command', command: wtpool, args: ['hook'], onFailure: 'continue' };
@@ -180,21 +169,22 @@ function specBlock(wtpool) {
 }
 
 /**
- * Writes the run's settings file: the hook block of the build copy (from `wtpool hook install`, or
- * H1's block while the build prints none), a recorder hook per event, WTPOOL_VERIFY_SANDBOX=1,
- * defaultMode `default`, the ask rule `Bash(git status)`, no WebFetch or WebSearch, and Claude
- * Code's sandbox on. Returns {file, printed}: whether the block came from `wtpool hook install`.
+ * Writes the run's settings file: the hook block of the build copy (from `wtpool hook install`,
+ * or {@link fallbackHooks} while the build prints none), a recorder hook per event,
+ * WTPOOL_VERIFY_SANDBOX=1, defaultMode `default`, the ask rule `Bash(git status)`, no WebFetch or
+ * WebSearch, and Claude Code's sandbox on. Returns {file, printed}, `printed` telling if the block
+ * came from `wtpool hook install`.
  */
 export function writeSettings(dirs, wtpool, pool) {
   let text = '';
   try {
     text = execFileSync(wtpool, ['hook', 'install'], { encoding: 'utf8', env: wtpoolEnv(dirs, pool), timeout: 30_000, stdio: ['ignore', 'pipe', 'pipe'] });
   } catch {
-    // A build that cannot run `hook install` yet: H1's block stands in.
+    // A build that cannot run `hook install` yet gets the fallback block.
   }
   const block = wholeObject(text);
   const printed = Boolean(block);
-  const hooks = structuredClone(block?.hooks ?? block ?? specBlock(wtpool));
+  const hooks = structuredClone(block?.hooks ?? block ?? fallbackHooks(wtpool));
   for (const event of EVENTS) {
     hooks[event] ??= [];
     hooks[event].push({ hooks: [{ type: 'command', command: `"${process.execPath}" "${RECORDER}"`, timeout: 10 }] });
@@ -250,7 +240,7 @@ function tempDirs() {
   return [...new Set(['/tmp', process.env.CLAUDE_CODE_TMPDIR].filter(Boolean).map((dir) => path.join(dir, name)))];
 }
 
-/** The folder names, in Claude Code's temporary folders, that a run's sessions name from their cwd. */
+/** The name prefix claude gives the folders of a session with its cwd below `runDir`. */
 function runMarker(runDir) {
   return path.resolve(runDir).replace(/[^A-Za-z0-9]/g, '-');
 }
@@ -267,7 +257,6 @@ export function tempFolders(runDir) {
   });
 }
 
-/** Deletes the folders the run's sessions left in Claude Code's temporary folders. */
 export function removeTempFolders(runDir) {
   const found = tempFolders(runDir);
   for (const folder of found) rmSync(folder, { recursive: true, force: true });
@@ -275,7 +264,7 @@ export function removeTempFolders(runDir) {
 }
 
 /**
- * What of the session `id`, run with cwd below `runDir`, reached the owner's Claude Code
+ * Lists the traces of the session `id`, run with cwd below `runDir`, in the owner's Claude Code
  * configuration: ~/.claude/ entries named after it or after the run folder, and project entries
  * of ~/.claude.json below the run folder. Reads names and keys only, never values.
  */
@@ -326,7 +315,7 @@ export function installSnapshot() {
   return { versions, launcher };
 }
 
-/** What differs between two {@link installSnapshot}s, one phrase each. */
+/** Lists the differences between two {@link installSnapshot}s, one phrase each. */
 export function installChanges(before, after) {
   const changes = [];
   for (const name of [...new Set([...Object.keys(before.versions), ...Object.keys(after.versions)])].sort()) {
@@ -338,7 +327,7 @@ export function installChanges(before, after) {
   return changes;
 }
 
-/** The transcript folder names there now. */
+/** The names of the transcript folders in {@link projectsDir} now. */
 export function transcriptFolders() {
   try {
     return new Set(readdirSync(projectsDir()));

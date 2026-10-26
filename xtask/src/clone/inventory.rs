@@ -1,4 +1,4 @@
-//! The checks the oracle implements and which part runs each.
+//! The checks the oracle implements and the part that runs each.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -39,7 +39,7 @@ pub fn absent_checks(root: &Path) -> Result<BTreeSet<String>, String> {
     Ok(absent.absent.into_iter().map(|entry| entry.check).collect())
 }
 
-/// Which part runs a check, `report` for the checks the report computes.
+/// The part that runs `check`, `report` for the checks the report computes.
 pub fn part_of(check: &str) -> &'static str {
     match check {
         "oracle_unchanged" | "repo_context__should_be_unchanged" | "lint__no_suppressions" => {
@@ -51,7 +51,7 @@ pub fn part_of(check: &str) -> &'static str {
     }
 }
 
-/// Which part runs a check: the registry of verify/checks.toml first, then [`part_of`].
+/// The part that runs `check`: the registry of verify/checks.toml first, then [`part_of`].
 pub fn part_for(root: &Path, check: &str) -> &'static str {
     crate::web::Registry::load(root)
         .ok()
@@ -97,7 +97,6 @@ pub fn implemented_checks(root: &Path) -> Result<BTreeSet<String>, String> {
     let trace = trace::load(root)?;
     let scenarios = trace::load_scenarios(root)?;
     let mut known = trace.known_checks(&scenarios);
-    // The flow checks are named by the User flows table, not the trace list.
     known.extend(crate::flows::check_names(root));
     let unknown: Vec<&String> = checks.iter().filter(|c| !known.contains(*c)).collect();
     if !unknown.is_empty() {

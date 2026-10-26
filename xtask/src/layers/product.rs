@@ -1,4 +1,4 @@
-//! The static checks of the Rust workspace and the generated files: S2 and S7.
+//! The static checks of the Rust workspace and of the generated files.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -14,7 +14,7 @@ use crate::results::CheckResult;
 
 pub(super) const NO_SOCKET_APIS: &str = "lint__no_socket_apis";
 
-/// Crates whose purpose is networking (lint__no_socket_apis, `cargo tree`).
+/// Crates whose purpose is networking.
 const NETWORK_CRATES: [&str; 31] = [
     "actix-web",
     "async-net",
@@ -49,8 +49,8 @@ const NETWORK_CRATES: [&str; 31] = [
     "zmq",
 ];
 
-/// S2: no socket type or call in the workspace (clippy `disallowed_types` and
-/// `disallowed_methods` from clippy.toml) and no networking crate in `cargo tree`.
+/// No socket type or call in the workspace, by clippy's `disallowed_types` and
+/// `disallowed_methods` of clippy.toml, and none of [`NETWORK_CRATES`] in `cargo tree`.
 pub(super) fn no_socket_apis(ctx: &Ctx) -> CheckResult {
     const CHECK: &str = NO_SOCKET_APIS;
     let clippy = ctx.run_logged(
@@ -140,8 +140,8 @@ pub(super) fn no_socket_apis(ctx: &Ctx) -> CheckResult {
     findings_result(CHECK, &found)
 }
 
-/// S7: `npm run generate` in a clone of the tree under test rewrites nothing, and every JSON
-/// Schema the product tracks accepts every scenario document.
+/// `npm run generate` in a clone of the tree under test rewrites nothing, and every JSON Schema
+/// the product tracks accepts every scenario document.
 pub(super) fn schema_current(ctx: &Ctx) -> CheckResult {
     const CHECK: &str = "schema__generated_files_current";
     let dir = ctx.run_dir.join("generate");

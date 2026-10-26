@@ -1,15 +1,10 @@
-//! Test once (verification.md, "The report"): each part's result records a hash of its inputs,
-//! and a part whose hash equals that of an earlier passing result of the same phase is not run
-//! again; the run copies that result and names its source.
+//! Each part's result records a hash of its inputs, and a part whose hash equals that of an
+//! earlier passing result of the same phase does not run again. The run copies that result and
+//! names its source.
 //!
-//! The inputs, wider rather than narrower, since a missed input is a hole and an extra one only
-//! costs time:
-//! - every oracle file and oracle key (crate::oracle), the lock and the phase;
-//! - the files the part reads: `crates/`, the Cargo files and the toolchain files for `int`,
-//!   `bench` and `cc`; those plus `vscode/` for `ui`; every file of the tree outside
-//!   `docs/` and `verify/reviews/` for `quick`, untracked ones included;
-//! - the versions of rustc, cargo, node, VS Code and Claude Code, and the VS Code executable
-//!   `WTPOOL_VERIFY_VSCODE` names.
+//! The inputs are wide, as a missed input is a hole and an extra one only costs time: every
+//! oracle file and oracle key of [`crate::oracle`], the lock, the phase, the files
+//! [`is_part_input`] selects, untracked ones included, and the [`tool_versions`].
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -207,7 +202,7 @@ pub fn tool_versions() -> BTreeMap<String, String> {
     versions
 }
 
-/// The inputs of `part` at `phase` with each one's hash, the tool versions given.
+/// The inputs of `part` at `phase`, each with its hash.
 pub fn inputs(
     root: &Path,
     phase: u8,
@@ -238,8 +233,8 @@ pub fn inputs(
     Ok(found)
 }
 
-/// A hash of the files `is_part_input(part, ..)` selects, without the oracle files: the files a
-/// build of that part's artifact reads, for the build once rule of a run.
+/// A hash of `HEAD` and of the files [`is_part_input`] selects for `part`, without the oracle
+/// files: the inputs of the part's build, made once per run.
 pub fn build_hash(root: &Path, part: &str) -> Result<String, String> {
     let mut found = BTreeMap::new();
     for rel in tree_files(root)? {
@@ -254,7 +249,6 @@ pub fn build_hash(root: &Path, part: &str) -> Result<String, String> {
     Ok(hash_of(&found))
 }
 
-/// One hash over `inputs`.
 pub fn hash_of(inputs: &BTreeMap<String, String>) -> String {
     let mut text = String::new();
     for (name, hash) in inputs {
@@ -266,12 +260,11 @@ pub fn hash_of(inputs: &BTreeMap<String, String>) -> String {
     sha256(text.as_bytes())
 }
 
-/// The input hash of `part` at `phase` in `root`.
 pub fn input_hash(root: &Path, phase: u8, part: &str) -> Result<String, String> {
     Ok(hash_of(&inputs(root, phase, part, &tool_versions())?))
 }
 
-/// Every part file below `dir`, at any depth: `verify/out/*/parts/` and `verify/reviews/`.
+/// Each `parts/<part>.json` below `dir`, at any depth.
 fn part_files(dir: &Path, part: &str, found: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
@@ -293,11 +286,11 @@ fn part_files(dir: &Path, part: &str, found: &mut Vec<PathBuf>) {
     }
 }
 
-/// True when every result of `file` passed. A check that skipped for want of the recordings folder,
-/// an optional input (code [`crate::scrub::NO_RECORDINGS`]: the fresh scrub, and the live sandbox
-/// session of a replay only cc part), counts as passed while that folder is still missing. The
-/// folder is no input of the hash, so on a machine that has gained it the check runs again rather
-/// than copy a skip. Any other skip still blocks reuse.
+/// True when every result of `file` passed. A skip with the code
+/// [`NO_RECORDINGS`](crate::scrub::NO_RECORDINGS), such as the fresh scrub or the live sandbox
+/// session of a replay only `cc` part, counts as passed while the recordings folder is still
+/// missing. The folder is no input of the hash, so on a machine that has gained it the check runs
+/// again rather than copy a skip. Any other skip blocks reuse.
 pub fn passed(file: &PartFile) -> bool {
     passed_with(file, crate::scrub::recordings_missing())
 }
@@ -349,7 +342,7 @@ mod tests {
     /// `resolveCliPathFromVSCodeExecutablePath` [`cli_of_app`] follows.
     const TEST_ELECTRON: &str = "3.1.0";
 
-    /// A tree with one file of each kind, committed, for the hash tests.
+    /// A repository with one untracked file of each kind.
     fn tree(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("xtask-reuse-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);

@@ -1,6 +1,5 @@
-// The sessions of verification.md, "Contract test": each one a script for claude, what Claude
-// Code must do (else assumption_broken), what wtpool must show (else a fail) and what is recorded.
-// Each session runs on a fresh pool of its own.
+// The cc layer's sessions. Each runs a script for claude on a fresh pool of its own, then checks
+// Claude Code with expectClaude and wtpool with plain asserts.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { chmodSync, closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -39,7 +38,7 @@ const allow = async (toolName, input) => ({ behavior: 'allow', updatedInput: inp
 /** `text` as a RegExp source that matches it literally. */
 const literal = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** A path as a command names it, bare or quoted; `slash` lets a folder end in one. */
+/** A path as a command names it, bare or quoted. `slash` lets a folder end in one. */
 function named(target, slash = '') {
   const bare = `${literal(target)}${slash}`;
   return `(?:${bare}|'${bare}'|"${bare}")`;
@@ -88,7 +87,7 @@ class Run {
     return JSON.parse(text);
   }
 
-  /** The actors of the document, each with its worktree's name; none when wtpool fails. */
+  /** The actors of the document, each with its worktree's name, or none when wtpool fails. */
   actors() {
     try {
       return this.status().pools[0].worktrees.flatMap((w) => w.actors.map((a) => ({ ...a, worktree: w.name })));
@@ -118,8 +117,8 @@ class Run {
 
   /**
    * Starts `prompt` with streaming input, so the claude process lives on after the turn, and
-   * reads messages until the turn's result; `onMessage(message, query)` sees each one. `end()`
-   * closes the input, which ends the session.
+   * reads messages until the turn's result. `onMessage(message, query)` sees each one.
+   * {@link Run.end} closes the input and so ends the session.
    */
   async query(prompt, options = {}, onMessage) {
     const folder = path.join(this.context.recordings, `claude-${this.context.version}`);
@@ -379,7 +378,7 @@ async function interruptSession(context, shared) {
     }
   }, 500);
   // A plain interrupt with no wait: the session's settings allow exactly this script, so Claude
-  // Code sends no PermissionRequest (which would leave a wait that never decays, H13, A1).
+  // Code sends no PermissionRequest, as one would leave a wait that never decays.
   const settings = JSON.parse(readFileSync(context.options.settings, 'utf8'));
   settings.permissions = { ...settings.permissions, allow: [`Bash(${script})`] };
   const sessionSettings = path.join(context.dirs.root, 'settings-cc_interrupt.json');

@@ -42,7 +42,7 @@ pub fn required_parts(phase: u8) -> &'static [&'static str] {
     }
 }
 
-/// `results` without those of the checks in `later`, which run only from a later phase.
+/// `results` without those of the checks in `later`, the checks that run only from a later phase.
 pub fn counted(results: Vec<CheckResult>, later: &BTreeSet<String>) -> Vec<CheckResult> {
     results
         .into_iter()

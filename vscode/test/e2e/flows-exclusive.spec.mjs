@@ -1,10 +1,9 @@
-// The flows that need the machine to themselves (verification.md, "User flows"): copying a path,
-// a missing worktree's actions, a narrow window and keyboard only use read the clipboard, each
-// its VS Code's private one (support/main-hooks.mjs), and keyboard only use, the narrow scroll
-// and live updates keep focus in the webview, which any other VS Code window that opens takes
-// away. playwright.exclusive.config.mjs
-// runs this file alone, one check after another, after the parallel checks (layers/e2e.rs). Each
-// still fails or passes on its own (U1, U3, U4, U5, S3, X14, X15, R6).
+// The flows that need the machine to themselves. Copying a path, a missing worktree's actions, a
+// narrow window and keyboard only use read the clipboard, each its VS Code's private one
+// (support/main-hooks.mjs). Keyboard only use, the narrow scroll and live updates keep focus in
+// the webview, and any other VS Code window that opens takes it away. So
+// playwright.exclusive.config.mjs runs this file alone, one check after another, after the
+// parallel checks (layers/e2e.rs). Each check still fails or passes on its own.
 import assert from 'node:assert/strict';
 import { realpathSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -82,7 +81,7 @@ test('flow__missing_worktree_actions', async () => {
     });
 
     // Then
-    // From phase 3 a slot may also offer free and fg (X12); U4's three come first.
+    // From phase 3 a slot may also offer free and fg, after the three actions of every row.
     const u4 = present.filter((action) => !['free', 'fg'].includes(action));
     assert.deepEqual(u4, ['open', 'terminal', 'copyPath'], 'wt1 does not offer the three actions');
     assert.deepEqual(missing, ['copyPath'], 'the missing wt3 does not offer copy path only');
@@ -164,12 +163,12 @@ test('flow__narrow_window', async () => {
 
     // Then
     assert.ok(Math.abs(layout.width - 600) <= 2, `setup: the webview is ${layout.width} px wide, not 600`);
-    // U1 (status-panel.md revision 14): the branch shows whole and the table scrolls sideways.
+    // The branch shows whole and the table scrolls sideways.
     assert.equal(layout.text, LONG_BRANCH, `the long branch is not shown whole at 600 px: ${JSON.stringify(layout)}`);
     assert.equal(layout.clipped, null, `the long branch is cut at 600 px: ${JSON.stringify(layout)}`);
     assert.ok(layout.table > layout.width && layout.scrolls, `the ${layout.table} px table does not scroll sideways in the 600 px tab: ${JSON.stringify(layout)}`);
-    // U4's three actions on each of five rows, plus from phase 3 free and fg on wt2, the slot
-    // that holds a branch (X12); free and fg elsewhere only on the other slots.
+    // The three actions on each of five rows, plus from phase 3 free and fg on wt2, the slot
+    // that holds a branch. Free and fg show elsewhere only on the other slots.
     const keys = reach.map((r) => r.key);
     const wanted = ['fg', 'wt1', 'wt2', 'wt3', 'x'].flatMap((name) => ['open', 'terminal', 'copyPath'].map((a) => `${a} ${name}`));
     wanted.push('free wt2', 'fg wt2');
@@ -196,8 +195,8 @@ async function keysReachPage(frame) {
 
 /**
  * Gives the tab's page keyboard focus from the webview frame around it, the step VS Code's webview
- * takes once its editor has focus. VS Code's own handover runs through the workbench, which can
- * leave the keyboard on its body; the workbench then drops every key the webview forwards, so
+ * takes once its editor has focus. VS Code's own handover runs through the workbench, and it can
+ * leave the keyboard on its body. The workbench then drops every key the webview forwards, so
  * neither the Command Palette nor a group command reaches the page.
  */
 async function focusPage(frame) {
@@ -261,7 +260,7 @@ test('flow__narrow_scroll', async () => {
 
     // Then
     assert.deepEqual(steps.problems, [], 'the hooks of the wait');
-    // U1 (status-panel.md revision 14): the table scrolls inside the tab, the page does not.
+    // The table scrolls inside the tab, the page does not.
     assert.ok(state.table > state.tab, `the ${state.table} px table fits the ${state.tab} px tab: its columns are squeezed`);
     assert.ok(state.page <= 1, `the page itself scrolls sideways by ${state.page} px`);
     assert.ok(state.scrolls, `no box around the table scrolls it sideways: ${JSON.stringify(state.scrollers)}`);
@@ -271,13 +270,16 @@ test('flow__narrow_scroll', async () => {
     assert.deepEqual(moved.map((h) => h.part), [], 'header parts that move or leave the view when the table scrolls');
     assert.ok(stops.some((f) => !f.isRow) && stops.some((f) => f.isRow), `setup: Tab reached ${stops.map((f) => f.key).join(', ')}`);
     assert.deepEqual(stops.filter((f) => !f.shown).map((f) => `${f.key} ${JSON.stringify(f)}`), [], 'focused by Tab but not in view: a row without its start, an action without its whole ring');
-    // U3: the waiting chip focuses wt2 and scrolls its start into view.
+    // The waiting chip focuses wt2 and scrolls its start into view.
     assert.equal(chip?.key, 'row wt2', 'the waiting chip does not focus wt2, the first waiting row');
     assert.ok(chip.shown, `the waiting chip focuses wt2 without its start in view: ${JSON.stringify(chip)}`);
   });
 });
 
-/** What has focus in the page: a row or action key, whether its focus shows, and whether it is shown. */
+/**
+ * The focused element of the page: its row or action key, if its focus shows, and if it is in
+ * view.
+ */
 async function focus(frame) {
   return frame.evaluate(() => {
     const el = document.activeElement;
@@ -295,7 +297,7 @@ async function focus(frame) {
   });
 }
 
-/** Presses Tab, then Shift+Tab, until `key` has focus; whether it got there. */
+/** Presses Tab, then Shift+Tab, until `key` has focus. Gives false when it never gets there. */
 async function tabTo(window, frame, key) {
   for (const press of ['Tab', 'Shift+Tab']) {
     for (let step = 0; step < 60; step += 1) {
@@ -307,10 +309,10 @@ async function tabTo(window, frame, key) {
 }
 
 /**
- * From phase 4, the machine strip by keys alone (X20, X22): Tab to the machine button, Enter
- * opens the strip with focus on Limit, then Tab goes the menu, Save, Use defaults, each chip list
- * as one stop with its input and Add, then the rows; Escape closes it and focus returns to the
- * button. Every stop shows its ring (X14).
+ * From phase 4, the machine strip by keys alone: Tab to the machine button, Enter opens the strip
+ * with focus on Limit, then Tab goes the menu, Save, Use defaults, each chip list as one stop with
+ * its input and Add, then the rows. Escape closes it and focus returns to the button. Every stop
+ * shows its ring.
  */
 async function stripByKeys(window, frame) {
   const keyOf = () => focusKey(frame);
@@ -341,7 +343,7 @@ async function stripByKeys(window, frame) {
 }
 
 test('flow__keyboard_only', async () => {
-  // From phase 4 the strip holds a pattern in each list, so each list is a tab stop (X22).
+  // From phase 4 the strip holds a pattern in each list, so each list is a tab stop.
   const prepare = (poolInfo) => (PHASE >= 4 ? addRepoKeys(poolInfo, { heavy: ['make'] }) : undefined);
   await withFlow('flow__keyboard_only', { scenario: 'folder_missing', prepare }, async (session) => {
     // Given
@@ -415,7 +417,7 @@ test('flow__keyboard_only', async () => {
   });
 });
 
-/** What the page's focused element is: `row <id>`, `<action> <id>`, or a tag. */
+/** The key of the page's focused element: `row <id>`, `<action> <id>`, or a tag. */
 async function focused(frame) {
   return frame.evaluate(() => {
     const el = document.activeElement;

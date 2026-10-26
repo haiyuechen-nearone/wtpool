@@ -1,5 +1,4 @@
-// D2, X5 and X6 in the extension host: the --watch stream against the fake wtpool's faults, on the
-// extension's fake clock.
+// The --watch stream against the fake wtpool's faults, on the extension's fake clock.
 const assert = require('node:assert/strict');
 
 const {
@@ -17,7 +16,10 @@ const {
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-/** The longest a fake wtpool may take to log its start, print a line or end: seconds on a loaded machine. */
+/**
+ * The longest a fake wtpool may take to log its start, print a line or end: seconds on a loaded
+ * machine.
+ */
 const RESTART_MS = 10_000;
 
 async function viewsSince(from) {
@@ -37,7 +39,7 @@ async function restartAfter(fault) {
   const first = await waitFor(() => starts()[0], 10_000);
   assert.ok(first, 'wtpool did not start');
   const leadShown = await waitFor(async () => (await viewsSince(from)).find((v) => same(v.status, expected)), 10_000);
-  // The fault pauses the stream, which sets its restart on the fake clock.
+  // The fault pauses the stream, and that sets its restart on the fake clock.
   await waitFor(async () => (await viewsSince(from)).some((v) => v.connection === 'paused'), 10_000);
   await sleep(1500);
   const beforeBackoff = starts().length;
@@ -57,9 +59,9 @@ async function restartAfter(fault) {
 
 /**
  * The second start faults too. Its restart came exactly at the first paused view's `retry_at`
- * on the fake clock, so the clock now reads that time: the second paused view's `retry_at` must
- * be when the next restart comes (X6, verification.md item 5), within a second either way, as an
- * RFC 3339 time may hold whole seconds only.
+ * on the fake clock, so the clock now reads that time. The second paused view's `retry_at` must
+ * be the time of the next restart, within a second either way, as an RFC 3339 time may hold
+ * whole seconds only.
  */
 async function secondRetry(pausedViews, fromRestart) {
   const firstAt = Date.parse(pausedViews[0]?.retry_at);
@@ -153,7 +155,7 @@ describe('stream', () => {
     const seen = [];
     for (const [exits, delay] of delays.entries()) {
       const count = starts().length;
-      // Each exit pauses the stream, which sets its restart on the fake clock.
+      // Each exit pauses the stream, and that sets its restart on the fake clock.
       await waitFor(async () => (await viewsSince(from)).filter((v) => v.connection === 'paused').length > exits, 10_000);
       await advance(delay - 1);
       await sleep(400);
@@ -201,8 +203,8 @@ describe('stream', () => {
   });
 
   it('stream__should_post_paused_before_the_first_document wtpool_error', async () => {
-    // Given: R10. The first start writes more stderr than the stream keeps, its last line before
-    // blank ones, and exits 2; the second exits 1 with no stderr; the third works.
+    // Given: the first start writes more stderr than the stream keeps, its last line before blank
+    // ones, and exits 2. The second exits 1 with no stderr. The third works.
     const message = 'wtpool: not inside a git repository: run wtpool in your repository or set WTPOOL_FOREGROUND';
     const stderr = `${'wtpool: a line before the error\n'.repeat(300)}${message}\n  \n\n`;
     await resetFake({ scenario: 'idle_pool', faults: ['error_exit', 'early_exit', 'none'], stderr, exitCode: 2, aliveMs: 200 });

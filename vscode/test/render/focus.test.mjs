@@ -1,7 +1,5 @@
-// U1 and U3 in jsdom: keyboard focus scrolls a focused row's start into view and a focused row
-// action wholly, with its focus ring, while focus that a click gives scrolls nothing. The shot
-// check scroll__should_bring_focus_and_waits_into_view measures the same in Chromium; this case
-// sits with the waiting chip's check, the render check of scrolling a row's start into view.
+// A case of the waiting chip's check, the render check of scrolling a row's start into view. The
+// shot check scroll__should_bring_focus_and_waits_into_view measures the same in Chromium.
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 
@@ -27,7 +25,6 @@ function tabTo(target) {
   target.dispatchEvent(new window.KeyboardEvent('keyup', { key: 'Tab', bubbles: true }));
 }
 
-/** Focuses `target` as a mouse press does, then clicks it. */
 function clickOn(target) {
   const { window } = webview;
   target.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }));

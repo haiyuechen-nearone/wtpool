@@ -64,7 +64,7 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 /// Every file and symlink below `dir`, as paths relative to `root` with `/` separators, skipping
-/// directories for which `skip_dir` returns true.
+/// the directories `skip_dir` returns true for.
 pub fn walk(root: &Path, dir: &Path, skip_dir: &dyn Fn(&str) -> bool) -> Vec<String> {
     let mut found = Vec::new();
     let mut stack = vec![dir.to_path_buf()];
@@ -125,16 +125,16 @@ fn commit_of(root: &Path, reference: &str) -> Option<String> {
 /// The variable that names the base commit instead of `spec-base`.
 pub const BASE_VARIABLE: &str = "WTPOOL_VERIFY_BASE";
 
-/// The commit `cover` and `repo_context__should_be_unchanged` measure from, and how it was found.
+/// The commit `cover` and `repo_context__should_be_unchanged` measure from, and its source.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Base {
     pub commit: String,
     pub source: String,
 }
 
-/// The base commit: the ref `WTPOOL_VERIFY_BASE` names, else the tag `spec-base` (the approved spec),
-/// else, in a clone without that tag, the merge base of `HEAD` with the remote's default branch,
-/// else the root commit.
+/// The base commit: the ref [`BASE_VARIABLE`] names, else the tag `spec-base`, else, in a clone
+/// without that tag, the merge base of `HEAD` with the remote's default branch, else the root
+/// commit.
 pub fn base(root: &Path) -> Result<Base, String> {
     let named = std::env::var(BASE_VARIABLE).ok();
     find_base(

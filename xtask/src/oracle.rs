@@ -42,7 +42,7 @@ const NOT_ORACLE: [&str; 5] = [
     "xtask/target",
 ];
 
-/// Oracle parts of files the builder otherwise owns: (file, TOML key path).
+/// Oracle parts of product files: (file, TOML key path).
 pub const ORACLE_KEYS: [(&str, &[&str]); 3] = [
     ("Cargo.toml", &["workspace", "members"]),
     ("Cargo.toml", &["workspace", "lints"]),
@@ -52,20 +52,20 @@ pub const ORACLE_KEYS: [(&str, &[&str]); 3] = [
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Default)]
 pub struct Lock {
     pub phase: u8,
-    /// Every check the frozen oracle implements, so the next freeze knows which checks are new.
+    /// Every check the frozen oracle implements, so the next freeze can tell the new ones.
     pub checks: Vec<String>,
     /// The id of every entry of oracle-changes.toml at a freeze. The lock holds their changes,
     /// so none allows a change again, in any copy of the history.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub spent: BTreeSet<String>,
-    /// SHA 256 of the rest of the lock, which freeze writes: a lock edited by hand no longer
-    /// matches it, so the lock itself counts as changed.
+    /// SHA 256 of the rest of the lock, written by freeze. A lock edited by hand no longer matches
+    /// it, so the lock itself counts as changed.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub seal: String,
     pub files: BTreeMap<String, String>,
     pub keys: BTreeMap<String, String>,
-    /// The raw recordings of the oracle step's live contract run, by their path below
-    /// `recordings/` of the harness data folder (crate::scrub), from phase 2.
+    /// The raw recordings of the live contract run, by their path below
+    /// [`recordings_dir`](crate::scrub::recordings_dir).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub recordings: BTreeMap<String, String>,
 }

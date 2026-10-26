@@ -1,5 +1,4 @@
-// The shot layer: Playwright's Chromium, headless, on buildHtml's page (support/page.mjs). A
-// check may take 180 s and is retried twice (verification.md, "Outcomes and limits").
+// The shot layer: headless Chromium on the page buildHtml writes (support/page.mjs).
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from '@playwright/test';
@@ -11,7 +10,7 @@ export default defineConfig({
   testDir: here,
   testMatch: '*.spec.mjs',
   timeout: 180_000,
-  // WTPOOL_VERIFY_RETRIES=0 when freeze only needs each new check to fail once; verify runs retry.
+  // freeze sets WTPOOL_VERIFY_RETRIES=0, as it only needs each new check to fail once.
   retries: Number(process.env.WTPOOL_VERIFY_RETRIES ?? 2),
   workers: 4,
   fullyParallel: true,

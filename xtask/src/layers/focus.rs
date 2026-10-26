@@ -1,13 +1,11 @@
-//! The focus guard (verification.md, "Isolation"): no window of a run takes focus. While `host`
-//! or `e2e` runs on macOS, a thread asks LaunchServices for the frontmost app every 250 ms with
-//! `lsappinfo`, a tool that needs no permission, and the layer fails when that app is a process
-//! whose command line names the run folder, as each VS Code of the layer does with its
-//! `--extensions-dir`. `<layer>/front.txt` lists the frontmost apps the layer saw. The other
-//! platforms have no guard: Linux runs the layers under xvfb.
+//! The focus guard: no window of a run takes focus. While `host` or `e2e` runs on macOS, a thread
+//! asks LaunchServices for the frontmost app every [`EVERY`] with `lsappinfo`, a tool that needs no
+//! permission, and the layer fails when that app is a process whose command line names the run
+//! folder, as each VS Code of the layer does with its `--extensions-dir`. `<layer>/front.txt` lists
+//! the frontmost apps the layer saw. The other platforms have no guard: Linux runs the layers under
+//! xvfb.
 //!
-//! [`side_effects`] is the other guard of the owner's session (verification.md, "No side
-//! effects"): it fails the layer when the main process hooks of one of its VS Codes refused a
-//! native dialog, an OS notification, a beep or a call past the private clipboard.
+//! [`side_effects`] is the other guard of the owner's session.
 
 use std::fs;
 use std::path::PathBuf;
@@ -32,7 +30,7 @@ struct Front {
     ours: bool,
 }
 
-/// The guard of one layer; [`Guard::finish`] stops it and judges the apps it saw.
+/// The focus guard of one layer. [`Guard::finish`] stops it and judges the apps it saw.
 pub(super) struct Guard {
     layer: String,
     file: PathBuf,
@@ -114,7 +112,8 @@ pub(super) fn side_effects(ctx: &Ctx, layer: &str) -> Option<CheckResult> {
     ))
 }
 
-/// Samples the frontmost app until `stop`: the number of samples it took, and each change of app.
+/// Samples the frontmost app until `stop`, and returns the number of samples it took and each
+/// change of app.
 fn sample(run_dir: &str, stop: &AtomicBool) -> (usize, Vec<Front>) {
     let start = Instant::now();
     let mut samples = 0;

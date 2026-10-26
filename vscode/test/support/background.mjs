@@ -1,35 +1,22 @@
-// Keeps every VS Code the oracle starts from taking focus (verification.md, "Isolation"). On macOS,
-// Electron activates its app each time a window shows (BrowserWindow.show calls
-// activateIgnoringOtherApps:YES), and VS Code shows every window it opens and steals focus for a
-// window another instance asks for (app.focus({ steal: true })). So each test window came to the
-// front and took the keyboard from the app in use, however VS Code was started: LaunchServices'
-// `open -g` keeps only the launch itself in the background. Instead VS Code starts paused before
-// its first line (`--inspect-brk` on a free port), and `release` makes it an app that is never
-// active, app.setActivationPolicy('prohibited'), then lets it run. Its windows open behind the
-// others and paint as before, and the checks reach them through CDP and Electron's API, which
-// need no active window. Elsewhere VS Code starts as before: Linux runs it under xvfb.
+// Keeps each VS Code a run launches on macOS from taking focus. Electron activates its app each
+// time a window shows, and VS Code shows every window it opens and steals focus for a window
+// another instance asks for. LaunchServices' `open -g` keeps only the launch itself in the
+// background. So VS Code starts paused before its first line (`--inspect-brk` on a free port), and
+// `release` installs support/main-hooks.mjs to make it an app that is never active, then lets it
+// run. The checks reach its windows through CDP and Electron's API, and neither needs an active
+// window.
 //
-// An app that is never active still orders a window it shows just behind the frontmost window,
-// in front of every other app's windows, so the window shows on top of the owner's windows as
-// soon as the owner switches to an app whose windows do not cover it. `keepAtBack` sends every
-// window to the back of the window order, behind all windows, when it opens and after each show,
-// focus or moveTop VS Code calls; there it still paints, so screenshots stay current. The demo
-// recording (scripts/demo.mjs) turns it on, as its window plays for half a minute mid screen.
-// Without it, as in the `host` and `e2e` layers, every window is transparent and lets the mouse
-// through instead, so it shows nowhere, wherever it is ordered.
-//
-// The same stop installs the rest of support/main-hooks.mjs before VS Code's first line: a
-// private clipboard, no recent documents, and no native dialog, notification or beep
-// (verification.md, "No side effects").
+// An app that is never active still orders a window it shows in front of every other app's
+// windows. `keepAtBack`, for the demo recording, keeps each window at the back of the window
+// order, where it still paints. Without it each window is transparent and lets the mouse through.
 import { execFileSync } from 'node:child_process';
 import net from 'node:net';
 
 import { mainHooks } from './main-hooks.mjs';
 
-/** How long VS Code may take to open its inspector and stop at its first line. */
+/** The time VS Code may take to open its inspector and stop at its first line. */
 const LIMIT_MS = 60_000;
 
-/** Whether launches from now on keep their windows at the back of the window order. */
 let atBack = false;
 
 /** Keeps the windows of every VS Code launched from now on at the back of the window order. */
@@ -37,7 +24,6 @@ export function keepAtBack() {
   atBack = true;
 }
 
-/** A free TCP port of the loopback interface. */
 function freePort() {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
@@ -102,7 +88,7 @@ async function session(url) {
   return { send, paused, close: () => socket.close() };
 }
 
-/** Kills the VS Code that `flag` started, so a VS Code that cannot be kept behind never opens a window. */
+/** Kills the VS Code that `flag` started, so one that cannot be kept behind never opens a window. */
 function kill(flag) {
   const listing = execFileSync('ps', ['-axo', 'pid=,args='], { encoding: 'utf8' });
   for (const line of listing.split('\n')) {
@@ -149,10 +135,10 @@ async function release(port, flag, back, log) {
 }
 
 /**
- * What keeps one VS Code launch in the background: `args` for its command line, and `release`,
- * to call while it starts, which resolves once VS Code runs as an app that is never active with
- * the hooks of support/main-hooks.mjs, or stops it and rejects. `log` names the file the hooks
- * note each refused side effect in. Outside macOS there are no arguments and nothing to release.
+ * Gives `args` for the command line of one VS Code launch, and `release` to call while it starts.
+ * `release` resolves once VS Code runs as an app that is never active with the hooks of
+ * support/main-hooks.mjs, or stops it and rejects. `log` names the file the hooks note each
+ * refused side effect in. Outside macOS there are no arguments and nothing to release.
  */
 export async function inBackground({ log } = {}) {
   if (process.platform !== 'darwin') return { args: [], release: async () => {} };

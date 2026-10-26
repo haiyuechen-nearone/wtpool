@@ -7,7 +7,8 @@ use crate::repo::walk;
 use crate::results::CheckResult;
 
 const NAME: &str = "lint__no_suppressions";
-/// How far below its `#[expect(clippy::panic)]` the `WTPOOL_VERIFY_PANIC` read may sit.
+/// The farthest the `WTPOOL_VERIFY_PANIC` read may sit below the `#[expect(clippy::panic)]` that
+/// guards it, in lines.
 const PANIC_EXCEPTION_WINDOW: usize = 15;
 
 #[derive(Debug, PartialEq, Eq, Clone)]

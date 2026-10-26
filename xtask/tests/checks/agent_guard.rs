@@ -12,7 +12,7 @@ use xtask::pool::{PoolSpec, WorktreeSpec};
 use crate::support::hook::{Hooks, START, add_seconds, catalog_spec, event, with};
 use crate::support::{must_wtpool_bin, worktree};
 
-/// The branch wt1 holds, which `fg` brings to the foreground.
+/// The branch wt1 holds and `fg` brings to the foreground.
 const BRANCH: &str = "feature-a";
 
 /// A label with an OSC 52 clipboard write in its C1 form and a bidi override.

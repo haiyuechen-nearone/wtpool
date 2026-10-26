@@ -1,6 +1,3 @@
-// U8: the tab shows one repository, its heading row naming the repository, then the machine:
-// `repository.github`, or `repository.name` when that is null, then ` · ` and the machine name.
-// A second pool in a document is ignored.
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 
@@ -11,12 +8,10 @@ import { isShown, mount, rows, text } from '../support/webview.mjs';
 let webview;
 afterEach(() => webview?.close());
 
-/** The shown heading rows, `tr[data-machine]` (verification.md, test interface 6). */
 function headings() {
   return [...webview.document.querySelectorAll('tr[data-machine]')].filter((row) => isShown(webview.window, row));
 }
 
-/** The single heading of interface 6, `tr.pool-heading[data-machine][data-pool]`, `data-pool` the pool's. */
 function poolOf(heading) {
   return heading.matches('tr.pool-heading[data-machine][data-pool]') ? heading.getAttribute('data-pool') : null;
 }
@@ -54,8 +49,8 @@ for (const [name, repository, expected] of cases) {
 }
 
 test('heading__should_name_the_repository_then_the_machine extra_pool_ignored', async () => {
-  // Given: a document a later wtpool might print, with a second pool after the first (S12: within
-  // version 1 changes only add). The tab shows one repository, the first pool's.
+  // Given: a document a later wtpool might print, with a second pool after the first, as changes
+  // within version 1 only add. The tab shows the first pool's repository alone.
   const other = '/Users/verify/tools';
   const second = document(
     [

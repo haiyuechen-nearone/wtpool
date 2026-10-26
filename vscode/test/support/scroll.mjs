@@ -1,7 +1,7 @@
-// In-page measurements of the tab's sideways scroll (status-panel.md revision 14, U1 and U3), for
-// page.evaluate or frame.evaluate after installHelpers of support/measure.mjs. A tab scroller is
-// an ancestor of the table with overflow-x auto or scroll; the view is the part of the viewport
-// every tab scroller shows (inside its borders and scrollbars).
+// In-page measurements of the tab's sideways scroll, for page.evaluate or frame.evaluate after
+// installHelpers of support/measure.mjs. A tab scroller is an ancestor of the table with
+// overflow-x auto or scroll. The view is the part of the viewport every tab scroller shows (inside
+// its borders and scrollbars).
 
 /** The page's own sideways overflow, the table's width and the tab scrollers. */
 export function scrollState() {
@@ -31,7 +31,7 @@ export function scrollDown() {
 }
 
 /**
- * The tab's height against the box that scrolls the table sideways (U1): the viewport's height,
+ * The tab's height against the box that scrolls the table sideways: the viewport's height,
  * the page's own vertical overflow, the innermost tab scroller that scrolls sideways with its
  * bottom edge (where its horizontal scrollbar is drawn) and the rows it hides vertically, and
  * where the header parts are.

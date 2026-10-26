@@ -1,17 +1,3 @@
-// U1 in Chromium (status-panel.md revision 14): columns take the width their content needs, the
-// table scrolls horizontally inside a narrower tab, and no text is clipped or cut with `…`
-// anywhere: cells, agent lines, the pool heading (U8, with a long repository name too), header
-// labels and chips. A worktree's tag (`fg`, `unmanaged`) shows whole inside its cell, after the
-// name.
-//
-// layout__ shows every scenario document, every_activity, the real-names pool, long
-// values in every column (with a long machine name and a long GitHub repository), two digit chip
-// counts, a pool without GitHub headed by a long folder name, the header stale and paused, at
-// 1100, 800 and 600 px in all four themes. Each document is measured plain and
-// with a row selected (its detail strip); the three state documents also with each row hovered.
-// It fails on text a clipping box cuts (a tab scroller counts by its scrollable area), an element
-// whose text is wider than its box, `…` in effect or in the text, table text on two lines (a
-// squeeze instead of a scroll), and a table end the tab cannot scroll to.
 import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 

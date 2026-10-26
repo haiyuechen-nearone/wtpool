@@ -216,7 +216,7 @@ fn budget_number(check: &str) -> Option<u32> {
     check.strip_prefix("budget__b")?.parse().ok()
 }
 
-/// Each budget result, B1 to B11, with its layer, outcome and first line.
+/// Each budget result by its number, with its layer, outcome and first line.
 fn budgets_section(out: &mut String, phase: u8, results: &[CheckResult]) {
     let _ = writeln!(out, "## Budgets\n");
     let mut budgets: Vec<&CheckResult> = results

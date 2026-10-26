@@ -1,18 +1,3 @@
-// U12, U13, U14 and A8 in Chromium (phase 4), in Dark Modern, Light Modern, High Contrast and High
-// Contrast Light: the `×N` count after a row's Activity word, the static state icon at the start of
-// each agent line, and ` (not queued)` after a build outside a job.
-//
-// count__ shows five_agents_one_worktree and several_agents_one_worktree at 1100, 600 and 320 px:
-// a row of N ≥ 2 agent lines shows one `.count` reading `×N`, on the word's line after it, in the
-// word's colour inside a 1 px solid border of that colour, at AA for its text and 3:1 for its
-// border, plain, hovered and selected; any other row shows none.
-//
-// line_icons__should_align_ measures each agent line's `.line-icon` at device scale 2: a 14 px box
-// with 5 px before the text, ink whose longer side is within 1 px of the median line icon's and
-// whose centre is within 1 px of the centre of a capital `H` in the line's font, every line's text
-// at one x, `build:` and `no agent` lines included, each state in its group's colour and at 3:1 on
-// plain, hovered and selected rows. line_icons__should_never_move compares the icons' pixels over
-// 500 ms of real time and lists running animations, with and without vscode-reduce-motion.
 import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
@@ -22,10 +7,10 @@ import { THEME_NAMES, computedThemeColours } from '../support/page.mjs';
 import { changedPixels, inkBounds, pixelHelper } from '../support/pixels.mjs';
 import { away, clickRow, hoverRow, settle, showPlain, visualPanel } from '../support/states.mjs';
 
-/** The tolerances of U13, in CSS px. */
+/** The tolerances of an icon's box and of its ink, in CSS px. */
 const BOX_PX = 0.5;
 const INK_PX = 1;
-/** The colour token of each line state (U13: its group's colour, the API error the problem colour). */
+/** The colour token of each line state: its group's, the problem colour for an API error. */
 const STATE_TOKENS = {
   working: '--vscode-textLink-foreground',
   quiet: '--vscode-descriptionForeground',

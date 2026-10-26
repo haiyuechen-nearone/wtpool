@@ -1,27 +1,24 @@
-// What runs in the main process of every VS Code the oracle starts on macOS, before its first line
-// (support/background.mjs), so that a run leaves the owner's session as it was (verification.md,
-// "No side effects"):
-// 1. the app is never active, so no window of it takes focus;
-// 2. Electron's clipboard is private to this VS Code: every read and write of
-//    `require('electron').clipboard`, the module VS Code's main process copies and pastes
-//    through, goes to an in-memory store, so no check reads or changes the system pasteboard;
-// 3. VS Code's macOS recent documents, which it clears and refills on every start for the bundle
-//    it shares with the owner's VS Code (the Dock menu's list), are left alone, and no power save
-//    blocker keeps the owner's display or Mac awake;
-// 4. every window is fully transparent and lets the mouse through, so nothing of the run shows
-//    on screen and no pointer or scroll wheel of the owner reaches it. An app that is never
-//    active still orders a window it shows just behind the frontmost window, in front of every
-//    other app's windows; transparent, it shows nowhere. The checks reach the windows through
-//    CDP alone, which neither affects, and a transparent window still paints;
-// 5. a native dialog, an OS notification or a beep never shows: each is refused and noted in
-//    the log file, which fails the layer (`<layer>:side_effects`, layers/focus.rs).
-// With `back` (background.mjs's keepAtBack, for the demo recording) or
-// WTPOOL_VERIFY_VISIBLE_WINDOWS=1, for a person watching a run, the windows are opaque instead and
-// kept at the back of the window order; nothing else changes.
+// Hooks for the main process of each VS Code a run starts on macOS, so that the run leaves the
+// user's session as it was:
+// 1. The app is never active, so no window of it takes focus.
+// 2. `require('electron').clipboard`, the module VS Code's main process copies and pastes
+//    through, reads and writes an in-memory store, so no check reads or changes the system
+//    pasteboard.
+// 3. VS Code clears and refills the macOS recent documents of its bundle on every start, and the
+//    bundle is the one the user's VS Code runs, so those calls do nothing here. No power save
+//    blocker keeps the display or the Mac awake either.
+// 4. Every window is fully transparent and lets the mouse through. An app that is never active
+//    still orders a window it shows just behind the frontmost window, in front of every other
+//    app's windows, so only transparency keeps it off the screen. The checks reach the windows
+//    through CDP alone, and a transparent window still paints.
+// 5. A native dialog, an OS notification or a beep never shows. Each is refused and noted in the
+//    log file, and a noted effect fails the layer (`<layer>:side_effects`, layers/focus.rs).
+// With `back`, or WTPOOL_VERIFY_VISIBLE_WINDOWS=1 for a person watching a run, the windows are
+// opaque instead and kept at the back of the window order.
 
 /**
- * Installs the hooks. Runs inside VS Code's main process through the inspector, while `require`
- * of the console API is there, so it takes every module it needs at once.
+ * Runs inside VS Code's main process through the inspector, while `require` of the console API is
+ * there, so it takes every module it needs at once.
  */
 function install({ back, log }) {
   const electron = require('electron');
@@ -38,8 +35,8 @@ function install({ back, log }) {
   };
   electron.app.setActivationPolicy('prohibited');
 
-  // The private clipboard: one store per clipboard type, a write replacing its whole content as
-  // a write of the system pasteboard does.
+  // One store per clipboard type. A write replaces its whole content, as a write of the system
+  // pasteboard does.
   const boards = new Map();
   const board = (type) => {
     const key = type === 'selection' ? 'selection' : 'clipboard';
@@ -107,12 +104,10 @@ function install({ back, log }) {
     if (clipboard[name] !== call) throw new Error(`clipboard.${name} cannot be replaced`);
   }
 
-  // The owner's recent documents of the VS Code bundle.
   const recent = [];
   electron.app.addRecentDocument = (file) => recent.push(file);
   electron.app.clearRecentDocuments = () => recent.push(null);
 
-  // Native dialogs, OS notifications and beeps: refused, each one noted.
   const dialogs = ['showMessageBox', 'showMessageBoxSync', 'showOpenDialog', 'showOpenDialogSync', 'showSaveDialog', 'showSaveDialogSync', 'showErrorBox', 'showCertificateTrustDialog'];
   for (const name of dialogs) {
     electron.dialog[name] = (...args) => {
@@ -132,19 +127,16 @@ function install({ back, log }) {
     };
   }
   electron.shell.beep = () => note('shell.beep: refused the system alert sound');
-  // A power save blocker would keep the owner's display or Mac awake while the run goes on.
   const blockers = [];
   electron.powerSaveBlocker.start = (type) => blockers.push(type) - 1;
   electron.powerSaveBlocker.stop = () => {};
   electron.powerSaveBlocker.isStarted = () => false;
 
-  // Every window, from its creation, before it first shows.
   electron.app.on('browser-window-created', (_event, win) => (back ? keepBack(win) : hide(win)));
   globalThis.__wtpoolVerify = { clipboard: { boards, writes }, recent, blockers, effects, back };
   return 'installed';
 }
 
-/** Makes a window transparent and lets the mouse through it, for good. */
 function hide(win) {
   win.setOpacity(0);
   win.setIgnoreMouseEvents(true);
@@ -181,9 +173,9 @@ function keepBack(win) {
 }
 
 /**
- * The expression the inspector evaluates in VS Code's main process: it installs the hooks and
- * yields `installed`. `log` names the file each refused effect is appended to; `back` keeps
- * opaque windows at the back instead of transparent ones.
+ * Gives the expression the inspector evaluates in VS Code's main process to install the hooks. It
+ * yields `installed`. `log` names the file each refused effect is appended to. `back` keeps opaque
+ * windows at the back instead of transparent ones.
  */
 export function mainHooks({ log, back = false } = {}) {
   const options = { back: back || process.env.WTPOOL_VERIFY_VISIBLE_WINDOWS === '1', log: log ?? null };

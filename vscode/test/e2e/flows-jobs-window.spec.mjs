@@ -1,6 +1,3 @@
-// The heavy job flows of jobs.md, "User flows", about the wtpool and the window the tab has: an
-// older wtpool without `wtpool job`, a wtpool that left, and a window whose folder is not on this
-// computer (S14, U10, U11, R9, R10, X3, X21).
 import assert from 'node:assert/strict';
 import { chmodSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -15,7 +12,10 @@ import { close, launch, pool, releaseWtpool, sandbox, sleep, watchers } from './
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OLD_NOTE = 'This wtpool has no heavy job limit. Update wtpool to a version with wtpool job to set one.';
 
-/** A folder outside the sandbox, which `sandbox` makes afresh, for a `wtpool.path` of the flow `key`. */
+/**
+ * A folder for a `wtpool.path` of the flow `key`. It lies outside the sandbox, as `sandbox` makes
+ * that afresh.
+ */
 function wrapperDir(key) {
   const dir = path.join(runDir(), 'e2e', 'wrappers', key);
   rmSync(dir, { recursive: true, force: true });
@@ -48,7 +48,8 @@ test('flow__jobs_old_wtpool', async () => {
 });
 
 test('flow__jobs_wtpool_missing', async () => {
-  // Given: wtpool.path names a link to the release wtpool, which the flow removes, as wtpool leaving PATH does.
+  // Given: wtpool.path names a link to the release wtpool. Removing the link later stands for
+  // wtpool leaving PATH.
   const link = path.join(wrapperDir('flow__jobs_wtpool_missing'), 'wtpool');
   symlinkSync(releaseWtpool(), link);
   await withFlow('flow__jobs_wtpool_missing', { wtpoolPath: link }, async (session) => {
@@ -90,7 +91,7 @@ test('flow__jobs_wtpool_missing', async () => {
 
 test('flow__jobs_remote_window', async () => {
   // Given: a workspace whose one folder has a scheme no file system provides here, as a
-  // Remote-SSH, WSL or virtual folder is not a local `file:` folder (R9). wtpool then runs in the
+  // Remote-SSH, WSL or virtual folder is not a local `file:` folder. wtpool then runs in the
   // home folder, where WTPOOL_FOREGROUND names the local pool.
   const key = 'flow__jobs_remote_window';
   const poolInfo = pool('idle_pool', key);

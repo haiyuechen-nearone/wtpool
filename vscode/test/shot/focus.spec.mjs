@@ -1,16 +1,3 @@
-// X14, U6 and U4 in Chromium (status-panel.md revision 14): every focus ring shows whole and has
-// 3:1 against the background under it, and action glyphs sit centred in their buttons.
-//
-// focus__ tabs through every_activity, the real-names pool and long values at 1100 and 600 px in all
-// four themes. At each stop it measures the focused element's ring (outline, else a box-shadow
-// ring): it must exist, no box that clips may cut it (a tab scroller counts by its scrollable
-// area, so a ring the tab can scroll to passes), and its colour has 3:1 against the background
-// at the middle of each side. On each row it also presses Enter (selected and focused) and tabs
-// through that row's actions.
-//
-// actions__should_centre_their_glyphs scrolls each row's actions into view, hovers the row, at
-// device scale 2, in every_activity and the real-names pool, and finds each shown action's glyph by its
-// ink: the ink's centre must be within 0.5 px of the button's centre on both axes.
 import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
@@ -20,14 +7,13 @@ import { inkBounds, pixelHelper } from '../support/pixels.mjs';
 import { hoverActions, rowIds, short, showPlain, visualPanel } from '../support/states.mjs';
 import { stateDocuments } from '../support/visual-docs.mjs';
 
-/** Tolerance of the glyph centre, in CSS px (U4). */
+/** Tolerance of the glyph centre, in CSS px. */
 const CENTRE_PX = 0.5;
 /** Ink is a pixel this far (0 to 255, per channel) from the button's background. */
 const INK_THRESHOLD = 60;
 
 test.describe.configure({ mode: 'parallel' });
 
-/** One line per problem of a measured ring, or none. */
 function ringProblems(r) {
   if (r.missing) return [`${r.key} (${r.state}): no focus ring`];
   const out = [];

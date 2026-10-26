@@ -1,12 +1,12 @@
-// The listening sockets of processes, for X17 in the e2e layer (e2e_no_listening_sockets).
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, readlinkSync } from 'node:fs';
 
 /**
  * The listening TCP and the bound UDP sockets of `pids`, one line each: `<pid> <protocol>
  * <local address>`. Node has no API that lists another process's sockets, and each OS exposes
- * them through its own interface, so this reads them per platform with what the OS ships: Linux's
- * /proc, macOS's lsof, Windows's netstat. Another platform is a setup error, never an empty list.
+ * them through its own interface, so this reads them per platform with the tools the OS ships:
+ * Linux's /proc, macOS's lsof, Windows's netstat. Another platform is a setup error, never an empty
+ * list.
  */
 export function listening(pids) {
   if (!pids.length) return [];
@@ -45,7 +45,8 @@ function procSockets(pids) {
     }
     for (const line of text.split('\n').slice(1)) {
       const fields = line.trim().split(/\s+/);
-      // local address, state (0A is LISTEN; a bound UDP socket is listed whatever its state), inode.
+      // Local address, state and inode. TCP state 0A is LISTEN, and a bound UDP socket counts in
+      // any state.
       const [local, state, inode] = [fields[1], fields[3], fields[9]];
       if (!inode || !owner.has(inode) || (protocol === 'TCP' && state !== '0A')) continue;
       found.push(`${owner.get(inode)} ${protocol} ${local}`);
@@ -54,7 +55,7 @@ function procSockets(pids) {
   return found;
 }
 
-/** macOS: lsof, which macOS ships; it exits 1 when it finds nothing. */
+/** macOS: lsof, shipped with the OS. It exits 1 when it finds nothing. */
 function lsofSockets(pids) {
   const run = (args) => {
     try {
@@ -72,7 +73,7 @@ function lsofSockets(pids) {
   });
 }
 
-/** Windows: `netstat -ano`, which Windows ships: protocol, local address, state, PID. */
+/** Windows: `netstat -ano`, shipped with the OS, in columns protocol, local address, state, PID. */
 function netstatSockets(pids) {
   const wanted = new Set(pids.map(String));
   const text = execFileSync('netstat', ['-ano'], { encoding: 'utf8' });

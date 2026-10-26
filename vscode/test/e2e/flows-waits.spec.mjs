@@ -1,6 +1,3 @@
-// The phase 2 flows (verification.md, "User flows"): an agent asks permission in wt2, the user
-// finds it from the waiting chip, and answers it (H13, U3, X18, D3). The agent's hooks are the
-// steps of permission_wait_and_answer, run by the release `wtpool hook` from a live stub claude.
 import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
@@ -11,7 +8,10 @@ import { expectedRows, waitForRows } from './rows.mjs';
 import { editorGroups, isStatusTab, panelFrame, runCommand } from './vscode.mjs';
 
 const SCENARIO = 'permission_wait_and_answer';
-/** R6: an agent event shows within 1 s; plus W5's merge and a second of polling and rendering. */
+/**
+ * An agent event shows within 1 s. The watch merges events for up to 200 ms, and polling and
+ * rendering take up to a second more.
+ */
 const AGENT_EVENT_MS = 3_000;
 
 /** The label of the Worktrees tab, or undefined. */
@@ -25,15 +25,15 @@ async function popups(window) {
   return window.locator('.notifications-toasts .notification-toast, .monaco-dialog-box, .quick-input-widget:visible').count();
 }
 
-/** What the polite live regions of the panel say. */
+/** The text of the panel's polite live regions. */
 async function announced(frame) {
   const texts = await frame.locator('[aria-live="polite"], [role="status"]').allTextContents();
   return texts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 /**
- * Opens the tab on the scenario's pool, runs its steps up to the first expected document (wt2
- * waiting) and returns {frame, steps, waiting, answered}: the steps object runs the rest.
+ * Opens the tab on the scenario's pool and runs its steps up to the first expected document, wt2
+ * waiting. The returned `steps` runs the rest.
  */
 async function untilWaiting(session) {
   const { scenario, documents } = scenarioDocuments(SCENARIO);

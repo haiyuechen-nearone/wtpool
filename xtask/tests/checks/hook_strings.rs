@@ -1,4 +1,4 @@
-//! Strings a record stores (H15) and labels (H16).
+//! The strings a record stores, and its labels.
 
 use std::fs;
 

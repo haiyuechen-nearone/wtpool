@@ -47,7 +47,7 @@ pub fn listed_features(text: &str) -> Option<BTreeSet<String>> {
     Some(names.into_iter().filter(|name| name != "default").collect())
 }
 
-/// Whether `text` holds `word` as a whole token, also as `v<word>`.
+/// True when `text` holds `word` as a whole token, also as `v<word>`.
 pub fn has_token(text: &str, word: &str) -> bool {
     text.split(|c: char| c.is_whitespace() || "(),;:[]".contains(c))
         .map(|token| token.strip_prefix('v').unwrap_or(token))

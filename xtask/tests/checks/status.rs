@@ -1,4 +1,5 @@
-//! `wtpool status --json` against sandbox pools: S1, S2, S4, S9, R2 and A6.
+//! `wtpool status --json` against sandbox pools: the schema, the one pool of the folder it runs
+//! in, and the facts `wtpool ls` reports.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -227,7 +228,7 @@ fn must_ls(sandbox: &Sandbox, pool: &Pool) -> BTreeMap<String, LsRow> {
         .collect()
 }
 
-/// The `git` object and branch a `wtpool ls` row stands for, as README.md's state table reads.
+/// The `git` object a `wtpool ls` row stands for, as the state table of README.md reads it.
 fn facts_of(row: &LsRow) -> BTreeMap<&'static str, Value> {
     let mut facts = BTreeMap::from([
         ("dirty", Value::from(0)),

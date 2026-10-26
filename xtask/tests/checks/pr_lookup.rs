@@ -18,7 +18,7 @@ const PR: &str = "42";
 const GITHUB: &str = "https://github.com/acme/app.git";
 
 /// The arguments `wtpool` gives `gh`, one per line.
-const GH_ARGS: &str = "pr\nview\n42\n--repo\nacme/app\n--json\nheadRefName,headRefOid,isCrossRepository\n--jq\n[.headRefName, .headRefOid, (.isCrossRepository | tostring)] | join(\" \")\n";
+pub(super) const GH_ARGS: &str = "pr\nview\n42\n--repo\nacme/app\n--json\nheadRefName,headRefOid,isCrossRepository\n--jq\n[.headRefName, .headRefOid, (.isCrossRepository | tostring)] | join(\" \")\n";
 
 /// A `gh` that logs its arguments beside itself and answers with `stdout`, `stderr` and `code`. It
 /// is a shell script, so a check that needs it stops at its setup without Unix.
@@ -52,7 +52,7 @@ fn git_only(sandbox: &Sandbox) -> PathBuf {
     dir
 }
 
-/// The pool's `origin` on GitHub until it drops, which puts the local repository back, so no
+/// The pool's `origin` on GitHub until it drops. The drop puts the local repository back, so no
 /// remote of the run leads outside it.
 struct GitHubOrigin {
     fg: PathBuf,
@@ -94,7 +94,7 @@ fn path_with(dir: &Path) -> OsString {
     std::env::join_paths(dirs).expect("setup: join PATH")
 }
 
-/// `wtpool bg 42` with `path` as `PATH`.
+/// Runs `wtpool bg` [`PR`] with `path` as `PATH`.
 fn bg_pr(sandbox: &Sandbox, pool: &Pool, path: &OsStr) -> Output {
     sandbox.run_in(&must_wtpool_bin(), &["bg", PR], &pool.fg, &[("PATH", path)])
 }
@@ -202,7 +202,8 @@ fn bg__should_say_gh_is_missing() {
     );
 }
 
-/// `output` failed with `warning`, then the line that no slot changed, and every slot is as it was.
+/// Asserts that `output` failed with `warning`, then the line that no slot changed, and that every
+/// slot is as it was.
 fn must_leave_the_pool(pool: &Pool, output: &Output, warning: &str) {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert_eq!(output.status.code(), Some(1), "wtpool bg {PR}: {stderr}");

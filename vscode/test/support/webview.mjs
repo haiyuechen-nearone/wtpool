@@ -46,7 +46,7 @@ function servedUrl(filePath) {
   return `${CSP_SOURCE}/${relative}`;
 }
 
-/** A webview as `buildHtml` sees it; `options.localResourceRoots[0]` is vscode/media. */
+/** A webview as `buildHtml` sees it, with vscode/media as `options.localResourceRoots[0]`. */
 export function fakeWebview(cspSource = CSP_SOURCE) {
   const media = new FakeUri('file', path.join(VSCODE, 'media'));
   return {
@@ -69,7 +69,6 @@ export function fakeWebview(cspSource = CSP_SOURCE) {
   };
 }
 
-/** `buildHtml` of the product's build. */
 export async function mustLoadBuildHtml() {
   assert.ok(existsSync(OUT_HTML), 'npm run build wrote no vscode/out/html.js');
   assert.ok(existsSync(WEBVIEW_JS), 'npm run build wrote no vscode/media/webview.js');
@@ -219,8 +218,8 @@ export function rowById(document, id) {
 }
 
 /**
- * Whether an element is on screen: in the document, not `hidden`, and not `display: none`, read
- * by screen readers or not.
+ * Tells an element on screen: in the document, not `hidden`, and not `display: none`, read by
+ * screen readers or not.
  */
 export function isDisplayed(window, element) {
   for (let node = element; node && node.nodeType === 1; node = node.parentElement) {
@@ -229,7 +228,7 @@ export function isDisplayed(window, element) {
   return Boolean(element?.isConnected);
 }
 
-/** Whether an element is shown: in the document, not `hidden`, and not `display: none`. */
+/** Tells an element shown: in the document, not `hidden`, `aria-hidden` or `display: none`. */
 export function isShown(window, element) {
   for (let node = element; node && node.nodeType === 1; node = node.parentElement) {
     if (node.hidden || node.getAttribute('aria-hidden') === 'true') return false;
@@ -238,7 +237,10 @@ export function isShown(window, element) {
   return Boolean(element?.isConnected);
 }
 
-/** The declared value of `property` for `element`: its matching style rules in order, then its style attribute. */
+/**
+ * The declared value of `property` for `element`: its matching style rules in order, then its
+ * style attribute.
+ */
 function declared(window, element, property) {
   let value = '';
   const visit = (rules) => {
@@ -267,9 +269,9 @@ function declared(window, element, property) {
 const px = (value) => (/^-?[\d.]+(px)?$/.test(value.trim()) ? parseFloat(value) : Number.NaN);
 
 /**
- * Whether the stylesheet hides `element` from sight only, as text for screen readers is hidden
- * (U12, U13): a box of at most 1×1 px that clips, a zero `clip` or `clip-path`, a place far off
- * screen, no opacity, or a zero font size.
+ * Tells an element the stylesheet hides from sight only, as text for screen readers is hidden: a
+ * box of at most 1×1 px that clips, a zero `clip` or `clip-path`, a place far off screen, no
+ * opacity, or a zero font size.
  */
 export function isVisuallyHidden(window, element) {
   const get = (property) => declared(window, element, property).trim();
@@ -286,8 +288,8 @@ export function isVisuallyHidden(window, element) {
 }
 
 /**
- * The text a sighted user reads in `element`, phase neutral: {@link text} without the agent count
- * `.count` (U12) and without visually hidden text (U12, U13), which phase 4 adds to rows.
+ * The text a sighted user reads in `element`: {@link text} without visually hidden text, and
+ * without the agent count `.count` unless `keepCount`.
  */
 export function seen(window, element, { keepCount = false } = {}) {
   const parts = [];

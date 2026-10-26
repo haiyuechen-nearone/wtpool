@@ -1,14 +1,11 @@
-// The heavy jobs of a status document (status-panel.md S14, from phase 4) for the render, host and
-// shot layers, and the oracle's model of what the heading's machine button (U10), the machine
-// strip (U11) and the pattern editor (U15) say about them, written from status-panel.md and
-// docs/design/jobs/jobs.md. Only the rows of the mockups bind.
+// The heavy jobs of a status document for the render, host and shot layers, and the text the
+// heading's machine button, the machine strip and the pattern editor should show for them.
 import { DOT, age, visible } from './grammar.mjs';
 import { NOW, POOL, ago, document, withActor, worktree } from './docs.mjs';
 
-/** The `config` of every test document: the machine file of J4. */
 export const CONFIG = '/Users/verify/.config/wtpool/machine.toml';
 
-/** S14's `machine.jobs`: limit 4 of 1 to 64 under `warn`, saved, with nothing listed or running. */
+/** A `machine.jobs`: limit 4 of 1 to 64 under `warn`, saved, with nothing listed or running. */
 export function jobs(overrides = {}) {
   return {
     limit: 4,
@@ -30,7 +27,7 @@ export function jobs(overrides = {}) {
 
 let jobCount = 0;
 
-/** A job or heavy process of S14: `id`, `summary`, `label`, `worktree`, `actor` and `since`. */
+/** A job or heavy process of `machine.jobs`. */
 export function job(overrides = {}) {
   jobCount += 1;
   return {
@@ -52,9 +49,9 @@ export function withJobs(status, value) {
 }
 
 /**
- * The Strip mockup's state (jobs.md, "Status, hook and panel"): 4 of 4 run, 2 wait, 1 heavy
- * process runs outside a job, the machine lists `just`, this repository three patterns and a
- * `build_processes` name, and two suggestions from `Cargo.toml` are left.
+ * A busy machine: 4 of 4 run, 2 wait, 1 heavy process runs outside a job, the machine lists
+ * `just`, this repository three patterns and a `build_processes` name, and two suggestions from
+ * `Cargo.toml` are left.
  */
 export function busyDocument() {
   const wt1 = withActor(
@@ -95,8 +92,8 @@ export function busyDocument() {
 }
 
 /**
- * The FirstOpen mockup's state (J23, J24): no list yet, `make` from `Makefile` and six pnpm
- * scripts from `package.json` suggested, nothing running.
+ * A repository opened for the first time: no list yet, `make` from `Makefile` and six pnpm scripts
+ * from `package.json` suggested, nothing running.
  */
 export function firstOpenDocument() {
   const status = document([worktree('fg'), worktree('wt1')], { repository: { name: 'shop', github: 'acme/shop' } });
@@ -107,13 +104,16 @@ export function firstOpenDocument() {
   );
 }
 
-/** The patterns of one scope of U15: `machine`, or `repository` with its `build_processes` names. */
+/**
+ * The patterns of one scope of the pattern editor: `machine`, or `repository` with its
+ * `build_processes` names.
+ */
 export function scopePatterns(value, scope) {
   const sources = scope === 'machine' ? ['machine'] : ['repository', 'build_processes'];
   return value.heavy.filter((entry) => sources.includes(entry.source));
 }
 
-/** U10's text of the machine button, its codicons aside. */
+/** The text of the machine button, its codicons aside. */
 export function buttonText(value, machine) {
   const name = visible(machine);
   if (value === undefined) return name;
@@ -126,9 +126,8 @@ export function buttonText(value, machine) {
 }
 
 /**
- * U10's accessible name: the button's visible text, then the sentence. The template lists every
- * count; the oracle reads it as naming the counts the button shows, in the template's words, so a
- * zero count is left out as it is on screen.
+ * The machine button's accessible name: its visible text, then a sentence that names the counts
+ * the button shows. A zero count is left out, as it is on screen.
  */
 export function buttonName(value, machine) {
   const parts = [`${value.running.length} of ${value.limit} running`];
@@ -138,7 +137,10 @@ export function buttonName(value, machine) {
   return `${buttonText(value, machine)}, heavy jobs on ${visible(machine)}: ${parts.join(', ')}`;
 }
 
-/** The parts of U10's text in the attention colour, and the one in the description colour. */
+/**
+ * The parts of the machine button's text in the attention colour, and the one in the description
+ * colour.
+ */
 export function buttonColours(value) {
   const attention = [];
   if (value.waiting.length) attention.push(`${value.waiting.length} queued`);
@@ -147,7 +149,7 @@ export function buttonColours(value) {
   return { attention, muted };
 }
 
-/** The worktree name and actor label of a job line (U11, S15), or `outside this pool`. */
+/** The worktree name and actor label of a job line, or `outside this pool`. */
 export function jobPlace(entry, status) {
   const worktrees = status.pools[0].worktrees;
   const where = worktrees.find((w) => w.path === entry.worktree);
@@ -156,7 +158,7 @@ export function jobPlace(entry, status) {
   return actor ? `${visible(where.name)}${DOT}${visible(actor.label)}` : visible(where.name);
 }
 
-/** The words of one job line of U11, in order: position (Queued only), name, place and age. */
+/** The words of one job line, in order: position (Queued only), name, place and age. */
 export function jobLineParts(entry, status, position, nowMs = NOW) {
   const parts = [];
   if (position !== undefined) parts.push(String(position));
@@ -164,7 +166,7 @@ export function jobLineParts(entry, status, position, nowMs = NOW) {
   return parts;
 }
 
-/** U11's fixed sentences. */
+/** The machine strip's fixed sentences. */
 export const TEXT = {
   oldWtpool: 'This wtpool has no heavy job limit. Update wtpool to a version with wtpool job to set one.',
   remote: (machine) => `This window's folder is not on this computer: the settings are for this computer, ${machine}.`,
@@ -181,9 +183,9 @@ export const TEXT = {
 };
 
 /**
- * J18 as the oracle reads it: one to three words split by single spaces, each 1 to 32 characters
- * of `A-Z a-z 0-9 . _ + -`, `:` allowed in a word but the first, no word starting with `-` or
- * `+`, and only the first word may end in a `*`, which is then not its only character.
+ * Tells a heavy pattern: one to three words split by single spaces, each 1 to 32 characters of
+ * `A-Z a-z 0-9 . _ + -`, `:` allowed in a word but the first, no word starting with `-` or `+`,
+ * and only the first word may end in a `*`, never as its only character.
  */
 export function isPattern(text) {
   const words = text.split(' ');
@@ -197,7 +199,7 @@ export function isPattern(text) {
   });
 }
 
-/** J18's cases: the examples, both limits of a word's length, and each rule broken once. */
+/** Pattern cases: the examples, both limits of a word's length, and each rule broken once. */
 export const PATTERN_CASES = [
   ['make', true],
   ['cargo build', true],
@@ -229,7 +231,7 @@ export const PATTERN_CASES = [
   ['make​', false],
 ];
 
-/** U15's label of a suggestions group: `from <marker>`, `package.json` read as its scripts. */
+/** The label of a suggestions group: `from <marker>`, `package.json` read as its scripts. */
 export function groupLabel(from) {
   return from === 'package.json' ? 'from package.json scripts' : `from ${visible(from)}`;
 }

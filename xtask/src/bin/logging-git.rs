@@ -45,7 +45,7 @@ fn main() -> ExitCode {
     run(&git, args)
 }
 
-/// The log and the real git that `logging-git.txt` beside this program names.
+/// The log and the real git that [`SETUP`] beside this program names.
 fn setup() -> Option<(PathBuf, PathBuf)> {
     let exe = std::env::current_exe().ok()?;
     let text = fs::read_to_string(exe.parent()?.join(SETUP)).ok()?;

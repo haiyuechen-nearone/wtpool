@@ -186,7 +186,7 @@ fn actors_by_key(value: &Value) -> Vec<Value> {
     actors
 }
 
-/// Each build's pid and name, and with `queued` its `queued` too (S4, from phase 4).
+/// Each build's pid and name, and with `queued` its `queued` too.
 fn builds(value: &Value, queued: bool) -> BTreeSet<(String, String, String)> {
     value
         .as_array()
@@ -203,11 +203,10 @@ fn builds(value: &Value, queued: bool) -> BTreeSet<(String, String, String)> {
         .collect()
 }
 
-/// What `actual` gets wrong against the scenario's `expected` document. `generated`,
-/// `machine.name` and `last_change` vary per run and are not compared; actors compare in any
-/// order; ahead and behind may be
-/// 0 or null without an upstream; a missing worktree's git facts are not compared and its
-/// reasons need only include `missing`.
+/// The faults of `actual` against the scenario's `expected` document. `generated`,
+/// `machine.name` and `last_change` vary per run and are not compared. Actors compare in any
+/// order. Without an upstream, ahead and behind may be 0 or null. A missing worktree's git facts
+/// are not compared, and its reasons need only include `missing`.
 pub fn differences(expected: &Value, actual: &Value) -> Vec<String> {
     let mut found: Vec<String> = schema_errors(actual)
         .into_iter()

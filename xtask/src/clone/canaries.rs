@@ -9,7 +9,6 @@ use crate::results::{CheckResult, FailKind, Outcome};
 
 use super::{ScratchClone, first_line};
 
-/// The needs you codes of verification.md, "Outcomes and limits".
 const NEEDS_YOU_CODES: [&str; 6] = [
     "logged_out",
     "no_network",
@@ -29,7 +28,7 @@ pub struct Canary {
     pub expect: Expect,
 }
 
-/// How a canary's check sees the patched tree.
+/// The state of the patched tree a canary's check sees.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tree {
     /// The patch is committed, so the check sees a clean tree, as in a fresh clone.
@@ -39,14 +38,14 @@ pub enum Tree {
     Uncommitted,
 }
 
-/// What a canary's check ends with when it catches the canary.
+/// The outcome a canary's check ends with when it catches the canary.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expect {
     /// A failure on an assertion.
     Assertion,
-    /// A needs you code, for a change only the owner can allow: an entry widened after its
-    /// acceptance stops a verdict at `oracle_change`, never at a failure. `Expect: <code>` above
-    /// the diff asks for it.
+    /// A needs you code, for a change only the owner can allow. An entry widened after its
+    /// acceptance ends at `oracle_change`, never at a failure. `Expect: <code>` above the diff
+    /// asks for it.
     NeedsYou(String),
 }
 
@@ -148,7 +147,8 @@ pub fn caught_as(result: &CheckResult, expect: &Expect) -> bool {
     }
 }
 
-/// Applies each canary to a clone of this tree and reports whether its check caught it.
+/// Applies each canary to a clone of this tree and prints the verdict of its check. True when
+/// every check caught its canary.
 pub fn canary(root: &Path, phase: u8, patches: &[PathBuf]) -> Result<bool, String> {
     let clone = ScratchClone::prepare(root, "canary")?;
     let base = git(&clone.dir, &["rev-parse", "HEAD"])?.trim().to_owned();

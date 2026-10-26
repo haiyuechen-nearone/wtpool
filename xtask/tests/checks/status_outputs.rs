@@ -1,5 +1,5 @@
-//! The outputs an actor lists in `wtpool status` (S13): its running background tasks, newest first,
-//! then the one that ended last, omitted when it has none; never a path that is not absolute.
+//! The outputs an actor lists in `wtpool status`: its running background tasks, newest first, then
+//! the one that ended last, omitted when it has none. Every path is absolute.
 
 use std::ffi::OsString;
 use std::fs;
@@ -37,8 +37,8 @@ fn background(hooks: &Hooks, id: &str) -> Value {
     )
 }
 
-/// The outputs of the actor `key` in worktree `name`: task, running, and whether it has a path
-/// and times.
+/// The task and running flag of each output of the actor `key` in worktree `name`. Panics on an
+/// output without the build's summary, an absolute path or consistent times.
 fn outputs(document: &Value, name: &str, key: &str) -> Option<Vec<(String, bool)>> {
     let actors = worktree(document, name)["actors"].as_array()?.clone();
     let actor = actors.into_iter().find(|actor| actor["key"] == key)?;

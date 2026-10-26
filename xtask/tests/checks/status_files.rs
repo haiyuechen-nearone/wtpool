@@ -1,4 +1,4 @@
-//! `wtpool status` leaves the pool as it found it: S2.
+//! `wtpool status` leaves the pool as it found it.
 
 use std::collections::BTreeMap;
 use std::fs;

@@ -1,7 +1,3 @@
-// The heavy job flows of jobs.md, "User flows", that share the machine: jobs running and queued,
-// a changed and a lowered limit, a build outside a job and a refusal under `require` (S4, S14,
-// S15, A8, U10, U11, U14, J3, J6, J10, J11, J21, X11, X20, X21, H29, W10). Each flow starts its
-// own VS Code on its own pool, with the limit and the patterns written by hand.
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { test } from '@playwright/test';
@@ -268,7 +264,7 @@ test('flow__jobs_require_refuses', async () => {
       try {
         decision = JSON.parse(refused.policy.stdout.trim());
       } catch {
-        // No decision: the assertion below names what it printed.
+        // No decision: the assertion below shows the output.
       }
       assert.deepEqual(
         decision,

@@ -20,13 +20,14 @@ pub use canaries::{
 };
 pub use inventory::{HARNESS_CHECKS, absent_checks, implemented_checks, part_for, part_of};
 
-/// A reused clone in `clones/` of the harness cache (crate::dirs), so its `target/` stays warm.
+/// A reused clone in `clones/` of the harness [`cache_dir`](crate::dirs::cache_dir), so its
+/// `target/` stays warm.
 pub struct ScratchClone {
     pub dir: PathBuf,
 }
 
-/// Removes untracked and ignored files, so nothing a canary added stays behind, a file in a
-/// folder git ignores included. Build and run output stays warm.
+/// The arguments of a `git clean` that removes untracked and ignored files, those in ignored
+/// folders included, so nothing a canary added stays behind. Build and run output stays warm.
 const CLEAN: [&str; 14] = [
     "clean",
     "-ffdqx",
@@ -190,9 +191,9 @@ impl ScratchClone {
         Ok(())
     }
 
-    /// Runs each of `parts` whole, once, in one run with `--fresh`, and returns every result:
-    /// int before cc, whose checks read the int part's `cc_replay:<name>`; report checks after
-    /// the parts the report needs.
+    /// Runs each of `parts` whole, once, in one run with `--fresh`, and returns every result. cc
+    /// brings int along, as its checks read the int part's `cc_replay:<name>`, and the report
+    /// brings the parts it needs.
     pub fn run_parts(&self, phase: u8, parts: &[&str]) -> Result<Vec<CheckResult>, String> {
         let millis = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -281,8 +282,8 @@ impl ScratchClone {
                 .find(|r| r.check == check)
                 .ok_or_else(|| format!("the report has no result for {check}"));
         }
-        // A cc check counts by the oracle step's live result and this tree's replay of its
-        // recordings; freeze starts no claude session (verification.md, "Contract test").
+        // A cc check counts by the live result recorded earlier and this tree's replay of its
+        // recordings. Freeze starts no claude session.
         if part == "cc" {
             let replay = format!("{}{check}", crate::replay::PREFIX);
             let mut args = base.to_vec();

@@ -1,5 +1,3 @@
-// U12 and U13 in jsdom (phase 4): a row with several agent lines counts them after its Activity
-// word, and each agent line starts with a static state icon and a visually hidden state.
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 
@@ -100,7 +98,7 @@ const STATES = [
   ['queued', { state: 'working', label: 'Design jobs', action: { tool: 'queued:', target: 'cargo test' } }],
 ];
 
-/** The icon of each case, one worktree per case so each line is alone in its row. */
+/** One worktree per case of {@link STATES}, so each line is alone in its row. */
 function iconsDocument() {
   const worktrees = [worktree('fg')];
   STATES.forEach(([, overrides], index) => {
@@ -113,13 +111,12 @@ function iconsDocument() {
   return document(worktrees);
 }
 
-/** The first `.line` of the row of `name` and its leading `.line-icon`. */
 function firstLine(name) {
   const line = row(name).querySelectorAll(':scope > td')[4]?.querySelector('.line');
   return { line, icon: line?.firstElementChild?.classList.contains('line-icon') ? line.firstElementChild : null };
 }
 
-/** What an icon is, as far as jsdom can tell: its classes, attributes and inner markup. */
+/** An icon's classes, attributes and inner markup without ids: all jsdom can tell of its look. */
 function signature(icon) {
   const clone = icon.cloneNode(true);
   for (const el of [clone, ...clone.querySelectorAll('*')]) el.removeAttribute('id');

@@ -1,5 +1,5 @@
-//! What the CLI prints from strings of git and settings: control, bidi and zero width characters
-//! as `\u{XXXX}`, as X10 shows them (R2).
+//! The CLI prints the control, bidi and zero width characters of strings from git and settings as
+//! `\u{XXXX}`.
 
 use std::process::{Command, Output};
 

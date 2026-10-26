@@ -1,19 +1,17 @@
-//! The cc layer (verification.md, "Contract test"): `vscode/test/cc/run.mjs` drives the
-//! installed `claude` through the Agent SDK, on a build copy of the release `wtpool` in `bin/` of the
-//! harness data folder (crate::dirs, `~/.local/share/wtpool-verify` by default). It runs only with
-//! `--contract`. With `--record`, the oracle step's live run, raw recordings go to `recordings/`
-//! there, for the lock and the scrubber; any other live run records into its run folder. The
-//! harness supports the latest installed Claude Code alone: a record in which every cc check
-//! passes moves the recordings of each other version into `recordings-backup/`
+//! The cc layer: `vscode/test/cc/run.mjs` drives the installed `claude` through the Agent SDK, on
+//! a build copy of the release `wtpool` in `bin/` of the harness
+//! [data folder](crate::dirs::data_dir). It runs only with `--contract`. With `--record`, raw
+//! recordings go to `recordings/` there, for the lock and the scrubber. Any other live run records
+//! into its run folder. The harness supports the latest installed Claude Code alone: a record where
+//! every cc check passes moves the recordings of each other version into [`BACKUP`]
 //! ([`retire_recordings`]).
 //!
 //! `claude` keeps the real home and the owner's login and loads only the run's settings file
 //! (`settingSources: []`). The runner deletes the `~/.claude/projects/` transcript folders its
 //! own sessions created and touches nothing else under `~/.claude/`.
 //!
-//! A machine that never recorded a live run (no recordings folder, so no live result for any
-//! Claude Code) counts the cc checks by this run's `cc_replay:<name>` alone, without `--contract`,
-//! and the report says so ([`replay_only_reason`]).
+//! A machine that never recorded a live run counts the cc checks by this run's
+//! `cc_replay:<name>` alone ([`replay_only_reason`]).
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -39,7 +37,6 @@ fn build_copy(release: &Path) -> Result<PathBuf, String> {
     Ok(copy)
 }
 
-/// The installed Claude Code's version, the first word `claude --version` prints.
 pub fn claude_version() -> Result<String, String> {
     let text = crate::cmd::output(
         std::process::Command::new("claude").arg("--version"),
@@ -51,17 +48,16 @@ pub fn claude_version() -> Result<String, String> {
         .ok_or_else(|| "claude --version printed nothing".to_owned())
 }
 
-/// The live result of the oracle step for `version`: `cc-results.json` beside its recordings,
-/// hashed by the lock.
+/// The live result of Claude Code `version`, beside its recordings, hashed by the lock.
 pub fn live_results_path(version: &str) -> Option<PathBuf> {
     crate::scrub::recordings_dir()
         .map(|dir| dir.join(format!("claude-{version}")).join(LIVE_RESULTS))
 }
 
 /// The reason the cc checks count by this run's replays alone, or `None` when they need the live
-/// result.
-/// They need it on a machine that keeps the recordings of a live run: it holds the live result of
-/// each Claude Code version it ran, and a new version needs its own live run (`--contract`).
+/// result. They need it on a machine that keeps the recordings of a live run: it holds the live
+/// result of each Claude Code version it ran, and a new version needs its own live run
+/// (`--contract`).
 pub fn replay_only_reason() -> Option<String> {
     let recordings = crate::scrub::recordings_dir()?;
     if recordings.exists() {
@@ -98,9 +94,9 @@ pub fn report_by_replay(root: &Path, run_dir: &Path) -> Option<Vec<CheckResult>>
     })
 }
 
-/// The cc checks without `--contract` (verification.md, "Contract test" and "Trace list"): the
-/// Claude Code asserts by the live result for the installed version, hashed by the lock,
-/// and the wtpool asserts by this run's `cc_replay:<name>` of the int part. It starts no session.
+/// The cc checks without `--contract`: the Claude Code asserts by the live result of the installed
+/// version, hashed by the lock, and the wtpool asserts by this run's `cc_replay:<name>` of the int
+/// part. It starts no session.
 fn from_live_result(ctx: &Ctx, wanted: &BTreeSet<String>) -> Vec<CheckResult> {
     if let Some(reason) = replay_only_reason() {
         return by_replay(&replayed(&ctx.run_dir), wanted, &reason);
@@ -141,8 +137,8 @@ fn from_live_result(ctx: &Ctx, wanted: &BTreeSet<String>) -> Vec<CheckResult> {
     judge_live(&live, &locked, &replayed(&ctx.run_dir), wanted)
 }
 
-/// Keeps the live result `text` of the installed Claude Code beside its recordings, for the lock;
-/// the version it kept it for.
+/// Keeps the live result `text` of the installed Claude Code beside its recordings, for the lock,
+/// and returns that version.
 fn keep_live_result(text: &str) -> Result<String, String> {
     let version = claude_version()?;
     let path = live_results_path(&version).ok_or("HOME is not set")?;
@@ -157,7 +153,7 @@ fn keep_live_result(text: &str) -> Result<String, String> {
 const BACKUP: &str = "recordings-backup";
 
 /// Moves each `claude-<version>` folder of `recordings` but `claude-{keep}` into [`BACKUP`]
-/// beside it, as `<folder>.bak-<seconds since the epoch>`; one line per folder.
+/// beside it, as `<folder>.bak-<seconds since the epoch>`. Returns one line per folder.
 fn retire_recordings(recordings: &Path, keep: &str) -> Vec<String> {
     let keep = format!("claude-{keep}");
     let Some(backup) = recordings.parent().map(|dir| dir.join(BACKUP)) else {
@@ -303,8 +299,6 @@ pub fn cc(ctx: &Ctx, contract: bool, record: bool) -> Vec<CheckResult> {
             ));
         }
     }
-    // The oracle step's live run keeps its result beside its recordings, for the lock, and once
-    // every cc check passed, the recordings of the other versions retire.
     if record {
         match keep_live_result(&text) {
             Ok(version) => {

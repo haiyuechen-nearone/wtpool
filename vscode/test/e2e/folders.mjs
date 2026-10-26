@@ -1,6 +1,3 @@
-// What the flows of R9 and R10 need beyond a scenario pool: a pool laid out as wtpool's defaults
-// expect it, with no wtpool.toml and no variables (status-panel.md revision 16), the webview frame of
-// a tab that has no rows, a narrow webview, and how a text in it lays out.
 import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from '@playwright/test';
@@ -88,7 +85,7 @@ export async function sizeWebview(session, frame, width) {
 }
 
 /**
- * How `needle` lays out in the frame: the smallest element whose text holds it, its line boxes,
+ * The layout of `needle` in the frame: the smallest element whose text holds it, its line boxes,
  * the boxes that cut it, its width on one line, and the frame's width. Null when no element
  * holds it.
  */

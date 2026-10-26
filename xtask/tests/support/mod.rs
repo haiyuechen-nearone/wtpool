@@ -28,7 +28,7 @@ pub fn must_repo() -> PathBuf {
     PathBuf::from(must_env("WTPOOL_VERIFY_REPO"))
 }
 
-/// Whether the tree had uncommitted changes when the harness built `wtpool`.
+/// True when the tree held uncommitted changes as the harness built `wtpool`.
 pub fn must_build_dirty() -> bool {
     must_env("WTPOOL_VERIFY_BUILD_DIRTY") == "1"
 }
@@ -110,9 +110,9 @@ pub fn contains_bytes(haystack: &[u8], needle: &str) -> bool {
         .any(|window| window == needle.as_bytes())
 }
 
-/// The phase the harness verifies, `WTPOOL_VERIFY_PHASE`, which the int and bench parts set;
-/// 1 when unset. A check of an earlier phase that phase 4 rewords asserts the new behaviour only
-/// from that phase on.
+/// The phase the harness verifies, from `WTPOOL_VERIFY_PHASE` as the int and bench parts set it,
+/// and 1 when unset. A check of an earlier phase that phase 4 changes asserts the new behaviour
+/// only from that phase on.
 pub fn phase() -> u8 {
     std::env::var("WTPOOL_VERIFY_PHASE")
         .ok()
@@ -122,7 +122,8 @@ pub fn phase() -> u8 {
 
 static SANDBOXES: AtomicUsize = AtomicUsize::new(0);
 
-/// A home, temp and XDG folder set inside the run folder, and a pool there that does not exist.
+/// A home, temp and XDG folder set inside the run folder, and a pool folder that holds no pool
+/// until [`Sandbox::must_pool`] builds one.
 pub struct Sandbox {
     pub root: PathBuf,
 }
@@ -194,7 +195,8 @@ impl Sandbox {
         command.output().expect("setup: start wtpool")
     }
 
-    /// The command [`Sandbox::run`] uses, not yet started.
+    /// `binary` from `cwd` in the sandbox's environment, not yet started, with
+    /// [`Sandbox::path_variable`] as its `PATH`.
     pub fn command(&self, binary: &Path, cwd: &Path) -> Command {
         let mut command = Command::new(binary);
         command
@@ -251,9 +253,9 @@ impl Sandbox {
             .unwrap_or_else(|e| panic!("setup: build the pool: {e}"))
     }
 
-    /// Puts a git first on `PATH` that logs its working folder and arguments, one line per
-    /// start, then runs the real git: a copy of xtask's `logging-git` (src/bin), which reads its
-    /// log and the real git from `logging-git.txt` beside it. Returns the log.
+    /// Puts a copy of xtask's `logging-git` first on `PATH`. It logs its working folder and
+    /// arguments, one line per start, then runs the real git. It reads the paths of its log and of
+    /// the real git from `logging-git.txt` beside it.
     pub fn must_log_git(&self) -> GitLog {
         let real = find_real_git();
         let shim = self.root.join("shim");
@@ -317,8 +319,8 @@ pub fn must_make_unreadable(path: &Path) {
     );
 }
 
-/// What tells an entry unchanged: its size and modification time, and on Unix its mode and
-/// inode, which a rewrite through a new file changes.
+/// The facts that tell an entry unchanged: its size and modification time, and on Unix its mode
+/// and inode, as a rewrite through a new file changes them.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileState {
     pub len: u64,
@@ -341,7 +343,6 @@ pub fn file_state(meta: &fs::Metadata) -> FileState {
     }
 }
 
-/// The file name of git on this system.
 const GIT: &str = if cfg!(windows) { "git.exe" } else { "git" };
 
 /// Lets `path` run. Windows has no such mode: every file there may run.
@@ -469,7 +470,7 @@ impl Watch {
         Some(line)
     }
 
-    /// Lines until `deadline` passes.
+    /// Every line that arrives within `duration`.
     pub fn lines_for(
         &mut self,
         duration: std::time::Duration,
@@ -518,7 +519,7 @@ impl Watch {
         first
     }
 
-    /// Reads lines until an alive line arrives; whether one did within `timeout`.
+    /// Reads lines until an alive line arrives, true when one did within `timeout`.
     pub fn lines_until_alive(&mut self, timeout: std::time::Duration) -> bool {
         let deadline = std::time::Instant::now() + timeout;
         while let Some(left) = deadline.checked_duration_since(std::time::Instant::now()) {
@@ -581,9 +582,9 @@ pub fn worktree<'a>(document: &'a serde_json::Value, name: &str) -> &'a serde_js
         .unwrap_or(&serde_json::Value::Null)
 }
 
-/// The oracle's schema of the status document for this run's phase, below `verify/schema/`:
-/// `status.schema.json`, and from phase 4 `status.phase-4.schema.json`, which adds `machine.jobs`
-/// (S14) and `build.queued` (S4) while an earlier wtpool's own schema still matches the first.
+/// The oracle's schema of the status document for this run's phase, below `verify/schema/`. The
+/// phase 4 schema adds `machine.jobs` and `build.queued`, and the own schema of a wtpool of an
+/// earlier phase still matches the older one.
 pub fn status_schema_file() -> &'static str {
     if phase() >= 4 {
         "status.phase-4.schema.json"

@@ -1,14 +1,3 @@
-// U9, U1, U6 and X14 in Chromium (phase 3): the detail strip's Output section with a growing build
-// log of long lines, in all four themes at 1100 and 600 px.
-//
-// output__should_clip_nothing_in_every_theme: no text in the strip is clipped or spills: a long
-// line wraps inside its block, nothing is wider than its box, and text that a tail block hides
-// lies in the block's own scrollable area. Every text meets AA contrast against its background,
-// and the block's border and the Follow button's border have 3:1 against what is around them.
-//
-// output__should_show_the_follow_ring_whole: Tab reaches each Follow button and each tail block
-// after the selected row's actions; each focus ring exists, no box cuts it, and it has 3:1
-// against the background under it.
 import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
@@ -98,8 +87,8 @@ for (const theme of THEME_NAMES) {
         };
       });
       const { issues } = await page.evaluate(clipping, false);
-      // Lines a tail block scrolls out of view lie in its own scrollable area (U9); that nothing in
-      // the block is wider than it, so nothing is cut sideways, `wider` says.
+      // A tail block scrolls its own lines out of view, so text it clips is no issue here. `wider`
+      // shows that nothing in it is cut sideways.
       const outsideBlocks = issues.filter((issue) => !(issue.kind === 'text-clipped' && String(issue.el).startsWith('pre.output-tail')));
       const low = await page.evaluate(textContrast);
       const borders = await page.evaluate(boundaries, 'pre.output-tail, button.follow');

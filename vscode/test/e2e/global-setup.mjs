@@ -1,5 +1,5 @@
-// Finds VS Code once per e2e run, before any check starts, downloading the pinned version when no
-// install is found (support/vscode-app.mjs), and names it to the test processes.
+// Finds VS Code once per run, downloading the pinned version when none is installed, and names it
+// to the test processes.
 import { exportVSCode } from '../support/vscode-app.mjs';
 
 export default async function globalSetup() {

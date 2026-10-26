@@ -1,7 +1,7 @@
-//! Flaky checks (verification.md, "Outcomes and limits"): a check that passed only on a retry of
-//! its layer's runner is flaky, and a check flaky in 3 runs in a row fails. A run is a report of
-//! the same phase in `verify/out/`; earlier runs count newest first, by when their report was
-//! written, and a run where the check was not flaky ends the row.
+//! Flaky checks. A check that passed only on a retry of its layer's runner is flaky, and a check
+//! flaky in [`IN_A_ROW`] runs in a row fails. A run is a report of the same phase in `verify/out/`.
+//! Earlier runs count newest first, by the time their report was written, and a run where the
+//! check was not flaky ends the row.
 
 use std::collections::BTreeSet;
 use std::fs;

@@ -1,35 +1,36 @@
 #!/usr/bin/env node
-// The fake `wtpool` of the host layer (verification.md, "Layers"). It replays documents, injects
-// stream faults, and logs its argv, working directory, WTPOOL_FOREGROUND and WTPOOL_SLOT_DIR, parent,
-// stdin close and exit as JSON lines.
+// The fake `wtpool` of the host layer. It replays documents, injects stream faults, and logs its
+// argv, working directory, WTPOOL_FOREGROUND and WTPOOL_SLOT_DIR, parent, stdin close and exit as
+// JSON lines.
 //
 // `WTPOOL_FAKE_CONFIG` names a JSON file read at each start:
 //   log        file the JSON lines go to (required)
-//   documents  status documents to print, in order; else `scenario`
+//   documents  status documents to print, in order, else `scenario`
 //   scenario   a scenario name of verify/scenarios/, its expected documents replayed
 //   scenarioDir   the folder of the scenario files, by default verify/scenarios/
 //   faults     one fault per start, the last repeating: none, partial, oversize, garbage,
 //              unknown_version, early_exit (exit 1 before any line), error_exit (write
 //              `stderr` to stderr, then exit `exitCode` before any line), stall, slow_start,
 //              ignore_eof
-//   stderr     what error_exit writes to stderr (default one line)
+//   stderr     the text error_exit writes to stderr (default one line)
 //   exitCode   the exit code of error_exit (default 1)
 //   lead       true: a start with a line fault (partial, oversize, garbage, unknown_version)
 //              prints the first document whole before the faulty line, so the extension holds
 //              a document of its own run when the fault comes
 //   slowStartMs   the delay of slow_start (default 5000)
 //   gapMs      a pause before each document after the first, as `wtpool` prints documents at
-//              least 200 ms apart (W5)
+//              least 200 ms apart
 //   aliveMs    the period of alive lines after the documents (default 1000, 0 for none)
 //   count      print this many distinct documents as fast as the pipe takes them
 //   control    a file whose appended lines steer a running fake: `emit <document JSON>`,
 //              `alive`, `exit <code>`
-//   actionExit the exit code of `free` and `fg` (phase 3, X12), which only log (default 0)
+//   actionExit the exit code of `free` and `fg`, calls that only log (default 0)
 //   actionStderr  the line `free` and `fg` write to stderr when actionExit is not 0
-//   jobExit    the exit code of `job limit`, `job enforce` and `job heavy` (phase 4, X21), which
-//              only log and never print a document: a number, or a list taken per `job` call in
-//              order, the last repeating (default 0)
-//   jobStderr  what a `job` call whose code is not 0 writes to stderr, as given (default one line)
+//   jobExit    the exit code of `job limit`, `job enforce` and `job heavy`, calls that only log
+//              and never print a document: a number, or a list taken per `job` call in order,
+//              the last repeating (default 0)
+//   jobStderr  the text a `job` call whose code is not 0 writes to stderr, as given (default one
+//              line)
 //   jobHangMs  a `job` call waits this long before it answers, so a kill can be seen (default 0)
 import { appendFileSync, existsSync, readFileSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -60,9 +61,8 @@ function startsSoFar() {
 }
 
 const index = startsSoFar();
-// The variables that name a pool, so a check sees whether the extension set them (R9).
-const pool = { foreground: process.env.WTPOOL_FOREGROUND ?? null, slotDir: process.env.WTPOOL_SLOT_DIR ?? null };
-log('start', { argv: args, script: process.argv[1], cwd: process.cwd(), ppid: process.ppid, parent: parentName(), index, ...pool });
+const poolVariables = { foreground: process.env.WTPOOL_FOREGROUND ?? null, slotDir: process.env.WTPOOL_SLOT_DIR ?? null };
+log('start', { argv: args, script: process.argv[1], cwd: process.cwd(), ppid: process.ppid, parent: parentName(), index, ...poolVariables });
 process.on('exit', (code) => log('exit', { code }));
 for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
   process.on(signal, () => {

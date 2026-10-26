@@ -11,7 +11,7 @@ const POOL = '/Users/verify/pool';
 const WT2 = `${POOL}/wt2`;
 const WT3 = `${POOL}/wt3`;
 const HOST_DIR = process.env.WTPOOL_VERIFY_HOST_DIR ?? fs.mkdtempSync('/tmp/wtpool-verify-output-');
-/** How long a check waits for something the extension must not do. */
+/** The time a check waits for something the extension must not do. */
 const QUIET_MS = 2500;
 
 let folder;

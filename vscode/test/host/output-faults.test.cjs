@@ -1,7 +1,3 @@
-// Output tails and Follow in the extension host when the system gets in the way of a read. A
-// watch that cannot be made, or that fails, leaves the 1 s poll to see the file grow. A change
-// made while a read holds the file is read after that read, never by a second read at the same
-// time. A followed file replaced by a symlink shows nothing more.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -73,7 +69,7 @@ function slowReads(dir) {
   };
 }
 
-/** Opens the Follow terminal of `file`, listed for wt2, and collects what it writes. */
+/** Opens the Follow terminal of `file`, listed for wt2, and collects its output. */
 async function followed(file, terminals) {
   const api = await start(poolWith({ wt2: [actor('s2', [output(file)])] }));
   await api.fromWebview({ type: 'follow', id: file });
@@ -105,7 +101,9 @@ describe('output reads against a system that gets in the way', () => {
     assert.ok(await nextOutput(before, WT2), 'selecting wt2 posted no output message');
   }
 
-  /** The output message after `before` whose tail of wt2 ends with `line`, within the poll's wait. */
+  /**
+   * The output message after `before` whose tail of wt2 ends with `line`, within the poll's wait.
+   */
   function shown(before, line) {
     return nextOutput(before, WT2, (m) => m.tails[0].lines.at(-1) === line, POLL_WAIT_MS);
   }

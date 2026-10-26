@@ -1,5 +1,5 @@
-//! `wtpool status --watch` against sandbox pools: W1 to W5 and W7 to W9. A git change must show
-//! within 1 s (R6), anything else within one 10 s heartbeat.
+//! `wtpool status --watch` against sandbox pools. A git change must show within [`GIT_CHANGE`],
+//! anything else within one [`HEARTBEAT`].
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -13,8 +13,7 @@ use crate::support::{Sandbox, Watch, is_alive, is_status, worktree};
 
 pub(super) const GIT_CHANGE: Duration = Duration::from_secs(1);
 pub(super) const HEARTBEAT: Duration = Duration::from_secs(10);
-/// A heartbeat plus the 1 s a change may take to show.
-pub(super) const MISSED_CHANGE: Duration = Duration::from_secs(11);
+pub(super) const MISSED_CHANGE: Duration = HEARTBEAT.saturating_add(GIT_CHANGE);
 
 pub(super) fn pool_spec(changes: &[(&str, WorktreeSpec)]) -> PoolSpec {
     let mut worktrees: BTreeMap<String, WorktreeSpec> = BTreeMap::from([

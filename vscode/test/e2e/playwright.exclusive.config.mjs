@@ -1,5 +1,5 @@
-// The e2e checks that need the machine to themselves (flows-exclusive*.spec.mjs): one worker,
-// one check at a time, run by layers/e2e.rs after the parallel checks of playwright.config.mjs.
+// The e2e checks that need the machine to themselves. layers/e2e.rs runs them one at a time, after
+// the parallel checks of playwright.config.mjs.
 import path from 'node:path';
 import { defineConfig } from '@playwright/test';
 

@@ -1,5 +1,5 @@
-//! How the latency budgets of verification.md, "Budgets", count their samples: the nearest rank
-//! p95, and rounds that stop once their p95 is over the budget.
+//! The statistics of the latency budgets: the nearest rank p95, and rounds that stop once their
+//! p95 is over the budget.
 
 use std::time::Duration;
 
@@ -21,13 +21,13 @@ fn p95_rank(samples: usize) -> usize {
 
 /// The delay of each of `rounds` rounds of `round`, `None` for a change that never showed.
 /// Stops once the p95 of the rounds can no longer be within `budget`, so a blind or slow watcher
-/// fails with what it measured, well before the bench profile's 120 s limit ends the test.
+/// fails with the delays it measured, well before the bench profile's 120 s limit ends the test.
 pub fn delays_within(
     rounds: usize,
     budget: Duration,
     mut round: impl FnMut(usize) -> Option<Duration>,
 ) -> Vec<Option<Duration>> {
-    // Rounds above the p95; one more decides it.
+    // The rounds that may miss the budget while the p95 still meets it.
     let spare = rounds.saturating_sub(p95_rank(rounds));
     let mut delays = Vec::new();
     for index in 0..rounds {

@@ -1,5 +1,5 @@
-//! The phase 2 scenarios of the catalog in the `int` layer: hook steps from fake `claude`
-//! processes at a fake time, then `wtpool status --json` against every expected document.
+//! The agent scenarios of the catalog in the `int` layer: hook steps from fake `claude` processes
+//! at a fake time, then `wtpool status --json` against every expected document.
 
 use super::scenarios::must_run_scenario;
 

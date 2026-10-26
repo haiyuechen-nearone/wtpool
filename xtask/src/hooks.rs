@@ -2,9 +2,9 @@
 //! scenario's `hook` step sends to `wtpool hook`.
 //!
 //! The corpus is written by hand from the hook input of Claude Code 2.1.295, one file per event
-//! and tool the spec names, `{pool}` standing for the pool folder. The scrubbed recordings of a
-//! live contract run go to `verify/fixtures/claude-<version>/` (crate::scrub) and join the corpus
-//! of the checks that run every fixture.
+//! and tool, with `{pool}` standing for the pool folder. The [scrubbed](crate::scrub) recordings
+//! of a live contract run go to `verify/fixtures/claude-<version>/` and join the corpus of the
+//! checks that run every fixture.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -166,7 +166,7 @@ fn set_identity(object: &mut Map<String, Value>, step: &HookStep, pool: &Pool) {
 
 pub const BASH_COMMANDS: &str = "verify/fixtures/bash-commands.toml";
 
-/// One command of `verify/fixtures/bash-commands.toml`.
+/// One command of [`BASH_COMMANDS`].
 #[derive(serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct BashCommand {

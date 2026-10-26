@@ -1,20 +1,19 @@
-//! The scrubber of verification.md, "Contract test": it turns the raw recordings of the oracle
-//! step's live run, kept in `recordings/` of the harness data folder (crate::dirs,
-//! `~/.local/share/wtpool-verify` by default) and hashed into the lock, into
-//! `verify/fixtures/claude-<version>/`. `fixtures__should_match_a_fresh_scrub` redoes it. On a
-//! machine without that folder, one that never ran the oracle step, it checks only that each
-//! fixture comes from a locked recording, and is skipped with that reason.
+//! The scrubber: it turns the raw recordings of a live `--part cc --contract --record` run, kept
+//! in [`recordings_dir`] and hashed into the lock, into `verify/fixtures/claude-<version>/`.
+//! `fixtures__should_match_a_fresh_scrub` redoes it. On a machine without that folder it checks
+//! only that each fixture comes from a locked recording, and is skipped with that reason.
 //!
 //! A raw recording `claude-<version>/<session>.jsonl` starts with a header line
 //! `{"wt_verify_recording": 1, "pool": <path>, "home": <path>, "config": <path>}` and then holds
 //! one hook payload per line, as the recorder hook read it. `config`, Claude Code's configuration
-//! folder in the run folder, is absent from recordings made before it moved there. The scrubbed
-//! copy drops the header, writes `/Users/verify/.claude` for the configuration folder, so a
-//! transcript path reads as with the default one, `{pool}` for
-//! the pool folder and `/Users/verify` for the home (`-verify-pool` and `-Users-verify` in the
-//! folder names Claude Code makes from paths), `{tmp}` for the system's temporary folder and
-//! `{tmp}/claude` for the one Claude Code keeps per account (`/tmp/claude-<uid>`), and renames
-//! session, agent and tool use ids in order of appearance: `s1`, `a1`, `toolu_01`.
+//! folder in the run folder, is absent from recordings made before it moved there.
+//!
+//! The scrubbed copy drops the header. It writes `{pool}` for the pool folder, `/Users/verify`
+//! for the home and `/Users/verify/.claude` for the configuration folder, so a transcript path
+//! reads as with the default one. The folder names Claude Code makes from these paths get
+//! `-verify-pool` and `-Users-verify`. `{tmp}` replaces the system's temporary folder and
+//! `{tmp}/claude` the one Claude Code keeps per account, `/tmp/claude-<uid>`. Session, agent and
+//! tool use ids get new names in order of appearance: `s1`, `a1`, `toolu_01`.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -30,7 +29,7 @@ pub const NAME: &str = "fixtures__should_match_a_fresh_scrub";
 const LAYER: &str = "static";
 const FIXTURES: &str = "verify/fixtures";
 
-/// The code of a result skipped because the recordings folder does not exist (crate::reuse).
+/// The code of a result skipped because the recordings folder does not exist.
 pub const NO_RECORDINGS: &str = "no_recordings";
 
 /// True when the recordings folder is missing, so the checks that need it skip.
@@ -38,15 +37,16 @@ pub fn recordings_missing() -> bool {
     recordings_dir().is_none_or(|dir| !dir.exists())
 }
 
-/// `recordings/` of the harness data folder, where the oracle step's live run records.
+/// `recordings/` of the harness data folder, [`crate::dirs::data_dir`], where a live `cc` run with
+/// `--record` writes.
 pub fn recordings_dir() -> Option<PathBuf> {
     crate::dirs::data_dir()
         .ok()
         .map(|dir| dir.join("recordings"))
 }
 
-/// The SHA 256 of each raw recording, and of each live result `cc-results.json` beside them
-/// (crate::layers::cc), by its path below the recordings folder.
+/// The SHA 256 of each raw recording and of each live result `cc-results.json` beside them, by
+/// path below `dir`.
 pub fn recording_hashes(dir: &Path) -> BTreeMap<String, String> {
     let skip = |_: &str| false;
     walk(dir, dir, &skip)
@@ -80,7 +80,8 @@ impl Names {
     }
 }
 
-/// Every string of `value` with `from` replaced by `to`, ids renamed by `names`.
+/// Rewrites every string of `value`. With `rename`, a string under an id `key` gets its name from
+/// `names`. Any other string gets `replacements`, then the names of the ids it holds.
 fn rewrite(
     value: &mut Value,
     replacements: &[(String, String)],
@@ -188,7 +189,6 @@ pub fn scrub(raw: &str) -> Result<String, String> {
             .unwrap_or_default()
             .to_owned()
     };
-    // Longest first, so the pool inside the home becomes {pool}.
     // Claude Code also names folders after a path with each other character as `-`, as in
     // `~/.claude/projects/-Users-x-pool-fg/`.
     let dashed = |path: String| -> String {
@@ -205,6 +205,7 @@ pub fn scrub(raw: &str) -> Result<String, String> {
     ];
     replacements.extend(temp_replacements(raw));
     replacements.retain(|(from, _)| from.len() > 1);
+    // Longest first, so the pool inside the home becomes {pool}.
     replacements.sort_by_key(|(from, _)| std::cmp::Reverse(from.len()));
     let mut names = Names::default();
     let mut out = String::new();
@@ -212,8 +213,8 @@ pub fn scrub(raw: &str) -> Result<String, String> {
         let mut value: Value =
             serde_json::from_str(line).map_err(|e| format!("line {}: {e}", index + 2))?;
         // Ids first, so later strings that hold them are renamed too. An Agent call's
-        // `tool_response.agentId` is the `agent_id` of the subagent it started (H16), and
-        // a recording may hold it before, or without, that subagent's own events.
+        // `tool_response.agentId` is the `agent_id` of the subagent it started, and a recording
+        // may hold it before, or without, that subagent's own events.
         for field in ["session_id", "agent_id", "tool_use_id"] {
             if let Some(item) = value.get_mut(field) {
                 rewrite(item, &[], &mut names, Some(field), true);

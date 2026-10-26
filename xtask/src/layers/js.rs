@@ -316,22 +316,24 @@ fn v8_lcov(ctx: &Ctx, coverage: &Path, layer: &str) {
     }
 }
 
-/// The ways one Playwright run differs from the default: its environment, a `--grep` that replaces
-/// the one `--only` gives, the folder of the run folder and the name of the results file its
-/// config writes, and further results files read with it, such as an earlier run's or
-/// `web::parse_extra` outcomes.
+/// The ways one Playwright run differs from the default.
 #[derive(Default)]
 pub(super) struct PlaywrightRun {
     pub(super) envs: Vec<(String, String)>,
+    /// Replaces the `--grep` that `--only` gives.
     pub(super) grep: Option<String>,
-    /// The folder of the results file, the layer's name by default.
+    /// The folder of the results file in the run folder, the layer's name by default.
     pub(super) folder: Option<&'static str>,
+    /// The name of the results file the config writes, `results.json` by default.
     pub(super) results: Option<&'static str>,
+    /// The name of the run's log, the layer's name by default.
     pub(super) log: Option<&'static str>,
+    /// Further results files read with it, such as an earlier run's or the outcomes
+    /// [`parse_extra`](crate::web::parse_extra) reads.
     pub(super) extra: Vec<ResultsFile>,
 }
 
-/// Starts one Playwright config and waits for it; `log` names its log file.
+/// Starts one Playwright config and waits for it. `log` names its log file.
 pub(super) fn run_config(
     ctx: &Ctx,
     wanted: &Wanted,

@@ -1,5 +1,5 @@
-//! Which changes the ledger allows: a live entry pins each changed path or key at its current
-//! hash, and an accept line names the entry's content.
+//! The changes the ledger allows: a live entry pins each changed path or key at its current hash,
+//! and an accept line names the entry's content.
 
 use std::collections::BTreeMap;
 

@@ -1,6 +1,6 @@
-//! `wtpool job`'s queue (J1, J9 to J12): a job runs once fewer jobs than the limit run, waiters
-//! start in the order they came, a dead job frees its place at once, a lowered limit stops no
-//! job, and a job inside a job runs in its parent's place.
+//! `wtpool job`'s queue: a job runs once fewer jobs than the limit run, waiters start in the order
+//! they came, a dead job frees its place at once, a lowered limit stops no job, and a job inside a
+//! job runs in its parent's place.
 
 use std::fs;
 use std::time::{Duration, Instant};
@@ -16,8 +16,8 @@ pub(super) fn limit_config(limit: u32) -> String {
     format!("[jobs]\nlimit = {limit}\n")
 }
 
-/// From a freed place to the next start: the first in line checks every 250 ms (J10), plus the
-/// start of a process.
+/// The longest wait from a freed place to the next start: the first in line checks every 250 ms,
+/// plus the start of a process.
 pub(super) const HANDOVER: Duration = Duration::from_millis(1500);
 
 /// The probe's start mark once `job`'s command ran, else an assertion naming `what`.
@@ -61,7 +61,8 @@ fn must_finish(job: &mut Job, what: &str) -> Option<i32> {
 
 #[test]
 fn job__should_run_once_a_place_is_free() {
-    // Given: limit 1, outside any repository.
+    // Given
+    // The jobs run outside any repository.
     let sandbox = Sandbox::must_new("job-place");
     sandbox.write_machine(&limit_config(1));
     let mut first = sandbox.must_start_job(&JobSpec::held("probe", &[]));
@@ -181,7 +182,7 @@ fn id_of(job: &Job, sandbox: &Sandbox) -> String {
 #[case::running(Killed::Running)]
 #[case::waiting(Killed::Waiting)]
 fn job__should_free_the_place_of_a_killed_job(#[case] killed: Killed) {
-    // Given: limit 1, one job running and two waiting.
+    // Given
     let sandbox = Sandbox::must_new("job-killed");
     sandbox.write_machine(&limit_config(1));
     let home = sandbox.root.join("home");
@@ -349,9 +350,10 @@ fn most_at_once(jobs: &[Job]) -> usize {
 
 #[test]
 fn job__should_never_run_more_than_the_limit() {
-    // Given: limit 3 and 20 jobs at once, each let go once it ran 100 ms.
+    // Given
     let sandbox = Sandbox::must_new("job-limit");
     sandbox.write_machine(&limit_config(3));
+    let run_for = Duration::from_millis(100).as_nanos();
     let mut jobs: Vec<Job> = (0..20)
         .map(|_| sandbox.must_start_job(&JobSpec::held("probe", &[])))
         .collect();
@@ -384,7 +386,7 @@ fn job__should_never_run_more_than_the_limit() {
                 .unwrap_or_default();
             if let Some(flag) = released.get_mut(index)
                 && !*flag
-                && ran >= 100_000_000
+                && ran >= run_for
             {
                 job.release();
                 *flag = true;
@@ -418,7 +420,7 @@ fn job__should_never_run_more_than_the_limit() {
 
 #[test]
 fn job__should_keep_running_jobs_when_the_limit_drops() {
-    // Given: limit 3, three jobs running and two waiting.
+    // Given
     let sandbox = Sandbox::must_new("job-limit-drops");
     sandbox.write_machine(&limit_config(3));
     let mut running: Vec<Job> = (0..3)
@@ -433,7 +435,7 @@ fn job__should_keep_running_jobs_when_the_limit_drops() {
     let mut second_waiting = sandbox.must_start_job(&JobSpec::held("probe", &[]));
     must_wait(&second_waiting, &sandbox, "the second waiting job");
 
-    // When: the limit drops to 1, then the running jobs end one by one.
+    // When
     sandbox.write_machine(&limit_config(1));
     std::thread::sleep(HANDOVER);
     let kept: Vec<bool> = running
@@ -496,21 +498,21 @@ fn install_wtpool(sandbox: &Sandbox) {
 
 #[test]
 fn job__should_run_a_nested_job_in_its_parent_place() {
-    // Given: limit 1.
+    // Given
     let sandbox = Sandbox::must_new("job-nested");
     sandbox.write_machine(&limit_config(1));
     install_wtpool(&sandbox);
     sandbox.must_install_probe("probe");
 
-    // When: a job three deep, `wtpool job -- wtpool job -- wtpool job -- probe`.
-    let mut nested = sandbox.must_start_job(&JobSpec::held(
+    // When
+    let mut three_deep = sandbox.must_start_job(&JobSpec::held(
         "wtpool",
         &["job", "--", "wtpool", "job", "--", "probe"],
     ));
-    let start = must_start(&nested, "the job three deep");
+    let start = must_start(&three_deep, "the job three deep");
     let records = job_records(&sandbox);
-    let outer = id_of(&nested, &sandbox);
-    let nested_code = must_finish(&mut nested, "the job three deep");
+    let outer = id_of(&three_deep, &sandbox);
+    let three_deep_code = must_finish(&mut three_deep, "the job three deep");
     // A dead job's id: its wtpool job killed, its record left with no lock held.
     let holder = sandbox.must_start_job(&JobSpec::held("probe", &[]));
     must_start(&holder, "the running job");
@@ -536,7 +538,7 @@ fn job__should_run_a_nested_job_in_its_parent_place() {
         Some(outer.as_str()),
         "WTPOOL_JOB of the innermost command is not the outer job's id {outer:?}: {start}"
     );
-    assert_eq!(nested_code, Some(0), "the job three deep's exit code");
+    assert_eq!(three_deep_code, Some(0), "the job three deep's exit code");
     assert!(
         dead_waits.is_some() && under_dead.start_mark().is_none(),
         "a job whose WTPOOL_JOB names the dead job {dead} did not queue: {:?}",

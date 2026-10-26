@@ -1,6 +1,6 @@
-//! The phase 4 budgets of the bench part on the release `wtpool` (jobs.md, "Budgets"): B12, what
-//! `wtpool job` adds with a free place; B13, the handover from a job's end to the next start; and
-//! B14, `wtpool hook policy` at each policy. The release build has no verify feature.
+//! The phase 4 budgets of the bench part on the release `wtpool`: the time `wtpool job` adds with a
+//! free place, the handover from a job's end to the next start, and `wtpool hook policy` at each
+//! policy. The release build has no verify feature.
 
 use std::io::Write;
 use std::path::Path;
@@ -16,7 +16,7 @@ use crate::support::Sandbox;
 use crate::support::hook::{fixture, wait_output};
 use crate::support::jobs::{Job, JobSpec, SETTLE};
 
-/// The time `command` takes from its start to its exit, and whether it exited 0.
+/// Runs `command` without input or output and returns its run time and its success.
 fn timed(command: &mut Command) -> (Duration, bool) {
     command
         .stdin(Stdio::null())
@@ -35,7 +35,7 @@ fn system_true() -> std::path::PathBuf {
         .expect("setup: no true on PATH")
 }
 
-/// B12: `wtpool job -- true` with a free place adds at most 20 ms at p95 over 200 runs, against
+/// `wtpool job -- true` with a free place adds at most 20 ms at p95 over 200 runs, against
 /// the median of `true` run directly.
 pub(super) fn budget_b12() {
     // Given
@@ -88,7 +88,7 @@ fn queued_job(sandbox: &Sandbox, state: &str) -> Job {
     job
 }
 
-/// B13: under limit 1, from a job's end to the next job's start, p95 at most 400 ms over 50
+/// Under limit 1, from a job's end to the next job's start, p95 at most 400 ms over 50
 /// handovers. One job waits at a time, first in line.
 pub(super) fn budget_b13() {
     // Given
@@ -128,7 +128,7 @@ pub(super) fn budget_b13() {
     );
 }
 
-/// The shell commands the B14 payloads cycle through, heavy and light, wrapped and not.
+/// The shell commands the [`payloads`] cycle through, heavy and light, wrapped and not.
 fn shell_commands(pool: &Pool) -> Vec<String> {
     let wt = |name: &str| pool.worktree(name).to_string_lossy().into_owned();
     vec![
@@ -171,7 +171,8 @@ fn payloads(pool: &Pool) -> Vec<Value> {
         .collect()
 }
 
-/// Runs the release `wtpool hook policy` once with `payload`: how long it took and its exit.
+/// Runs the release `wtpool hook policy` once with `payload` and returns its run time and exit
+/// code.
 fn policy(sandbox: &Sandbox, cwd: &Path, payload: &Value) -> (Duration, Option<i32>) {
     let mut command = sandbox.command(&crate::support::must_wtpool_bin(), cwd);
     command
@@ -189,7 +190,7 @@ fn policy(sandbox: &Sandbox, cwd: &Path, payload: &Value) -> (Duration, Option<i
     (started.elapsed(), output.status.code())
 }
 
-/// B14: `wtpool hook policy` p95 at most 5 ms and max at most 30 ms over 1000 shell call
+/// `wtpool hook policy` p95 at most 5 ms and max at most 30 ms over 1000 shell call
 /// fixtures, at each policy.
 pub(super) fn budget_b14() {
     // Given

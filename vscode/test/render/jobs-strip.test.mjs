@@ -1,6 +1,3 @@
-// U11, X15 and X20 in jsdom (phase 4): the machine strip under the heading shows the limit, the
-// policy, the heavy commands and the jobs, follows each document in place, and saves through
-// one `jobSettings` message at a time.
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 
@@ -29,7 +26,6 @@ afterEach(() => {
 
 const busy = busyDocument();
 
-/** Whether `parts` appear in `shown` in this order. */
 function inOrder(shown, parts) {
   let at = 0;
   for (const part of parts) {
@@ -46,7 +42,6 @@ function jobLines(root, selector) {
   return { list, lines: [...(list?.querySelectorAll('li[data-job-id]') ?? [])].map((li) => ({ id: li.dataset.jobId, text: text(li) })) };
 }
 
-/** Whether an empty list reads `none`, in it or right beside it. */
 function readsNone(list) {
   if (!list) return false;
   return [list, list.previousElementSibling, list.nextElementSibling].some((el) => el && text(el) === 'none');

@@ -1,5 +1,3 @@
-// U8 in a real VS Code with the release wtpool: the pool heading names the GitHub repository of the
-// pool's remote, then the machine, and the main worktree's folder name without a GitHub remote.
 import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
@@ -7,10 +5,7 @@ import { panelFrame, close, git, launch, pool, runCommand, sandbox, statusJson }
 
 const GITHUB = 'https://github.com/acme/app.git';
 
-/**
- * The shown headings of the tab, `tr[data-machine]`, each with its text and, for the single
- * heading of interface 6, `tr.pool-heading[data-machine][data-pool]`, its `data-pool`.
- */
+/** The shown headings of the tab, each with its text and, for a pool heading, its `data-pool`. */
 async function headings(frame) {
   return frame.locator('tr[data-machine]').evaluateAll((rows) =>
     rows
@@ -22,7 +17,7 @@ async function headings(frame) {
   );
 }
 
-/** Waits up to 15 s for the headings to read `expected`; returns the last seen. */
+/** Waits up to 15 s for the headings to read `expected`, and gives the last seen. */
 async function waitForHeadings(frame, expected) {
   const deadline = Date.now() + 15_000;
   let seen = [];
@@ -41,7 +36,7 @@ test.afterEach(() => {
 });
 
 test('heading__should_name_the_repository_then_the_machine e2e', async () => {
-  // Given: the pool's origin on GitHub; isolation__left_no_trace fails on a remote outside the
+  // Given: the pool's origin on GitHub. isolation__left_no_trace fails on a remote outside the
   // run folder, so the local one comes back after.
   const poolInfo = pool('idle_pool', 'headings');
   const local = git(poolInfo.fg, ['remote', 'get-url', 'origin']).trim();

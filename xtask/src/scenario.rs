@@ -1,4 +1,4 @@
-//! Scenario files `verify/scenarios/<name>.json` of the scenario catalog in verification.md.
+//! Scenario files, `verify/scenarios/<name>.json`.
 //!
 //! A file holds `phase`, `covers`, `layers`, `pool` (see [`crate::pool::PoolSpec`]), `steps`
 //! and the final `expect` document. A step is one of `{"git": {"in": <worktree>, "args": [..]}}`,
@@ -10,12 +10,12 @@
 //! - `hook` runs `wtpool hook` once with a payload built from a fixture of `verify/fixtures/hooks/`
 //!   ([`crate::hooks::payload`]), from the process `process`, a `claude` that a `process` step
 //!   started. In `int` the clock starts at [`HOOK_CLOCK`] when a scenario has hook steps, and each
-//!   hook step first moves it on by one second; `e2e` waits a little over a second between hook
+//!   hook step first moves it on by one second. `e2e` waits a little over a second between hook
 //!   steps instead, so `updated` orders the actors the same way.
 //! - `gc` runs `wtpool hook gc`.
 //! - `files` lists every file name `<common>/wtpool-activity/` holds then, `.verify-sandbox` left out.
 //!
-//! Phase 4 steps, `int` only (jobs.md):
+//! Phase 4 steps, `int` only:
 //! - `machine` writes its text as `<config>/wtpool/machine.toml`.
 //! - `wtpool_toml` appends its text to `<common>/wtpool.toml`.
 //! - `job` starts a real `wtpool job` in a worktree ([`JobStart`]), ends one, or awaits one's state.
@@ -76,7 +76,7 @@ pub enum JobStep {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct JobStart {
-    /// The step's own name for the job, which later steps and `{job:<name>}` use.
+    /// The step's own name for the job, for later steps and `{job:<name>}`.
     pub name: String,
     #[serde(rename = "in")]
     pub worktree: String,
@@ -114,11 +114,11 @@ pub struct HookStep {
     /// `agent_id`, for an event of a subagent.
     #[serde(default)]
     pub agent: Option<String>,
-    /// The worktree the session runs in, which sets `cwd`.
+    /// The worktree the session runs in. It sets `cwd`.
     pub cwd: String,
     /// The pid of the `claude` that runs the hook, from a `process` step.
     pub process: u32,
-    /// `HOME` of the hook, `{pool}` allowed; the sandbox home when absent.
+    /// `HOME` of the hook, `{pool}` allowed. The sandbox home when absent.
     #[serde(default)]
     pub home: Option<String>,
     /// Top level fields that replace the fixture's, `{pool}` and `{common}` allowed.
@@ -126,7 +126,6 @@ pub struct HookStep {
     pub with: serde_json::Map<String, serde_json::Value>,
 }
 
-/// `{"gc": {}}`: runs `wtpool hook gc`.
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct GcStep {}
@@ -157,7 +156,7 @@ pub struct Process {
     /// pid already listed is that pid reused. `int` only: e2e starts real processes.
     #[serde(default)]
     pub started: Option<String>,
-    /// Phase 4, `int` only: its arguments, the program first (J19).
+    /// Phase 4, `int` only: its arguments, the program first.
     #[serde(default)]
     pub cmd: Option<Vec<String>>,
     /// Phase 4, `int` only: its parent's pid, 1 when absent.

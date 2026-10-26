@@ -1,5 +1,3 @@
-// The row actions that leave the panel (verification.md, "User flows"): open in a new window and
-// open a terminal (U4). The clipboard flows are in flows-clipboard.spec.mjs.
 import assert from 'node:assert/strict';
 import { realpathSync } from 'node:fs';
 import { test } from '@playwright/test';
@@ -7,7 +5,7 @@ import { test } from '@playwright/test';
 import { clickAction, openStatus, poll, terminalFolder, withFlow, worktreePath } from './flows.mjs';
 import { editorGroups, isStatusTab, workbench } from './vscode.mjs';
 
-/** The folder a VS Code window shows, from its title: VS Code puts the folder name there. */
+/** Splits a window's title into its parts. VS Code puts the window's folder name there. */
 async function titleParts(window) {
   return (await window.title()).split(/\s+[—–-]\s+/).map((part) => part.trim());
 }

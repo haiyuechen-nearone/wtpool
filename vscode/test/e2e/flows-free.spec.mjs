@@ -1,8 +1,3 @@
-// The phase 3 flows (verification.md, "User flows"): free a slot and bring a slot's branch to
-// the foreground from its row (X12). The row's free and fg buttons ask in VS Code's modal
-// dialog, drawn inside the window (`window.dialogStyle: custom`, support/code.mjs), and the
-// release wtpool changes the sandbox pool. Agents are the steps of a scenario, run by the release
-// `wtpool hook` from a live stub claude (agents.mjs).
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { test } from '@playwright/test';
@@ -13,11 +8,12 @@ import { clickAction, openStatus, poll, withFlow, worktreePath } from './flows.m
 import { shownRows } from './rows.mjs';
 import { git, panelFrame, runCommand, sleep } from './vscode.mjs';
 
+/** VS Code's modal dialog, drawn in the window as support/code.mjs sets `window.dialogStyle`. */
 const DIALOG = '.monaco-dialog-box';
 const TOAST = '.notifications-toasts .notification-toast';
-/** R6: a git change shows within 1 s; plus W5's merge, `wtpool` itself and polling. */
+/** A git change shows within 1 s, plus the watch's merge, `wtpool` itself and polling. */
 const CHANGE_MS = 10_000;
-/** How long a flow watches for a change that must not come. */
+/** The time a flow watches for a change that must not come. */
 const STILL_MS = 3_000;
 
 /** The branch a worktree has checked out, or null when detached. */
@@ -46,7 +42,7 @@ async function rowRead(frame, session, name) {
   return (await shownRows(frame).catch(() => [])).find((row) => row.id === id);
 }
 
-/** Waits until the row of `name` satisfies `check`; returns the last row read. */
+/** Waits until the row of `name` satisfies `check`, and gives the last row read. */
 async function rowUntil(frame, session, name, check, timeoutMs) {
   let last;
   await poll(async () => {
@@ -65,7 +61,7 @@ async function modal(window, timeoutMs = 5_000) {
   return { text, buttons };
 }
 
-/** Clicks the dialog's button that `matches` accepts; whether there was one. */
+/** Clicks the dialog's button that `matches` accepts, and tells if there was one. */
 async function press(window, matches) {
   const buttons = window.locator(`${DIALOG} .monaco-button`);
   for (let index = 0; index < (await buttons.count()); index += 1) {

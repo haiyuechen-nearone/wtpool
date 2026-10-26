@@ -1,6 +1,6 @@
-//! Signals and the wait note of `wtpool job` (J14, J15): it ignores the terminal's SIGINT and
-//! SIGQUIT, passes SIGTERM and SIGHUP on, ends as its command ended, leaves the queue on a signal
-//! while it waits, and writes one stderr line when it starts to wait and one when it starts.
+//! Signals and the wait note of `wtpool job`: it ignores the terminal's SIGINT and SIGQUIT, passes
+//! SIGTERM and SIGHUP on, ends as its command ended, leaves the queue on a signal while it waits,
+//! and writes one stderr line when it starts to wait and one when it starts.
 
 use std::time::Duration;
 
@@ -19,7 +19,7 @@ enum Signal {
     PassedOn(&'static str, i32),
     /// The command ends by it, and so does the job.
     Mirrored(&'static str, i32),
-    /// The command ends by a signal outside the six: exit 128 + N.
+    /// The command ends by a signal that is not mirrored: exit 128 + N.
     Other(&'static str, i32),
     /// Sent to the job's process group, as a terminal does.
     Group(&'static str, i32),
@@ -206,7 +206,7 @@ fn is_started_line(line: &str) -> bool {
 
 #[test]
 fn job__should_note_only_a_wait_on_stderr() {
-    // Given: limit 1; the first job runs at once, three wait, the second of them quiet.
+    // Given
     let sandbox = Sandbox::must_new("job-stderr");
     sandbox.write_machine(&limit_config(1));
     let mut first = sandbox.must_start_job(&JobSpec::held("probe", &[]));
@@ -222,7 +222,7 @@ fn job__should_note_only_a_wait_on_stderr() {
     std::thread::sleep(Duration::from_millis(500));
     let while_waiting = (lines(&second), lines(&fourth));
 
-    // When: each ends in turn.
+    // When
     for job in [&mut first, &mut second, &mut quiet, &mut fourth] {
         let _ = job.wait_start(SETTLE);
         let _ = job.finish(SETTLE);

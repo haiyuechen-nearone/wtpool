@@ -1,7 +1,5 @@
-// The phase 2 steps of a scenario in the e2e layer: `claude` processes are stubs that run the
-// release `wtpool hook` (claude-stub.mjs), so hooks see a live parent and the real clock. A hook step
-// gets its payload from `cargo xtask payload`. Hook steps of different actors run a little over a
-// second apart, so `updated` orders the actors as the int clock does.
+// The `claude` processes of a scenario in the e2e layer are stubs that run the release
+// `wtpool hook` (claude-stub.mjs), so hooks see a live parent and the real clock.
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { readdirSync } from 'node:fs';
@@ -13,6 +11,10 @@ import { env, releaseWtpool, sleep } from './vscode.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const STUB = path.join(here, 'claude-stub.mjs');
+/**
+ * Hook steps of different actors run this far apart, so `updated` orders them as the int clock
+ * does.
+ */
 const ACTOR_GAP_MS = 1100;
 
 /** A running stub: send(request) resolves with the hook's reply. */
@@ -77,9 +79,9 @@ export function activityFiles(poolInfo) {
 }
 
 /**
- * Runs the steps of `scenario` that `range` selects, in a session whose VS Code shows the pool.
- * `observe(index)` runs at each expect step with the index of its document. Returns the problems
- * of hook and files steps, which are the product's.
+ * Runs the steps of a scenario in a session whose VS Code shows the pool. {@link AgentSteps.run}
+ * calls `observe(index)` at each expect step with the index of its document. `problems` collects
+ * the failures of hook and files steps, as those are the product's.
  */
 export class AgentSteps {
   constructor(session, scenarioName, scenario) {

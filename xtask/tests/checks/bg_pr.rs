@@ -1,6 +1,6 @@
 //! `wtpool bg` with a PR as its `<ref>`: a fake `gh` on `PATH` names the PR's head, and `origin`
-//! is `git@github.com:acme/app.git` served from the sandbox's bare origin through a fake `ssh`, so
-//! nothing leaves the machine.
+//! is [`GITHUB_ORIGIN`] served from the sandbox's bare origin through a fake `ssh`, so nothing
+//! leaves the machine.
 
 use std::ffi::OsString;
 use std::fs;
@@ -10,13 +10,11 @@ use std::process::Output;
 use rstest::rstest;
 use xtask::pool::{Pool, git_in};
 
+use super::pr_lookup::GH_ARGS;
 use super::status::spec;
 use crate::support::{Sandbox, must_symlink, must_wtpool_bin, set_executable};
 
 const GITHUB_ORIGIN: &str = "git@github.com:acme/app.git";
-
-/// What the fake `gh` was asked, one argument per line.
-const GH_ARGS: &str = "pr\nview\n42\n--repo\nacme/app\n--json\nheadRefName,headRefOid,isCrossRepository\n--jq\n[.headRefName, .headRefOid, (.isCrossRepository | tostring)] | join(\" \")\n";
 
 #[cfg(unix)]
 fn must_write_script(path: &Path, text: &str) {
@@ -48,8 +46,8 @@ fn must_push_commit(pool: &Pool, refs: &[&str]) -> String {
     commit
 }
 
-/// The foreground's `origin` at [`GITHUB_ORIGIN`] until it drops, which puts the sandbox's origin
-/// back, so no remote of the run leads outside it.
+/// The foreground's `origin` at [`GITHUB_ORIGIN`] until it drops. The drop puts the sandbox's
+/// origin back, so no remote of the run leads outside it.
 struct GitHubOrigin {
     fg: PathBuf,
     local: String,

@@ -1,7 +1,6 @@
-//! Heavy jobs (jobs.md) in a sandbox: the machine config `<config>/wtpool/machine.toml`, the job
-//! folder `<state>/wtpool/jobs/`, and `wtpool job` running xtask's `probe` (src/bin) under a
-//! program's name, which marks its start and end (jobs.md, "Verification plan", test interfaces 1
-//! to 3).
+//! Heavy jobs in a sandbox: the machine config `<config>/wtpool/machine.toml`, the job folder
+//! `<state>/wtpool/jobs/`, and `wtpool job` running xtask's `probe` under a program's name. The
+//! probe marks its start and end.
 
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -17,25 +16,24 @@ use serde_json::Value;
 
 use super::{Sandbox, must_repo, must_wtpool_bin, set_executable};
 
-/// The machine config every sandbox starts with: the builds of phases 1 to 3, processes named
-/// `cargo`, `cargo-*` or `rustc` (S4), as heavy patterns of the machine. From phase 4 a build is
-/// a process that matches a heavy pattern (J19, J20) and no list is built in, so the checks of
-/// the earlier phases keep their builds through this list; a wtpool before phase 4 reads no such
-/// file. A job check writes its own or removes it.
+/// The machine config every sandbox starts with. Up to phase 3 a build is a process named
+/// `cargo`, `cargo-*` or `rustc`. From phase 4 a build is a process that matches a heavy pattern,
+/// with none built in, so these patterns keep the builds the checks of earlier phases count on. A
+/// wtpool before phase 4 reads no such file. A job check writes its own or removes it.
 pub const EARLIER_BUILDS: &str = "# The builds of phases 1 to 3 (S4) as heavy patterns (J20).\n\
 [jobs]\n\
 heavy = [\"cargo\", \"cargo-*\", \"rustc\"]\n";
 
-/// How long a check waits for a job to reach a state the spec gives no time for.
+/// The longest a check waits for a job to reach a state that has no time limit of its own.
 pub const SETTLE: Duration = Duration::from_secs(10);
 
-/// How long the stream readers of a `wtpool job` that ended get to read what is left.
+/// The time the stream readers of an ended `wtpool job` get to read the rest of its output.
 const READERS_DRAIN: Duration = Duration::from_secs(1);
 
 static JOBS: AtomicUsize = AtomicUsize::new(0);
 
 impl Sandbox {
-    /// `<config>/wtpool/machine.toml` of this sandbox, with `XDG_CONFIG_HOME` set (J4).
+    /// `<config>/wtpool/machine.toml` of this sandbox, with `XDG_CONFIG_HOME` set.
     pub fn machine_config(&self) -> PathBuf {
         self.root.join("xdg/config/wtpool/machine.toml")
     }
@@ -51,7 +49,7 @@ impl Sandbox {
         let _ = fs::remove_file(self.machine_config());
     }
 
-    /// `<state>/wtpool/jobs/` of this sandbox, with `XDG_STATE_HOME` set (J7).
+    /// `<state>/wtpool/jobs/` of this sandbox, with `XDG_STATE_HOME` set.
     pub fn jobs_dir(&self) -> PathBuf {
         self.root.join("xdg/state/wtpool/jobs")
     }
@@ -137,19 +135,19 @@ fn start_in_own_group(_command: &mut Command, _own: bool) {}
 /// One `wtpool job` of a check: `wtpool job [--label <label>] [--quiet] -- <program> <args>`.
 #[derive(Clone, Default)]
 pub struct JobSpec {
-    /// The program's name, under which the probe runs.
+    /// The name the probe runs under.
     pub program: String,
     pub args: Vec<String>,
     pub label: Option<String>,
     pub quiet: bool,
-    /// The folder it runs in; the sandbox home when `None`.
+    /// The folder it runs in, the sandbox home when `None`.
     pub cwd: Option<PathBuf>,
-    /// Holds the probe until [`Job::release`]; else it ends at once.
+    /// Holds the probe until [`Job::release`]. Without it the probe ends at once.
     pub hold: bool,
     pub exit: Option<u8>,
     pub signal: Option<String>,
     pub copy_stdin: bool,
-    /// Bytes on stdin; stdin is empty when `None`.
+    /// The bytes on stdin, an empty stdin when `None`.
     pub stdin: Option<Vec<u8>>,
     pub envs: Vec<(String, OsString)>,
     pub remove: Vec<String>,
@@ -186,7 +184,7 @@ impl JobSpec {
 
 /// A running `wtpool job` and its probe.
 pub struct Job {
-    /// The probe's label, which names its marks.
+    /// The probe's label, the stem of its mark files.
     pub name: String,
     child: Child,
     marks: PathBuf,
@@ -271,7 +269,7 @@ impl Job {
         serde_json::from_str(&text).ok()
     }
 
-    /// What the probe wrote when it started, once it did.
+    /// The mark the probe wrote at its start, `None` before it started.
     pub fn start_mark(&self) -> Option<Value> {
         self.mark("start")
     }
@@ -311,7 +309,7 @@ impl Job {
 
     /// The exit status within `timeout`, or `None` while it still runs. It returns once
     /// `wtpool job` itself has ended: a command it left holding the streams keeps them open, and
-    /// what that command writes later still reaches [`Job::stdout`] and [`Job::stderr`].
+    /// the later output of that command still reaches [`Job::stdout`] and [`Job::stderr`].
     pub fn wait_exit(&mut self, timeout: Duration) -> Option<ExitStatus> {
         let deadline = Instant::now() + timeout;
         loop {
@@ -417,7 +415,7 @@ pub fn wait_until<T>(timeout: Duration, mut probe: impl FnMut() -> Option<T>) ->
     }
 }
 
-/// Every record of the job folder, with its file stem; files that are no JSON left out.
+/// Every record of the job folder that parses as JSON, with its file stem, in stem order.
 pub fn job_records(sandbox: &Sandbox) -> Vec<(String, Value)> {
     let Ok(entries) = fs::read_dir(sandbox.jobs_dir()) else {
         return Vec::new();
@@ -444,7 +442,6 @@ pub fn record_of(sandbox: &Sandbox, pid: u32) -> Option<Value> {
         .find(|record| record["pid"].as_u64() == Some(u64::from(pid)))
 }
 
-/// Runs `wtpool` with `args` from `cwd` in the sandbox, with `envs` added.
 pub fn wtpool(sandbox: &Sandbox, cwd: &Path, args: &[&str], envs: &[(&str, &OsStr)]) -> Output {
     sandbox.run_in(&must_wtpool_bin(), args, cwd, envs)
 }
@@ -459,7 +456,7 @@ pub fn describe(output: &Output) -> String {
     )
 }
 
-/// `wtpool job ls --json` from `cwd`, which must exit 0 with one JSON object (J2).
+/// `wtpool job ls --json` from `cwd`. It must exit 0 and print one JSON object.
 pub fn must_job_ls_json(sandbox: &Sandbox, cwd: &Path, envs: &[(&str, &OsStr)]) -> Value {
     let output = wtpool(sandbox, cwd, &["job", "ls", "--json"], envs);
     assert!(
@@ -484,17 +481,18 @@ pub fn schema_file_errors(file: &str, value: &Value) -> Vec<String> {
         .collect()
 }
 
-/// `machine.jobs` of a status document (S14), `Null` when absent.
+/// `machine.jobs` of a status document, `Null` when absent.
 pub fn jobs_of(document: &Value) -> &Value {
     &document["machine"]["jobs"]
 }
 
-/// One line of `WTPOOL_VERIFY_PROCS`, `cmd` the arguments with the program first, as `sysinfo`
-/// reads them; `None` for a process whose arguments are not readable (J19).
+/// One line of `WTPOOL_VERIFY_PROCS`.
 pub struct ProcLine<'a> {
     pub pid: u32,
     pub ppid: u32,
     pub name: &'a str,
+    /// The arguments with the program first, as `sysinfo` reads them. `None` when they are not
+    /// readable.
     pub cmd: Option<&'a [&'a str]>,
     pub cwd: &'a Path,
 }

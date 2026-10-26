@@ -1,5 +1,5 @@
-//! `wtpool hook policy`, the Claude Code adapter of the heavy job policy (H29, J21), and the words
-//! of a shell command it matches against the heavy patterns (J19).
+//! `wtpool hook policy`, the Claude Code adapter of the heavy job policy, and the words of a shell
+//! command it matches against the heavy patterns.
 
 use std::collections::BTreeMap;
 use std::ffi::OsString;
@@ -11,11 +11,12 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
+use super::hook_io::malformed;
 use crate::support::hook::{HookRun, Hooks, RunOptions, event, wait_output, with};
 use crate::support::jobs::{JobSpec, SETTLE};
 use crate::support::{FileState, file_state};
 
-/// The watchdog's 1 s plus the start and exit of a process (H4).
+/// The watchdog's 1 s plus the start and exit of a process.
 const WATCHDOG: Duration = Duration::from_millis(1500);
 
 /// `machine.toml` of the policy `enforce` with the heavy patterns `heavy`.
@@ -53,7 +54,7 @@ pub(super) fn policy(hooks: &Hooks, payload: &Value, envs: &[(&str, OsString)]) 
     hooks.run_with(payload, &options)
 }
 
-/// The decision H29 prints for `reason`.
+/// The deny decision `wtpool hook policy` prints for `reason`.
 fn deny(reason: &str) -> Value {
     json!({
         "hookSpecificOutput": {
@@ -64,8 +65,8 @@ fn deny(reason: &str) -> Value {
     })
 }
 
-/// What the run printed: `None` for nothing, the reason of a deny decision on one line, or why
-/// its stdout is neither.
+/// The reason of the deny decision the run printed on one line, `None` for no output, or an error
+/// when its stdout is neither.
 pub(super) fn decision(run: &HookRun) -> Result<Option<String>, String> {
     if run.code() != Some(0) {
         return Err(format!("it did not exit 0: {}", run.describe()));
@@ -90,7 +91,7 @@ pub(super) fn decision(run: &HookRun) -> Result<Option<String>, String> {
     Ok(Some(reason))
 }
 
-/// The reason H29 gives for `words` and the wrapped `command`.
+/// The reason of the deny decision for `words` and the wrapped `command`.
 pub(super) fn reason(words: &str, command: &str) -> String {
     format!("wtpool: {words} is heavy on this machine (enforce = require). Run it as: {command}")
 }
@@ -120,10 +121,10 @@ fn tree(dir: &Path, skip: &[PathBuf]) -> BTreeMap<PathBuf, FileState> {
     found
 }
 
-/// What one call of the deny check printed, and the reason it had to give.
+/// The name of one call of the deny check, its decision, and the reason it had to give.
 type Said = (String, Result<Option<String>, String>, Option<String>);
 
-/// One call of the deny check: what it runs and the reason it must give, `None` for nothing.
+/// One call of the deny check, with the reason it must give, `None` for nothing.
 struct Case {
     what: &'static str,
     tool: &'static str,
@@ -297,28 +298,6 @@ fn hook_policy__should_deny_only_unwrapped_heavy_calls_under_require() {
         wrong.push(format!("wtpool hook policy started git {git} times"));
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
-}
-
-/// Inputs no hook may act on, as for `wtpool hook` (H5).
-fn malformed() -> Vec<(&'static str, Vec<u8>)> {
-    vec![
-        ("empty", Vec::new()),
-        ("open brace", b"{".to_vec()),
-        ("array", b"[]".to_vec()),
-        ("null", b"null".to_vec()),
-        ("string", b"\"PreToolUse\"".to_vec()),
-        (
-            "number session",
-            br#"{"session_id":5,"hook_event_name":"UserPromptSubmit","cwd":"/"}"#.to_vec(),
-        ),
-        ("no event", br#"{"session_id":"s9","cwd":"/"}"#.to_vec()),
-        ("binary", vec![0xff, 0xfe, 0x00, 0x7b, 0x80]),
-        (
-            "trailing garbage",
-            br#"{"session_id":"s9","hook_event_name":"UserPromptSubmit","cwd":"/","prompt":"x"} x"#
-                .to_vec(),
-        ),
-    ]
 }
 
 /// Runs the policy with `payload` and stdin left open after it, as a stuck harness would.
@@ -563,8 +542,8 @@ fn hook_policy__should_quote_the_wrapped_command() {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
-/// The shell words of J19: a command, the heavy patterns, and the words and wrapped command of
-/// its refusal, `None` for no refusal. The session runs in wt1, so a command names no folder.
+/// A command, the heavy patterns, and the words and wrapped command of its refusal, `None` for no
+/// refusal. The session runs in wt1, so a command names no folder.
 #[rstest::rstest]
 #[case::assignment("TOKEN=x cargo test", &["cargo test"], Some(("cargo test", "TOKEN=x wtpool job -- cargo test")))]
 #[case::env("env A=1 cargo test", &["cargo test"], Some(("cargo test", "wtpool job -- env A=1 cargo test")))]

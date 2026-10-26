@@ -1,6 +1,6 @@
-//! The judges of the cc layer (verification.md, "Contract test"): the cc checks by the live result
-//! of the installed Claude Code and this run's replays, or by the replays alone, as pure functions
-//! of the files crate::layers::cc reads.
+//! The judges of the cc layer: the cc checks by the live result of the installed Claude Code and
+//! this run's replays, or by the replays alone, as pure functions of the files
+//! [`cc`](super::cc::cc) reads.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -12,7 +12,7 @@ use crate::results::{CheckResult, FailKind, Outcome};
 
 pub(super) const LAYER: &str = "cc";
 
-/// An outcome the runner writes; any other counts as an error.
+/// An outcome the runner writes. Any other counts as an error.
 #[derive(Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case")]
 enum RunnerOutcome {
@@ -24,7 +24,7 @@ enum RunnerOutcome {
     Unknown,
 }
 
-/// The kind of a failure the runner writes; any other counts as an error.
+/// The kind of a failure the runner writes. Any other counts as an error.
 #[derive(Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case")]
 enum RunnerKind {
@@ -52,7 +52,8 @@ impl RunnerResult {
         self.outcome == RunnerOutcome::Pass
     }
 
-    /// The Claude Code asserts held, or failed as asserts: anything else decides the check alone.
+    /// True when the Claude Code asserts held or failed as asserts. Any other outcome decides the
+    /// check alone.
     fn claude_ok(&self) -> bool {
         match self.outcome {
             RunnerOutcome::Pass => true,
@@ -195,7 +196,7 @@ pub(super) fn by_replay(
     found
 }
 
-/// The live result of the oracle step for one Claude Code version, as read from `path`.
+/// The live result of one Claude Code version, as read from `path`.
 pub(super) struct LiveResult<'a> {
     pub(super) version: &'a str,
     pub(super) path: &'a Path,

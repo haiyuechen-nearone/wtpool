@@ -1,5 +1,5 @@
-//! `catalog__should_match_the_files`: the scenario files against the scenario catalog of
-//! docs/design/status-panel/verification.md, read from the document itself.
+//! `catalog__should_match_the_files`: the scenario files against the scenario catalog, read from
+//! the harness's design document.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -10,7 +10,7 @@ use crate::results::CheckResult;
 pub const NAME: &str = "catalog__should_match_the_files";
 const DOC: &str = "docs/design/status-panel/verification.md";
 const HEADING: &str = "## Scenario catalog";
-/// Every scenario also covers these (verification.md, "Scenario catalog").
+/// Every scenario also covers these.
 const ALWAYS_COVERED: [&str; 2] = ["R3", "U1"];
 const ACTIVITIES: [&str; 10] = [
     "missing",
@@ -30,7 +30,7 @@ const ACTIVITIES: [&str; 10] = [
 pub struct Entry {
     pub name: String,
     pub phase: u8,
-    /// The IDs in brackets plus R3 and U1.
+    /// The IDs in brackets plus those every scenario covers.
     pub covers: BTreeSet<String>,
     /// Each ``<worktree> `<activity>` `` the entry names, activity in snake case.
     pub rows: BTreeSet<(String, String)>,
@@ -158,7 +158,8 @@ pub fn file_facts(name: &str, json: &serde_json::Value) -> FileFacts {
     }
 }
 
-/// What the files get wrong against the catalog, for a phase `phase` oracle.
+/// The faults of the files against the catalog. Each entry of phase `phase` or earlier needs a
+/// file.
 pub fn problems(catalog: &[Entry], files: &[FileFacts], phase: u8) -> Vec<String> {
     let mut found = Vec::new();
     for entry in catalog.iter().filter(|e| e.phase <= phase) {

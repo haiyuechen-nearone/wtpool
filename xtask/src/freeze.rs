@@ -1,5 +1,5 @@
-//! `cargo xtask freeze`: commits exactly the oracle author's files with `verify/oracle.lock`,
-//! after each new check failed on an assertion in a clone, with its canary when it has one.
+//! `cargo xtask freeze`: commits the changed oracle files, and nothing else, with [`LOCK`], after
+//! each new check failed on an assertion in a clone, with its canary when it has one.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsStr;
@@ -55,7 +55,7 @@ pub fn freeze(root: &Path, phase: u8, dry_run: bool) -> Result<(), String> {
     fs::write(clone.dir.join(LOCK), &lock_text).map_err(|e| e.to_string())?;
     let frozen = clone.commit_freeze(phase)?;
     let at_head = clone.checks_at_source_head()?;
-    // Each new check's part comes from the frozen tree's registry, which lists it.
+    // Only the frozen tree's registry lists the new checks and so knows their parts.
     clone.reset_to(&frozen)?;
     let mut refused = Vec::new();
     let mut judge = |check: &str, result: &crate::results::CheckResult, with: String| {
@@ -73,8 +73,8 @@ pub fn freeze(root: &Path, phase: u8, dry_run: bool) -> Result<(), String> {
             refused.push(check.to_owned());
         }
     };
-    // Test once: checks without a canary run in one invocation per part against the frozen
-    // tree; only a canary needs a run of its own (verification.md, "The report").
+    // Checks without a canary run in one invocation per part against the frozen tree. Only a
+    // canary needs a run of its own.
     let mut by_part: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
     for check in &new_checks(&checks, &at_head) {
         if absent.contains(check) {
@@ -144,8 +144,8 @@ pub fn freeze(root: &Path, phase: u8, dry_run: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// The checks the author adds: implemented in the tree, not at the commit under it, whose checks
-/// all came in through accepted entries, whether or not an earlier lock lists them.
+/// The checks the tree implements and the commit under it lacks. Each check of that commit came
+/// in through an accepted entry, listed in an earlier lock or not.
 fn new_checks(tree: &BTreeSet<String>, at_head: &BTreeSet<String>) -> BTreeSet<String> {
     tree.difference(at_head).cloned().collect()
 }
@@ -153,7 +153,7 @@ fn new_checks(tree: &BTreeSet<String>, at_head: &BTreeSet<String>) -> BTreeSet<S
 #[derive(Debug, PartialEq, Eq)]
 struct StatusEntry {
     path: String,
-    /// The source of a staged rename or copy, which `git add` needs no more.
+    /// The source of a staged rename or copy, left out of `git add`.
     from: Option<String>,
 }
 
@@ -358,7 +358,7 @@ mod tests {
 
     #[test]
     fn new_checks__should_be_only_those_the_head_lacks() {
-        // Given: the tree adds a check, keeps one an earlier lock never listed, drops none.
+        // Given
         let set = |names: &[&str]| -> BTreeSet<String> {
             names.iter().map(|name| (*name).to_owned()).collect()
         };

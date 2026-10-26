@@ -1,5 +1,3 @@
-// B8: the webview's heap after 1000 documents is at most 15 MB and grows at most 1 MB over the
-// next 500. Heap is V8's used size after a forced garbage collection.
 import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 

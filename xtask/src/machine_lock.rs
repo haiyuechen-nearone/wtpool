@@ -1,13 +1,12 @@
-//! The machine's verify lock, `verify.lock` in the cache folder (crate::dirs): every part and the
-//! shared builds of a run hold it shared, and the bench part holds it alone while its budgets
-//! measure (verification.md, "Budgets"). So no other part, of the same run or another, loads the
-//! machine during a budget, and none starts until the budgets end. The system frees the lock of a
-//! process that exits, so a part that crashes never keeps it.
+//! The machine's verify lock, `verify.lock` in the [cache folder](crate::dirs::cache_dir). Every
+//! part and the shared builds of a run hold it shared, and the bench part holds it alone while its
+//! budgets measure. So no other part, of the same run or another, loads the machine during a
+//! budget, and none starts until the budgets end. The system frees the lock of a process that
+//! exits, so a part that crashes never keeps it.
 
 use std::fs::{self, File, TryLockError};
 use std::path::{Path, PathBuf};
 
-/// Where the lock lives.
 pub fn path() -> Result<PathBuf, String> {
     Ok(crate::dirs::cache_dir()?.join("verify.lock"))
 }
@@ -25,7 +24,7 @@ fn open(path: &Path) -> Result<File, String> {
 }
 
 /// Holds the lock at `path` shared until the file drops, first waiting while a bench part holds
-/// it alone, which is never longer than that part's own limits.
+/// it alone. That wait never outlasts the bench part's own limits.
 pub fn shared(path: &Path) -> Result<File, String> {
     let file = open(path)?;
     let failed = |e: std::io::Error| format!("lock {}: {e}", path.display());
@@ -53,7 +52,7 @@ pub fn turn() -> Option<File> {
     }
 }
 
-/// Holds the lock at `path` alone until the file drops; `None` while any other part holds it.
+/// Holds the lock at `path` alone until the file drops. `None` while any other part holds it.
 pub fn alone(path: &Path) -> Result<Option<File>, String> {
     let file = open(path)?;
     match file.try_lock() {

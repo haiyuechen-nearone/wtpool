@@ -1,4 +1,3 @@
-// X8, X13, X14, R3 and U6 in Chromium: themes, colours, icons, axe, keyboard, motion and CSP.
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -10,8 +9,8 @@ import { REPO, SCENARIOS, runDir } from '../support/paths.mjs';
 import { THEME_NAMES, computedThemeColours, openPanel } from '../support/page.mjs';
 
 const APPROVED = path.join(REPO, 'verify', 'shots', 'approved');
-/** The phase 2 shots of the visual review: a scenario and the index of its document. */
-const PHASE_2_SHOTS = [
+/** The other shots taken for review in every theme: a scenario and the index of its document. */
+const REVIEW_SHOTS = [
   ['permission_wait_and_answer', 0],
   ['several_agents_one_worktree', -1],
 ];
@@ -53,8 +52,8 @@ async function foreignColours(page, allowed) {
 }
 
 /**
- * A scenario document as the visual review shows it: on GitHub, so its heading reads `acme/app ·
- * verify-mac` (U8). idle_pool keeps its own, the folder name `fg`, for the heading without one.
+ * A scenario document on GitHub, so its heading reads `acme/app · verify-mac`. The idle_pool shots
+ * keep the folder name `fg`, for the heading without GitHub.
  */
 function onGithub(doc) {
   const shown = structuredClone(doc);
@@ -88,8 +87,7 @@ test.describe('themes', () => {
       // When
       await panel.show(idle);
       await screenshot(page, `${theme}-idle_pool-1100`);
-      // From phase 2 the visual review also shoots these two (verification.md, "Visual review").
-      for (const [name, index] of PHASE_2_SHOTS) {
+      for (const [name, index] of REVIEW_SHOTS) {
         await panel.show(onGithub(scenarioDocuments(name).documents.at(index)));
         await screenshot(page, `${theme}-${name}-1100`);
       }
@@ -124,7 +122,7 @@ test.describe('themes', () => {
     // When
     await panel.show(long);
     await screenshot(page, 'dark-idle_pool-600');
-    // From phase 2 the 600 px shot is permission_wait_and_answer's wait.
+    // The first document of permission_wait_and_answer is its wait.
     await panel.show(onGithub(scenarioDocuments('permission_wait_and_answer').documents[0]));
     await screenshot(page, 'dark-permission_wait_and_answer-600');
     await panel.show(long);
@@ -141,8 +139,8 @@ test.describe('themes', () => {
     });
 
     // Then
-    // U1 (status-panel.md revision 14): nothing is cut; a table wider than the tab scrolls
-    // sideways inside it, which layout__should_clip_no_text checks in full.
+    // Nothing is cut, as a table wider than the tab scrolls sideways inside it.
+    // layout__should_clip_no_text checks that in full.
     assert.equal(layout.text, long.pools[0].worktrees[2].branch, 'the branch text is cut in the DOM');
     assert.ok(!layout.clipped, `the long branch is cut at 600 px (text-overflow ${layout.ellipsis})`);
     assert.deepEqual(panel.errors, [], 'page errors');
@@ -336,7 +334,6 @@ test('keyboard__should_reach_every_row_and_action', async ({ page }) => {
 
   // Then
   const keys = new Set(reached.map((r) => r.key));
-  // From phase 3 each slot that holds a branch also offers free and fg (X12).
   const expected = rowOrder(all.pools[0].worktrees).flatMap((w) => [
     `row ${w.path}`,
     ...(w.missing ? ['copyPath'] : ['open', 'terminal', 'copyPath']).map((a) => `${a} ${w.path}`),
@@ -355,9 +352,9 @@ test('keyboard__should_reach_every_row_and_action', async ({ page }) => {
 
 test('motion__should_stop_the_spinner', async ({ browser }) => {
   // Given
-  // The building dial spins and the working robot swings both arms (U6), until motion is reduced (X14).
-  // Only the Activity cell is judged: an agent line's icon never moves (U13), and no animation at
-  // all runs under reduce motion.
+  // The building dial spins and the working robot swings both arms until motion is reduced. Only
+  // the Activity cell is judged, as an agent line's icon never moves, and no animation at all runs
+  // under reduce motion.
   const busy = mustValidate(
     document([
       worktree('fg'),

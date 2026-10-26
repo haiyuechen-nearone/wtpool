@@ -1,7 +1,3 @@
-// R11 and X5 in the extension host: a document with properties the extension does not know, at
-// every level of the document, is no schema error. The stream keeps running and the webview gets
-// each document live, as it gets the same document without them (status-panel.md revision 16,
-// S12: within version 1 changes only add).
 const assert = require('node:assert/strict');
 const { isDeepStrictEqual } = require('node:util');
 

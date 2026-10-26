@@ -31,7 +31,7 @@ vscode.window.registerWebviewPanelSerializer = function registerWebviewPanelSeri
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Waits in real time until `check` returns a truthy value; returns it, or undefined. */
+/** Waits in real time until `check` returns a truthy value, and gives it, or undefined. */
 async function waitFor(check, timeoutMs = 10_000) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -48,7 +48,7 @@ let api;
 async function verifyApi() {
   if (api) return api;
   const extension = vscode.extensions.getExtension(EXTENSION_ID);
-  // The manifest is an oracle file, so an extension that does not load or activate is the
+  // verify/oracle.lock pins the manifest, so an extension that does not load or activate is the
   // product's failure, an assertion.
   assert.ok(extension, `the extension ${EXTENSION_ID} is not loaded`);
   try {
@@ -111,7 +111,7 @@ function starts() {
   return fakeLog().filter((entry) => entry.event === 'start');
 }
 
-/** Whether the fake with `pid` has ended: an exit or signal logged, or no such process. */
+/** Tells if the fake with `pid` has ended: an exit or signal logged, or no such process. */
 function ended(pid) {
   const logged = fakeLog().some((e) => e.pid === pid && (e.event === 'exit' || e.event === 'signal'));
   if (logged) return true;
@@ -164,7 +164,10 @@ async function advance(ms, { step = ms, realMs = 0 } = {}) {
   }
 }
 
-/** Replaces `object[name]` with a recorder until `restore` runs; `through` decides whether the original runs. */
+/**
+ * Replaces `object[name]` with a recorder until `restore` runs. The original runs only for the
+ * calls `through` accepts.
+ */
 function wrap(object, name, through = () => false, result = () => undefined) {
   const original = object[name];
   const calls = [];
@@ -182,8 +185,8 @@ function wrap(object, name, through = () => false, result = () => undefined) {
 
 /**
  * Records `clipboard.writeText` until `restore` runs. `vscode.env.clipboard` is a frozen object,
- * so its method cannot be replaced; `vscode.env`, which the extension under development shares
- * with these checks, gets a recording clipboard instead. Nothing reaches the system clipboard.
+ * so its method cannot be replaced. `vscode.env`, shared by the extension under development and
+ * these checks, gets a recording clipboard instead. Nothing reaches the system clipboard.
  */
 function wrapClipboard() {
   const original = Object.getOwnPropertyDescriptor(vscode.env, 'clipboard');

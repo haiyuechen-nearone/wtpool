@@ -1,5 +1,5 @@
-//! What the harness reads about the machine: the use of its cores and its processes. The only
-//! module that names sysinfo, so another sysinfo version touches this file alone.
+//! The machine as the harness reads it: the use of its cores and its processes. The only module
+//! that names sysinfo, so another sysinfo version touches this file alone.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -15,7 +15,7 @@ pub struct Process {
     pub cwd: PathBuf,
 }
 
-/// The use of all cores over `sample`, in percent, and how many cores there are.
+/// The use of all cores over `sample`, in percent, and the number of cores.
 pub fn cpu_use(sample: Duration) -> Result<(f32, usize), String> {
     use sysinfo::{CpuRefreshKind, System};
     let mut system = System::new();
@@ -34,8 +34,8 @@ pub fn cpu_use(sample: Duration) -> Result<(f32, usize), String> {
 /// Every process by its pid. An error when the table does not hold this process.
 pub fn processes() -> Result<BTreeMap<u32, Process>, String> {
     use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
-    // Name and parent come with every refresh; the working folder is asked for. Threads are left
-    // out: on Linux they would list as processes of their own.
+    // Name and parent come with every refresh, the working folder only when asked for. Threads
+    // are left out, as on Linux they would list as processes of their own.
     let refresh = ProcessRefreshKind::nothing()
         .with_cwd(UpdateKind::Always)
         .without_tasks();

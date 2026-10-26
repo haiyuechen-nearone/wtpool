@@ -1,13 +1,13 @@
-// Documents for the visual checks of status-panel.md revision 14: a pool with real-world
-// worktree names, long values in every column, many chips, a long machine name, and long
-// repository names in the heading (U8, revision 16), on GitHub and local. Each is valid against
-// the schema; `visualDocuments` adds every scenario document and every_activity.
+// Documents for the visual checks: a pool with real-world worktree names, long values in every
+// column, many chips, a long machine name, and long repository names in the heading, on GitHub and
+// local. Each is valid against the schema. `visualDocuments` adds every scenario document and
+// every_activity.
 import { readdirSync } from 'node:fs';
 
 import { POOL, actor, ago, document, everyActivity, git, mustValidate, scenarioDocuments, worktree } from './docs.mjs';
 import { SCENARIOS } from './paths.mjs';
 
-/** A worktree with a real name, its role given; a slot is busy unless `overrides` frees it. */
+/** A worktree with a real name, its role given. A slot is busy unless `overrides` frees it. */
 function named(name, role, overrides = {}) {
   const base = worktree(role === 'foreground' ? 'fg' : role === 'slot' ? 'wt9' : 'x');
   const busy = role === 'slot' ? { free: false } : {};
@@ -117,7 +117,10 @@ export function bigCounts() {
   return document(list, { repository: { name: 'app', github: null } });
 }
 
-/** The real-names pool without a GitHub remote, its long main worktree folder name its heading (U8). */
+/**
+ * The real-names pool without a GitHub remote, with its long main worktree folder name as its
+ * heading.
+ */
 export function longFolder() {
   const doc = realistic();
   const pool = doc.pools[0];
@@ -136,8 +139,9 @@ export function stateDocuments() {
 }
 
 /**
- * Every scenario document, then the state documents and bigCounts, each with `states` true when
- * a check should also hover each row, and the header in its stale and paused forms.
+ * Every scenario document, then the state documents, each with `states` true as a check should
+ * also hover each of their rows, bigCounts and longFolder, and the header in its stale and paused
+ * forms.
  */
 export function visualDocuments() {
   const list = [];
@@ -158,7 +162,7 @@ export function visualDocuments() {
   return list;
 }
 
-/** The tag each row of `doc` carries (U1): `fg` for the foreground, `unmanaged` for those. */
+/** The tag each row of `doc` carries: `fg` for the foreground, `unmanaged` for those. */
 export function expectedTags(doc) {
   const out = {};
   for (const w of doc.pools[0].worktrees) {

@@ -1,5 +1,3 @@
-// X8: the HTML buildHtml writes holds the CSP of the template, nonce scripts (files under
-// cspSource or inline) and no inline style.
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { test } from 'vitest';
@@ -34,7 +32,7 @@ test.each(cases)('csp__should_match_the_template %s', async (_, cspSource, nonce
   const scripts = [...document.querySelectorAll('script')];
   assert.ok(scripts.length >= 1, 'no script element');
   for (const script of scripts) {
-    // X8 allows any script that carries the nonce: a file under cspSource, or an inline one.
+    // Any script with the nonce may run, a file under cspSource or an inline one.
     assert.equal(script.getAttribute('nonce'), nonce, `a script without the nonce, or with another: ${script.outerHTML}`);
     if (script.hasAttribute('src')) {
       assert.ok(script.getAttribute('src').startsWith(`${cspSource}/`), `a script not loaded from cspSource: ${script.outerHTML}`);

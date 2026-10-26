@@ -1,6 +1,3 @@
-// S10 and S12 with the release wtpool, no VS Code window: the repository each pool names, the
-// schema `wtpool status --schema` publishes, and that wtpool's documents hold only the properties the
-// schema lists (status-panel.md revision 16).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -11,12 +8,15 @@ import { claude, cliSandbox, firstWatchDocument, oracleSchema, payload, statusDo
 import { git, pool, startProcess } from './vscode.mjs';
 import { repositoryPool } from './folders.mjs';
 
-/** Annotations a schema words freely: they never change what it accepts. */
+/** Annotations a schema words freely, as they never change the documents it accepts. */
 const ANNOTATIONS = new Set(['title', 'description', '$id', '$comment']);
 /** Arrays whose order means nothing to a schema. */
 const SETS = new Set(['required', 'enum', 'type']);
 
-/** `schema` without annotations, its unordered arrays sorted: what decides what it accepts. */
+/**
+ * `schema` without annotations and with its unordered arrays sorted, the part that decides the
+ * documents it accepts.
+ */
 function structure(schema, key = '') {
   if (Array.isArray(schema)) {
     const items = schema.map((item) => structure(item));
@@ -95,7 +95,7 @@ test('schema__should_be_published_by_wtpool_status', async () => {
   assert.deepEqual(differences(structure(schema), structure(oracle)), [], 'wtpool status --schema is not the oracle schema (descriptions and titles aside)');
   assert.deepEqual(undescribed(schema), [], 'properties without a one-line description');
   assert.deepEqual(closedObjects(schema), [], 'objects that set additionalProperties: false');
-  // The example's text is in src/generated, which schema__generated_files_current keeps current.
+  // The example's text is in src/generated, kept current by schema__generated_files_current.
   assert.deepEqual(schema, generated, 'wtpool status --schema differs from the status_schema example (vscode/src/generated/status.schema.json)');
 });
 
@@ -136,7 +136,7 @@ test('status__should_emit_only_listed_properties', async () => {
   assert.deepEqual(problems, [], "wtpool's documents against the oracle schema with every object closed");
 });
 
-/** Each remote URL form of S10, and what `repository.github` reads for it. */
+/** Each remote URL form, and the `repository.github` it gives. */
 const REMOTES = [
   ['https://github.com/acme/app.git', 'acme/app'],
   ['https://github.com/acme/app', 'acme/app'],
@@ -168,7 +168,8 @@ test('status__should_name_the_repository', async () => {
   };
   restore.push(putBack);
   const seen = [];
-  // Each case reads on, so a failure shows every case's repository, or why wtpool printed none.
+  // Each case reads on, so a failure shows every case's repository, or the reason wtpool printed
+  // none.
   const read = (label, options) => {
     try {
       seen.push([label, statusDocument(dirs, poolInfo, options).pools[0].repository ?? 'no repository']);

@@ -1,6 +1,6 @@
-//! `flows__should_each_have_an_e2e_check`: every flow of the User flows table of
-//! docs/design/status-panel/verification.md, read from the document itself, has a passing
-//! `flow__<name>` check, and every `flow__` check names a flow of the table.
+//! `flows__should_each_have_an_e2e_check`: every flow of the User flows table, read from the
+//! harness's design document, has a passing `flow__<name>` check, and every `flow__` check names a
+//! flow of the table.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -21,7 +21,7 @@ pub struct Flow {
     pub phase: u8,
 }
 
-/// Reads one table row, `| \`name\` | phase | steps | IDs |`; the header and rule give none.
+/// Reads one table row, `| \`name\` | phase | steps | IDs |`. The header and rule give `None`.
 pub fn parse_row(line: &str) -> Option<Flow> {
     let cells: Vec<&str> = line
         .trim()
@@ -57,7 +57,7 @@ pub fn flows(doc: &str) -> Vec<Flow> {
     found
 }
 
-/// The flows of the document in `root`, or why there are none.
+/// The flows of the document in `root`, or the reason there are none.
 pub fn load(root: &Path) -> Result<Vec<Flow>, String> {
     let doc = fs::read_to_string(root.join(DOC)).map_err(|e| format!("{DOC}: {e}"))?;
     let found = flows(&doc);
@@ -76,8 +76,8 @@ pub fn check_names(root: &Path) -> BTreeSet<String> {
         .collect()
 }
 
-/// What the check reports: each flow of phase `phase` or earlier without a passing check, and
-/// each `flow__` check, registered or reported, that names no flow.
+/// The problems the check reports: each flow of phase `phase` or earlier without a passing check,
+/// and each `flow__` check, registered or reported, that names no flow.
 pub fn problems(
     flows: &[Flow],
     phase: u8,

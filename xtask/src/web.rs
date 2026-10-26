@@ -1,5 +1,5 @@
 //! The check registry of verify/checks.toml and the results of the JavaScript layers:
-//! Vitest (render), Mocha (host) and Playwright (shot, e2e and the B8 budget).
+//! Vitest (render), Mocha (host) and Playwright (shot, e2e and the Chromium budget).
 
 mod merge;
 mod registry;

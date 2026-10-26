@@ -1,5 +1,4 @@
-//! `wtpool hook gc`, the gc the hook runs itself once a day (H21), and the records a week leaves
-//! (B11).
+//! `wtpool hook gc`, the gc the hook runs itself once a day, and the records a week leaves.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -184,7 +183,7 @@ fn gc__should_delete_the_lock_with_the_record() {
     );
 }
 
-/// The time `wtpool-activity/gc.stamp` holds: when the pool's last gc began (H21).
+/// The start time of the pool's last gc, as `wtpool-activity/gc.stamp` holds it.
 fn stamp(hooks: &Hooks) -> Option<String> {
     fs::read_to_string(hooks.activity().join("gc.stamp"))
         .ok()

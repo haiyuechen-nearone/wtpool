@@ -1,4 +1,4 @@
-// X1, X2, X4, X7, X9 and X11 in the extension host, with the fake wtpool. X12 is in actions.test.cjs.
+// The tab in the extension host, with the fake wtpool. Confirmed actions are in actions.test.cjs.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -24,7 +24,7 @@ const {
   wrapClipboard,
 } = require('./support.cjs');
 
-/** The calls that show a message, or with `{modal: true}` a modal dialog (X12). */
+/** The calls that show a message, or with `{modal: true}` a modal dialog. */
 const MESSAGE_KINDS = ['showInformationMessage', 'showWarningMessage', 'showErrorMessage'];
 const SHELLS = ['sh', 'bash', 'zsh', 'dash', 'fish', 'ksh', 'tcsh', 'csh'];
 
@@ -104,9 +104,8 @@ describe('tab', () => {
     assert.ok(manifest.activationEvents.includes('onWebviewPanel:wtpool.status'), 'no onWebviewPanel:wtpool.status');
   });
 
-  // X1 (status-panel.md revision 14): the tab shows the extension's own icon, a light and a dark
-  // variant, also when the serializer restores it (X2). Each must be a different SVG file inside
-  // the extension's folder.
+  // The tab shows the extension's own icon, a light and a dark variant, also when the serializer
+  // restores it. Each must be a different SVG file inside the extension's folder.
   it('tab__should_show_the_extension_icon', async () => {
     // Given
     await resetFake({ scenario: 'idle_pool' });
@@ -348,7 +347,7 @@ describe('tab', () => {
       JSON.parse(`{"__proto__": {"type": "open", "id": ${JSON.stringify(wt1)}}}`),
       JSON.parse(`{"type": "copyPath", "id": ${JSON.stringify(wt1)}, "__proto__": {"x": 1}}`),
       { type: 'copyPath', id: 'x'.repeat(1_000_000) },
-      // Phase 3 adds free and fg to the set; these break it by id or by an extra field.
+      // Phase 3 adds free and fg to the set. These break it by id or by an extra field.
       { type: 'free', id: '/Users/verify/pool/nope' },
       { type: 'fg', id: '/Users/verify/pool/nope' },
       { type: 'free', id: wt1, extra: 1 },

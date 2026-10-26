@@ -1,7 +1,4 @@
-// The release wtpool as a command line program, for the e2e checks of the status document and the
-// activity records that need no VS Code window (S10 to S12, H25, H26): a sandbox without VS Code,
-// hook payloads from verify/fixtures/hooks/, run by stub `claude` processes, records read and
-// written by hand, and the oracle's schema, open as the product's or closed for the strict check.
+// The release wtpool as a command line program, for the e2e checks that need no VS Code window.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -41,7 +38,7 @@ export function wtpool(dirs, poolInfo, args, { cwd = poolInfo?.fg, extra = {}, d
   return { code: ran.status, stdout: ran.stdout, stderr: ran.stderr };
 }
 
-/** The document `wtpool status --json` prints, or an assertion naming how it failed. */
+/** The document `wtpool status --json` prints, or a failed assertion that names the failure. */
 export function statusDocument(dirs, poolInfo, options) {
   const ran = wtpool(dirs, poolInfo, ['status', '--json'], options);
   assert.equal(ran.code, 0, `wtpool status --json exited ${ran.code}: ${ran.stderr.trim()}`);
@@ -67,7 +64,7 @@ export function payload(name, poolInfo, overrides = {}) {
 
 /**
  * A stub `claude` process that runs the release `wtpool hook` as its child, so records name a live
- * parent (H19): `run(payload, cwd)` asserts the hook exited 0 and printed nothing (H2, H3).
+ * parent. `run(payload, cwd)` asserts the hook exited 0 and printed nothing.
  */
 export function claude(dirs, poolInfo) {
   const stub = startStub();
@@ -97,7 +94,7 @@ export function readRecord(poolInfo, stem) {
   return JSON.parse(readFileSync(path.join(activityDir(poolInfo), `${stem}.json`), 'utf8'));
 }
 
-/** Replaces a record as a hook writes it: a temp file renamed over it (H18). */
+/** Replaces a record as a hook writes it: a temp file renamed over it. */
 export function writeRecord(dirs, poolInfo, stem, record) {
   const temp = path.join(dirs.tmp, `${stem}.${Date.now()}.json`);
   writeFileSync(temp, JSON.stringify(record));
@@ -109,19 +106,18 @@ export function secondsAgo(seconds) {
   return new Date(Date.now() - seconds * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
-/** The phase the harness runs (WTPOOL_VERIFY_PHASE), 1 by default. */
 const PHASE = Number(process.env.WTPOOL_VERIFY_PHASE ?? 1);
 
 /**
- * The oracle's schema of this run's phase, open as status-panel.md S12 has it: from phase 4
- * `status.phase-4.schema.json`, which adds `machine.jobs` (S14) and `build.queued` (S4).
+ * The schema of this run's phase, its objects open as the product's are. From phase 4 it is
+ * `status.phase-4.schema.json`, with `machine.jobs` and `build.queued` added.
  */
 export function oracleSchema() {
   const file = PHASE >= 4 ? path.join(path.dirname(SCHEMA), 'status.phase-4.schema.json') : SCHEMA;
   return JSON.parse(readFileSync(file, 'utf8'));
 }
 
-/** `schema` with every object closed: wtpool itself emits only the listed properties (S12). */
+/** `schema` with every object closed, as wtpool itself emits only the listed properties. */
 export function closed(schema) {
   if (Array.isArray(schema)) return schema.map(closed);
   if (schema === null || typeof schema !== 'object') return schema;
@@ -134,7 +130,7 @@ let strict;
 
 /**
  * The closed validator, proved first to accept a scenario document and to refuse it with an
- * unlisted property at each level, so the strict check catches what it exists for.
+ * unlisted property at each level, so the strict check is known to catch one.
  */
 function strictValidator() {
   if (strict) return strict;
@@ -162,8 +158,8 @@ function strictValidator() {
 }
 
 /**
- * The problems of `document` against the closed oracle schema: each missing, wrong or unlisted
- * property, with its place in the document.
+ * The problems of `document` against the closed schema: each missing, wrong or unlisted property,
+ * with its place in the document.
  */
 export function strictProblems(document) {
   const validator = strictValidator();
@@ -174,7 +170,7 @@ export function strictProblems(document) {
   });
 }
 
-/** The first line `wtpool status --watch` prints, parsed; then it gets stdin EOF (W8). */
+/** The first line `wtpool status --watch` prints, parsed. The watch then gets stdin EOF. */
 export function firstWatchDocument(dirs, poolInfo) {
   return new Promise((resolve, reject) => {
     const child = spawn(dirs.wtpoolPath, ['status', '--watch'], { cwd: poolInfo.fg, env: env(dirs, poolInfo), stdio: ['pipe', 'pipe', 'pipe'] });

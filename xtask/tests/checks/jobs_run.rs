@@ -1,6 +1,6 @@
-//! A job's folder, record and pass-through (J7, J8, J13 to J17): an unsafe job folder refuses
-//! the job, a record keeps only the summary, the command gets exactly its arguments, streams,
-//! exit status and signals, and `wtpool job` says only that it waits.
+//! A job's folder, record and pass-through: an unsafe job folder refuses the job, a record keeps
+//! only the summary, the command gets exactly its arguments, streams, exit status and signals, and
+//! `wtpool job` says only that it waits.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -35,7 +35,6 @@ fn set_mode(path: &Path, mode: u32) {
     fs::set_permissions(path, fs::Permissions::from_mode(mode)).expect("setup: chmod");
 }
 
-/// Whether the process `pid` still lives.
 pub(super) fn alive(pid: u32) -> bool {
     Command::new("kill")
         .args(["-s", "0", &pid.to_string()])
@@ -138,7 +137,8 @@ fn job__should_refuse_an_unsafe_folder(#[case] folder: Folder) {
     }
 }
 
-/// `^<pid>[-_.]?[0-9a-f]{8}$`: J8 names the pid and 8 random hex digits, no separator.
+/// `^<pid>[-_.]?[0-9a-f]{8}$`: the pid, then 8 random hex digits. A separator between them also
+/// passes.
 fn is_job_id(id: &str, pid: u32) -> bool {
     let Some(rest) = id.strip_prefix(&pid.to_string()) else {
         return false;
@@ -153,7 +153,7 @@ fn is_time(value: &Value) -> bool {
     })
 }
 
-/// Every byte of every file below `dir`, with its path.
+/// The path and bytes of each file in `dir`.
 fn contents(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     fs::read_dir(dir)
         .map(|entries| {
@@ -324,7 +324,7 @@ fn job__should_record_only_its_summary() {
 
 #[test]
 fn job__should_not_pass_its_lock_to_the_command() {
-    // Given: limit 1, one job running and one waiting.
+    // Given
     let sandbox = Sandbox::must_new("job-lock");
     sandbox.write_machine(&limit_config(1));
     let mut first = sandbox.must_start_job(&JobSpec::held("probe", &[]));
@@ -333,7 +333,8 @@ fn job__should_not_pass_its_lock_to_the_command() {
     must_wait(&second, &sandbox, "the waiting job");
     let probe = first.probe_pid().unwrap_or_default();
 
-    // When: wtpool job alone is killed; its command lives on.
+    // When
+    // SIGKILL reaches wtpool job alone, so its command lives on.
     first.signal("KILL");
     let reaped = first.wait_exit(SETTLE);
     let started = second.wait_start(HANDOVER);
@@ -351,7 +352,6 @@ fn job__should_not_pass_its_lock_to_the_command() {
     );
 }
 
-/// 64 rounds of every byte value.
 fn binary_bytes() -> Vec<u8> {
     (0..64).flat_map(|_| 0..=255_u8).collect()
 }

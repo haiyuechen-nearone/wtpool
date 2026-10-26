@@ -1,5 +1,3 @@
-// X18 in the extension host, with the fake wtpool: the tab title reads `Worktrees (N)` while N
-// worktrees are waiting (A4), else `Worktrees`, set from each document whether the tab shows or not.
 const assert = require('node:assert/strict');
 const vscode = require('vscode');
 

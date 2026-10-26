@@ -1,9 +1,5 @@
-// What the heavy job flows need beyond a scenario pool (jobs.md, "User flows"): the machine's
-// config and a repository's patterns written by hand, so a Given never depends on the CLI under
-// test (J4, J5, J20); jobs started by the release `wtpool job` with the sandbox's HOME and XDG
-// folders, the extension's; blocking stand ins for heavy commands; stub agents whose children are
-// jobs (S15); and the heading, strip and live region of the tab (jobs.md, "Test interfaces it
-// adds", item 5).
+// Helpers of the heavy job flows. The machine's config and a repository's patterns are written by
+// hand, so a Given never depends on the CLI under test.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -17,26 +13,25 @@ import { poll, worktreePath } from './flows.mjs';
 import { shownRows } from './rows.mjs';
 import { env, panelFrame, releaseWtpool, runCommand, sleep, statusJson } from './vscode.mjs';
 
-/** The phase the harness runs (WTPOOL_VERIFY_PHASE), 1 by default. */
 export const PHASE = Number(process.env.WTPOOL_VERIFY_PHASE ?? 1);
 
 /**
- * W10: a change shows within 1 s. The wait adds the extension's 200 ms merge (W5) and polling, as
- * AGENT_EVENT_MS of scenarios-agents.spec.mjs does, and fails at that deadline.
+ * A change shows within 1 s. The wait adds the watch's 200 ms merge and polling, as AGENT_EVENT_MS
+ * of scenarios-agents.spec.mjs does, and fails at that deadline.
  */
 export const WITHIN_A_SECOND_MS = 3_000;
 
-/** J5's default limit on this machine: a quarter of the cores, rounded down, kept from 1 to 8. */
+/** The default heavy job limit on this machine. */
 export function defaultLimit() {
   return Math.min(8, Math.max(1, Math.floor(availableParallelism() / 4)));
 }
 
-/** `<config>/wtpool/machine.toml` of the sandbox (J4): XDG_CONFIG_HOME is `<home>/.config`. */
+/** The sandbox's machine.toml, as its XDG_CONFIG_HOME is `<home>/.config`. */
 export function machineTomlPath(dirs) {
   return path.join(dirs.home, '.config', 'wtpool', 'machine.toml');
 }
 
-/** Writes machine.toml by hand, folder 0700 and file 0600 as J5 asks, `[jobs]` with the keys given. */
+/** Writes machine.toml by hand, `[jobs]` with the keys given, or `text` as the whole file. */
 export function writeMachineToml(dirs, { limit, enforce, heavy, text } = {}) {
   const file = machineTomlPath(dirs);
   mkdirSync(path.dirname(file), { recursive: true });
@@ -54,14 +49,14 @@ export function readText(file) {
   return existsSync(file) ? readFileSync(file, 'utf8') : null;
 }
 
-/** `<common>/wtpool.toml`, which the pool builder writes with the slot keys. */
+/** `<common>/wtpool.toml`, written by the pool builder with the slot keys. */
 export function repoTomlPath(poolInfo) {
   return path.join(poolInfo.common, 'wtpool.toml');
 }
 
 /**
- * Appends top level keys to the repository's wtpool.toml, as J20 names them beside
- * `build_processes`: `heavy`, `build_processes`, and `comment` as a line of its own.
+ * Appends top level keys to the repository's wtpool.toml: `heavy`, `build_processes`, and
+ * `comment` as a comment line of its own.
  */
 export function addRepoKeys(poolInfo, { heavy, buildProcesses, comment } = {}) {
   const file = repoTomlPath(poolInfo);
@@ -96,8 +91,8 @@ export function holdDir(dirs) {
 /**
  * A stand in for a heavy command called `name` in `dirs.bin`: it marks `<pid>.started`, waits
  * until `<pid>.go` or `all.go` appears, or the folder goes, marks `<pid>.ended` and exits 0. A
- * shell script, so the process table reads `sh <bin>/<name> <args>`, whose words J19 reads as
- * `<name> <args>`.
+ * shell script, so the process table reads `sh <bin>/<name> <args>`, and wtpool matches its words
+ * as `<name> <args>`.
  */
 export function heavyCommand(dirs, name) {
   const file = path.join(dirs.bin, name);
@@ -128,12 +123,12 @@ export function runningCommands(dirs) {
     .sort((a, b) => a.at - b.at);
 }
 
-/** How many commands have started so far. */
+/** The number of commands started so far. */
 export function startedCount(dirs) {
   return readdirSync(holdDir(dirs)).filter((name) => name.endsWith('.started')).length;
 }
 
-/** Ends the running command `pid`; resolves once it marked its end. */
+/** Ends the running command `pid`, and resolves once it marked its end. */
 export async function endCommand(dirs, pid) {
   const hold = holdDir(dirs);
   writeFileSync(path.join(hold, `${pid}.go`), '');
@@ -149,7 +144,7 @@ export function jobEnv(session, extra = {}) {
 
 /**
  * Starts `wtpool job [--label <label>] -- <args>` in `cwd` with the release wtpool. Returns the
- * child; its stderr collects in `child.err`.
+ * child, its stderr collected in `child.err`.
  */
 export function startJob(session, args, { cwd = session.pool.fg, label } = {}) {
   const argv = ['job', ...(label ? ['--label', label] : []), '--', ...args];
@@ -199,7 +194,7 @@ export function wtpoolRun(session, args, { cwd = session.pool.fg } = {}) {
   return { code: ran.status, stdout: ran.stdout, stderr: ran.stderr };
 }
 
-/** The pool's heading as U8 names it, and the machine, from `wtpool status --json`. */
+/** The repository the pool's heading names, and the machine, from `wtpool status --json`. */
 export function names(session) {
   const status = statusJson(session.dirs, session.pool);
   const pool = status.pools[0];
@@ -207,9 +202,9 @@ export function names(session) {
 }
 
 /**
- * A wrapper `wtpool` for `wtpool.path` (X4) that notes each argument array, tab separated, one
- * line per run, then runs the release wtpool with it: {file, log}. It lives outside the sandbox,
- * which `sandbox` makes afresh, so the settings can name it before VS Code starts; each attempt
+ * A wrapper `wtpool` for `wtpool.path` that notes each argument array, tab separated, one line per
+ * run, then runs the release wtpool with it: {file, log}. It lives outside the sandbox, as
+ * `sandbox` makes that afresh, so the settings can name it before VS Code starts. Each attempt
  * starts with an empty log.
  */
 export function loggingWtpool(key) {
@@ -233,7 +228,7 @@ export function loggedRuns(log) {
     .filter((argv) => argv[0] !== 'status');
 }
 
-/** A stub agent: a live `claude` stand in whose hooks and jobs run as its children (H19, S15). */
+/** A stub agent: a live `claude` stand in whose hooks and jobs run as its children. */
 export function agent(session, { id, title, cwd }) {
   const stub = startStub();
   const base = { session_id: id, cwd, session_title: title };
@@ -244,12 +239,12 @@ export function agent(session, { id, title, cwd }) {
   };
   const handle = {
     stub,
-    /** Runs `wtpool hook` with fixture `name`, overrides merged in; a failing hook fails as setup. */
+    /** Runs `wtpool hook` with fixture `name`, overrides merged in. A failing hook fails setup. */
     async hook(name, overrides = {}) {
       const reply = await runHook(['hook'], { ...payload(name, session.pool), ...base, ...overrides });
       if (reply.code !== 0 || reply.stdout) throw new Error(`setup: wtpool hook ${name} exited ${reply.code ?? reply.signal}, stdout ${reply.stdout}, stderr ${reply.stderr}`);
     },
-    /** A Bash call: PreToolUse through `wtpool hook policy` (H29), whose reply it returns, then `wtpool hook`. */
+    /** A Bash call through `wtpool hook policy`, then `wtpool hook`. Gives the policy's reply. */
     async bash(command) {
       calls += 1;
       const body = { ...payload('PreToolUse-Bash', session.pool), ...base, tool_input: { command, description: 'wtpool-verify' }, tool_use_id: `toolu_${id}_${calls}` };
@@ -294,19 +289,19 @@ export async function openTab(session) {
 
 const squash = (text) => (text ?? '').replace(/\s+/g, ' ').trim();
 
-/** The heading's machine button, asserted present (U10): the first step every jobs flow needs. */
+/** The heading's machine button, asserted present. */
 export async function machineButton(frame) {
   const button = frame.locator('tr.pool-heading button.machine-button');
   assert.equal(await button.count(), 1, 'the heading holds no button.machine-button (U10)');
   return button;
 }
 
-/** The heading row's text as shown, spaces collapsed (U8, U10). */
+/** The heading row's text as shown, spaces collapsed. */
 export async function headingText(frame) {
   return squash(await frame.locator('tr.pool-heading').first().innerText());
 }
 
-/** The machine strip's text as shown, `tr.machine-detail` (U11), or null when it is closed. */
+/** The machine strip's text as shown, or null when it is closed. */
 export async function stripText(frame) {
   const strip = frame.locator('tr.machine-detail');
   if (!(await strip.count())) return null;
@@ -322,7 +317,7 @@ export async function openStrip(frame) {
   return frame.locator('tr.machine-detail');
 }
 
-/** Each job list of the strip (U11): its items' text, in order. */
+/** Each job list of the strip: its items' text, in order. */
 export async function jobLists(frame) {
   return frame.evaluate(() => {
     const items = (selector) =>
@@ -331,20 +326,20 @@ export async function jobLists(frame) {
   });
 }
 
-/** The texts of the polite live regions (X14). */
+/** The texts of the polite live regions. */
 export async function liveText(frame) {
   return frame.evaluate(() =>
     [...document.querySelectorAll('[aria-live="polite"], [role="status"]')].map((r) => r.textContent.replace(/\s+/g, ' ').trim()).join(' | '),
   );
 }
 
-/** What has focus in the page: a short key per element of the jobs DOM, else tag and class. */
+/** The focused element: a short key per element of the jobs DOM, else its tag and class. */
 export async function focusKey(frame) {
   return frame.evaluate(() => {
     const el = document.activeElement;
     if (!el || el === document.body) return null;
-    // An input or Add outside its list's `[data-scope]` takes its scope by order: U15 lists This
-    // machine, then This repository.
+    // An input or Add outside its list's `[data-scope]` takes its scope by order: This machine
+    // comes first, then This repository.
     const byOrder = (selector) => ['machine', 'repository'][[...document.querySelectorAll(`tr.machine-detail ${selector}`)].indexOf(el)];
     const scope =
       el.closest('[data-scope]')?.dataset.scope ??
@@ -370,7 +365,7 @@ export async function focusKey(frame) {
   });
 }
 
-/** Whether the focused element shows a ring (X14): an outline or a box shadow. */
+/** Tells if the focused element shows a ring: an outline or a box shadow. */
 export async function focusRing(frame) {
   return frame.evaluate(() => {
     const el = document.activeElement;
@@ -390,7 +385,7 @@ export async function focusWebview(session, frame) {
 const AGE = /(now|\d+ s|\d+ m)$/;
 const squashAll = (text) => text.replace(/\s+/g, '');
 
-/** Whether a job line reads `parts`, in order and with nothing between them but spaces, then an age (U11, U7). */
+/** Tells a job line that reads `parts` in order, with only spaces between them, then an age. */
 export function reads(line, parts) {
   const want = squashAll(parts.join(' '));
   return squashAll(line).startsWith(want) && AGE.test(line.trim());
@@ -425,10 +420,10 @@ export async function tokenColour(frame, token) {
 }
 
 /**
- * Four jobs running and two waiting under limit 4, as the flows' step 1 has them: running
- * `cargo nextest` in wt1, `npm run build` in wt3, `cargo xtask verify` labelled `verify` and
- * `cargo build` outside the pool; waiting `cargo test` of the agent `Design jobs` in wt1, when
- * `withAgent`, else in wt1 from no agent, then `cargo clippy` in fg.
+ * Four jobs running and two waiting under limit 4. Running: `cargo nextest` in wt1, `npm run build`
+ * in wt3, `cargo xtask verify` labelled `verify` and `cargo build` outside the pool. Waiting:
+ * `cargo test` in wt1, of the agent `Design jobs` when `withAgent`, else of no agent, then
+ * `cargo clippy` in fg.
  */
 export async function fourRunTwoWait(session, { withAgent = false } = {}) {
   const { dirs } = session;

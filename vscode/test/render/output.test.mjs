@@ -1,7 +1,3 @@
-// U9 in jsdom (phase 3): the detail strip's Output section per agent with outputs (S13): each
-// task's summary as a heading with running or its end time, a Follow button, and the tail the
-// extension posts (R12) in a monospace block that wraps and follows the end unless scrolled up.
-// The webview tells the extension the selected row (`select`) and asks for Follow (`follow`).
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 

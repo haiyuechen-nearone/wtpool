@@ -1,6 +1,7 @@
-//! The phase 2 budgets of the bench part on the release `wtpool`: B1 (`wtpool hook` latency), B4's
-//! record writes and B6 (the watcher while 3 agents write). The release build has no verify
-//! feature, so its hooks see the real clock and process table: their parent, this test, lives.
+//! The phase 2 budgets of the bench part on the release `wtpool`: the latency of `wtpool hook`, the
+//! time a record write takes to show, and the watcher while 3 agents write. The release build has
+//! no verify feature, so its hooks see the real clock and process table, where their parent, this
+//! test, lives.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -15,7 +16,7 @@ use super::{SLOTS, must_bench_pool};
 use crate::support::hook::{every_fixture, fixture, wait_output};
 use crate::support::{Sandbox, Watch, is_status, must_make_unreadable, must_wtpool_bin, worktree};
 
-/// The phase the harness verifies (WTPOOL_VERIFY_PHASE), 1 when unset.
+/// The phase the harness verifies, 1 when `WTPOOL_VERIFY_PHASE` is unset.
 pub(crate) fn phase() -> u8 {
     std::env::var("WTPOOL_VERIFY_PHASE")
         .ok()
@@ -23,7 +24,7 @@ pub(crate) fn phase() -> u8 {
         .unwrap_or(1)
 }
 
-/// Runs the release `wtpool hook` once with `payload` and returns how long it took and its exit.
+/// Runs the release `wtpool hook` once with `payload` and returns its run time and exit code.
 fn hook(sandbox: &Sandbox, payload: &Value) -> (Duration, Option<i32>) {
     let cwd = payload["cwd"]
         .as_str()
@@ -90,8 +91,8 @@ pub(crate) fn budget_b1() {
     );
 }
 
-/// Writes records through `wtpool hook` in a watched bench pool; how long each took to show, as
-/// [`delays_within`] measures them.
+/// Writes records through `wtpool hook` in a watched bench pool and returns the time each took to
+/// show, as [`delays_within`] measures it.
 pub(crate) fn record_writes(
     sandbox: &Sandbox,
     dir: &Path,

@@ -15,7 +15,7 @@ pub struct Entry {
     pub id: String,
     /// Each path, or `file:key` for an oracle key, with its hash after the change.
     pub files: BTreeMap<String, String>,
-    /// The hash of the entry's whole content, which its accept line names.
+    /// The hash of the entry's whole content, named by its accept line.
     pub hash: String,
 }
 
@@ -96,7 +96,8 @@ pub fn live_entries(entries: Vec<Entry>, spent: &BTreeSet<String>) -> Vec<Entry>
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Accept {
     pub id: String,
-    /// `None` on a line written before accept lines named an entry hash; it accepts no entry.
+    /// `None` on a line written before accept lines named an entry hash. Such a line accepts no
+    /// entry.
     pub hash: Option<String>,
 }
 

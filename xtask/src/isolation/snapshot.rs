@@ -17,13 +17,14 @@ pub struct Snapshot {
     /// The foreground of the real pool this snapshot read ([`Places::real`]).
     #[serde(default)]
     pub pool: String,
-    /// Whether that foreground is a git worktree. Without one, the pool rules have nothing to read.
+    /// True when that foreground is a git worktree. Without one, the pool rules have nothing to
+    /// read.
     #[serde(default)]
     pub pool_found: bool,
     pub wtpool_activity: Option<Vec<ActivityEntry>>,
     pub worktrees: Vec<String>,
-    /// Whether any line of `git worktree list --porcelain`, a lock reason included, names the run
-    /// folder.
+    /// True when any line of `git worktree list --porcelain`, a lock reason included, names the
+    /// run folder.
     #[serde(default)]
     pub listing_mentions_run: bool,
     /// Listed worktrees whose folder, or the `.git` link in it, is gone. git keeps listing such a
@@ -67,7 +68,7 @@ pub struct Places {
     pub home: PathBuf,
     /// The foreground of the real pool, when `WTPOOL_FOREGROUND` names one.
     pub pool: Option<PathBuf>,
-    /// Where [`pool`](Self::pool) came from, or why there is none, for the report.
+    /// Where [`pool`](Self::pool) came from, or the reason there is none, for the report.
     pub pool_source: String,
     /// `<publisher>.<name>` of the product's extension, lower case, when `vscode/package.json`
     /// names one.
@@ -78,8 +79,8 @@ pub struct Places {
 const FOREGROUND_VARIABLE: &str = "WTPOOL_FOREGROUND";
 
 impl Places {
-    /// The user's real places: the pool is the foreground `WTPOOL_FOREGROUND` names, as for wtpool, and
-    /// none without it; wtpool has no default pool to fall back to. Inside a run's sandbox
+    /// The user's real places. The pool is the foreground `WTPOOL_FOREGROUND` names, as for
+    /// wtpool, and none without it, as wtpool has no default pool. Inside a run's sandbox
     /// (`WTPOOL_VERIFY_SANDBOX`), `WTPOOL_FOREGROUND` names the sandbox pool, never a real one.
     pub fn real() -> Self {
         let home = crate::dirs::home().unwrap_or_default();
@@ -116,7 +117,7 @@ pub fn extension_id(root: &Path) -> Option<String> {
     Some(format!("{publisher}.{name}").to_lowercase())
 }
 
-/// Whether an `~/.vscode/extensions/` folder holds a version of one of `ids`.
+/// True when an `~/.vscode/extensions/` folder holds a version of one of `ids`.
 pub fn is_extension_folder(folder: &str, ids: &[String]) -> bool {
     let folder = folder.to_lowercase();
     ids.iter().any(|id| {
@@ -148,7 +149,8 @@ pub fn snapshot(places: &Places, run_dir: &Path) -> Snapshot {
         found.sort();
         found
     });
-    // A folder that is no worktree may still lie inside another repository, which git would read.
+    // A folder that is no worktree may still lie inside another repository, and git would read
+    // that one.
     let pool = pool.filter(|pool| pool.join(".git").exists());
     let pool_found = pool.is_some();
     let listing = pool

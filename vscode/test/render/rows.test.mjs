@@ -1,4 +1,3 @@
-// R1, U1, U2 and U7: the rows of the panel against the oracle's text model.
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 

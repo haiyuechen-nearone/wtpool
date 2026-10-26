@@ -45,7 +45,7 @@ pub fn report(root: &Path, phase: u8, run: &str, run_dir: &Path) -> Result<Verdi
     for part in required_parts(phase) {
         if load_part(run_dir, part)?.is_none() {
             // Without the cc part, a machine that never recorded a live run counts the cc checks
-            // by this run's replays (crate::layers::cc).
+            // by this run's replays.
             if *part == "cc"
                 && let Some(by_replay) = crate::layers::report_by_replay(root, run_dir)
             {

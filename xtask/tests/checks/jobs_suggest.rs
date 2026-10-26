@@ -1,5 +1,5 @@
-//! Suggested heavy patterns (J22 to J24): the plugin's skill names none, the stack markers of a
-//! repository's main worktree give the table's suggestions, reading them reads names only, and a
+//! Suggested heavy patterns: the plugin's skill names none, the stack markers of a repository's
+//! main worktree give the table's suggestions, reading them reads names only, and a
 //! `package.json` gives its scripts.
 
 use std::collections::BTreeSet;
@@ -16,8 +16,8 @@ use super::status::spec;
 use crate::support::jobs::{describe, must_job_ls_json, wtpool};
 use crate::support::{Sandbox, must_repo, must_symlink};
 
-/// Commands and program names of the suggestion table and of J24, which the skill may name only
-/// inside a `wtpool job` example. `make` is left out: it is an English word too.
+/// Commands and program names of the suggestion table and the package managers. The skill may
+/// name them only inside a `wtpool job` example. `make` is left out: it is an English word too.
 const NAMED: [&str; 20] = [
     "cargo",
     "mvn",
@@ -45,7 +45,7 @@ fn is_word(c: char) -> bool {
     c.is_alphanumeric() || c == '-' || c == '_'
 }
 
-/// Whether the text before a pattern ends a `wtpool job` command: `wtpool job -- ` or
+/// True when the text before a pattern ends a `wtpool job` command: `wtpool job -- ` or
 /// `wtpool job --label <label> -- `, the label one word or quoted.
 fn wrapped(before: &str) -> bool {
     if before.ends_with("wtpool job -- ") {
@@ -147,8 +147,8 @@ enum Place {
     Held,
 }
 
-/// A bare repository `app.git` in the pool folder with its foreground `fg`, which the sandbox's
-/// `WTPOOL_FOREGROUND` names.
+/// A bare repository `app.git` in the pool folder with its foreground `fg`, the folder the
+/// sandbox's `WTPOOL_FOREGROUND` names.
 fn must_bare_pool(sandbox: &Sandbox) -> std::path::PathBuf {
     let dir = sandbox.pool_dir();
     let seed = sandbox.root.join("seed");
@@ -408,7 +408,8 @@ fn npm_build() -> Vec<String> {
     owned(&["npm run build"])
 }
 
-/// Script names J18 refuses, one of them with a right-to-left override, and `test`.
+/// Script names outside the grammar of a heavy pattern, one of them with a right-to-left
+/// override, and `test`.
 const OUTSIDE_THE_GRAMMAR: &str = "{\"scripts\": {\"test:a b\": \"x\", \"build;rm\": \"x\", \"test/x\": \"x\", \"test:\\u202e\": \"x\", \"test:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\": \"x\", \"build$(id)\": \"x\", \"test\": \"x\"}}";
 
 #[rstest]

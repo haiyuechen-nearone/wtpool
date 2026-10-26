@@ -117,7 +117,7 @@ fn drain<R: Read + Send + 'static>(mut pipe: R) -> thread::JoinHandle<String> {
     })
 }
 
-/// The text of a finished reader; an unfinished one is detached.
+/// The text of a finished reader. An unfinished one is detached, and its text is empty.
 fn join(handle: thread::JoinHandle<String>) -> String {
     if handle.is_finished() {
         handle.join().unwrap_or_default()

@@ -1,6 +1,7 @@
-//! `wtpool job ls` (J2): the rules first, then the running jobs, the waiting ones in queue order
-//! and the heavy processes outside any job; `--json` as the object of S14 with folders. And the
-//! grammar of a heavy pattern (J18), through `wtpool job heavy add` and `machine.toml`.
+//! `wtpool job ls`: the rules first, then the running jobs, the waiting ones in queue order and the
+//! heavy processes outside any job. `--json` prints the `machine.jobs` object of `wtpool status`
+//! with folders. Also the grammar of a heavy pattern, through `wtpool job heavy add` and
+//! `machine.toml`.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -22,7 +23,7 @@ fn words(line: &str) -> BTreeSet<&str> {
         .collect()
 }
 
-/// Whether `line` holds an age: digits, an optional space, then `s`, `m`, `h` or `d` alone.
+/// True when `line` holds an age: digits, an optional space, then `s`, `m`, `h` or `d` alone.
 fn has_age(line: &str) -> bool {
     let chars: Vec<char> = line.chars().collect();
     let unit_at = |at: usize| {

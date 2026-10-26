@@ -1,5 +1,5 @@
-// The scenario catalog in the render layer: every expected document of a scenario renders as
-// the oracle's text model says.
+// Every scenario of the render layer: each expected document renders as support/grammar.mjs
+// says.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -60,7 +60,7 @@ test.each(names)('%s', async (name) => {
   const observed = documents.map((status) => {
     webview.show(status);
     const note = webview.document.querySelector('.agents-off');
-    // From phase 4 a scenario of its own phase also judges U12's count and U13's line starts.
+    // A scenario of phase 4 or later also judges the agent count and the start of each agent line.
     const byPath = new Map(status.pools[0].worktrees.map((w) => [w.path, w]));
     const agents =
       scenario.phase >= 4
@@ -90,7 +90,6 @@ test.each(names)('%s', async (name) => {
     assert.deepEqual(observed[index].chips, expectedChips, `${name}, document ${index + 1}: chips`);
     if (pool.agents === 'off') {
       assert.ok(observed[index].note?.includes('agent activity is off'), `${name}: the agents off note: ${observed[index].note}`);
-      // S8 (round publish-fixups): `wtpool setup`, then the plugin's commands (H28) and `wtpool hook install` (H22).
       const note = observed[index].note ?? '';
       const setup = note.indexOf('wtpool setup');
       const hooks = ['/plugin marketplace add haiyuechen-nearone/wtpool', '/plugin install wtpool@wtpool', 'wtpool hook install'];

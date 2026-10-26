@@ -57,7 +57,6 @@ impl Registry {
         Ok(Self { layers })
     }
 
-    /// The checks a layer runs.
     pub fn in_layer(&self, layer: &str) -> BTreeSet<String> {
         self.layers
             .iter()
@@ -66,7 +65,7 @@ impl Registry {
             .collect()
     }
 
-    /// Every part that runs `check`; empty for a check the registry does not know.
+    /// Every part that runs `check`, none for a check the registry does not know.
     pub fn parts(&self, check: &str) -> BTreeSet<&'static str> {
         self.layers
             .get(check)

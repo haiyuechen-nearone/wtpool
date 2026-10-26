@@ -1,6 +1,6 @@
-//! Waits (H13): the input hash a permission wait binds by, and the question or plan that still
-//! waits when a wait ends by its call ending (status-panel.md revision 11), whether that end
-//! writes the record itself or merges into a newer writer's record (H24).
+//! Waits: the input hash a permission wait binds by, and the question or plan that still waits
+//! when a wait ends by its call ending. That end may write the record itself or merge into a
+//! newer writer's record.
 
 use std::io::Write;
 use std::process::Stdio;
@@ -161,7 +161,7 @@ fn bash_end(fixture: &'static str) -> Step {
     )
 }
 
-/// A prompt and a permission wait bound to Bash call `toolu_c1`.
+/// A prompt and a permission wait bound to the Bash call [`BASH_CALL`].
 fn permission_wait() -> Vec<Step> {
     vec![
         prompt(),
@@ -173,8 +173,8 @@ fn permission_wait() -> Vec<Step> {
     ]
 }
 
-/// What a case runs: the steps before, the PreToolUse that lands during the wait, the event
-/// that ends the wait, and the wait it must leave (`reason`, `call`), or none.
+/// The steps before a case, the PreToolUse that lands during the wait, the event that ends the
+/// wait, and the wait it must leave (`reason`, `call`), or none.
 struct Case {
     before: Vec<Step>,
     pre: Step,
@@ -214,9 +214,9 @@ fn case(name: &str) -> Case {
             ),
             expected: Some(("question", "toolu_q")),
         },
-        // Stricter reading: a wait a Notification set ends on the session's next call end,
-        // which counts as its call ending. Direct writes only: whether a merged older call end
-        // came after the Notification is not knowable from the record.
+        // A wait a Notification set ends on the session's next call end. That end counts as its
+        // call ending. The case has no older writer, as the record cannot tell if a merged older
+        // call end came after the Notification.
         "question_after_a_notification_wait" => Case {
             before: vec![
                 prompt(),
@@ -249,7 +249,7 @@ fn case(name: &str) -> Case {
 }
 
 /// Runs `end` as a hook that starts before `pre` and writes after it: the older writer merges
-/// into the record the newer one wrote (H24).
+/// into the record the newer one wrote.
 fn end_as_older_writer(hooks: &Hooks, pre: &Step, end: &Step) -> Result<(), String> {
     let older = ev(hooks, end.fixture, &end.fields);
     let newer = ev(hooks, pre.fixture, &pre.fields);

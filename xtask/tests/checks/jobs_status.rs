@@ -1,5 +1,5 @@
 //! Heavy patterns in `wtpool status` and `wtpool job ls`: builds are the processes that match a
-//! heavy pattern (S4, J19, J20), `queued` when a job holds them, and the policy's flags (J21).
+//! heavy pattern, `queued` when a job holds them, and the policy's flags.
 
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
@@ -22,7 +22,7 @@ pub(super) fn started(hooks: &Hooks, spec: &JobSpec, state: &str) -> (Job, Optio
     (job, record)
 }
 
-/// The record of a job that must have reached its state, with what the job said otherwise.
+/// The record of a job that must have reached its state. Otherwise panics with the job's stderr.
 pub(super) fn must_have(job: &Job, record: Option<Value>, what: &str) -> Value {
     record.unwrap_or_else(|| {
         panic!(

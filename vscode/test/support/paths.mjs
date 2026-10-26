@@ -1,4 +1,3 @@
-// Where the oracle finds the product's build outputs and its own data.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,11 +12,11 @@ export const VSIX = path.join(VSCODE, 'wtpool.vsix');
 export const SCENARIOS = path.join(REPO, 'verify', 'scenarios');
 export const THEMES = path.join(REPO, 'verify', 'themes');
 export const SCHEMA = path.join(REPO, 'verify', 'schema', 'status.schema.json');
-/** {@link SCHEMA} with the properties phase 4 adds: `machine.jobs` and `build.queued`. */
+/** {@link SCHEMA} with `machine.jobs` and `build.queued` added. */
 export const SCHEMA_PHASE_4 = path.join(REPO, 'verify', 'schema', 'status.phase-4.schema.json');
 export const FAKE_WTPOOL = path.join(TEST, 'fake-wtpool.mjs');
 
-/** The run folder `cargo xtask verify` gives this layer, or a scratch folder outside it. */
+/** The run folder `cargo xtask verify` gives this layer. */
 export function runDir() {
   const dir = process.env.WTPOOL_VERIFY_RUN_DIR;
   if (!dir) {

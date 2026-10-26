@@ -1,5 +1,3 @@
-// S14, U8, U10, A8 and U14 in jsdom (phase 4): the heading's machine button counts the heavy jobs
-// of `machine.jobs` and opens the machine strip; builds outside a job read `(not queued)`.
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 
@@ -19,7 +17,7 @@ const plain = () => document([worktree('fg'), worktree('wt1')]);
 const busy = busyDocument();
 const first = firstOpenDocument();
 
-/** The full template of U10's accessible name, the visible text and then every count named. */
+/** The longest accessible name the machine button may have: its text, then every count by name. */
 function fullName(value, machine) {
   const counts = [`${value.running.length} of ${value.limit} running`, `${value.waiting.length} queued`];
   counts.push(`${value.outside.length} not queued`, `${value.suggested.length} suggested`);
@@ -173,7 +171,10 @@ for (const [name, act] of [
   });
 }
 
-/** The S4 builds of phase 4 and the actors that run them, with `machine.jobs` as `value` says. */
+/**
+ * An agent's build and a row's own build outside a job, and a queued build. Without `enforce` the
+ * document has no `machine.jobs`, as an older wtpool prints it.
+ */
 function buildsDocument(enforce) {
   const wt1 = worktree('wt1', {
     branch: 'design-jobs',

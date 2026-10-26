@@ -1,6 +1,6 @@
 // Status documents and view messages for the render, shot and host layers. Every document is
-// valid against verify/schema/status.phase-4.schema.json, which only adds properties to
-// status.schema.json; `mustValidate` proves it before a test uses it.
+// valid against verify/schema/status.phase-4.schema.json, and `mustValidate` proves it before a
+// test uses it. That schema only adds properties to status.schema.json.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
@@ -33,7 +33,7 @@ function roleOf(name) {
   return /^wt\d+$/.test(name) ? 'slot' : 'unmanaged';
 }
 
-/** A worktree of the pool; the defaults follow its role. */
+/** A worktree of the pool, with defaults that follow its role. */
 export function worktree(name, overrides = {}) {
   const role = roleOf(name);
   const base = {
@@ -72,7 +72,7 @@ export function worktree(name, overrides = {}) {
 
 let actorCount = 0;
 
-/** An actor line; a session working on a Bash call unless `overrides` says otherwise. */
+/** An actor line: a session working on a Bash call unless `overrides` says otherwise. */
 export function actor(overrides = {}) {
   actorCount += 1;
   return {
@@ -91,7 +91,7 @@ export function actor(overrides = {}) {
   };
 }
 
-/** A slot or worktree on a branch that holds one actor, its activity following the actor's state (A4). */
+/** A worktree on a branch that holds one actor, its activity following the actor's state. */
 export function withActor(name, actorOverrides, worktreeOverrides = {}) {
   const one = actor(actorOverrides);
   const activity =
@@ -113,7 +113,7 @@ export function withActor(name, actorOverrides, worktreeOverrides = {}) {
   });
 }
 
-/** The repository of the pool (S10), on GitHub: its heading reads `acme/app · verify-mac` (U8). */
+/** The repository of the pool, on GitHub: its heading reads `acme/app · verify-mac`. */
 export const REPOSITORY = { name: 'app', github: 'acme/app' };
 
 export function document(worktrees, poolOverrides = {}, overrides = {}) {
@@ -136,10 +136,9 @@ export function document(worktrees, poolOverrides = {}, overrides = {}) {
   };
 }
 
-/** The webview input of verification.md, test interface 5. */
 /**
- * A webview input message (verification.md, Test interfaces item 5). `retryAt` is the next
- * restart of a `paused` view; `status` is null only before the first document.
+ * A webview input message. `retryAt` is the next restart of a `paused` view. `status` is null only
+ * before the first document.
  */
 export function view(status, { connection = 'live', lastLine = status?.generated ?? GENERATED, retryAt } = {}) {
   const message = { type: 'view', version: 1, connection, last_line: lastLine, status };
@@ -147,7 +146,7 @@ export function view(status, { connection = 'live', lastLine = status?.generated
   return message;
 }
 
-/** One worktree per activity value, as the legend lists them. */
+/** One worktree per activity value. */
 export function everyActivity() {
   return document([
     worktree('fg', { last_change: ago(300) }),
@@ -191,7 +190,7 @@ export function everyActivity() {
 
 let validator;
 
-/** Throws a setup error when `status` breaks the oracle's schema, so a test never feeds one. */
+/** Throws a setup error when `status` breaks the schema, so a test never feeds one. */
 export function mustValidate(status) {
   if (!validator) {
     const ajv = new Ajv2020({ allErrors: true, strict: false });

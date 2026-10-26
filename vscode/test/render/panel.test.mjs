@@ -1,4 +1,3 @@
-// U3, U4, U5, X2, X6, X10, X14 and X15: the panel's behaviour in jsdom.
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 
@@ -23,8 +22,8 @@ afterEach(() => {
 });
 
 /**
- * Whether a row action is offered: present, not hidden and not disabled. Row actions show on
- * hover and focus only (U4), which jsdom does not compute; shot checks that part.
+ * Tells a row action is offered: neither it nor an ancestor is hidden, and it is enabled. Row
+ * actions show on hover and focus only, and jsdom computes neither, so the shot layer judges that.
  */
 function isOffered(button) {
   for (let node = button; node && node.nodeType === 1; node = node.parentElement) {
@@ -113,8 +112,8 @@ test('actions__should_match_the_row_kind', async () => {
   const messages = webview.posted.slice(before);
 
   // Then
-  // U4's three actions, copy path only when missing; from phase 3 (X11, X12) free and fg on
-  // each slot that holds a branch, and nowhere outside the slots that are there.
+  // Every row offers copyPath, open and terminal, a missing one copyPath alone. A slot that holds
+  // a branch also offers fg and free, any other slot that is there may, and no other row does.
   const expected = status.pools[0].worktrees.map((w) => {
     const required = w.missing ? ['copyPath'] : ['copyPath', 'open', 'terminal'];
     const slotWithBranch = w.role === 'slot' && !w.missing && w.branch !== null;
@@ -489,13 +488,6 @@ test('render__should_escape_and_isolate_controls', async () => {
  */
 const SEPARATORS_AND_FORMAT = [' ', ' ', '؀', '۝', '܏', '࣢', '⁪', '￹', '\u{110bd}', '\u{1d173}', '\u{e0001}'];
 
-/** `text` with each character of SEPARATORS_AND_FORMAT as X10 writes it, `\u{XXXX}`. */
-function escapedFormat(text) {
-  return [...text]
-    .map((c) => (SEPARATORS_AND_FORMAT.includes(c) ? `\\u{${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}}` : c))
-    .join('');
-}
-
 test('render__should_escape_and_isolate_controls separators_and_format', async () => {
   // Given
   const hidden = `main${SEPARATORS_AND_FORMAT.join('x')}end`;
@@ -515,8 +507,8 @@ test('render__should_escape_and_isolate_controls separators_and_format', async (
 
   // Then
   const { data } = cells(wt1);
-  assert.equal(normalizeEscapes(text(data[2])), normalizeEscapes(escapedFormat(hidden)), 'separators or format characters in a branch do not show as \\u{XXXX}');
-  assert.ok(normalizeEscapes(seen(webview.window, data[4])).startsWith(normalizeEscapes(escapedFormat(hidden))), 'separators or format characters in an agent label do not show as \\u{XXXX}');
+  assert.equal(normalizeEscapes(text(data[2])), normalizeEscapes(visible(hidden)), 'separators or format characters in a branch do not show as \\u{XXXX}');
+  assert.ok(normalizeEscapes(seen(webview.window, data[4])).startsWith(normalizeEscapes(visible(hidden))), 'separators or format characters in an agent label do not show as \\u{XXXX}');
   const page = webview.document.body.textContent;
   const raw = SEPARATORS_AND_FORMAT.filter((c) => page.includes(c)).map((c) => c.codePointAt(0).toString(16));
   assert.deepEqual(raw, [], 'a raw separator or format character reached the page');

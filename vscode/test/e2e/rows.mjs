@@ -1,12 +1,10 @@
-// The rows of the Worktrees tab as a user reads them, and what they must read, for the e2e
-// layer. Expected rows come from the oracle's text model (support/grammar.mjs).
 import { age, expectedRow, normalizeEscapes, rowOrder } from '../support/grammar.mjs';
 
 /**
- * The rows of the panel as the oracle's text model lists them, Last included. A cell's text
- * leaves out U12's count, `.count`, and the visually hidden text U12 and U13 add for screen
- * readers, an element taken out of the flow whose box is at most 1 px square or clipped away,
- * so the text model of phases 1 to 3 reads a phase 4 row as before.
+ * The rows of the panel as support/grammar.mjs lists them, Last included. A cell's text leaves
+ * out the agent count, `.count`, and the visually hidden text for screen readers, an element taken
+ * out of the flow whose box is at most 1 px square or clipped away, so the expected text of phases
+ * 1 to 3 still matches a phase 4 row.
  */
 export async function shownRows(frame) {
   return frame.locator('tr[data-row-id]').evaluateAll((rows) =>
@@ -62,7 +60,7 @@ export function resolved(status, poolInfo) {
   );
 }
 
-/** What the rows of `status` must read, Last left out: scenario times are not the pool's. */
+/** The text the rows of `status` must read, Last left out, as scenario times are not the pool's. */
 export function expectedRows(status, poolInfo) {
   return rowOrder(resolved(status, poolInfo).pools[0].worktrees).map((w) => {
     const { last: _, ...row } = expectedRow(w, Date.now(), status.machine?.jobs);
@@ -70,7 +68,7 @@ export function expectedRows(status, poolInfo) {
   });
 }
 
-/** What each row's Last must read at `nowMs`, from a document `wtpool status --json` printed. */
+/** The text of each row's Last at `nowMs`, from a document `wtpool status --json` printed. */
 export function expectedLast(status, nowMs) {
   return Object.fromEntries(rowOrder(status.pools[0].worktrees).map((w) => [w.path, expectedRow(w, nowMs).last]));
 }
@@ -91,7 +89,7 @@ export async function rowsWithoutLast(frame) {
   return (await shownRows(frame)).map(({ last: _, ...row }) => normalizedRow(row));
 }
 
-/** Waits until the rows read `expected`, at most `timeoutMs`; returns the last rows seen. */
+/** Waits until the rows read `expected`, at most `timeoutMs`, and gives the last rows seen. */
 export async function waitForRows(frame, expected, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let seen = [];
@@ -107,7 +105,7 @@ export async function waitForRows(frame, expected, timeoutMs) {
   }
 }
 
-/** Whether a shown Last reads the age of `time` at some instant between `fromMs` and `toMs`. */
+/** Tells a shown Last that reads the age of `time` at some instant from `fromMs` to `toMs`. */
 export function lastMatches(shown, time, fromMs, toMs) {
   const allowed = new Set();
   for (let at = fromMs; at <= toMs + 999; at += 500) allowed.add(age(time, at));
@@ -115,9 +113,9 @@ export function lastMatches(shown, time, fromMs, toMs) {
 }
 
 /**
- * U12 and U13 as a row shows them: per row its count `.count` (text, whether screen readers skip
- * it, its colour and border, and whether it sits on the word's line), the activity cell's
- * visually hidden text, and per agent line its visually hidden text and its `.line-icon` box.
+ * The agent facts of each row: its count `.count` (its text, colour and border, and if screen
+ * readers skip it and it sits on the word's line), the activity cell's visually hidden text, and
+ * per agent line its visually hidden text and its `.line-icon` box.
  */
 export async function lineFacts(frame) {
   return frame.locator('tr[data-row-id]').evaluateAll((rows) =>
@@ -167,7 +165,7 @@ export async function lineFacts(frame) {
         lines: [...(cells[4]?.querySelectorAll('.line') ?? [])].map((line) => {
           const icon = line.querySelector('.line-icon');
           const box = icon?.getBoundingClientRect();
-          // The first shown character after the icon: where the line's text starts (U13).
+          // The first shown character after the icon: where the line's text starts.
           const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
           let textLeft = null;
           for (let node = walker.nextNode(); node && textLeft === null; node = walker.nextNode()) {
@@ -198,12 +196,12 @@ export async function lineFacts(frame) {
   );
 }
 
-/** U13's visually hidden start of an actor's line. */
+/** The visually hidden start of an actor's line. */
 export function statePrefix(actor) {
   return actor.state === 'idle' && actor.error ? 'idle, API error: ' : `${actor.state}: `;
 }
 
-/** What U12 and U13 make of each row of `status`: the count, the hidden text, the line prefixes. */
+/** The {@link lineFacts} each row of `status` must show: the count, hidden text, line prefixes. */
 export function expectedLineFacts(status, poolInfo) {
   return rowOrder(resolved(status, poolInfo).pools[0].worktrees).map((w) => {
     const n = w.actors.length;

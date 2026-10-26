@@ -1,5 +1,3 @@
-// The flows of the panel's look (verification.md, "User flows"): theme switches and reduced
-// motion (U6, X13, X14). The narrow window is in flows-clipboard.spec.mjs.
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { test } from '@playwright/test';
@@ -11,7 +9,7 @@ import { openStatus, poll, withFlow, worktreePath } from './flows.mjs';
 import { PHASE, agent } from './jobs.mjs';
 import { panelFrame, runCommand, sleep, startProcess, writeSettings } from './vscode.mjs';
 
-/** Each theme with the test of its webview body classes, which VS Code sets per theme kind. */
+/** Each theme with the test of its webview body classes. VS Code sets them per theme kind. */
 const THEMES = [
   ['Default Light Modern', 'vscode-light', (c) => c.includes('vscode-light') && !c.some((k) => k.startsWith('vscode-high-contrast'))],
   ['Default Dark Modern', 'vscode-dark', (c) => c.includes('vscode-dark') && !c.some((k) => k.startsWith('vscode-high-contrast'))],
@@ -21,7 +19,7 @@ const THEMES = [
 
 /**
  * Each row's word and icon colour, and the colour of each group token, in the page. A page that
- * reloaded detaches its frame, which reads as no marker and no rows.
+ * reloaded detaches its frame, and that reads as no marker and no rows.
  */
 async function colours(frame) {
   return frame.evaluate((tokens) => {
@@ -119,8 +117,8 @@ test('flow__reduced_motion', async () => {
       assert.ok(frame, 'Worktrees: Open Status showed no tab with rows');
       const building = expectedRows(documents[0], poolInfo);
       const rows = await waitForRows(frame, building, 15_000);
-      // From phase 4 an agent line starts with a state icon, the working robot among them, which
-      // never moves, with or without reduce motion (U13).
+      // From phase 4 an agent line starts with a state icon, the working robot among them, and it
+      // never moves, with or without reduce motion.
       reader = PHASE >= 4 ? agent(session, { id: 'reader', title: 'Read in wt2', cwd: poolInfo.fg }) : null;
       let lineIcons = 0;
       if (reader) {
@@ -144,7 +142,7 @@ test('flow__reduced_motion', async () => {
             .map((a) => `${a.animationName ?? a.constructor.name} on ${a.effect?.target?.closest?.('tr')?.dataset?.rowId ?? a.effect?.target?.tagName}${a.effect?.pseudoElement ?? ''}`),
         );
       const state = { body: await frame.evaluate(() => document.body.className), running: await running() };
-      // The control: without the class the building row's dial spins (U6), so the check above
+      // The control: without the class the building row's dial spins, so the check above
       // is not empty by construction. The class goes back at once.
       await frame.evaluate(() => document.body.classList.remove('vscode-reduce-motion'));
       const spinning = await running();

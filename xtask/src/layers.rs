@@ -1,6 +1,6 @@
-//! The layers phase 1 adds (verification.md, "Layers"): the static checks of the extension,
-//! `render`, `host`, `shot`, `e2e` and `bench`, and the product builds they test through:
-//! `npm run build`, `npm run package` and `npm run generate` in vscode/.
+//! The layers besides `int`: the static checks, `render`, `host`, `shot`, `e2e`, `bench` and
+//! `cc`, and the product builds they test through, `npm run build`, `npm run package` and
+//! `npm run generate` in vscode/.
 //!
 //! `WTPOOL_VERIFY_WINDOWS=0` records the checks of `host` and `e2e`, the layers that open VS Code
 //! windows, as not run, for runs inside a time when windows may not take focus.

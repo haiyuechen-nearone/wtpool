@@ -1,4 +1,4 @@
-//! The bench part and the machine_busy rule of verification.md, "Budgets".
+//! The bench part and its machine_busy rule.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -14,7 +14,7 @@ use crate::results::CheckResult;
 use crate::system::{self, Process};
 use crate::web::{self, Registry};
 
-/// The bench part: waits for an idle machine, then runs the Rust budgets and B8.
+/// The bench part: waits for an idle machine, then runs the Rust and the Chromium budgets.
 pub fn bench(ctx: &Ctx) -> Vec<CheckResult> {
     let registry = match Registry::load(&ctx.root) {
         Ok(registry) => registry,
@@ -30,7 +30,7 @@ pub fn bench(ctx: &Ctx) -> Vec<CheckResult> {
         return Vec::new();
     }
     let mut results = Vec::new();
-    // Its builds hold the machine's verify lock shared, as any part does; the budgets hold it
+    // Its builds hold the machine's verify lock shared, as any part does. The budgets hold it
     // alone.
     let builds = machine_lock::turn();
     let release = match release_wtpool(ctx) {
@@ -83,8 +83,8 @@ pub fn bench(ctx: &Ctx) -> Vec<CheckResult> {
             },
         ));
     }
-    // A busy machine only slows a budget down, so a pass still holds; each result says the load
-    // went unread, never skipping the wait in silence.
+    // A busy machine only slows a budget down, so a pass still holds. Each result says the load
+    // went unread, so the wait is never skipped in silence.
     if let Some(reason) = &idle.unmeasured {
         for result in &mut budgets {
             result.message = format!(
@@ -154,8 +154,8 @@ struct Idle {
 
 /// Waits, at most `limit`, until no other verify part holds the machine's verify `lock`, at most
 /// half the cores are busy and no build runs outside `run_dir`. `Ok` once idle, or at once when
-/// this system gives no reading, so the budgets run and say so; the reason it is still busy
-/// otherwise.
+/// this system gives no reading, so the budgets run and say so. Otherwise the reason it is still
+/// busy.
 fn wait_for_idle_machine(
     run_dir: &Path,
     lock: Result<&Path, &str>,
@@ -207,8 +207,8 @@ fn wait_for_idle_machine(
 /// The length of one reading of the CPU use.
 const CPU_SAMPLE: Duration = Duration::from_secs(3);
 
-/// The state of the machine, read the same way on every system (crate::system). The use of all
-/// cores over a sample stands for the load: Windows has no load average.
+/// The state of the machine, read the same way on every system through [`crate::system`]. The
+/// use of all cores over a sample stands for the load, as Windows has no load average.
 #[derive(Debug)]
 enum Machine {
     Idle,
@@ -248,14 +248,15 @@ fn foreign_build(listed: &Processes, me: u32, run_dirs: &[PathBuf]) -> Option<St
     listed.iter().find_map(|(pid, process)| {
         let name = &process.name;
         let is_build = name == "cargo" || name.starts_with("cargo-") || name == "rustc";
-        // An empty folder is one this account may not read: outside, as nothing says otherwise.
+        // An empty `cwd` is one this account may not read. It counts as outside, as nothing says
+        // otherwise.
         let inside = run_dirs.iter().any(|dir| process.cwd.starts_with(dir));
         (is_build && !own.contains(pid) && !inside)
             .then(|| format!("a build runs outside the sandbox: {name} ({pid})"))
     })
 }
 
-/// Reads the machine over `sample`; a build inside `run_dir` is the run's.
+/// Reads the machine over `sample`. A build inside `run_dir` is the run's.
 fn machine(run_dir: &Path, sample: Duration) -> Machine {
     let (used, cores) = match system::cpu_use(sample) {
         Ok(reading) => reading,

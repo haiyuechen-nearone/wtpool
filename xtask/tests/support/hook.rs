@@ -1,10 +1,8 @@
 //! `wtpool hook` in a sandbox pool, from a fake `claude` of the process table (`WTPOOL_VERIFY_PROCS`) at
 //! a fake time (`WTPOOL_VERIFY_CLOCK`).
 //!
-//! The process table gives `pid`, `ppid`, `started`, `name` and `cwd` per process, so the hook
-//! finds its parent through it: its own line names the parent, and the parent's line its start
-//! time. Each run copies the table and a `/bin/sh` wrapper adds the hook's own line, `ppid` the
-//! fake `claude`, before it `exec`s `wtpool`, so the hook keeps the wrapper's pid.
+//! The hook finds its parent through the table: its own line names the parent, and the parent's
+//! line gives the parent's start time. [`WRAPPER`] adds the hook's own line.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{OsStr, OsString};
@@ -20,25 +18,26 @@ use xtask::pool::{Pool, PoolSpec, WorktreeSpec};
 
 use super::{Sandbox, must_repo, must_status_json, must_wtpool_bin, set_executable};
 
-/// The fake `claude` most checks run their hooks from.
+/// The pid of the fake `claude` most checks run their hooks from.
 pub const CLAUDE: u32 = 7001;
 pub const CLAUDE_STARTED: &str = "2026-10-20T11:00:00Z";
 pub const START: &str = "2026-10-20T12:00:00Z";
 
 static RUNS: AtomicUsize = AtomicUsize::new(0);
 
+/// Adds the hook's own line to a copy of the table, then `exec`s `wtpool`, so the hook keeps the
+/// pid that line names. A POSIX shell, on Unix only.
+///
 /// Arguments: the table copy, the fake parent, the hook's start time and `wtpool`, then its arguments.
 /// The start time is the real one, to the microsecond, so writers that start apart stay apart
-/// whether `wtpool` reads its own start time from the table or the kernel (H24). A POSIX shell, on
-/// Unix only: only `exec` keeps the pid the line names.
+/// both when `wtpool` reads its own start time from the table and when it asks the kernel.
 const WRAPPER: &str = "#!/bin/sh
 table=$1; parent=$2; started=$3; wtpool=$4; shift 4
 printf '{\"pid\":%s,\"ppid\":%s,\"started\":\"%s\",\"name\":\"wtpool\",\"cwd\":\"/\"}\\n' \"$$\" \"$parent\" \"$started\" >> \"$table\"
 WTPOOL_VERIFY_PROCS=\"$table\" exec \"$wtpool\" \"$@\"
 ";
 
-/// The pool of the scenario catalog: fg on main with an upstream, detached slots wt1 to wt3,
-/// unmanaged x on side, and `wtpool-activity/` with the sandbox marker.
+/// The pool of the scenario catalog.
 pub fn catalog_spec() -> PoolSpec {
     let detached = WorktreeSpec {
         detached: true,
@@ -78,7 +77,7 @@ pub struct Proc {
     pub name: String,
     pub cwd: PathBuf,
     pub started: String,
-    /// The arguments, the program first (J19); `None` for none readable.
+    /// The arguments, the program first. `None` when they are not readable.
     pub cmd: Option<Vec<String>>,
 }
 
@@ -92,7 +91,7 @@ pub struct Hooks {
     wrapper: PathBuf,
 }
 
-/// How one hook run differs from the default.
+/// The settings of one hook run that differ from the default.
 #[derive(Default, Clone)]
 pub struct RunOptions {
     /// The fake parent pid, [`CLAUDE`] when absent.
@@ -103,7 +102,7 @@ pub struct RunOptions {
     pub remove: Vec<String>,
     /// Raw stdin instead of the payload.
     pub stdin: Option<Vec<u8>>,
-    /// Arguments after `hook`, such as `policy` (H29).
+    /// Arguments after `hook`, such as `policy`.
     pub args: Vec<String>,
 }
 
@@ -163,7 +162,7 @@ impl Hooks {
         fs::write(&self.clock, time).expect("setup: write the clock");
     }
 
-    /// Moves the clock on by `seconds` from the time it holds.
+    /// Moves the clock on by `seconds` and returns the new time.
     pub fn advance(&self, seconds: i64) -> String {
         let now = fs::read_to_string(&self.clock).expect("setup: read the clock");
         let next = add_seconds(now.trim(), seconds);
@@ -218,7 +217,7 @@ impl Hooks {
         fs::write(&self.table, text).expect("setup: write the process table");
     }
 
-    /// The environment of every `wtpool` this sandbox runs, the clock and table included.
+    /// The variables that give a `wtpool` of this sandbox its clock and process table.
     pub fn base_envs(&self) -> Vec<(&'static str, OsString)> {
         vec![
             ("WTPOOL_VERIFY_CLOCK", self.clock.clone().into_os_string()),
@@ -226,7 +225,8 @@ impl Hooks {
         ]
     }
 
-    /// The command of one hook run, not yet started, and the stdin it gets.
+    /// The command of one hook run, not yet started. Each run gets its own copy of the table, as
+    /// [`WRAPPER`] appends to it.
     pub fn command(&self, payload: &Value, options: &RunOptions) -> Command {
         let number = RUNS.fetch_add(1, Ordering::SeqCst);
         let copy = self.sandbox.root.join(format!("procs-run-{number}.jsonl"));
@@ -303,7 +303,6 @@ impl Hooks {
         run
     }
 
-    /// Runs `wtpool hook gc` with the clock and table.
     pub fn gc(&self) -> Output {
         let envs = self.base_envs();
         let envs: Vec<(&str, &OsStr)> = envs.iter().map(|(k, v)| (*k, v.as_os_str())).collect();
@@ -311,7 +310,6 @@ impl Hooks {
             .run_in(&must_wtpool_bin(), &["hook", "gc"], &self.pool.fg, &envs)
     }
 
-    /// `wtpool status --json` with the clock and table.
     pub fn status(&self) -> Value {
         let envs = self.base_envs();
         let envs: Vec<(&str, &OsStr)> = envs.iter().map(|(k, v)| (*k, v.as_os_str())).collect();
@@ -328,7 +326,7 @@ impl Hooks {
         serde_json::from_str(&text).ok()
     }
 
-    /// The record of `stem`, which the hook must have written.
+    /// The record of `stem`, panicking when the hook wrote none.
     pub fn must_record(&self, stem: &str) -> Value {
         self.record(stem).unwrap_or_else(|| {
             panic!(
@@ -356,9 +354,8 @@ impl Hooks {
     }
 }
 
-/// Waits for `child` up to `limit`, then kills it; its output either way. The wait blocks on
-/// the child, so it adds no polling delay to what a budget measures (B1); a watchdog thread
-/// kills the child only if it outlives `limit`.
+/// The output of `child`, killed once it runs longer than `limit`. The wait blocks on the child
+/// and a watchdog thread does the kill, so no polling delay adds to the time a budget measures.
 pub fn wait_output(child: Child, limit: Duration) -> Output {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -457,7 +454,7 @@ pub fn fixture(pool: &Pool, name: &str) -> Value {
     value
 }
 
-/// Every hand written fixture with its name, placeholders resolved to `pool`.
+/// Every hand written fixture and recorded payload with its name, placeholders resolved to `pool`.
 pub fn every_fixture(pool: &Pool) -> Vec<(String, Value)> {
     let root = must_repo();
     let mut found: Vec<(String, Value)> = xtask::hooks::fixture_names(&root)
@@ -475,7 +472,7 @@ pub fn every_fixture(pool: &Pool) -> Vec<(String, Value)> {
     found
 }
 
-/// A payload of `event` for `session` running in `cwd`, from the event's base fixture.
+/// The fixture `name` as `session` sends it from `cwd`.
 pub fn event(pool: &Pool, name: &str, session: &str, cwd: &Path) -> Value {
     let mut value = fixture(pool, name);
     value["session_id"] = json!(session);

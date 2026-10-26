@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-// The recorder hook of the cc layer (verification.md, "Contract test"): it appends each hook
-// payload Claude Code sends, as read, to WTPOOL_VERIFY_CC_RECORDING, and the event with this hook's
-// parent pid and name to WTPOOL_VERIFY_CC_PARENTS. It prints nothing and exits 0.
+// The Claude Code hook of the cc layer: it records each payload and its own parent process, prints
+// nothing and exits 0.
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 

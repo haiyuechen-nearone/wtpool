@@ -1,7 +1,3 @@
-// The flows of where wtpool runs (verification.md, "User flows"; status-panel.md revision 16): the
-// extension runs wtpool in the window's first workspace folder and sets no WTPOOL_FOREGROUND (R9), says
-// what to do with no folder open (R9), and shows wtpool's error, wrapped and whole (R10, U1). VS Code
-// gets no WTPOOL_FOREGROUND or WTPOOL_SLOT_* here, only a sandbox HOME.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -72,7 +68,7 @@ test('flow__no_folder_open', async () => {
   }
 });
 
-/** The last non-empty line of what `wtpool status --watch` writes to stderr, run as the extension runs it. */
+/** The last non-empty stderr line of `wtpool status --watch`, run as the extension runs it. */
 function wtpoolError(dirs, cwd) {
   const ran = spawnSync(dirs.wtpoolPath, ['status', '--watch'], { cwd, env: env(dirs, undefined), input: '', encoding: 'utf8', timeout: 15_000 });
   assert.ok(ran.status !== 0 && !ran.error, `setup: wtpool status --watch outside a repository exited ${ran.status}: ${ran.error ?? ''}`);
@@ -82,7 +78,7 @@ function wtpoolError(dirs, cwd) {
 }
 
 test('flow__wtpool_error_shown', async () => {
-  // Given: VS Code on a folder in no git repository; the run folder's repository lies above
+  // Given: VS Code on a folder in no git repository. The run folder's repository lies above
   // GIT_CEILING_DIRECTORIES, so wtpool fails.
   const dirs = sandbox('flow__wtpool_error_shown');
   const expected = wtpoolError(dirs, dirs.workspace);

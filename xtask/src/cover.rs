@@ -18,7 +18,7 @@ pub type Lines = BTreeMap<String, BTreeMap<u32, u64>>;
 pub struct Uncovered {
     pub path: String,
     pub line: u32,
-    /// Only the builder's own tests run this line.
+    /// Only the product's own unit tests run this line.
     pub unit_only: bool,
 }
 
@@ -136,8 +136,8 @@ pub fn measure(changed: &BTreeMap<String, BTreeSet<u32>>, unit: &Lines, int: &Li
     coverage
 }
 
-/// Whether `cargo llvm-cov` measures a file of this kind: not the integration tests, benches
-/// and examples of a crate, which it leaves out of its reports.
+/// False for the integration tests, benches and examples of a crate: `cargo llvm-cov` leaves them
+/// out of its reports.
 pub fn is_measured_kind(rel: &str) -> bool {
     !rel.split('/')
         .any(|part| matches!(part, "tests" | "benches" | "examples"))
@@ -145,8 +145,8 @@ pub fn is_measured_kind(rel: &str) -> bool {
 
 pub fn is_product_source(rel: &str) -> bool {
     let rust = rel.ends_with(".rs");
-    // The extension's sources, which `render` and `host` measure through the build's source
-    // maps (V8 coverage).
+    // `render` and `host` measure the extension's sources through the build's source maps (V8
+    // coverage).
     let extension = rel.starts_with("vscode/src/")
         && WEB_SOURCES
             .iter()
@@ -168,8 +168,8 @@ pub fn merge_lines(lines: &mut Lines, more: Lines) {
     }
 }
 
-/// Lines changed since the base commit (crate::repo::base, `spec-base` when it exists) in
-/// product Rust and extension sources, untracked files included whole.
+/// Lines changed since `base` in product Rust and extension sources, untracked files included
+/// whole.
 fn changed_since_base(root: &Path, base: &str) -> Result<BTreeMap<String, BTreeSet<u32>>, String> {
     let diff = git(
         root,
@@ -228,8 +228,8 @@ pub fn check(root: &Path, run_dir: &Path) -> (CheckResult, Option<Coverage>) {
         Ok(changed) => changed,
         Err(error) => return (CheckResult::error(NAME, "cover", error), None),
     };
-    // The oracle layers: int, and from phase 1 render and host over the extension's sources.
-    // Without their lcov files no extension line would count, so cover cannot decide.
+    // The oracle layers are int, and render and host over the extension's sources. Without their
+    // lcov files no extension line would count, so cover cannot decide.
     let mut oracle_lines = parse_lcov(&int_text, root);
     let extension_changed = changed.keys().any(|rel| rel.starts_with("vscode/src/"));
     for layer in ["render.lcov", "host.lcov"] {

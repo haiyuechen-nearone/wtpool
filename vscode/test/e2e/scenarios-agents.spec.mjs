@@ -1,8 +1,3 @@
-// The phase 2 scenarios in the e2e layer: each one a check of its own, in its own VS Code on its
-// own pool, its hook steps run by the release `wtpool hook` from live stub processes (agents.mjs).
-// Each expected document's rows must show, Last read against what `wtpool status --json` printed
-// then. The visual review's e2e shots of phase 2 are taken here (verification.md, "Visual
-// review"): every document of permission_wait_and_answer and several_agents_one_worktree.
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -18,8 +13,8 @@ import { close, panelFrame, runCommand, statusJson } from './vscode.mjs';
 
 const PHASE = Number(process.env.WTPOOL_VERIFY_PHASE ?? 1);
 /**
- * R6: an agent event shows within 1 s. The wait adds the extension's 200 ms merge (W5) and a
- * second of polling and rendering, and fails at that deadline, not the 300 s test timeout.
+ * An agent event shows within 1 s. The wait adds the watch's 200 ms merge and a second of polling
+ * and rendering, and fails at that deadline, not the 300 s test timeout.
  */
 const AGENT_EVENT_MS = 3_000;
 const SHOTS = new Set(['permission_wait_and_answer', 'several_agents_one_worktree']);
@@ -32,7 +27,7 @@ const names = readdirSync(SCENARIOS)
     return scenario.phase >= 2 && scenario.phase <= PHASE && scenario.layers.includes('e2e');
   });
 
-/** The Last lines a row must read at some instant from `fromMs` to `toMs`, per `status`. */
+/** Tells a row whose Last lines read their times' ages at one instant from `fromMs` to `toMs`. */
 function lastOk(row, worktree, fromMs, toMs) {
   const times = worktree.actors.length
     ? shownActors(worktree).map((actor) => actor.updated)
@@ -58,7 +53,7 @@ for (const name of names) {
 
       // When
       const observe = async (index) => {
-        // A hook that failed is the product's failure; the rows cannot follow it.
+        // A hook that failed is the product's failure, and the rows cannot follow it.
         assert.deepEqual(steps.problems, [], `${name}: hook or files steps before document ${index + 1}`);
         const expected = expectedRows(documents[index], session.pool);
         const rows = await waitForRows(frame, expected, AGENT_EVENT_MS);
@@ -66,8 +61,8 @@ for (const name of names) {
         const shown = await shownRows(frame);
         const status = statusJson(session.dirs, session.pool);
         const to = Date.now();
-        // From phase 4 a row also counts its agent lines and starts each with its state for
-        // screen readers (U12, U13); a scenario of phase 4 checks that too.
+        // Only a scenario of phase 4 or later checks the agent count and the screen reader text of
+        // the agent lines.
         const lines = scenario.phase >= 4 ? lineProblems(await lineFacts(frame), expectedLineFacts(documents[index], session.pool)) : [];
         seen.push({ index, expected, rows, shown, status, from, to, lines });
         if (SHOTS.has(name)) {

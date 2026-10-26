@@ -1,6 +1,5 @@
-// The render layer's reach into the phase 4 parts of the panel: the heading's machine button
-// (U10), the machine strip (U11, X20), the pattern editor (U15, X22) and the agent lines' count
-// and icons (U12, U13), through the DOM of jobs.md, "Test interfaces it adds", item 5.
+// The render layer's reach into the heading's machine button, the machine strip, the pattern
+// editor and the agent lines' count and icons.
 import assert from 'node:assert/strict';
 
 import { shownActors } from './grammar.mjs';
@@ -14,7 +13,7 @@ export function strip(webview) {
   return found && isShown(webview.window, found) ? found : null;
 }
 
-/** The machine button, asserted present: phase 3 has none. */
+/** The machine button, asserted present. */
 export function mustButton(webview) {
   const found = button(webview.document);
   assert.ok(found, `the heading holds no button.machine-button (U10): ${text(webview.document.querySelector('tr.pool-heading'))}`);
@@ -71,7 +70,10 @@ export function press(webview, target, key) {
   webview.tick(20);
 }
 
-/** The accessible name of `element`: `aria-labelledby`, else `aria-label`, else its text, else `title`. */
+/**
+ * The accessible name of `element`: `aria-labelledby`, else `aria-label`, else its text, else
+ * `title`.
+ */
 export function accessibleName(element) {
   const doc = element.ownerDocument;
   const ids = element.getAttribute('aria-labelledby');
@@ -87,12 +89,12 @@ export function accessibleName(element) {
   return spoken(element) || (element.getAttribute('title') ?? '').trim();
 }
 
-/** The texts of the polite live regions (X14), joined. */
+/** The texts of the polite live regions, joined. */
 export function announced(webview) {
   return [...webview.document.querySelectorAll('[aria-live="polite"], [role="status"]')].map(text).join(' ');
 }
 
-/** Whether `element` takes part in sequential focus navigation, and its tabindex. */
+/** The tabindex of `element`, or null when sequential focus navigation skips it. */
 function tabIndex(window, element) {
   if (element.disabled || !isShown(window, element)) return null;
   const attribute = element.getAttribute('tabindex');
@@ -124,7 +126,7 @@ export function scope(webview, name) {
   return { input, list, add, error, box };
 }
 
-/** A key for each element Tab reaches from the machine button to the first row, for the X20 and X22 order. */
+/** A key for each element Tab reaches from the machine button to the first row. */
 export function stopsAfterButton(webview) {
   const order = tabOrder(webview);
   const start = order.indexOf(button(webview.document));
@@ -179,7 +181,7 @@ export function suggestions(webview) {
   }));
 }
 
-/** Posts the extension's answer to a jobSettings message (X21). */
+/** Posts the extension's answer to a jobSettings message. */
 export function answer(webview, fields) {
   webview.post({ type: 'jobSettings', version: 1, ...fields });
 }
@@ -189,15 +191,15 @@ export function settingsSince(webview, from) {
   return webview.posted.slice(from).filter((message) => message?.type === 'jobSettings');
 }
 
-/** U13's visually hidden prefix of an actor's line. */
+/** The visually hidden prefix of an actor's line. */
 export function statePrefix(actor) {
   return actor.state === 'idle' && actor.error ? 'idle, API error: ' : `${actor.state}: `;
 }
 
 /**
- * What U12 and U13 put in a row: the `.count` text, whether it is hidden from screen readers,
- * the Activity cell as a screen reader reads it, and each agent line's spoken start, its first
- * element and whether that is a hidden `.line-icon`.
+ * The agent facts of a row: the `.count` text and its `aria-hidden`, the Activity cell as a screen
+ * reader reads it, and for each agent line its spoken text, its visually hidden text and its first
+ * element, a `.line-icon` hidden from screen readers or not.
  */
 export function agentFacts(window, row) {
   const cells = [...row.children].filter((child) => child.tagName === 'TD' && !child.classList.contains('actions'));
@@ -224,7 +226,7 @@ export function agentFacts(window, row) {
   };
 }
 
-/** The problems of a row against U12 and U13 for `worktree`, the word its Activity shows. */
+/** The problems of a row's agent count and lines for `worktree`, `word` its Activity word. */
 export function agentProblems(window, row, worktree, word) {
   const facts = agentFacts(window, row);
   const problems = [];

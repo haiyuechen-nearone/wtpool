@@ -23,7 +23,6 @@ pub struct WtpoolPackage {
     pub features: BTreeMap<String, Vec<String>>,
 }
 
-/// The workspace package with the `wtpool` binary, from `cargo metadata`.
 pub fn wtpool_package(ctx: &Ctx) -> Result<WtpoolPackage, String> {
     let text = cmd::output(
         ctx.command("cargo")

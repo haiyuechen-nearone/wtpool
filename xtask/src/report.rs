@@ -1,5 +1,5 @@
-//! `verify --report` (verification.md, "The report"): the verdict over a run's parts, with the
-//! checks the report computes itself, written as `report.md`, `report.html` and `report.json`.
+//! `verify --report`: the verdict over a run's parts, with the checks the report computes itself,
+//! written as `report.md`, `report.html` and `report.json`.
 
 mod markdown;
 mod verdict;

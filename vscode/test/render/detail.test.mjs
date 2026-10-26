@@ -1,6 +1,3 @@
-// U5 and X15 (phase 3): the open detail strip follows every document, in place: its facts, its
-// actors' state, action and start, and the Output section (U9), while focus, selection and a
-// focused Follow button stay where they were.
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 

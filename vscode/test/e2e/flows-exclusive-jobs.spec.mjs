@@ -1,7 +1,5 @@
-// The heavy job flows of jobs.md, "User flows", driven by keys: the machine button, the pattern
-// editor, an invalid limit and a repository's first open (U10, U11, U15, X20, X21, X22, J3, J6,
-// J18, J20, J23, J24). Keys need focus in the webview, which another VS Code window takes, so
-// playwright.exclusive.config.mjs runs this file alone, as it does flows-exclusive.spec.mjs.
+// Keys need focus in the webview, and another VS Code window would take it, so
+// playwright.exclusive.config.mjs runs this file alone.
 import assert from 'node:assert/strict';
 import { appendFileSync, mkdirSync, renameSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -39,7 +37,7 @@ import { sleep, startProcess } from './vscode.mjs';
 
 const NOT_A_PATTERN = 'Not a pattern: 1 to 3 words of letters, digits and . _ + -, and : after the first, none starting with - or +; only the first may end in *.';
 
-/** The content of the codicon glyph the machine button shows, its chevron (U10). */
+/** The content of the codicon glyph the machine button shows, its chevron. */
 async function chevron(frame) {
   return frame.locator('tr.pool-heading button.machine-button').evaluate((button) => {
     const glyphs = [];
@@ -55,7 +53,7 @@ async function chevron(frame) {
 
 /**
  * Presses Tab, then Shift+Tab, until the focus key passes `matches`, at most `limit` times each
- * way, as a keyboard user looks for a control; the key it reached.
+ * way, as a keyboard user looks for a control. Gives the key it reached.
  */
 async function pressUntil(session, frame, matches, limit = 30) {
   for (const key of ['Tab', 'Shift+Tab']) {
@@ -127,12 +125,15 @@ test('flow__jobs_open_from_heading', async () => {
   });
 });
 
-/** The chips of a scope's list (U15), each its text, in order. */
+/** The chips of a scope's list, each its text, in order. */
 async function chips(frame, scope) {
   return frame.locator(`tr.machine-detail ul.heavy-chips[data-scope="${scope}"] li.heavy-chip`).evaluateAll((items) => items.map((li) => li.textContent.replace(/\s+/g, ' ').trim()));
 }
 
-/** The text of the element an input's aria-describedby names, and whether it is a `.heavy-error` or `.limit-error`. */
+/**
+ * The text and colour of the `.heavy-error` or `.limit-error` an input's aria-describedby names,
+ * with the ids it names.
+ */
 async function describedText(input) {
   return input.evaluate((el) => {
     const ids = (el.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
@@ -243,7 +244,7 @@ test('flow__jobs_invalid_value', async () => {
       tried.push({ value, invalid: await limit.getAttribute('aria-invalid'), error: await describedText(limit), live: await liveText(frame), focus: await focusKey(frame) });
     }
     const runsAfterInvalid = loggedRuns(logging.log);
-    // wtpool refuses a write through a symlinked machine.toml (J6), naming its target.
+    // wtpool refuses a write through a symlinked machine.toml, naming its target.
     const file = machineTomlPath(session.dirs);
     const target = path.join(session.dirs.root, 'machine-target.toml');
     renameSync(file, target);

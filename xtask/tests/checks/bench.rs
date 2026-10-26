@@ -1,8 +1,7 @@
-//! The Rust budgets of the bench part, in the int test binary but run only by the bench part (verification.md, "Budgets"): B1, B3 to B6 and from phase 4 B12 to B14, measured on
-//! the release `wtpool` (`WTPOOL_BIN`) in a pool with 4 worktrees cloned from the repository
-//! `WTPOOL_BENCH_SOURCE` names, by default this one; naming a larger repository measures on it. The
-//! harness waits for an idle machine first and reports `machine_busy` otherwise. No budget is
-//! ever raised.
+//! The Rust budgets of the bench part. They live in the int test binary, but only the bench part
+//! runs them. Each measures the release `wtpool` (`WTPOOL_BIN`) in a pool of 4 worktrees cloned
+//! from the repository that `WTPOOL_BENCH_SOURCE` names, this one by default. The harness waits
+//! for an idle machine first and reports `machine_busy` otherwise.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -64,8 +63,8 @@ pub(super) fn must_bench_pool(name: &str) -> BenchPool {
     );
     // The bare copy keeps no remote outside the run folder.
     must_git(&origin, &["remote", "remove", "origin"]);
-    // A source on a detached HEAD, as a frozen or CI checkout, leaves the copy no branch at
-    // HEAD, so every commit of the slots would count as unreferenced; a branch there gives `fg`
+    // A source on a detached HEAD, such as a frozen or CI checkout, leaves the copy no branch at
+    // HEAD, so every commit of the slots would count as unreferenced. A branch there gives `fg`
     // one, as in a pool someone works in.
     if git_in(&origin, &["symbolic-ref", "--quiet", "HEAD"]).is_err() {
         must_git(&origin, &["branch", "bench", "HEAD"]);
@@ -155,7 +154,7 @@ fn budget__b4() {
     let pool = must_bench_pool("b4");
     let mut watch = Watch::must_start(&pool.sandbox, &[]);
     let first = watch.settle_after_heartbeat();
-    // From the first document's counts, so the source's history never decides what to wait for.
+    // From the first document's counts, so the source's history never decides the awaited counts.
     let mut expected = SLOTS.map(|slot| {
         count(&first, slot, "unreferenced").unwrap_or_else(|| {
             panic!("setup: the first document gives {slot} no unreferenced count")

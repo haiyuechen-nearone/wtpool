@@ -1,4 +1,4 @@
-// B7 and B10 in the extension host: what the extension posts, and that no wtpool outlives the tab.
+// The extension's posts to the webview, and no wtpool outliving the tab, in the extension host.
 const assert = require('node:assert/strict');
 const vscode = require('vscode');
 

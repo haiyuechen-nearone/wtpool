@@ -1,5 +1,4 @@
-//! Record files under concurrent and hostile conditions (H18, H24) and the process a record
-//! names (H19).
+//! Record files under concurrent and hostile conditions, and the process a record names.
 
 use std::fs;
 use std::io::Write;
@@ -15,8 +14,7 @@ use serde_json::{Value, json};
 use crate::support::hook::{CLAUDE, CLAUDE_STARTED, Hooks, RunOptions, event, wait_output, with};
 use crate::support::must_symlink;
 
-/// Load models one wtpool instance with fewer than 10 worktrees (verification.md, Budgets): H18's
-/// parallel writers, and H24's writers and rounds.
+/// The writers and rounds model the load of one wtpool instance with fewer than 10 worktrees.
 const WHOLE_WRITERS: usize = 16;
 const UPDATE_WRITERS: usize = 8;
 const UPDATE_ROUNDS: usize = 10;
@@ -50,7 +48,7 @@ fn spawn(hooks: &Hooks, payload: &Value, options: &RunOptions) -> Child {
     child
 }
 
-/// Waits for every child; the exit codes that were not 0, with their stderr.
+/// Waits for every child and returns each exit status other than 0, with its stderr.
 fn wait_all(children: Vec<Child>) -> Vec<String> {
     children
         .into_iter()
@@ -120,7 +118,7 @@ fn hook__should_not_follow_a_symlinked_record(#[case] kind: &str) {
     );
 }
 
-/// A record's limit: `wtpool status` and the hook refuse to read a larger one (H18).
+/// The size limit of a record. `wtpool status` and the hook refuse to read a larger one.
 const MAX_RECORD: usize = 16 * 1024;
 
 /// A folder below `fg` whose path is `length` bytes longer, in parts of 200 bytes.

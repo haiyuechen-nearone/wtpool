@@ -1,5 +1,3 @@
-// J18, U15 and X22 in jsdom (phase 4): the pattern editor of the machine strip, its chips per
-// scope and the suggestions, the webview's own check of J18, and its keyboard.
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'vitest';
 
@@ -32,7 +30,6 @@ const busy = busyDocument();
 const first = firstOpenDocument();
 const SCOPE_WORDS = { machine: 'this machine', repository: 'this repository' };
 
-/** The parts of a scope, each asserted present. */
 function mustScope(name) {
   const parts = scope(webview, name);
   assert.ok(parts.input, `the ${name} list has no input.heavy-input (U15)`);
@@ -294,7 +291,10 @@ test('heavy_editor__should_follow_the_keyboard arrows_home_end', async () => {
   assert.deepEqual(tabbable, ['-1', '0', '-1', '-1'], 'focus does not enter the list on the last focused chip (X22)');
 });
 
-/** Removes or adds the chip `index` of a list by `key`, answers, then shows `next`. */
+/**
+ * Presses `key` on `target`, answers with `fields`, then shows `next`. Gives the settings sent and
+ * the live region's text before and after the answer.
+ */
 function act(key, target, fields, next) {
   const before = webview.posted.length;
   target.focus();

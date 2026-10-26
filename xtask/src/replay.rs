@@ -1,8 +1,8 @@
-//! `cc_replay:<name>` (verification.md, "Contract test"): every `int` run replays the scrubbed
-//! recordings of the live contract run through the `verify` build of `wtpool hook`, from a fake
-//! `claude` at a fake time, and judges each session's wtpool asserts again. The live result keeps the
-//! Claude Code asserts; the replay gives the wtpool asserts for the build under test, so a session
-//! recorded once counts for every later build.
+//! `cc_replay:<name>`: every `int` run replays the scrubbed recordings of the live contract run
+//! through the `verify` build of `wtpool hook`, from a fake `claude` at a fake time, and judges
+//! each session's wtpool asserts again. The live result keeps the Claude Code asserts. The replay
+//! gives the wtpool asserts for the build under test, so a session recorded once counts for every
+//! later build.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -17,7 +17,8 @@ use crate::pool::{self, Pool, PoolSpec, WorktreeSpec};
 use crate::results::CheckResult;
 
 pub const PREFIX: &str = "cc_replay:";
-/// How a replay's failure starts when `wtpool hook` printed: a session fails on that before its asserts.
+/// The start of a replay's failure when `wtpool hook` printed. A session fails on that before its
+/// asserts.
 pub const PRINTED: &str = "wtpool hook printed";
 const LAYER: &str = "int";
 const CLAUDE: u32 = 7001;
@@ -33,11 +34,12 @@ printf '{\"pid\":%s,\"ppid\":%s,\"started\":\"2026-10-20T11:30:00Z\",\"name\":\"
 WTPOOL_VERIFY_PROCS=\"$table\" exec \"$wtpool\" \"$@\"
 ";
 
-/// Why the replay cannot run without Unix.
+/// The reason the replay cannot run without Unix.
 const NO_EXEC: &str = "the replay names wtpool hook by the pid its shell wrapper execs it under, and \
      this system has no exec";
 
-/// One state of the replay: after `payload`, what `wtpool status --json` and the records said.
+/// One state of the replay: the document of `wtpool status --json` and the records after
+/// `payload`.
 struct Snapshot {
     payload: Value,
     status: Value,
@@ -154,7 +156,7 @@ impl Sandbox {
         fs::write(&self.clock, clock_text(seconds)).map_err(|e| e.to_string())
     }
 
-    /// Runs `wtpool hook` with `payload`; its stdout, which must stay empty.
+    /// Runs `wtpool hook` with `payload` and returns its stdout. The hook must print nothing.
     fn hook(&mut self, payload: &Value) -> Result<String, String> {
         self.runs += 1;
         let copy = self.dir.join(format!("procs-{}.jsonl", self.runs));
@@ -279,7 +281,7 @@ fn expect(condition: bool, message: impl Into<String>) -> Result<(), String> {
     }
 }
 
-/// The wtpool asserts of `session` over its snapshots; `late` is the state 125 s after its last
+/// The wtpool asserts of `session` over its snapshots. `late` is the state 125 s after its last
 /// event before SessionEnd.
 fn judge(session: &str, snapshots: &[Snapshot], late: &Value) -> Result<(), String> {
     let before_end = || {
@@ -466,7 +468,7 @@ fn sessions(root: &Path) -> Vec<(String, Vec<Value>)> {
     found
 }
 
-/// Replays one session; its result and the records it left.
+/// Replays one session and returns its result and the records it left.
 fn replay(
     dir: &Path,
     wtpool: &Path,

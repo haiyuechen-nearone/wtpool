@@ -1,5 +1,5 @@
-//! The Claude Code plugin of the repository (H28) and what `wtpool hook install` says about it and
-//! about a block that is not whole (H22), from phase 3.
+//! The Claude Code plugin of the repository, and the note of `wtpool hook install` on it and on a
+//! block that is not whole, from phase 3.
 
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
@@ -17,7 +17,7 @@ use crate::support::{Sandbox, must_repo};
 /// The settings file as the note names it, with the sandbox's `HOME` and no `CLAUDE_CONFIG_DIR`.
 const SHOWN: &str = "~/.claude/settings.json";
 
-/// The plugin's key in `enabledPlugins` (H28).
+/// The plugin's key in `enabledPlugins`.
 const PLUGIN_ID: &str = "wtpool@wtpool";
 
 /// The event names among the words of `text`, so `Stop` is not found in `SubagentStop`.
@@ -30,7 +30,7 @@ fn events_named(text: &str) -> BTreeSet<&'static str> {
         .collect()
 }
 
-/// `wtpool hook install` with `settings` as `settings.json` (raw text, `None` for no file) and
+/// Runs `wtpool hook install` with `settings_text` as `settings.json`, `None` for no file, and
 /// `path` as `PATH`.
 fn install_with(
     sandbox: &Sandbox,
@@ -64,7 +64,7 @@ fn install_with(
 /// The other `wtpool` a stale block runs.
 const OTHER: &str = "/opt/elsewhere/wtpool";
 
-/// A settings file and what the note on it must name.
+/// A settings file and the words the note on it must name.
 struct Case {
     what: &'static str,
     /// The text of `settings.json`, `None` for no file.
@@ -82,7 +82,7 @@ fn edited(block: &Value, edit: impl FnOnce(&mut Value)) -> String {
     value.to_string()
 }
 
-/// H22: a note that starts `hooks missing:` names what is missing: each event without the hook,
+/// A note that starts `hooks missing:` names the missing part: each event without the hook,
 /// another `wtpool` by its path, a file that is not valid JSON, and the settings file itself.
 #[test]
 fn install__should_name_what_is_missing() {
@@ -206,9 +206,9 @@ fn install__should_name_what_is_missing() {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
-/// H28: the enabled plugin counts as present, and the note names the `wtpool` its hooks find on
-/// `PATH`, or says there is none; the plugin and the block together are `hooks present twice:`;
-/// a disabled plugin, or one of another marketplace, is missing.
+/// The enabled plugin counts as present, and the note names the `wtpool` its hooks find on
+/// `PATH`, or says there is none. The plugin and the block together are `hooks present twice:`.
+/// A disabled plugin, or one of another marketplace, is missing.
 #[test]
 fn install__should_report_the_plugin() {
     // Given
@@ -330,9 +330,9 @@ fn install__should_report_the_plugin() {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
-/// H28: the repository's marketplace `wtpool` lists the one plugin `wtpool` in `plugins/wtpool/`,
-/// whose hook file holds the block `wtpool hook install` prints, with the bare command `wtpool`;
-/// from phase 4 that block holds the policy entry (H1, H29).
+/// The repository's marketplace `wtpool` lists the one plugin `wtpool` in `plugins/wtpool/`,
+/// whose hook file holds the block `wtpool hook install` prints, with the bare command `wtpool`.
+/// From phase 4 that block holds the policy entry.
 #[test]
 fn plugin__should_hold_the_printed_block() {
     // Given

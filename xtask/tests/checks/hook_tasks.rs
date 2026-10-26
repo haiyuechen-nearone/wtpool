@@ -1,4 +1,4 @@
-//! The background tasks a record keeps (H27): the output file of each Bash call that went to the
+//! The background tasks a record keeps: the output file of each Bash call that went to the
 //! background, in Claude Code's task folder of its session, at most 5, until Claude Code's own
 //! list of its session's work in flight says it ended. The hook never opens an output file.
 
@@ -15,7 +15,7 @@ use crate::support::worktree;
 /// The project folder of the transcripts these payloads name.
 const PROJECT: &str = "-home-verify-code-app";
 
-/// The hook's watchdog (H4): a hook that opened a FIFO would wait for it.
+/// The hook's watchdog. A hook that opened a FIFO would wait for it.
 const WATCHDOG: Duration = Duration::from_millis(900);
 
 struct Tasks {
@@ -103,7 +103,7 @@ impl Tasks {
         )
     }
 
-    /// The tasks of the record `stem`: id, path and whether it ended.
+    /// The tasks of the record `stem`: their id, path, and true once ended.
     fn tasks(&self, stem: &str) -> Vec<(String, String, bool)> {
         let record = self.hooks.must_record(stem);
         record["tasks"]
@@ -130,7 +130,7 @@ impl Tasks {
     }
 }
 
-/// The letters and digits of a task id, for a call id that keeps its pattern (H17).
+/// The letters and digits of a task id, so the call id made from it keeps the pattern of call ids.
 fn call_id(id: &Value) -> String {
     let text = id.as_str().map_or_else(|| id.to_string(), str::to_owned);
     text.chars().filter(char::is_ascii_alphanumeric).collect()
@@ -171,7 +171,7 @@ fn hook__should_record_background_tasks() {
     assert!(made.success(), "setup: mkfifo failed");
     tasks.send(&tasks.ev("UserPromptSubmit", "s1", &[]));
 
-    // When: six tasks start, the first one's output file a FIFO the hook must never open.
+    // When
     let first = tasks.send(&tasks.background("s1", &json!("b1")));
     let one = tasks.tasks("s1");
     for id in ["b2", "b3", "b4", "b5", "b6"] {
@@ -199,7 +199,7 @@ fn hook__should_record_background_tasks() {
         .collect();
     assert_eq!(six, kept, "the last 5 tasks, a known id added once");
 
-    // When: calls that name no task in the session's folder.
+    // When
     tasks.send(&tasks.background("s1", &json!("../../b7")));
     tasks.send(&tasks.background("s1", &json!("b/8")));
     tasks.send(&tasks.background("s1", &json!(9)));
@@ -234,7 +234,7 @@ fn hook__should_record_background_tasks() {
         "no task outside the session's task folder"
     );
 
-    // When: the turn ends with b3 and b4 in flight, then a Stop without the list.
+    // When
     tasks.hooks.advance(60);
     tasks.send(&tasks.ev(
         "Stop",
@@ -371,8 +371,7 @@ fn actor_in_wt1(document: &Value, key: &str) -> Value {
 /// listed its build ends that task at the session's next Stop.
 #[test]
 fn hook__should_end_a_task_through_its_session() {
-    // Given: the session runs b0; subagent a1 ends its turn while its build b1 runs, and a2
-    // while b1 and its own b2 run.
+    // Given
     let tasks = Tasks::must_new("hook-tasks-session");
     tasks.send(&tasks.ev("UserPromptSubmit", "s1", &[]));
     tasks.send(&tasks.background("s1", &json!("b0")));
@@ -396,7 +395,7 @@ fn hook__should_end_a_task_through_its_session() {
     let later = tasks.hooks.advance(600);
     let stuck = tasks.hooks.status();
 
-    // When: b1 has ended, and the session's Stop lists b0 as completed and b2 as running.
+    // When
     let stop = stop_fields(&[
         entry("a2", "subagent", "running"),
         entry("b0", "shell", "completed"),
@@ -443,8 +442,8 @@ fn hook__should_end_a_task_through_its_session() {
     );
 }
 
-/// The session's turn end changes another record only under that record's lock: one whose lock
-/// path holds a folder, which no lock can be taken on, keeps its running task.
+/// The session's turn end changes another record only under that record's lock. A record whose
+/// lock path holds a folder, where no lock can be taken, keeps its running task.
 #[test]
 fn hook__should_end_no_task_of_a_record_it_cannot_lock() {
     // Given

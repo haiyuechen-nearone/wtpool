@@ -1,9 +1,7 @@
-//! The int checks: `wtpool status` and the scenarios of the catalog, run in sandbox pools (phase 1),
-//! `wtpool hook`, `wtpool hook gc`, `wtpool hook install`, `wtpool setup` and agents in `wtpool status` (phase 2),
-//! the agent guard of `wtpool free` and `wtpool fg`, the strings of git the CLI prints, the PR
-//! lookup of `wtpool bg` and the PR branches it fetches and refuses, heavy jobs, `wtpool job` and
-//! `wtpool hook policy` (phase 4, the `jobs_` and `hook_policy` modules), and the Rust budgets,
-//! which only the bench part runs (`checks::bench`).
+//! The int checks, run in sandbox pools: `wtpool status` and the scenarios of the catalog,
+//! `wtpool hook` and its subcommands, `wtpool setup`, agents in `wtpool status`, the agent guard of
+//! `wtpool free` and `wtpool fg`, the strings of git the CLI prints, the PR lookup of `wtpool bg`,
+//! heavy jobs and `wtpool job`. Only the bench part runs the Rust budgets of [`bench`].
 
 mod agent_guard;
 mod bench;

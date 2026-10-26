@@ -1,16 +1,6 @@
 #!/usr/bin/env node
-// The cc layer's runner (verification.md, "Contract test"), started by xtask/src/layers/cc.rs:
-// the contract check, then each session of the table on the installed `claude` (the SDK's
-// pathToClaudeCodeExecutable, not its bundled CLI), model claude-haiku-5-5, on the owner's login
-// with no user, project or local settings, only the run's settings file, and its configuration in
-// the run folder (sandbox.mjs). A session's canUseTool allows only its scripted calls
-// (sessions.mjs), and the contract turn has no tools. It writes WTPOOL_VERIFY_CC_RESULTS, a JSON
-// array of {check, outcome: pass | fail | needs_you | not_run, kind, code, message}, and deletes
-// the folders its sessions left in Claude Code's temporary folder and any in ~/.claude/projects/.
-//
-// A failed Claude Code assert is `assumption_broken`, a failed wtpool assert a fail. Tool calls that
-// differ from the script rerun a session twice at most, then it is `inconclusive`. Records never
-// fail.
+// The cc layer's runner, started by xtask/src/layers/cc.rs. It runs the contract check and each
+// wanted session on the installed `claude`, and writes their outcomes to WTPOOL_VERIFY_CC_RESULTS.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -56,7 +46,6 @@ function everyOther(outcome, details) {
   }
 }
 
-/** The installed claude on PATH. */
 function installedClaude() {
   return execFileSync('/usr/bin/which', ['claude'], { encoding: 'utf8' }).trim();
 }
@@ -106,7 +95,6 @@ async function contract(sdk, context) {
   if (init?.claude_code_version !== context.version) {
     problems.push(`the session ran Claude Code ${init?.claude_code_version}, not the installed ${context.version}`);
   }
-  // No side effects: the session's files stay in the run's configuration folder.
   const traces = init?.session_id ? ownerTraces(init.session_id, process.env.WTPOOL_VERIFY_RUN_DIR) : [];
   if (traces.length) problems.push(`the session wrote into the owner's Claude Code configuration: ${traces.join(', ')}`);
   return problems.length
@@ -125,7 +113,7 @@ async function runSessions(sdk, context) {
   }
   const shared = { parents: [], records: [], hookOutput: [], open: [] };
   let sessions = SESSIONS.filter((s) => WANTED.includes(s.name));
-  // The checks over all sessions need at least one session, which `--only` alone would not run.
+  // The checks over all sessions need a session to run, and `--only` with them alone selects none.
   const aggregate = ['cc_no_hook_output', 'cc_records_claude_pid'].some((check) => WANTED.includes(check));
   const silent = new Set();
   if (aggregate && !sessions.length) {
@@ -219,8 +207,6 @@ async function main() {
     writeFileSync(path.join(dirs.logs, 'transcripts-removed.json'), JSON.stringify(removed, null, 2));
     const temp = removeTempFolders(process.env.WTPOOL_VERIFY_RUN_DIR);
     writeFileSync(path.join(dirs.logs, 'temp-removed.json'), JSON.stringify(temp, null, 2));
-    // No side effects: the owner's Claude Code install stays as it was, so no session pruned or
-    // updated it.
     const changes = installChanges(install, installSnapshot());
     if (changes.length) {
       failAfter('contract__should_run_in_the_sandbox', `the owner's Claude Code install changed during the run: ${changes.join(', ')}`);

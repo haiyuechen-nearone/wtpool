@@ -1,5 +1,5 @@
 //! Work an actor started in `wtpool status`: a build below its session's harness process, or a
-//! background task of its own, keeps it working after its turn ends, until that work ends (A1).
+//! background task of its own, keeps it working after its turn ends, until that work ends.
 
 use serde_json::{Value, json};
 
@@ -21,7 +21,7 @@ fn actor(document: &Value, name: &str, key: &str) -> Value {
 
 #[test]
 fn builds__should_keep_the_session_that_started_them_working() {
-    // Given: s1 starts a build in wt1 in the background and ends its turn.
+    // Given
     let mut hooks = Hooks::must_new("own-builds");
     let wt1 = hooks.pool.worktree("wt1");
     let wt2 = hooks.pool.worktree("wt2");
@@ -40,7 +40,7 @@ fn builds__should_keep_the_session_that_started_them_working() {
     hooks.send(&ev(&hooks, "Stop", &[]));
     hooks.advance(600);
     let fg = hooks.pool.fg.clone();
-    // The session's shell and its build, an MCP server of the session, and a build of yours.
+    // The session's shell and its build, an MCP server of the session, and a build outside it.
     hooks.start_child(7100, CLAUDE, "zsh", &wt1, CLAUDE_STARTED);
     hooks.start_child(7101, 7100, "cargo-nextest", &wt1, CLAUDE_STARTED);
     hooks.start_child(7102, 7101, "cargo", &wt1, CLAUDE_STARTED);
@@ -72,12 +72,13 @@ fn builds__should_keep_the_session_that_started_them_working() {
 
 #[test]
 fn builds__should_keep_no_session_working_through_other_children() {
-    // Given: only an MCP server and a build of another process run.
+    // Given
     let mut hooks = Hooks::must_new("other-children");
     let fg = hooks.pool.fg.clone();
     let wt2 = hooks.pool.worktree("wt2");
     hooks.send(&ev(&hooks, "UserPromptSubmit", &[]));
     hooks.send(&ev(&hooks, "Stop", &[]));
+    // An MCP server of the session and a build outside it.
     hooks.start_child(7200, CLAUDE, "node", &fg, CLAUDE_STARTED);
     hooks.start_child(7201, 7200, "python3", &fg, CLAUDE_STARTED);
     hooks.start_child(7300, 1, "zsh", &wt2, CLAUDE_STARTED);
@@ -133,7 +134,7 @@ fn as_subagent(mut payload: Value) -> Value {
 
 #[test]
 fn background__should_keep_a_session_working_until_its_task_ends() {
-    // Given: s1 runs `cargo test` in wt1 in the background and ends its turn while it runs.
+    // Given
     let hooks = Hooks::must_new("background-session");
     hooks.send(&ev(&hooks, "UserPromptSubmit", &[]));
     hooks.send(&background_test(&hooks, "wt1", "b1"));
@@ -161,8 +162,7 @@ fn background__should_keep_a_session_working_until_its_task_ends() {
 
 #[test]
 fn background__should_keep_a_subagent_working_until_its_task_ends() {
-    // Given: subagent a1 runs `cargo test` in wt2 in the background and stops while it runs,
-    // and its session ends its turn.
+    // Given
     let hooks = Hooks::must_new("background-subagent");
     hooks.send(&ev(&hooks, "UserPromptSubmit", &[]));
     hooks.send(&ev(&hooks, "PreToolUse-Agent", &[]));

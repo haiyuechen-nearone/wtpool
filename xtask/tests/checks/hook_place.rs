@@ -1,4 +1,5 @@
-//! Where `wtpool hook` writes and where it places an actor: H6 to H9 and `wtpool setup`.
+//! Where `wtpool hook` writes, where it places an actor, and the commands that create
+//! `wtpool-activity`.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -18,7 +19,7 @@ fn no_activity() -> PoolSpec {
     }
 }
 
-/// A UserPromptSubmit at `cwd`, then the PreToolUse of `tool` with `input`.
+/// Sends a UserPromptSubmit at `cwd`, then `fixture` with `input`, and returns the record.
 fn place(hooks: &Hooks, session: &str, cwd: &Path, fixture: &str, input: Value) -> Option<Value> {
     hooks.send(&event(&hooks.pool, "UserPromptSubmit", session, cwd));
     let payload = with(
@@ -207,7 +208,7 @@ fn hook__should_write_only_inside_wtpool_activity() {
     );
 }
 
-/// The command and its preparation for each pool changing command.
+/// Prepares the pool changing command `case` and returns its arguments.
 fn pool_command(case: &str, pool: &xtask::pool::Pool) -> Vec<&'static str> {
     let branch = |name: &str| {
         git_in(&pool.fg, &["branch", name]).unwrap_or_else(|e| panic!("setup: git branch: {e}"));
@@ -554,7 +555,7 @@ fn placement__should_read_the_path_field_of_each_tool(
     );
 }
 
-/// Runs each command of bash-commands.toml from a fresh session; (form, record) per command.
+/// Runs each command of bash-commands.toml from a fresh session and returns it with its record.
 pub(super) fn bash_records(name: &str) -> (Hooks, Vec<(xtask::hooks::BashCommand, Option<Value>)>) {
     let hooks = Hooks::must_new(name);
     let commands =

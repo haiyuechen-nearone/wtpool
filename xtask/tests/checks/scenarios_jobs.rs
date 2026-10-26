@@ -1,6 +1,6 @@
-//! The phase 4 steps of the scenario catalog in the `int` layer: real `wtpool job` runs in the
+//! The job steps of the scenario catalog in the `int` layer: real `wtpool job` runs in the
 //! sandbox, their processes in the fake process table, and `machine.jobs` of the expected
-//! documents (S14, S15), with `{job:<name>}` and `{config}` resolved.
+//! documents, with `{job:<name>}` and `{config}` resolved.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -180,8 +180,8 @@ fn is_time(value: &Value) -> bool {
     })
 }
 
-/// The compared part of one job or process of `machine.jobs` (S14): every field but `since`,
-/// which only has to be a time, and an `outside` process's `id`, which only has to be a string.
+/// The compared part of one job or process of `machine.jobs`: every field, but `since` only has
+/// to be a time, and without `compare_id` the `id` only has to be a string.
 fn entry(item: &Value, compare_id: bool) -> Value {
     json!({
         "id": if compare_id { item["id"].clone() } else { json!(item["id"].is_string()) },
@@ -217,10 +217,10 @@ fn sorted_list(list: &Value) -> Vec<String> {
     found
 }
 
-/// What `actual`'s `machine.jobs` gets wrong against `expected`'s, when the expected document
-/// has one: settings and sources as they are but `default`, which only has to be a limit of J5,
-/// patterns and suggestions in any order, running jobs in any order, waiting jobs in queue order
-/// and outside processes newest first.
+/// The faults of `actual`'s `machine.jobs` against `expected`'s, when the expected document has
+/// one. Settings and sources compare as they are, but `default` only has to be a whole number
+/// from 1 to 8. Patterns, suggestions and running jobs compare in any order, waiting jobs in
+/// queue order and outside processes newest first.
 pub(super) fn job_differences(expected: &Value, actual: &Value) -> Vec<String> {
     let want = &expected["machine"]["jobs"];
     if !want.is_object() {
@@ -231,7 +231,7 @@ pub(super) fn job_differences(expected: &Value, actual: &Value) -> Vec<String> {
         return vec![format!("machine.jobs: expected {want}, got {got}")];
     }
     let mut found = Vec::new();
-    // The default limit follows this machine's cores (J5), so a scenario fixes `limit` instead.
+    // The default limit follows this machine's cores, so a scenario fixes `limit` instead.
     if !got["default"]
         .as_u64()
         .is_some_and(|n| (1..=8).contains(&n))

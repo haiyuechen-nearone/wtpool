@@ -1,5 +1,4 @@
-//! What a record holds after each event: the event table (H11), calls in flight (H12), waits
-//! (H13) and summaries (H14).
+//! The record each event leaves: its state, the calls in flight, waits and summaries.
 
 use rstest::rstest;
 use serde_json::{Value, json};
@@ -131,8 +130,8 @@ fn transition(case: &str) -> (Vec<Step>, &'static str, &'static str, Option<&'st
             steps.extend(waiting_on_bash());
             ("s1", "waiting", Some("permission"))
         }
-        // The three call ends start from a wait bound to their call (phase 2 review 1): from
-        // `working` they could not fail.
+        // The three call ends start from a wait bound to their call, as from `working` they could
+        // not fail.
         "post_tool_use" => {
             steps.extend(waiting_on_bash());
             steps.push(end_of_waited_call("PostToolUse-Bash"));
@@ -437,7 +436,7 @@ fn in_flight__should_keep_at_most_32() {
     );
 }
 
-/// H14 from phase 4: a Bash call's summary skips `wtpool job` with its options up to `--`.
+/// A Bash call's summary skips `wtpool job` with its options up to `--`.
 fn job_summaries(hooks: &Hooks) -> Vec<String> {
     let cases = [
         ("s-job", "wtpool job -- cargo test", "cargo test"),

@@ -1,6 +1,6 @@
-// The oracle's lint rules for the extension's sources, grouped by the check that runs them:
-// lint__no_html_sinks (X10), lint__no_colour_literals (X13) and lint__no_network_modules (X17).
-// vscode/eslint.config.mjs applies every group; vscode/test/lint/check.mjs runs one group alone.
+// Lint rules for the extension's sources, one group per check: lint__no_html_sinks,
+// lint__no_colour_literals and lint__no_network_modules. vscode/eslint.config.mjs applies every
+// group, and vscode/test/lint/check.mjs runs one group alone.
 
 export const NETWORK_MODULES = ['net', 'http', 'https', 'tls', 'dgram', 'http2'];
 const NETWORK_MODULE = `^(node:)?(${NETWORK_MODULES.join('|')})(/.*)?$`;
@@ -14,7 +14,9 @@ const NETWORK = 'X17: no networking module, no server';
 
 const HEX = '#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})';
 const COLOUR_FUNCTION = '\\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix|light-dark)\\(';
-/** A string that is a hex colour, or that holds a CSS declaration with one, or a colour function. */
+/**
+ * A string that is a hex colour, or that holds a CSS declaration with one, or a colour function.
+ */
 const COLOUR_TEXT = `/^\\s*${HEX}\\s*$|:\\s*${HEX}\\b|${COLOUR_FUNCTION}/`;
 
 export const groups = {

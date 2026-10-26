@@ -1,5 +1,5 @@
-//! Jobs in `wtpool status`: the lists of `machine.jobs` (S14), each job's worktree and actor
-//! (S15), and the decay table of A1 with a job of the actor's own (A8).
+//! Jobs in `wtpool status`: the lists of `machine.jobs`, each job's worktree and actor, and the
+//! decay table with a job of the actor's own.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{OsStr, OsString};
@@ -39,7 +39,7 @@ fn of_agent(mut payload: Value, agent: &str) -> Value {
     payload
 }
 
-/// Sends `payload` from the fake harness process `parent`; the hook must exit 0.
+/// Sends `payload` from the fake harness process `parent`. The hook must exit 0.
 fn send_from(hooks: &Hooks, parent: u32, payload: &Value) {
     let options = RunOptions {
         parent: Some(parent),
@@ -49,7 +49,6 @@ fn send_from(hooks: &Hooks, parent: u32, payload: &Value) {
     assert_eq!(run.code(), Some(0), "wtpool hook: {}", run.describe());
 }
 
-/// Each entry of the job folder with its size, mtime, mode and inode.
 fn folder_state(dir: &Path) -> BTreeMap<PathBuf, FileState> {
     fs::read_dir(dir)
         .map(|entries| {
@@ -216,12 +215,12 @@ fn status__should_attribute_jobs() {
     );
 }
 
-/// Whether `case` of the decay table is one of A8's, with a job of s1's own.
+/// True for the cases of the decay table with a job of s1's own.
 pub(super) fn is_job_case(case: &str) -> bool {
     case.starts_with("job_")
 }
 
-/// Runs one A8 case of `decay__should_match_the_table`, from phase 4: s1's job waits or runs, and
+/// Runs one job case of `decay__should_match_the_table`, from phase 4: s1's job waits or runs, and
 /// s1 shows the state and action of the case 300 s after its events, `None` leaving the action
 /// unchecked.
 pub(super) fn must_decay_with_a_job(case: &str) {
@@ -323,7 +322,7 @@ pub(super) fn must_decay_with_a_job(case: &str) {
     }
 }
 
-/// `value` with every object that lists `properties` closed, as wtpool emits only those (S12).
+/// Closes every object of `value` that lists `properties`, as wtpool emits no other key.
 fn closed(value: &mut Value) {
     match value {
         Value::Object(map) => {
@@ -370,8 +369,8 @@ fn keys(value: &Value, found: &mut BTreeSet<String>) {
     }
 }
 
-/// The compared fields of each job or process of a list: id (or whether it is one), summary,
-/// label, worktree, actor, and whether `since` is a time.
+/// The compared fields of each job or process of `list`. `since` compares as true when it is a
+/// time, and without `ids` the id as true when it is a string that is not empty.
 fn rows(list: &Value, ids: bool) -> Vec<Value> {
     list.as_array()
         .into_iter()

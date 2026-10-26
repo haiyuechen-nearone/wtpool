@@ -1,4 +1,4 @@
-// X2, X8, X16 and X17 in a real VS Code. The scenario catalog runs in flow__every_activity_shows.
+// The panel in a real VS Code. The scenarios run in flow__every_activity_shows.
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { test } from '@playwright/test';
@@ -83,7 +83,7 @@ test('windows__should_run_one_watcher_each', async () => {
     await runCommand(window, 'Worktrees: Open Status');
     assert.ok(await panelFrame(window), 'the first window shows no rows');
 
-    // When: a second window on the same folder (R9: a window without one runs no wtpool).
+    // When: a second window on the same folder, as a window without one runs no wtpool.
     const second = await newWindow(session, poolInfo);
     await runCommand(second, 'Worktrees: Open Status');
     const secondFrame = await panelFrame(second);

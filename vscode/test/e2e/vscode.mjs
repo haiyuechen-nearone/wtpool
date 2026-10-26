@@ -1,6 +1,5 @@
-// Drives a real VS Code with the packaged extension and the release wtpool for the e2e layer. Every
-// folder VS Code and wtpool write is below <run>/e2e/: user data, extensions, home and temp. wtpool sees
-// a sandbox pool each check attempt builds from a scenario file ({@link pool}), in Asia/Kolkata.
+// Drives a real VS Code with the packaged extension and the release wtpool. Every folder VS Code
+// and wtpool write is below <run>/e2e/: user data, extensions, home and temp.
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import {
@@ -37,8 +36,8 @@ function attemptName(key) {
 }
 
 /**
- * A fresh sandbox pool of `scenario` in <run>/e2e/pools/<key>, built by `cargo xtask pool`
- * (WTPOOL_VERIFY_XTASK), replacing what an earlier attempt left: {scenario, dir, fg, common}.
+ * A fresh sandbox pool of `scenario` in <run>/e2e/pools/<key>, built by `cargo xtask pool` over the
+ * one an earlier attempt left: {scenario, dir, fg, common}.
  */
 export function pool(scenario, key = scenario) {
   const xtask = process.env.WTPOOL_VERIFY_XTASK;
@@ -119,7 +118,7 @@ export function sandbox(name, { settings = {}, wtpoolPath, earlierBuilds = true 
 /**
  * `<run>/e2e`, symlinks resolved: the `GIT_CEILING_DIRECTORIES` of every sandbox process, so git
  * and wtpool, looking for the repository a folder of the run is in, never climb into the repository
- * that holds the run folder (R9: the extension runs wtpool in the workspace folder).
+ * that holds the run folder.
  */
 export function ceiling() {
   const dir = path.join(runDir(), 'e2e');
@@ -129,7 +128,8 @@ export function ceiling() {
 
 /**
  * The environment of VS Code and every process it starts. With `poolInfo` it names the pool in
- * `WTPOOL_FOREGROUND` and `WTPOOL_SLOT_DIR`; without, wtpool finds the pool from its working directory (R9).
+ * `WTPOOL_FOREGROUND` and `WTPOOL_SLOT_DIR`. Without, wtpool finds the pool from its working
+ * directory.
  */
 export function env(dirs, poolInfo) {
   const variables = {
@@ -162,11 +162,11 @@ export async function workbench(window) {
 
 /**
  * Starts VS Code on `folder`, by default `dirs.workspace`, or with null on no folder, and returns
- * the session: {app, window, dirs, output, env}. `output` collects what VS Code prints, so
- * {@link close} can find keychain errors; `env` is the environment VS Code got. On macOS VS Code
+ * the session: {app, window, dirs, output, env}. `output` collects VS Code's output, so
+ * {@link close} can find keychain errors. `env` is the environment VS Code got. On macOS VS Code
  * runs as an app that is never active, with a private clipboard and windows that do not show
- * (support/background.mjs, support/main-hooks.mjs); a side effect the hooks refuse goes to
- * <run>/e2e/side-effects.txt, which fails the layer (layers.rs).
+ * (support/background.mjs, support/main-hooks.mjs). A side effect the hooks refuse goes to
+ * <run>/e2e/side-effects.txt and fails the layer (layers/focus.rs).
  */
 export async function launch(dirs, poolInfo, extraArgs = [], { folder = dirs.workspace } = {}) {
   const variables = env(dirs, poolInfo);
@@ -187,7 +187,7 @@ export async function launch(dirs, poolInfo, extraArgs = [], { folder = dirs.wor
     env: variables,
     timeout: 120_000,
   });
-  // A failed launch shows at `await launching`, after a failed release, which stops VS Code.
+  // A failed launch shows at `await launching`. A failed release stops VS Code first.
   launching.catch(() => {});
   await background.release().catch(async (error) => {
     await launching.then((started) => started.close(), () => {});
@@ -207,10 +207,9 @@ export async function launch(dirs, poolInfo, extraArgs = [], { folder = dirs.wor
 /**
  * Opens a second window of the session's VS Code on `folder`, by default a second empty folder of
  * the sandbox, as a user does with `code --new-window <folder>`: the CLI hands the folder to the
- * running VS Code, which shows the window that has a folder open already rather than a second
- * one. A window needs a folder for the tab to run wtpool (R9), so the "New Window" command, which
- * opens none, no longer gives a window that shows the pool. Returns the window, its workbench
- * loaded.
+ * running VS Code, and it shows the window that has a folder open already rather than a second
+ * one. A window needs a folder for the tab to run wtpool, so the "New Window" command, opening
+ * none, gives no window that shows the pool. Returns the window, its workbench loaded.
  */
 export async function newWindow(session, poolInfo, folder = path.join(session.dirs.root, 'workspace-2')) {
   const { dirs } = session;
@@ -226,7 +225,7 @@ export async function newWindow(session, poolInfo, folder = path.join(session.di
 
 /**
  * Closes VS Code and removes the sandbox's short link. A keychain error in VS Code's output
- * goes to <run>/e2e/keychain.txt, which fails the layer (layers.rs).
+ * goes to <run>/e2e/keychain.txt and fails the layer (layers/js.rs).
  */
 export async function close(session) {
   try {
@@ -252,7 +251,7 @@ const appOf = new WeakMap();
  * Runs the command of an item of VS Code's application menu in `window`, such as
  * `workbench.action.showCommands` of View > Command Palette...: VS Code's main process sends the
  * window the `vscode:runAction` message a click on the item sends. A click itself acts only in
- * the focused window, and on macOS no window of the oracle has focus (support/background.mjs).
+ * the focused window, and on macOS no window of the run has focus (support/background.mjs).
  */
 async function menuCommand(window, command) {
   const app = appOf.get(window);
@@ -266,7 +265,7 @@ async function menuCommand(window, command) {
  * a quick input that just opened, and the keys may never reach the workbench: a webview frame can
  * hold the keyboard while the workbench's active element is its body, and the workbench then
  * drops every key the webview forwards. So it tries again, from the second try on through the
- * menu command `fallback`, which a keyboard reaches through the menu bar as well.
+ * menu command `fallback`, also in a keyboard's reach through the menu bar.
  */
 async function quickInput(window, keys, text, { fallback }) {
   const input = window.locator('.quick-input-widget input');
@@ -291,7 +290,7 @@ async function entries(window) {
 }
 
 /**
- * Opens the quick input, types `text` and waits up to 5 s for an entry `matches` accepts; tries
+ * Opens the quick input, types `text` and waits up to 5 s for an entry `matches` accepts. It tries
  * three times, as a quick input that loses focus closes. Returns the entry's index and the
  * entries last seen.
  */
@@ -333,7 +332,7 @@ export async function panelFrame(window, timeoutMs = 30_000) {
       try {
         if (await frame.locator('tr[data-row-id]').count()) return frame;
       } catch {
-        // A frame that navigates away cannot be queried; the next round finds the new one.
+        // A frame that navigates away cannot be queried. The next round finds the new one.
       }
     }
     if (Date.now() >= deadline) return undefined;
@@ -358,7 +357,7 @@ export async function editorGroups(window) {
   );
 }
 
-/** Whether a tab label is the Worktrees tab's: `Worktrees`, or from phase 2 `Worktrees (N)`. */
+/** Tells the Worktrees tab's label: `Worktrees`, or from phase 2 `Worktrees (N)`. */
 export const isStatusTab = (label) => /^Worktrees( \(\d+\))?$/.test(label);
 
 /** Opens a file of the workspace in the active group with Quick Open (Cmd+P), as a user does. */
@@ -393,7 +392,6 @@ export function watchers(binary = releaseWtpool()) {
     .map((match) => ({ pid: Number(match[1]), ppid: Number(match[2]) }));
 }
 
-/** Every process below `pid`. */
 export function descendants(pid) {
   const listing = execFileSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' });
   const children = new Map();
@@ -489,8 +487,8 @@ export async function writeClipboard(app, text) {
 }
 
 /**
- * The change count of the macOS system pasteboard, which every write moves, read without its
- * content and so without any permission; undefined elsewhere.
+ * The change count of the macOS system pasteboard, moved by every write, read without its content
+ * and so without any permission. Undefined elsewhere.
  */
 export function pasteboardCount() {
   if (process.platform !== 'darwin') return undefined;

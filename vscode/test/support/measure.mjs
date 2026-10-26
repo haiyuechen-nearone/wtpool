@@ -1,10 +1,10 @@
-// In-page measurements for the visual rules of status-panel.md revision 14 (U1, U4, U6, X14).
-// `installHelpers` runs once per page through page.evaluate and defines window.__visual; each
-// other export runs through page.evaluate after it and uses nothing else from outside.
+// In-page measurements of the panel's layout and colours. `installHelpers` runs once per page
+// through page.evaluate and defines window.__visual. Each other export runs through page.evaluate
+// after it and uses nothing else from outside.
 //
 // The tab's horizontal scroller is the viewport or an ancestor of the table with overflow-x auto
 // or scroll. Content inside such a scroller counts as reachable when it lies in its scrollable
-// area; every other box that clips (overflow not visible) cuts what lies outside its padding box.
+// area. Every other box that clips (overflow not visible) cuts the part outside its padding box.
 
 /** Defines window.__visual: geometry, clipping and WCAG colour helpers. */
 export function installHelpers() {
@@ -39,13 +39,12 @@ export function installHelpers() {
   const hex = (c) => `#${[c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
   const withAlpha = (c, a) => ({ ...c, a: c.a * a });
 
-  /** The product of `opacity` from `el` up to <html>. */
   const opacity = (el) => {
     let o = 1;
     for (let e = el; e; e = e.parentElement) o *= Number(st(e).opacity);
     return o;
   };
-  /** What VS Code paints behind a webview whose page is transparent: the editor background. */
+  /** VS Code paints the editor background behind a webview whose page is transparent. */
   const base = () => {
     const probe = document.createElement('span');
     probe.style.color = 'var(--vscode-editor-background)';
@@ -122,7 +121,6 @@ export function installHelpers() {
   const has = (r) => r.right - r.left > 0.5 && r.bottom - r.top > 0.5;
   const scrolls = (v) => v === 'auto' || v === 'scroll';
 
-  /** The tab's horizontal scrollers: ancestors of the table with overflow-x auto or scroll. */
   const tabScrollers = () => {
     const table = document.querySelector('table');
     const found = [];
@@ -131,7 +129,7 @@ export function installHelpers() {
     }
     return found;
   };
-  /** Whether <body>'s overflow went to the viewport (CSS overflow propagation). */
+  /** True when <body>'s overflow goes to the viewport (CSS overflow propagation). */
   const bodyPropagates = () => st(document.documentElement).overflowX === 'visible' && st(document.documentElement).overflowY === 'visible';
   const viewportOverflow = () => (bodyPropagates() ? st(document.body) : st(document.documentElement));
   /** The area `el` lets its content show in, in client coordinates, per axis. */
@@ -229,9 +227,9 @@ export function installHelpers() {
 }
 
 /**
- * U1: text clipped or spilling, `…` in effect or in the text, wrapped table text, and a table
- * whose sides the tab cannot scroll to. `sourceHasEllipsis` is true when the document itself
- * holds a `…`.
+ * Finds text clipped or spilling, `…` in effect or in the text, wrapped table text, and a table
+ * with a side the tab cannot scroll to. `sourceHasEllipsis` is true when the document itself holds
+ * a `…`.
  */
 export function clipping(sourceHasEllipsis) {
   const V = window.__visual;
@@ -298,8 +296,8 @@ export function clipping(sourceHasEllipsis) {
 }
 
 /**
- * U1: each row's tag (`expected[rowId]`, `fg` or `unmanaged`) shows whole, inside its Worktree
- * cell's content box, after the name and on its line.
+ * Checks that each row's tag (`expected[rowId]`, `fg` or `unmanaged`) shows whole, inside its
+ * Worktree cell's content box, after the name and on its line.
  */
 export function tags(expected) {
   const V = window.__visual;
@@ -377,8 +375,8 @@ export function tags(expected) {
 }
 
 /**
- * X14 and U6: the focused element's ring. It must exist, lie inside every box that clips it (a
- * tab scroller by its scrollable area) and have 3:1 against the background under it.
+ * Measures the focused element's ring. It must exist, lie inside every box that clips it (a tab
+ * scroller by its scrollable area) and have 3:1 against the background under it.
  */
 export function ring() {
   const V = window.__visual;
@@ -405,7 +403,7 @@ export function ring() {
     }
   }
   if (!colour || (V.parse(colour)?.a ?? 0) === 0) return { key, state, missing: true };
-  // The tab scrolls, so the viewport cuts only what lies outside the scrollable page.
+  // The tab scrolls, so the viewport cuts only the part outside the scrollable page.
   const grow = offset + width;
   const outer = { left: r.left - grow, right: r.right + grow, top: r.top - grow, bottom: r.bottom + grow };
   const { v: area, cutters } = V.visible(outer, el.parentElement);
@@ -446,7 +444,7 @@ export function ring() {
   };
 }
 
-/** U6: every shown text below 4.5:1 (3:1 when large) against its composited background. */
+/** Finds every shown text below 4.5:1 (3:1 when large) against its composited background. */
 export function textContrast() {
   const V = window.__visual;
   const failures = new Map();
@@ -462,7 +460,7 @@ export function textContrast() {
     if (value >= need - 0.005) continue;
     const row = el.closest('tr[data-row-id]');
     const state = row ? ` ${row.getAttribute('aria-selected') === 'true' ? 'selected' : 'plain'}${row.matches(':hover') ? ' hovered' : ''}` : '';
-    // One entry per place, element class, row state and colour pair; the first text as sample.
+    // One entry per place, element class, row state and colour pair, with the first text as sample.
     const key = `${V.place(el)}: ${V.desc(el).replace(/\[.*\]$/, '')}${state} ${V.hex(fg)} on ${V.hex(bg)}`;
     if (!failures.has(key)) failures.set(key, { key, ratio: Math.round(value * 100) / 100, need, text: t.text, row: row ? row.dataset.rowId.split('/').pop() : null });
   }
@@ -470,8 +468,8 @@ export function textContrast() {
 }
 
 /**
- * U6: the boundary of each element of `selector` against what is around it: its four borders, its
- * outline or a box-shadow ring against its parent's background, or its fill against `page`
+ * Measures the boundary of each element of `selector` against its surroundings: its four borders,
+ * its outline or a box-shadow ring against its parent's background, or its fill against `page`
  * (the background of `pageOf`, default its parent). Gives the best of them per element.
  */
 export function boundaries(selector, pageOf = null) {
@@ -502,8 +500,8 @@ export function boundaries(selector, pageOf = null) {
 }
 
 /**
- * U6: the detail strip's boundary. Candidates are `tr.detail` and each element in it whose box
- * holds all of the strip's text; the best candidate's boundary counts.
+ * Measures the detail strip's boundary. Candidates are `tr.detail` and each element in it with a
+ * box that holds all of the strip's text. The best candidate's boundary counts.
  */
 export function stripBoundary() {
   const V = window.__visual;
@@ -537,7 +535,6 @@ export function stripBoundary() {
   return { best: Math.max(0, ...found.map((f) => Math.max(f.fill, f.border, f.outline))), candidates: found };
 }
 
-/** U4: the boxes of `rowId`'s shown action buttons. */
 export function actionBoxes(rowId) {
   const row = [...document.querySelectorAll('tr[data-row-id]')].find((r) => r.dataset.rowId === rowId);
   if (!row) return [];
@@ -550,7 +547,7 @@ export function actionBoxes(rowId) {
 }
 
 /**
- * U6: each row's activity icon (the `::before` of its Activity cell or an element in it, or an
+ * Gives each row's activity icon (the `::before` of its Activity cell or an element in it, or an
  * inline `<svg>` in the cell) and the background behind it.
  */
 export function iconBoxes() {

@@ -19,8 +19,8 @@ pub struct TestCase {
     pub skipped: bool,
 }
 
-/// Each test case of a nextest JUnit report as an outcome of its check, whose title is the check;
-/// a failure's message starts with the test case's full name.
+/// Each test case of a nextest JUnit report as an outcome titled with its check. A failure's
+/// message starts with the test case's full name.
 pub fn to_outcomes(xml: &str) -> Vec<TestOutcome> {
     parse(xml).into_iter().map(outcome).collect()
 }
@@ -120,8 +120,9 @@ fn failure_of(body: &str) -> Option<Failure> {
     Some(Failure { kind, message })
 }
 
-/// Checks panic through `assert!` and its relatives, whose message is free text, and fail
-/// their setup with a `setup:` message. Runtime panics of the check's own code are errors too.
+/// True when the panic `message` is an assertion failure. Checks assert through `assert!` and its
+/// relatives, whose message is free text, and fail their setup with a `setup:` message. Runtime
+/// panics of the check's own code are errors too.
 pub fn panic_kind_is_assertion(message: &str) -> bool {
     const ERRORS: [&str; 8] = [
         "setup:",

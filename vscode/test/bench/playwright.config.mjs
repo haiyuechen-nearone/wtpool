@@ -1,4 +1,3 @@
-// Budgets measured in Playwright's Chromium (B8). A budget may take 120 s and is not retried.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from '@playwright/test';

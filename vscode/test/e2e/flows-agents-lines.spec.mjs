@@ -1,6 +1,3 @@
-// The flow several_agents_in_one_row (U12, U13, R4): five agents in wt2, four sessions working and
-// a subagent done, then one session ends. The row counts its agent lines after the Activity word,
-// and each agent line starts with a static state icon and its state for screen readers.
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { test } from '@playwright/test';
@@ -10,13 +7,13 @@ import { WITHIN_A_SECOND_MS, agent, openTab, stopJobs } from './jobs.mjs';
 import { lineFacts } from './rows.mjs';
 import { sleep } from './vscode.mjs';
 
-/** U13: a line icon's box and the gap after it, px. */
+/** A line icon's box and the gap after it, in px. */
 const ICON_BOX = 14;
 const ICON_GAP = 5;
-/** Agents of different records write a little over a second apart, so `updated` orders them (R4). */
+/** Agents of different records write a little over a second apart, so `updated` orders them. */
 const ACTOR_GAP_MS = 1100;
 
-/** Every running animation whose target lies in the Agent cell of a row: none may (U13). */
+/** The running animations whose target lies in the Agent cell of a row. */
 async function lineAnimations(frame) {
   return frame.evaluate(() =>
     document

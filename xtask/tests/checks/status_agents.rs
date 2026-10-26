@@ -1,5 +1,5 @@
-//! Agents in `wtpool status`: the decay table (A1), activity precedence (A4), records outside the
-//! pool (A7) and the records it reads (S5, S6).
+//! Agents in `wtpool status`: the decay table, activity precedence, records outside the pool and
+//! the records it reads.
 
 use std::fs;
 use std::path::Path;
@@ -572,7 +572,7 @@ fn status__should_skip_an_unknown_record_version() {
 }
 
 /// A record of `key` as an older wtpool wrote it from `template`: no `harness`, and calls of
-/// `tools` without a kind (H25, H26), in the harness process `pid`.
+/// `tools` without a kind, in the harness process `pid`.
 fn older(template: &Value, key: &str, pid: u32, tools: &[&str]) -> Value {
     let mut record = template.clone();
     let (session, agent) = key
@@ -599,9 +599,9 @@ fn older(template: &Value, key: &str, pid: u32, tools: &[&str]) -> Value {
 
 #[test]
 fn status__should_read_the_kind_of_an_older_call() {
-    // Given: sessions in wt1 while a build runs there, each in its own harness process, as an
-    // older wtpool wrote them. Past 120 s only a shell call during a build, or a call starting a
-    // subagent while that subagent works, keeps a session working (A1).
+    // Given
+    // Past 120 s only a shell call during a build, or a call starting a subagent while that
+    // subagent works, keeps a session working.
     let mut hooks = Hooks::must_new("older-kinds");
     hooks.send(&ev(&hooks, "UserPromptSubmit", "s1", &[]));
     hooks.send(&ev(

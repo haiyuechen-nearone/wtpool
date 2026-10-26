@@ -1,8 +1,8 @@
-// flow__every_activity_shows (verification.md, "User flows"): every phase 1 scenario that runs
-// in e2e, each a case of its own, `flow__every_activity_shows <scenario>`, in its own VS Code on its
-// own pool (a pool is VS Code's environment, WTPOOL_FOREGROUND and WTPOOL_SLOT_DIR, so one session
-// cannot show two). Each case also gives its scenario check its e2e result:
-// <run>/e2e/scenarios/<scenario>.json, which layers/e2e.rs reads.
+// Every phase 1 scenario that runs in e2e, each a case of its own,
+// `flow__every_activity_shows <scenario>`, in its own VS Code on its own pool. A pool is VS Code's
+// environment, WTPOOL_FOREGROUND and WTPOOL_SLOT_DIR, so one session cannot show two. Each case
+// also writes its scenario check's e2e result to <run>/e2e/scenarios/<scenario>.json for
+// layers/e2e.rs.
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, utimesSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -20,7 +20,7 @@ const PHASE = Number(process.env.WTPOOL_VERIFY_PHASE ?? 1);
 
 /**
  * Each row's activity icon: the ::before of the activity cell or an element in it, or an inline
- * SVG in the cell, which its shapes identify.
+ * SVG in the cell, known by its shapes.
  */
 async function icons(frame) {
   return frame.locator('tr[data-row-id]').evaluateAll((rows) =>
@@ -47,7 +47,7 @@ async function icons(frame) {
   );
 }
 
-/** How long ago each worktree's HEAD and index last changed, so Last shows every unit. */
+/** The age of each worktree's HEAD and index, so Last shows every unit. */
 const AGES = { fg: 130, wt1: 40, wt2: 3 * 3600 + 60, wt3: 3 * 86400 + 60, x: 70 * 60 };
 
 /** Sets the times of each worktree's HEAD and index to {@link AGES} ago. */
@@ -61,7 +61,7 @@ function backdate(poolInfo) {
   }
 }
 
-/** Runs one scenario's steps in its own VS Code and returns what each document showed. */
+/** Runs one scenario's steps in its own VS Code and gives the panel each document showed. */
 async function showScenario(name) {
   const session = await flowSession(`flow__every_activity_shows/${name}`, { scenario: name, prepare: backdate });
   const processes = new Map();
@@ -94,7 +94,7 @@ async function showScenario(name) {
     }
     await observe(documents.at(-1));
     if (name === 'idle_pool') {
-      // The e2e shot of the visual review (verification.md, "Visual review").
+      // The e2e shot taken for review.
       mkdirSync(path.join(runDir(), 'shots'), { recursive: true });
       await window.screenshot({ path: path.join(runDir(), 'shots', 'e2e-idle_pool.png') });
     }
@@ -106,7 +106,7 @@ async function showScenario(name) {
 }
 
 /**
- * Asserts what one scenario showed: each document's rows, each row's Last against the document
+ * Asserts the panel of one scenario: each document's rows, each row's Last against the document
  * `wtpool status --json` printed then, and an icon without text per row. Adds each activity's icon
  * to `signatures`.
  */
@@ -141,7 +141,10 @@ function result(name, error) {
   return { title: name, outcome: 'fail', kind: assertion ? 'assertion' : 'error', message };
 }
 
-/** The phase 1 scenarios that run in e2e; scenarios-agents.spec.mjs runs the later ones, which have hook steps. */
+/**
+ * The phase 1 scenarios that run in e2e. scenarios-agents.spec.mjs runs the later ones, with their
+ * hook steps.
+ */
 const NAMES = readdirSync(SCENARIOS)
   .filter((file) => file.endsWith('.json'))
   .map((file) => file.slice(0, -'.json'.length))
@@ -150,7 +153,10 @@ const NAMES = readdirSync(SCENARIOS)
     return scenario.phase === 1 && scenario.phase <= PHASE && scenario.layers.includes('e2e');
   });
 
-/** Writes `value` to `file` as JSON in one step, so a case running beside it reads all of it or none. */
+/**
+ * Writes `value` to `file` as JSON in one step, so a case running beside it reads all of it or
+ * none.
+ */
 function writeWhole(file, value) {
   mkdirSync(path.dirname(file), { recursive: true });
   const partial = `${file}.${process.pid}.partial`;
@@ -161,7 +167,7 @@ function writeWhole(file, value) {
 /**
  * Asserts across every case that has written <run>/e2e/icons/<scenario>.json so far: each
  * activity shows one icon, and no two activities share one. Each case writes its own file before
- * it reads the others', so of two cases that disagree the later reader fails, whatever their order.
+ * it reads the others', so of two cases that disagree the later reader fails, in either order.
  */
 function judgeIcons() {
   const dir = path.join(runDir(), 'e2e', 'icons');

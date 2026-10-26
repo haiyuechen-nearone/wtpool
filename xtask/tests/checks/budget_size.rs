@@ -1,4 +1,4 @@
-//! B9: a document of 10 worktrees with 5 actors each stays within 64 KiB.
+//! A document of 10 worktrees with 5 actors each stays within 64 KiB.
 
 use std::collections::BTreeMap;
 use std::ffi::OsStr;

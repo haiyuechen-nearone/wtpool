@@ -1,5 +1,5 @@
 // Turns a NODE_V8_COVERAGE folder of the render or host layer into an lcov file over vscode/src,
-// through the source maps of the product's build (verification.md, "Layers", cover).
+// through the source maps of the extension's build.
 // Usage: node support/v8-lcov.mjs <coverage folder> <lcov file>
 //
 // Each script of vscode/ (not node_modules/ or test/) goes through v8-to-istanbul with the
@@ -8,9 +8,9 @@
 // an exclude filter that sees the source map's unresolved `../src/...` paths, excludes every
 // range, and so leaves every line at its initial count of 1.
 //
-// Scripts the render layer runs in jsdom carry their served URL (support/webview.mjs); they are
-// mapped back to the file below vscode/ first. A script whose text differs from the file on
-// disk, by the length V8 saw, stops the conversion: offsets into it would land on wrong lines.
+// Scripts the render layer runs in jsdom carry their served URL (support/webview.mjs), so they
+// are mapped back to the file below vscode/ first. A script whose length as V8 saw it differs from
+// its file's size on disk stops the conversion, as offsets into it would land on wrong lines.
 // `c8 ignore` comments count for nothing. Without any script of vscode/ it writes no lcov, and
 // `cover` fails. Files no script maps to drop out of the lcov, and `cover` lists their changed
 // lines as not measured.
@@ -22,7 +22,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { VSCODE } from './paths.mjs';
 import { CSP_SOURCE } from './webview.mjs';
 
-// c8, a locked dependency of the oracle, brings both libraries; resolve them through it.
+// c8, a locked dependency, brings both libraries.
 const fromC8 = createRequire(createRequire(import.meta.url).resolve('c8/package.json'));
 const v8toIstanbul = fromC8('v8-to-istanbul');
 const { createCoverageMap } = fromC8('istanbul-lib-coverage');
@@ -34,7 +34,7 @@ const OWN = [`${PRODUCT}node_modules/`, `${PRODUCT}test/`];
 /**
  * The file URL of a script of vscode/, or undefined for any other script. The page's inline
  * script carries the page's URL, and no file below vscode/ holds it: it is a string of html.ts,
- * which counts as Node loads out/html.js.
+ * counted when Node loads out/html.js.
  */
 export function productUrl(url) {
   if (url.split(/[?#]/)[0] === `${CSP_SOURCE}/index.html`) return undefined;
@@ -112,7 +112,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const [coverage, out] = process.argv.slice(2);
   if (!coverage || !out) throw new Error('setup: usage: v8-lcov.mjs <coverage folder> <lcov file>');
   const scripts = existsSync(coverage) ? productScripts(coverage) : [];
-  // A layer that ran the product always loads a script of it; none means the data is broken.
+  // A layer that ran the extension always loads a script of it, so none means the data is broken.
   if (!scripts.length) throw new Error(`setup: no script of vscode/ in the V8 coverage of ${coverage}`);
   const hits = await lineHits(scripts);
   mkdirSync(path.dirname(out), { recursive: true });

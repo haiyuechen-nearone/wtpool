@@ -1,9 +1,3 @@
-// U4 in Chromium (status-panel.md revision 12): shown row actions never cover another column's
-// text. Every row of every_activity is hovered, focused, and focused on its last action, at
-// 1100 px and at 600 px; no shown action button may intersect the text of the row's other six
-// cells (Activity, Worktree, Branch, Git, Agent · doing, Last), as far as that text is not
-// clipped away. Each slot that holds a branch shows all five actions (open, terminal, copy path,
-// free, fg), so the check cannot pass by hiding them.
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -17,10 +11,10 @@ const APPROVED = path.join(REPO, 'verify', 'shots', 'approved');
 const HEIGHT = 900;
 /** Real time for a transition that shows or moves the actions to end. */
 const SETTLE_MS = 250;
-/** The row whose focused shot the visual review can look at (phase 3 review 1, N27). */
+/** The row whose focused shot is taken for review. */
 const FOCUS_SHOT_ROW = '/wt2';
 
-/** The actions a row offers by its kind (U4, X11, X12). */
+/** The actions a row offers by its kind. All must show, so the check cannot pass by hiding them. */
 function expectedActions(w) {
   if (w.missing) return ['copyPath'];
   const base = ['open', 'terminal', 'copyPath'];
@@ -28,9 +22,9 @@ function expectedActions(w) {
 }
 
 /**
- * For the row `id`: each shown action button and each place it covers text of another cell, and
- * which actions show. Text is each non-blank text node's line boxes, cut to the cell and to every
- * ancestor inside it that clips its overflow.
+ * Measures the row `id`: the actions it shows, the text of another cell each one covers, and the
+ * actions outside the row. Text is each non-blank text node's line boxes, cut to the cell and to
+ * every ancestor inside it that clips its overflow.
  */
 function measure(id) {
   const row = [...document.querySelectorAll('tr[data-row-id]')].find((r) => r.dataset.rowId === id);
@@ -47,7 +41,7 @@ function measure(id) {
     return [style.overflowX, style.overflowY].some((v) => v !== 'visible');
   };
   const cells = [...row.querySelectorAll(':scope > td')].filter((td) => !td.classList.contains('actions'));
-  // Text for screen readers only (U12, U13) shows nowhere: a box of at most 1 px, or clipped away.
+  // Text for screen readers only shows nowhere: a box of at most 1 px, or clipped away.
   const srOnly = (el, cell) => {
     for (let e = el; e && e !== cell; e = e.parentElement) {
       const r = e.getBoundingClientRect();
@@ -96,7 +90,7 @@ async function shoot(page, name) {
   const dir = path.join(runDir(), 'shots');
   mkdirSync(dir, { recursive: true });
   const shot = await page.screenshot({ path: path.join(dir, `${name}.png`), fullPage: true });
-  // Not part of the approved set until the owner approves it; compared once approved.
+  // A shot is compared only once it is in the approved set.
   if (existsSync(path.join(APPROVED, `${name}.png`))) {
     expect(shot).toMatchSnapshot([`${name}.png`], { maxDiffPixelRatio: 0.001 });
   }

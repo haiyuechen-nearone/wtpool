@@ -1,14 +1,3 @@
-// U10, U11, U15, X20 and X22 in Chromium (phase 4), in Dark Modern, Light Modern, High Contrast
-// and High Contrast Light: the heading's machine button, the machine strip and its pattern
-// editor.
-//
-// machine_strip__ and heavy_editor__should_clip_nothing_ open the strip through the button in
-// each state U11 names, at 1100 and 600 px, and fail on text a box cuts or that spills its box
-// (support/measure.mjs, clipping), text under WCAG AA, a strip without the detail strip's 1 px
-// description coloured border, form controls outside the theme's input and dropdown colours, chips
-// without their 1 px border (dashed for suggestions), monospace text and 3:1 glyphs, and on any
-// axe violation. The ring checks tab through the button, the strip's controls and the editor and
-// measure each ring as focus__should_show_every_ring_whole_in_contrast does.
 import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
@@ -33,7 +22,6 @@ async function jobsPanel(browser, theme, width) {
   return { context, page, panel, colours };
 }
 
-/** Shows `doc` plainly, then opens the strip with the button; the mouse leaves it after. */
 async function showOpen(page, doc, extra, at) {
   await showView(page, doc, extra);
   await away(page);
@@ -52,7 +40,6 @@ async function looks(page, at) {
   ];
 }
 
-/** One line per problem of a measured ring, or none. */
 function ringProblems(at, r) {
   if (!r || r.missing) return [`${at}: no focus ring`];
   const out = [];
@@ -61,7 +48,7 @@ function ringProblems(at, r) {
   return out;
 }
 
-/** Which named control of the strip has focus, or its tag and classes. */
+/** The focused control's selector, else the focused element's tag and classes. */
 function focusedControl() {
   const el = document.activeElement;
   if (!el || el === document.body) return null;
@@ -146,7 +133,7 @@ for (const theme of THEME_NAMES) {
         problems.push(...(await looks(page, at)));
         for (const v of await axeViolations(page)) problems.push(`${at}: axe ${v}`);
       }
-      // An inline error under This repository's input (U15).
+      // An inline error under This repository's input.
       await showOpen(page, states[0].doc, {}, `error at ${width} px`);
       const inputs = page.locator('tr.machine-detail input.heavy-input');
       assert.ok((await inputs.count()) >= 2, `the strip shows ${await inputs.count()} input.heavy-input, not one per list (U15)`);
@@ -215,7 +202,7 @@ for (const theme of THEME_NAMES) {
           problems.push(...ringProblems(`${control.name} at ${width} px, stop ${step}`, await page.evaluate(ring)));
         }
         if (control.name === 'button.chip-remove' && !reached.has('button.chip-remove')) {
-          // X22: the arrows move between a list's chips; the second chip's ring counts too.
+          // The arrows move between a list's chips, and the second chip's ring counts too.
           await page.keyboard.press('ArrowRight');
           await page.clock.runFor(20);
           problems.push(...ringProblems(`second chip at ${width} px`, await page.evaluate(ring)));

@@ -1,6 +1,3 @@
-// What every VS Code the oracle starts shares: the flags that keep it off the owner's keychain and
-// away from system dialogs, short socket paths, the scan for keychain errors, and the machine
-// config of its sandbox home.
 import { createHash } from 'node:crypto';
 import { chmodSync, lstatSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -23,8 +20,8 @@ export const CODE_FLAGS = [
 ];
 
 /**
- * VS Code's accessibility signals (1.143): most play their sound only while a screen reader runs,
- * some always, so a run would sound while the owner uses VoiceOver, or at all.
+ * VS Code's accessibility signals (1.143). Most play their sound only while a screen reader runs,
+ * some always.
  */
 const SIGNALS = [
   'chatEditModifiedFile', 'chatRequestSent', 'chatResponsePending', 'chatResponseReceived',
@@ -38,14 +35,17 @@ const SIGNALS = [
   'voiceRecordingStarted', 'voiceRecordingStopped',
 ];
 
-/** Settings that keep a sandbox VS Code silent: every signal's sound off, and the volume at 0 for any later one. */
+/** Every signal's sound off, and the volume at 0 for any signal a later VS Code adds. */
 const SILENT = {
   'accessibility.signalOptions.volume': 0,
   ...Object.fromEntries(SIGNALS.map((signal) => [`accessibility.signals.${signal}`, { sound: 'off' }])),
   'terminal.integrated.enableVisualBell': false,
 };
 
-/** User settings that keep a sandbox VS Code from prompting, updating, reaching out, sounding or raising system dialogs. */
+/**
+ * User settings that keep a sandbox VS Code from prompting, updating, reaching out, sounding or
+ * raising system dialogs.
+ */
 export const QUIET_SETTINGS = {
   ...SILENT,
   'workbench.startupEditor': 'none',
@@ -66,7 +66,7 @@ export const QUIET_SETTINGS = {
   'terminal.integrated.enablePersistentSessions': false,
   'terminal.integrated.confirmOnExit': 'never',
   'terminal.integrated.confirmOnKill': 'never',
-  // A modal (X12) draws inside the window, never as a macOS system dialog.
+  // A modal dialog draws inside the window, never as a macOS system dialog.
   'window.dialogStyle': 'custom',
 };
 
@@ -91,8 +91,8 @@ export function shortLink(dir) {
 }
 
 /**
- * Removes what sits at `link`: the link itself, never its target, or the real folder a killed
- * run left in its place, so the next run can make the link again.
+ * Removes the entry at `link`: the link itself, never its target, or the real folder a killed run
+ * left in its place, so the next run can make the link again.
  */
 export function removeLink(link) {
   // lstat describes the link, not its target, so only a real folder goes with its files.
@@ -109,11 +109,10 @@ export function keychainErrors(text) {
 }
 
 /**
- * The machine config every sandbox home starts with: processes named `cargo`, `cargo-*` or
- * `rustc`, the builds of phases 1 to 3, as heavy patterns of the machine. From phase 4 only a
- * process that matches a heavy pattern is a build, so the checks of the earlier phases keep their
- * builds through this list, and a wtpool before phase 4 reads no such file. A check of heavy jobs
- * writes its own.
+ * The machine config every sandbox home starts with: `cargo`, `cargo-*` and `rustc` as heavy
+ * patterns of the machine. wtpool counts a process as a build only when it matches a heavy
+ * pattern, so this list keeps the cargo and rustc builds of every check. A wtpool without heavy
+ * jobs reads no such file. A check of heavy jobs writes its own.
  */
 export const EARLIER_BUILDS = '# The builds of phases 1 to 3 as heavy patterns.\n[jobs]\nheavy = ["cargo", "cargo-*", "rustc"]\n';
 

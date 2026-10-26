@@ -1,6 +1,6 @@
-//! The settings commands of heavy jobs (J3): `wtpool job limit`, `enforce` and `heavy` print a
-//! setting with its source, set it or reset it, and refuse bad values; how they write the files
-//! is in [`super::jobs_settings_files`] (J6). Also the helpers both share.
+//! The settings commands of heavy jobs: `wtpool job limit`, `enforce` and `heavy` print a setting
+//! with its source, set it or reset it, and refuse bad values. [`super::jobs_settings_files`]
+//! checks the files they write. Also the helpers both share.
 
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
@@ -49,7 +49,7 @@ pub(super) fn set_of(items: &[&str]) -> BTreeSet<String> {
     items.iter().map(|s| (*s).to_owned()).collect()
 }
 
-/// Whether a line of `text` holds `value`, as a word when it is one, and the source word
+/// True when a line of `text` holds `value`, as a word when it is one, and the source word
 /// `source`.
 fn printed_with(text: &str, value: &str, source: &str) -> bool {
     text.lines().any(|line| {
@@ -87,7 +87,6 @@ pub(super) fn succeeded(wrong: &mut Vec<String>, what: &str, output: &Output) ->
     ok
 }
 
-/// One setting of J3.
 enum Setting {
     Limit,
     Enforce,

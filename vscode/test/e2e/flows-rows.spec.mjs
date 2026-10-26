@@ -1,5 +1,3 @@
-// The flows of the rows and the header (verification.md, "User flows"): selection, the connection
-// states and the agents off note (X6, U5, S8). Live updates are in flows-exclusive.spec.mjs.
 import assert from 'node:assert/strict';
 import { chmodSync, copyFileSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -40,7 +38,7 @@ test('flow__select_and_deselect', async () => {
 });
 
 test('flow__connection_states', async () => {
-  // Given: wtpool.path names a copy of the release wtpool, which the check swaps for a failing start.
+  // Given: wtpool.path names a copy of the release wtpool. The check swaps it for a failing start.
   const key = 'flow__connection_states';
   const { repeatEachIndex, retry } = test.info();
   const binary = path.join(runDir(), 'e2e', 'bins', `${key}-${repeatEachIndex}-${retry}`, 'wtpool');
@@ -72,7 +70,7 @@ test('flow__connection_states', async () => {
       };
       const paused = await poll(pausedN, 40_000);
       const seen = [];
-      // The failing restarts back off 1, 2, 4, 8 s: wait for a pause with N of 4 or more, then
+      // The failing restarts back off 1, 2, 4, 8 s. Wait for a pause with N of 4 or more, then
       // read it again 2 s later, still inside the same pause. The header may lag the host's
       // retry_at by a fraction of a second, so N must drop by 1 to N - 1.
       const long = await poll(async () => {
@@ -138,7 +136,7 @@ test('flow__agents_off_note', async () => {
     assert.ok(shown, 'the agents off note is not shown');
     assert.ok(text.includes('agent activity is off'), `the note does not say agent activity is off: ${text}`);
     assert.ok(text.includes('wtpool setup'), `the note does not name wtpool setup: ${text}`);
-    // S8 (round publish-fixups): then the plugin's commands (H28) and `wtpool hook install` (H22).
+    // Then the plugin's commands and `wtpool hook install`.
     for (const step of ['/plugin marketplace add haiyuechen-nearone/wtpool', '/plugin install wtpool@wtpool', 'wtpool hook install']) {
       assert.ok(text.indexOf(step) > text.indexOf('wtpool setup'), `the note does not name ${step} after wtpool setup: ${text}`);
     }

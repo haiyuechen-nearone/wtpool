@@ -1,10 +1,10 @@
-//! `wtpool status --watch` and agents: timers at their exact time (W6), and the git refresh after an
-//! edit tool or Bash PostToolUse, once a second at most (W4, its phase 2 sentence).
+//! `wtpool status --watch` and agents: timers at their exact time, and the git refresh after an
+//! edit tool or Bash PostToolUse, once a second at most.
 //!
-//! The spec does not say which record fields mark an ended edit or Bash call, so the W4 check
-//! goes through `wtpool hook` itself. The oracle's reading, the stricter one: a PostToolUse of Edit,
-//! Write, NotebookEdit or Bash refreshes the git facts of the worktree the actor is in within
-//! 1 s (R6); a PreToolUse, or a PostToolUse of any other tool, starts no git for it.
+//! No record field is fixed to mark an ended edit or Bash call, so the refresh check sends its
+//! events through `wtpool hook`. A PostToolUse of Edit, Write, NotebookEdit or Bash refreshes the
+//! git facts of the worktree the actor is in within 1 s. A PreToolUse, or a PostToolUse of any
+//! other tool, starts no git for it.
 
 use std::ffi::OsStr;
 use std::fs;
@@ -56,7 +56,7 @@ fn watch__should_turn_quiet_on_time() {
             && actor_state(d, "s1.a1").as_deref() == Some("done")
     });
 
-    // When: the done subagent leaves after a minute (A2), then s1 turns quiet after 120 s (A1).
+    // When
     hooks.set_clock(&add_seconds(START, 59));
     let early_done = watch.lines_for(Duration::from_millis(1500));
     hooks.set_clock(&add_seconds(START, 61));
@@ -103,7 +103,8 @@ fn watch__should_turn_quiet_on_time() {
     );
 }
 
-/// Whether a logged git start ran for `wt1`: in its folder, with `-C` it, or on its admin folder.
+/// True when a logged git start ran for `wt1`: in its folder, with `-C` it, or on its admin
+/// folder.
 fn for_wt1(hooks: &Hooks, line: &str) -> bool {
     let wt1 = hooks.worktree_text("wt1");
     let admin = hooks.pool.git_dir("wt1").to_string_lossy().into_owned();
@@ -112,8 +113,8 @@ fn for_wt1(hooks: &Hooks, line: &str) -> bool {
         || line.contains(&admin)
 }
 
-/// The git starts for wt1 that began at or after `after`, by the start times the log holds,
-/// not by when the follower read them, which lags up to 20 ms.
+/// The git starts for wt1 that began at or after `after`, by the start times the log holds. The
+/// follower reads them up to 20 ms late.
 fn wt1_starts(hooks: &Hooks, log: &mut GitLog, after: SystemTime) -> Vec<SystemTime> {
     log.starts()
         .iter()

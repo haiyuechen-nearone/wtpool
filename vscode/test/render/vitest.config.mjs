@@ -1,5 +1,4 @@
-// The render layer: Vitest in Node, the webview in jsdom (support/webview.mjs). A check may
-// take 60 s (verification.md, "Outcomes and limits"); a failed check is not retried.
+// The render layer: Vitest in Node, with the webview in jsdom (support/webview.mjs).
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';

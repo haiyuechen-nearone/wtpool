@@ -53,7 +53,7 @@ export async function inkBounds(helper, png, scale, regions) {
   );
 }
 
-/** How many pixels of `rect` (CSS px) differ by more than 8 in some channel between two PNGs. */
+/** Counts the pixels of `rect` (CSS px) that differ by over 8 in a channel between two PNGs. */
 export async function changedPixels(helper, a, b, rect, scale) {
   return helper.page.evaluate(
     async ({ A, B, r, s }) => {

@@ -1,4 +1,4 @@
-// The scenario catalog in the host layer: the fake wtpool replays each scenario's documents and the
+// The scenarios in the host layer: the fake wtpool replays each scenario's documents and the
 // extension posts every one of them to the webview, in order.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -55,8 +55,8 @@ describe('scenarios', () => {
   }
 });
 
-// S7 in the extension: the validator generated from the schema accepts every scenario document,
-// so none restarts the stream, and rejects one that breaks the schema, which does.
+// The validator generated from the schema accepts every scenario document, so none restarts the
+// stream, and rejects one that breaks the schema, so that one does.
 describe('validator', () => {
   it('validator__should_accept_every_scenario_document', async () => {
     // Given
@@ -99,7 +99,7 @@ describe('validator', () => {
   });
 });
 
-// D3: waits raise no popup and the extension shows no status bar item.
+// Waits raise no popup and the extension shows no status bar item.
 describe('popups', () => {
   it('manifest__should_contribute_no_status_bar_item waits_raise_no_popup', async () => {
     // Given

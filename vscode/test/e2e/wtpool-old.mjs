@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-// A wtpool from before phase 4, for the flow jobs_old_wtpool (jobs.md): it runs the wtpool that
-// argv[2] names with the rest of argv, stdin and stderr passed through, and prints each line of
-// its stdout with `machine.jobs` dropped, as a wtpool without `wtpool job` prints its documents
-// (S14). `wtpool job …` fails as an unknown subcommand. The exit code is wtpool's.
+// A wtpool from before `wtpool job`: it runs the wtpool that argv[2] names with the rest of argv,
+// stdin and stderr passed through, and prints each line of its stdout with `machine.jobs` dropped.
+// `wtpool job …` fails as an unknown subcommand. The exit code is wtpool's.
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 

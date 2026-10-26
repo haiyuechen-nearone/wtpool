@@ -229,7 +229,7 @@ fn html_sink(line: &str) -> Option<String> {
         .map(|sink| (*sink).to_owned())
 }
 
-/// The static layer's checks that verify/checks.toml does not list, which `--only` still names.
+/// The static layer's checks that verify/checks.toml does not list. `--only` still names them.
 pub(super) const UNREGISTERED: [&str; 3] =
     ["static:ascii_bundles", "static:eslint", "static:stylelint"];
 

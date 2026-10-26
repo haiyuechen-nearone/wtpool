@@ -206,3 +206,7 @@ accept p4-oracle-fixes eedf883dd37dc7a2f2aef02d3d9735f6e98c3a206688d613903a19de1
 accept flake-fixes-2 244287c0903ea2f472542e1096233c45ca6d7a081df16d047c603a149ad1a9d0
 # expectedRows of the e2e layer reads a document without machine as one without jobs, so flow__workspace_folder_pool no longer throws on its document of pools alone.
 accept p4-oracle-fixes-2 7f0be2b1a85557a60c0fd854e98735687f3812f7c333d9ce2dc6e0e07f3edcdd
+# The xtask comments state only what the code cannot say, with no spec IDs or design-document references; two duplicated test helpers are defined once; no check changes what it asserts.
+accept comments-xtask 00930a2ab8d5e40ac7e8ba203bbf4db2f20c139803979514075d95a36172b048
+# The JS test harness comments drop spec references, and visible() escapes the extension's set of invisible characters.
+accept comments-jstest 97ec6861304a7be86dcca9d743b9f2b6c6787753f53e5c85c60d298d02724f99

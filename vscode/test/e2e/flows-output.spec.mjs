@@ -1,9 +1,6 @@
-// The flow live_output (verification.md, "User flows"; phase 3: H27, S13, R12, U9, X19): a
-// `claude` stub's hooks report a background Bash task in wt2, whose output file, in the sandbox's
-// Claude Code temp folder (CLAUDE_CODE_TMPDIR), grows. Selecting wt2 shows the tail in the strip's
-// Output section, each new line within a second; Follow opens a terminal that shows the file and
-// its new lines. The release wtpool records only the file's path; the extension reads the file. While
-// the strip is open, a commit in wt2 and the agent's next call show in it too (U5, X15).
+// A `claude` stub's hooks report a background Bash task in wt2, whose output file in the sandbox's
+// Claude Code temp folder grows. The release wtpool records only the file's path, and the extension
+// reads the file.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';

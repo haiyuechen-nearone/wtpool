@@ -1,7 +1,7 @@
-// The phase 4 states the shot layer measures (status-panel.md U10 to U15, A8): documents with heavy
-// jobs and agent lines, the strip opened through the machine button, and in-page measurements of
-// the button, the strip, the chips, the `×N` count and the agent line icons. Each in-page function
-// runs through page.evaluate after measure.mjs's installHelpers and uses nothing else from outside.
+// The heavy jobs states the shot layer measures: documents with heavy jobs and agent lines, the
+// strip opened through the machine button, and in-page measurements of the button, the strip, the
+// chips, the `×N` count and the agent line icons. Each in-page function runs through page.evaluate
+// after measure.mjs's installHelpers and uses nothing else from outside.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -10,7 +10,7 @@ import { POOL, actor, ago, document, mustValidate, view, withActor, worktree } f
 import { busyDocument, firstOpenDocument, job, jobs, withJobs } from './jobs.mjs';
 import { TEST } from './paths.mjs';
 
-/** The states of the open strip that U11 names: busy, first open, over the limit, error, old, remote. */
+/** The states of the open strip: busy, first open, over the limit, error, old wtpool, remote. */
 export function stripStates() {
   const busy = busyDocument();
   const over = withJobs(busy, { ...busy.machine.jobs, limit: 2, default: 4 });
@@ -36,8 +36,8 @@ export function stripStates() {
 }
 
 /**
- * The NotQueued mockup (A8, U14) under `warn`: wt1's agent works on a `cargo test` no job holds,
- * wt2 builds `make` outside a job, wt3 builds `cargo nextest` inside one.
+ * Builds outside jobs under `warn`: wt1's agent works on a `cargo test` no job holds, wt2 builds
+ * `make` outside a job, wt3 builds `cargo nextest` inside one.
  */
 export function notQueuedDocument() {
   const wt1 = withActor(
@@ -74,10 +74,10 @@ export function notQueuedDocument() {
   );
 }
 
-/** The agent line states of U13, one line each in wt1, then a `build:` line and `no agent` lines. */
+/** The agent line states, one line each in wt1, then a `build:` line and `no agent` lines. */
 export const LINE_STATES = ['working', 'quiet', 'waiting', 'idle', 'error', 'done'];
 
-/** wt1 lists one agent line per state of U13, newest first in LINE_STATES order; wt2 a build. */
+/** wt1 lists one agent line per state, newest first in {@link LINE_STATES} order, wt2 a build. */
 export function lineStatesDocument() {
   const lines = [
     actor({ key: 'l1', label: 'Review the TS host', state: 'working', action: { tool: 'Read', target: 'vscode/src/host/panel.ts' }, updated: ago(2) }),
@@ -92,7 +92,7 @@ export function lineStatesDocument() {
   return mustValidate(document([worktree('fg'), wt1, wt2, worktree('wt3')]));
 }
 
-/** Posts a view message of `status` with `extra` fields, such as `folder_remote` (jobs.md, item 4). */
+/** Posts a view message of `status` with `extra` fields, such as `folder_remote`. */
 export async function showView(page, status, extra = {}) {
   await page.evaluate((message) => {
     window.dispatchEvent(new MessageEvent('message', { data: message }));
@@ -100,7 +100,7 @@ export async function showView(page, status, extra = {}) {
   await page.clock.runFor(50);
 }
 
-/** Opens the machine strip with a click on the machine button, unless it is open (U10, U11). */
+/** Opens the machine strip with a click on the machine button, unless it is open. */
 export async function openStrip(page, at) {
   const button = page.locator('tr.pool-heading button.machine-button');
   assert.ok((await button.count()) > 0, `${at}: the heading holds no button.machine-button (U10)`);
@@ -111,7 +111,7 @@ export async function openStrip(page, at) {
   assert.ok((await page.locator('tr.machine-detail').count()) > 0, `${at}: a click on the machine button opens no tr.machine-detail (U11)`);
 }
 
-/** Tabs until the machine button has focus, and returns whether it got it. */
+/** Tabs until the machine button has focus. Gives false when it never gets it. */
 export async function tabToButton(page, steps = 30) {
   for (let step = 0; step < steps; step += 1) {
     await page.keyboard.press('Tab');
@@ -135,8 +135,8 @@ export async function axeViolations(page) {
 }
 
 /**
- * U11 and U6: the strip's text, the elements that hold all of it with their borders, and the
- * colours of its form controls against their own backgrounds.
+ * The strip's text, the elements that hold all of it with their borders, and the colours of its
+ * form controls against their own backgrounds.
  */
 export function stripFacts() {
   const V = window.__visual;
@@ -169,8 +169,8 @@ export function stripFacts() {
 }
 
 /**
- * U15: each chip's pattern, its list, the element whose four borders hold its text, the font of
- * its text, and its remove or add glyph's colour against the glyph button's background.
+ * Each chip's pattern, its list, the element with four borders that hold its text, the font of its
+ * text, and its remove or add glyph's colour against the glyph button's background.
  */
 export function chipFacts() {
   const V = window.__visual;
@@ -207,7 +207,7 @@ export function chipFacts() {
   });
 }
 
-/** U10: the machine button's text parts with their colours, background, outline and contrast. */
+/** The machine button's text parts with their colours, background, outline and contrast. */
 export function buttonFacts() {
   const V = window.__visual;
   const button = document.querySelector('tr.pool-heading button.machine-button');
@@ -230,7 +230,7 @@ export function buttonFacts() {
   };
 }
 
-/** U12: each row's `.count` elements and its Activity word, with boxes, colours and contrast. */
+/** Each row's `.count` elements and its Activity word, with boxes, colours and contrast. */
 export function countFacts() {
   const V = window.__visual;
   return [...document.querySelectorAll('tr[data-row-id]')].map((row) => {
@@ -265,7 +265,7 @@ export function countFacts() {
 }
 
 /**
- * U13: each `.line` of the Agent column: its row, its line icon's box and colour (a codicon's
+ * Each `.line` of the Agent column: its row, its line icon's box and colour (a codicon's
  * `::before`, else the fills of an inline SVG), the background behind it, and where its first
  * shown text starts. A probe `H` in the line's font is appended for the capital letters' ink.
  */

@@ -1,4 +1,4 @@
-//! `wtpool status --watch` reacts only to what changed: W3, W4, W5 and W7 to W9.
+//! `wtpool status --watch` reacts only to changes, and exits when its input or output closes.
 
 use std::fs;
 use std::path::PathBuf;

@@ -1,5 +1,5 @@
-// Shared steps of the flow checks (verification.md, "User flows"): each flow starts a VS Code
-// with the .vsix on its own sandbox pool and drives it through the UI.
+// Shared steps of the flow checks: each flow starts a VS Code with the .vsix on its own sandbox
+// pool and drives it through the UI.
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
@@ -35,7 +35,6 @@ export function worktreePath(session, name) {
   return path.join(session.pool.dir, name);
 }
 
-/** The row of a worktree in the panel frame. */
 export function rowOf(frame, session, name) {
   return frame.locator(`tr[data-row-id="${worktreePath(session, name)}"]`);
 }
@@ -59,7 +58,7 @@ export async function openStatus(session, window = session.window) {
   return frame;
 }
 
-/** Which rows the detail strips follow, in DOM order. */
+/** The row ids the detail strips follow, in DOM order. */
 export async function detailOwners(frame) {
   return frame.locator('tr.detail').evaluateAll((strips) =>
     strips.map((strip) => strip.previousElementSibling?.dataset?.rowId ?? null),
@@ -73,7 +72,7 @@ export async function detailText(frame) {
   return (await strips.first().textContent()).replace(/\s+/g, ' ').trim();
 }
 
-/** Waits in real time until `check` returns a truthy value; returns it, or the last value. */
+/** Waits in real time until `check` returns a truthy value, and gives it or the last value. */
 export async function poll(check, timeoutMs, stepMs = 200) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -90,9 +89,9 @@ export async function poll(check, timeoutMs, stepMs = 200) {
 
 /**
  * Runs `body` with VS Code's private clipboard holding a marker, so only a copy made in `body`
- * replaces it, and returns what `body` returns. The system pasteboard must not change meanwhile
- * (verification.md, "No side effects"): a change fails the check as a setup error, since either
- * a copy bypassed the private clipboard or the owner copied in these few seconds.
+ * replaces it, and gives `body`'s result. A change of the system pasteboard meanwhile fails the
+ * check as a setup error, since either a copy bypassed the private clipboard or the owner copied
+ * in these few seconds.
  */
 export async function withClipboard(app, body) {
   const before = pasteboardCount();
@@ -123,7 +122,7 @@ export async function terminalFolder(window, dirs, { keyboard = false } = {}) {
   const out = path.join(dirs.root, 'tmp', `pwd-${Date.now()}.txt`);
   rmSync(out, { force: true });
   const screen = window.locator('.terminal-wrapper.active .xterm-screen, .terminal-wrapper .xterm-screen').first();
-  // No terminal is the product's failure, which the caller asserts.
+  // No terminal is the product's failure, and the caller asserts it.
   if (!(await screen.waitFor({ timeout: 15_000 }).then(() => true, () => false))) return undefined;
   await sleep(1500);
   if (keyboard) await runCommand(window, 'Terminal: Focus Terminal');

@@ -14,7 +14,7 @@ use crate::results::{CheckResult, FailKind};
 pub const PART_LIMIT: Duration = Duration::from_secs(3600);
 
 /// The retry and test order variables of the layer runners (vscode/test), passed on to them.
-/// Unset, a runner keeps its own retries and order; `0`, the value freeze sets, turns retries off.
+/// Unset, a runner keeps its own retries and order. `0`, the value freeze sets, turns retries off.
 /// Any other value would change the outcome of a check, so a run refuses it.
 pub const RUNNER_VARIABLES: [&str; 4] = [
     "WTPOOL_VERIFY_RETRIES",
@@ -32,11 +32,12 @@ pub struct Ctx {
     pub commit: String,
     pub only: Option<String>,
     pub deadline: Instant,
-    /// True when the jobs this context starts yield the processor to the owner's work
-    /// (crate::priority): every part's but bench's.
+    /// True when the jobs this context starts yield the processor to the owner's work, through
+    /// [`crate::priority`]: for every part but bench.
     pub low_priority: bool,
-    /// The checks that run only from a phase after `phase` (crate::trace::later_in): no layer
-    /// runs or counts them, so a run of an earlier phase is never judged by a later phase's checks.
+    /// The checks that run only from a phase after `phase`, as [`later_in`](crate::trace::later_in)
+    /// finds them. No layer runs or counts them, so a later phase's checks never judge a run of an
+    /// earlier phase.
     pub later: BTreeSet<String>,
 }
 
@@ -82,13 +83,13 @@ impl Ctx {
         limit.min(self.remaining())
     }
 
-    /// Whether this invocation runs and counts `check`: `--only` names it or is absent, and it
+    /// True when this invocation runs and counts `check`: `--only` names it or is absent, and it
     /// runs from this phase or an earlier one.
     pub(crate) fn wants(&self, check: &str) -> bool {
         self.counts(check) && self.only.as_deref().is_none_or(|only| only == check)
     }
 
-    /// Whether `check` runs from this phase or an earlier one.
+    /// True when `check` runs from this phase or an earlier one.
     pub(crate) fn counts(&self, check: &str) -> bool {
         !self.later.contains(check)
     }
@@ -147,7 +148,7 @@ impl Ctx {
         let _ = fs::write(self.log_path(name), text);
     }
 
-    /// The log [`Ctx::run_logged`] writes for `name`: `<run>/logs/<name>.log`.
+    /// The log [`Ctx::run_logged`] writes for `name`.
     pub(crate) fn log_path(&self, name: &str) -> PathBuf {
         self.run_dir.join("logs").join(format!("{name}.log"))
     }

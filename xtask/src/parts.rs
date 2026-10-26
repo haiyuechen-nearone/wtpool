@@ -1,5 +1,5 @@
-//! The parts of `verify --part` (verification.md, "The report"): [`run_part`] runs one, whole
-//! or with `--only`, in this process, reusing an earlier passing result of the same inputs.
+//! The parts of `verify --part`. [`run_part`] runs one in this process, whole or with `--only`,
+//! and reuses an earlier passing result of the same inputs.
 
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -28,7 +28,7 @@ pub enum Contract {
 }
 
 impl Contract {
-    /// The contract that `--contract` and `--record` ask for; `--record` needs `--contract`.
+    /// The contract that `--contract` and `--record` ask for.
     pub fn from_flags(contract: bool, record: bool) -> Result<Self, String> {
         match (contract, record) {
             (false, false) => Ok(Self::Off),
@@ -58,7 +58,7 @@ impl Contract {
 /// Every part that `--part` names.
 pub const PARTS: [&str; 5] = ["quick", "int", "ui", "bench", "cc"];
 
-/// Runs `part` in `ctx` and stores its results in the run folder; a whole part copies an earlier
+/// Runs `part` in `ctx` and stores its results in the run folder. A whole part copies an earlier
 /// passing result of the same inputs instead, unless `fresh` or a live `contract` asks for a run.
 pub fn run_part(
     ctx: &Ctx,
@@ -67,8 +67,6 @@ pub fn run_part(
     fresh: bool,
 ) -> Result<Vec<CheckResult>, String> {
     contract.check_parts(&[part])?;
-    // Test once: a whole part whose inputs equal those of an earlier passing result is not run
-    // again (verification.md, "The report"). A live cc run always runs.
     let hash = if ctx.only.is_none() {
         Some(crate::reuse::input_hash(&ctx.root, ctx.phase, part)?)
     } else {
@@ -101,8 +99,8 @@ pub fn run_part(
         )?;
         return Ok(file.results);
     }
-    // Every part but bench holds the machine's verify lock shared, waiting while a bench part
-    // holds it alone to measure; bench takes its own turns (layers::bench).
+    // Every part but bench holds the machine's verify lock shared, so it waits while a bench part
+    // holds it alone to measure. Bench takes its own turns.
     let _turn = if part == "bench" {
         None
     } else {

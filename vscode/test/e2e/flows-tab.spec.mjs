@@ -1,5 +1,3 @@
-// The flows of the tab itself (verification.md, "User flows"): opening, revealing, restoring,
-// hiding, closing and two windows (X1, X2, X7, X16, B10, U5).
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -139,7 +137,7 @@ test('flow__hide_and_show', async () => {
     await openTextFile(window, session.dirs, 'notes.txt');
     const hidden = statusTabs(await editorGroups(window));
     const wt1 = worktreePath(session, 'wt1');
-    // A commit changes wt1's HEAD, which the watch sees at once (W2, R6), so the hidden tab's
+    // A commit changes wt1's HEAD, and the watch sees it at once, so the hidden tab's
     // extension holds the new document before the tab shows again.
     writeFileSync(path.join(wt1, 'change.txt'), 'wtpool-verify\n');
     git(wt1, ['add', 'change.txt']);
@@ -168,7 +166,9 @@ const STARTING = 'starting…';
 /** The pause between hiding the tab and showing it again, one per switch. */
 const RESHOW_PAUSES_MS = [0, 0, 50, 0, 150, 0, 300, 0, 50, 0];
 const RESHOW_BOUND_MS = 2_000;
-/** A show that misses the bound is watched this much longer, to tell a late table from a lost view. */
+/**
+ * A show that misses the bound is watched this much longer, to tell a late table from a lost view.
+ */
 const RESHOW_GRACE_MS = 8_000;
 
 /** Clicks the label of the editor tab `name` in the editor tab bar. */
@@ -183,7 +183,7 @@ async function pageFrames(window) {
     try {
       if (await frame.locator('header .connection').count()) found.push(frame);
     } catch {
-      // A frame that navigates away cannot be queried; the next round finds the new one.
+      // A frame that navigates away cannot be queried. The next round finds the new one.
     }
   }
   return found;
@@ -275,7 +275,7 @@ test('flow__two_windows', async () => {
     await openStatus(session);
     const one = await poll(() => watchers().filter((w) => wtpoolProcesses(main).some((p) => p.pid === w.pid)).length === 1, 5_000);
 
-    // When: a second window on the same folder (R9: a window without one runs no wtpool).
+    // When: a second window on the same folder, as a window without one runs no wtpool.
     const second = await newWindow(session, session.pool);
     await openStatus(session, second);
     const own = () => watchers().filter((w) => wtpoolProcesses(main).some((p) => p.pid === w.pid));

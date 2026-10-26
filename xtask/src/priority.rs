@@ -1,12 +1,12 @@
-//! The priority of a run's jobs (verification.md, "No side effects"): every part but `bench`, and
-//! the shared builds before the parts, start their jobs at a priority that yields the processor to
-//! the owner's own work. On macOS that is the `utility` QoS clamp (`taskpolicy -c utility`), as
-//! the scheduler there all but ignores `nice`; elsewhere on Unix it is `nice -n 10`. Both replace
-//! themselves with the job, so its pid, exit and kill stay as they were. A job of an idle machine
-//! runs as fast as before; the budgets of `bench` measure at the normal priority, and so do the
-//! int checks, after their build: the `utility` clamp coalesces timers, so a 10 ms sleep takes
-//! about 35 ms, past the limits of checks that time sleeps and file events.
-//! `WTPOOL_VERIFY_PRIORITY=normal` starts every job at the normal priority.
+//! The priority of a run's jobs. Every part but `bench`, and the shared builds before the parts,
+//! start their jobs at a priority that yields the processor to the owner's own work. On macOS
+//! that is the `utility` QoS clamp (`taskpolicy -c utility`), as the scheduler there all but
+//! ignores `nice`. Elsewhere on Unix it is `nice -n 10`. Both replace themselves with the job, so
+//! its pid, exit and kill stay as they were. On an idle machine a job runs as fast as before.
+//! The budgets of `bench` measure at the normal priority, and so do the int checks after
+//! their build: the `utility` clamp coalesces timers, so a 10 ms sleep takes about 35 ms, past the
+//! limits of checks that time sleeps and file events. `WTPOOL_VERIFY_PRIORITY=normal` starts every
+//! job at the normal priority.
 
 use std::process::Command;
 

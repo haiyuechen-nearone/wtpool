@@ -1,6 +1,6 @@
-//! The files the settings commands write (J6): atomically, privately and in place, editing
-//! only the changed value, and refusing a symlink, bad TOML or a comment inside the array they
-//! would replace.
+//! The files the settings commands write: atomically, privately and in place, editing only the
+//! changed value, and refusing a symlink, bad TOML or a comment inside the array they would
+//! replace.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -166,7 +166,8 @@ fn job_settings__should_write_atomically_and_privately() {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
-/// Whether `stderr`, without the paths it names, holds the line number `line`.
+/// True when `stderr`, with `path` taken out as written and resolved, holds the line number
+/// `line`.
 fn names_line(stderr: &str, path: &Path, line: u32) -> bool {
     let mut rest = stderr.replace(&*path.to_string_lossy(), "");
     if let Ok(resolved) = fs::canonicalize(path) {
@@ -210,7 +211,7 @@ fn job_settings__should_refuse_a_symlink_or_bad_toml() {
             }
         };
 
-    // When, Then: symlinks.
+    // When
     let machine_target = elsewhere.join("machine-real.toml");
     fs::write(&machine_target, "[jobs]\nlimit = 2\n").expect("setup: write");
     sandbox.remove_machine();
@@ -237,7 +238,6 @@ fn job_settings__should_refuse_a_symlink_or_bad_toml() {
     fs::remove_file(&config).expect("setup: remove the link");
     fs::write(&config, &original).expect("setup: write wtpool.toml");
 
-    // When, Then: files that are no TOML, and comments inside the array to replace.
     sandbox.write_machine("[jobs\nlimit = 2\n");
     let before = file(&path);
     let output = job(&sandbox, &pool.fg, &["limit", "3"]);
@@ -314,7 +314,6 @@ fn job_settings__should_refuse_a_symlink_or_bad_toml() {
         ));
     }
 
-    // When, Then: a file whose only fault is a value out of bounds is rewritten.
     for (text, args, key, value) in [
         (
             "[jobs]\nlimit = 99\n",
@@ -339,10 +338,12 @@ fn job_settings__should_refuse_a_symlink_or_bad_toml() {
             ));
         }
     }
+
+    // Then
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
-/// Whether `text` is `prefix`, an array that parses to `items`, then `suffix`.
+/// True when `text` is `prefix`, an array that parses to `items`, then `suffix`.
 fn array_between(text: &str, prefix: &str, suffix: &str, items: &[&str]) -> bool {
     let Some(middle) = text
         .strip_prefix(prefix)

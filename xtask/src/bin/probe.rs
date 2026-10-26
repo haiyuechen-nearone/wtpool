@@ -1,19 +1,19 @@
 //! The probe command of the job checks: the command a `wtpool job` runs. Copied under a program's
 //! name, such as `cargo` or `go`, it takes any arguments, so a check can give a job exactly the
-//! command line it wants, and reads what it does from variables, which a job passes through
+//! command line it wants. It reads its behaviour from variables, as a job passes them through
 //! untouched:
 //!
 //! - `WTPOOL_PROBE_MARKS`: a folder. At its start the probe writes `<label>.start` there, a JSON
 //!   object of its `pid`, the wall clock `at` in nanoseconds since the epoch, its `args` after the
-//!   program, its folder `cwd`, `job` (the value of `WTPOOL_JOB`, else null) and `tty`, whether
-//!   stdin, stdout and stderr are terminals; at its end `<label>.end` with `pid` and `at`. Each
-//!   file appears whole, through a rename.
+//!   program, its folder `cwd`, `job` (the value of `WTPOOL_JOB`, else null) and `tty`, true for
+//!   each of stdin, stdout and stderr that is a terminal. At its end it writes `<label>.end` with
+//!   `pid` and `at`. Each file appears whole, through a rename.
 //! - `WTPOOL_PROBE_LABEL`: the label of those files, else the pid.
 //! - `WTPOOL_PROBE_WAIT`: a file the probe waits for, polling every 5 ms, before it ends.
 //! - `WTPOOL_PROBE_STDIN=copy`: copies stdin to stdout and to stderr, byte for byte, to its end.
 //! - `WTPOOL_PROBE_EXIT`: the exit code, 0 by default.
-//! - `WTPOOL_PROBE_SIGNAL`: a signal name such as `TERM`, which the probe sends itself instead of
-//!   exiting, through `kill`; exit code 70 if it outlives it. `PIPE` comes from a shell that
+//! - `WTPOOL_PROBE_SIGNAL`: a signal name such as `TERM` that the probe sends itself through
+//!   `kill` instead of exiting. Exit code 70 if it outlives it. `PIPE` comes from a shell that
 //!   replaces the probe, as a Rust program ignores SIGPIPE from its start.
 //!
 //! A program rather than a shell script: no shell reads the clock below the second or tells a
