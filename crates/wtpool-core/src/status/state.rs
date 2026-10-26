@@ -153,6 +153,18 @@ impl PoolState {
         self.jobs.refresh_repository_config(&self.common);
     }
 
+    /// Reads the process table again, and nothing else.
+    pub fn refresh_processes(&mut self, processes: &impl ListProcesses) {
+        self.processes = processes.list(&builds::query());
+    }
+
+    /// `true` while heavy processes outside a job are flagged, so the process table is worth
+    /// reading between heartbeats.
+    #[must_use]
+    pub fn flags_outside(&self) -> bool {
+        self.jobs.flags_outside()
+    }
+
     /// Reads again the jobs whose files are called `stems`, and the process table, as a job's
     /// start or end changes it.
     pub fn refresh_jobs(&mut self, stems: &BTreeSet<OsString>, processes: &impl ListProcesses) {

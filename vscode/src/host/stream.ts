@@ -41,7 +41,7 @@ function lastErrorLine(text: string): string | undefined {
 }
 
 /** Gives wtpool's error at the end of a start, or undefined after a clean exit. */
-function endError(end: RunEnd): string | undefined {
+export function endError(end: RunEnd): string | undefined {
   if (!end.started) {
     return `wtpool did not start: ${end.error.message}`;
   }

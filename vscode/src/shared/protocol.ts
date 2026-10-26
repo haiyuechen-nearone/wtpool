@@ -1,6 +1,7 @@
 // Both tsconfigs include this file, so it imports only types of the generated schema: no Node,
 // VS Code or DOM API.
 import type { StatusDocument, Worktree } from '../generated/status';
+import type { JobSettingsAnswer, JobSettingsMessage } from './jobs';
 
 /** The state of a tab's watch. `starting` lasts until wtpool's first line. */
 export type Connection = 'starting' | 'live' | 'stale' | 'paused';
@@ -26,6 +27,8 @@ export interface ViewMessage {
   error?: string;
   /** No folder is open, so no `wtpool` runs: `connection` is paused, with no `retry_at`. */
   no_folder?: true;
+  /** The first folder is not on this computer, so `wtpool` runs in the home folder. */
+  folder_remote?: true;
 }
 
 /** Holds the tail of one output file: its last lines, or the reason there are none. */
@@ -45,7 +48,7 @@ export interface OutputMessage {
 }
 
 /** A message the extension posts to a webview. */
-export type PanelMessage = ViewMessage | OutputMessage;
+export type PanelMessage = ViewMessage | OutputMessage | JobSettingsAnswer;
 
 /** The row actions a webview may ask for, in the order a row shows them. */
 const ACTION_TYPES = ['open', 'terminal', 'copyPath', 'free', 'fg'] as const;
@@ -62,10 +65,13 @@ export function isActionType(value: unknown): value is ActionType {
  * Holds a message a webview may send: a row action or a `select` names a row by its path, the
  * empty string for none in a `select`, and a `follow` names an output path instead.
  */
-export interface WebviewMessage {
+export interface RowMessage {
   type: ActionType | 'select' | 'follow';
   id: string;
 }
+
+/** A message a webview may send. */
+export type WebviewMessage = RowMessage | JobSettingsMessage;
 
 /** A worktree that holds a branch, the one kind of row that `free` and `fg` act on. */
 export interface BranchSlot extends Worktree {

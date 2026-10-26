@@ -16,6 +16,7 @@ export async function flowSession(key, options = {}) {
   const poolInfo = pool(options.scenario ?? 'idle_pool', key);
   await options.prepare?.(poolInfo);
   const dirs = sandbox(key.replaceAll('/', '-'), options);
+  await options.beforeLaunch?.(dirs);
   const session = await launch(dirs, poolInfo, options.args ?? []);
   return { ...session, pool: poolInfo, scenario: poolInfo.scenario };
 }

@@ -1,4 +1,5 @@
 import type { StatusDocument, Worktree } from '../generated/status';
+import { flagsUnqueued, jobsOf, type JobSettingsAnswer } from '../shared/jobs';
 import {
   isActionType,
   isRecord,
@@ -10,6 +11,7 @@ import { DetailStrip } from './detail';
 import { cell, div, span } from './dom';
 import { Header } from './header';
 import { PoolHeading } from './heading';
+import { MachineStrip } from './machine';
 import { RowView } from './row';
 import { rowOrder, waitAnnouncement } from './text';
 
@@ -52,7 +54,9 @@ export class Page {
   private readonly scroller = div('scroller');
   private readonly tbody = document.createElement('tbody');
   /** The pool's heading row, hidden until the first document. */
-  private readonly heading = new PoolHeading(COLUMNS.length + 1);
+  private readonly heading = new PoolHeading(COLUMNS.length + 1, () => void this.toggleMachine());
+  /** The machine strip under the heading, in the table only while it is open. */
+  private readonly machine: MachineStrip;
   private readonly detail = document.createElement('tr');
   private readonly detailCell = cell('detail-cell');
   private readonly strip = new DetailStrip();
@@ -74,6 +78,16 @@ export class Page {
     this.detail.append(this.detailCell);
     this.announcer.setAttribute('role', 'status');
     this.announcer.setAttribute('aria-live', 'polite');
+    this.machine = new MachineStrip(COLUMNS.length + 1, {
+      send: (message) => void host.postMessage(message),
+      announce: (text) => {
+        this.announcer.textContent = text;
+      },
+      close: () => {
+        this.toggleMachine();
+        this.heading.button.focus();
+      },
+    });
     document.body.append(this.header.element, this.noFolder, this.agentsOff, this.table(), this.announcer);
   }
 
@@ -122,19 +136,21 @@ export class Page {
     this.noFolder.hidden = !noFolder;
     this.scroller.hidden = noFolder;
     this.header.show(view);
-    if (view.status) this.renderStatus(view.status, nowMs);
+    if (view.status) this.renderStatus(view.status, view.folder_remote === true, nowMs);
     else this.clear();
     this.tick(nowMs);
   }
 
-  /** Shows the document's first pool, the one pool wtpool sends. */
-  private renderStatus(status: StatusDocument, nowMs: number): void {
+  /** Shows the document's first pool, the one pool wtpool sends, and this machine's heavy jobs. */
+  private renderStatus(status: StatusDocument, remote: boolean, nowMs: number): void {
     const [pool] = status.pools;
-    this.heading.update(pool, status.machine.name);
+    const jobs = jobsOf(status);
+    this.heading.update(pool, status.machine.name, jobs);
     this.heading.element.hidden = false;
+    this.machine.show({ name: status.machine.name, jobs, worktrees: pool.worktrees, remote }, nowMs);
     this.agentsOff.hidden = pool.agents !== 'off';
     this.header.count(pool);
-    this.renderRows(rowOrder(pool.worktrees), nowMs);
+    this.renderRows(rowOrder(pool.worktrees), flagsUnqueued(jobs), nowMs);
     this.announce(pool.worktrees);
   }
 
@@ -143,6 +159,7 @@ export class Page {
     this.rows.forEach((row) => void row.element.remove());
     this.rows.clear();
     this.heading.element.hidden = true;
+    if (this.machine.element.isConnected) this.toggleMachine();
     this.order = [];
     this.detail.remove();
     this.waiting = null;
@@ -153,12 +170,16 @@ export class Page {
   /** Moves the clock: ages and the stale or paused header, nothing else. */
   tick(nowMs: number): void {
     this.rows.forEach((row) => void row.tick(nowMs));
+    this.machine.tick(nowMs);
     if (!this.view || this.view.no_folder) return;
     this.header.tick(this.view, nowMs);
   }
 
-  /** Shows the pool's rows after its heading, kept and moved, never remade, so focus survives. */
-  private renderRows(ordered: Worktree[], nowMs: number): void {
+  /**
+   * Shows the pool's rows after its heading and the machine strip, kept and moved, never remade, so
+   * focus survives.
+   */
+  private renderRows(ordered: Worktree[], flagUnqueued: boolean, nowMs: number): void {
     const ids = new Set(ordered.map((w) => w.path));
     for (const [id, row] of this.rows) {
       if (!ids.has(id)) {
@@ -166,14 +187,14 @@ export class Page {
         this.rows.delete(id);
       }
     }
-    let previous: Element = this.heading.element;
+    let previous: Element = this.machine.element.isConnected ? this.machine.element : this.heading.element;
     this.order = [];
     for (const worktree of ordered) {
       let row = this.rows.get(worktree.path);
       if (row) {
-        row.update(worktree, nowMs);
+        row.update(worktree, nowMs, flagUnqueued);
       } else {
-        row = new RowView(worktree, nowMs);
+        row = new RowView(worktree, nowMs, flagUnqueued);
         this.rows.set(worktree.path, row);
       }
       this.order.push(row);
@@ -221,6 +242,23 @@ export class Page {
   /** Shows the tails the extension read for the selected row's outputs. */
   showOutput(message: OutputMessage): void {
     if (message.row === this.selected) this.strip.showTails(message.row, message.tails);
+  }
+
+  /** Shows the extension's answer to the settings the machine strip sent. */
+  showJobSettings(answer: JobSettingsAnswer): void {
+    this.machine.answer(answer);
+  }
+
+  /** Opens the machine strip under the heading, focus on its first field, or closes it. */
+  private toggleMachine(): void {
+    const open = !this.machine.element.isConnected;
+    if (open) {
+      this.heading.element.after(this.machine.element);
+      this.machine.focus();
+    } else {
+      this.machine.element.remove();
+    }
+    this.heading.expand(open);
   }
 
   /** Opens the detail strip under `row`, or closes it when it is open there. */

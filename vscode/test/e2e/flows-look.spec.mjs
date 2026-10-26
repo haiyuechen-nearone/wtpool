@@ -6,7 +6,7 @@ import { scenarioDocuments } from '../support/docs.mjs';
 import { GROUP_TOKENS, GROUPS } from '../support/grammar.mjs';
 import { expectedRows, resolved, waitForRows } from './rows.mjs';
 import { openStatus, poll, withFlow, worktreePath } from './flows.mjs';
-import { PHASE, agent } from './jobs.mjs';
+import { PHASE, agent, unflaggedCargo } from './jobs.mjs';
 import { panelFrame, runCommand, sleep, startProcess, writeSettings } from './vscode.mjs';
 
 /** Each theme with the test of its webview body classes. VS Code sets them per theme kind. */
@@ -104,7 +104,7 @@ test('flow__theme_switch', async () => {
 });
 
 test('flow__reduced_motion', async () => {
-  await withFlow('flow__reduced_motion', { scenario: 'building_without_agent', settings: { 'workbench.reduceMotion': 'on' } }, async (session) => {
+  await withFlow('flow__reduced_motion', { scenario: 'building_without_agent', settings: { 'workbench.reduceMotion': 'on' }, beforeLaunch: unflaggedCargo }, async (session) => {
     // Given
     const { window, dirs, pool: poolInfo } = session;
     const { scenario, documents } = scenarioDocuments(session.scenario);

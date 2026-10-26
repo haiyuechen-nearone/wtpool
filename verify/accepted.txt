@@ -210,3 +210,9 @@ accept p4-oracle-fixes-2 7f0be2b1a85557a60c0fd854e98735687f3812f7c333d9ce2dc6e0e
 accept comments-xtask 00930a2ab8d5e40ac7e8ba203bbf4db2f20c139803979514075d95a36172b048
 # The JS test harness comments drop spec references, and visible() escapes the extension's set of invisible characters.
 accept comments-jstest 97ec6861304a7be86dcca9d743b9f2b6c6787753f53e5c85c60d298d02724f99
+# Three e2e checks follow the panel from phase 4: the heading expects the machine button's text from the live machine.jobs, under enforce off, and the build flows give cargo a heavy pattern under enforce off, so build: cargo reads as their fixture documents expect.
+accept p4-oracle-fixes-3 2075c21b048f37abd9795e52fcb85bd140eda4e94dd25888bd615afa4e67400e
+# W10 reads the process table once a second while enforce is not off, so a heavy process outside a job shows within 1 s.
+accept watch-process-sample 72e9d570021da56a70cd4e13c34f9a29e629690b88960e0134cc8f576d467c70
+# The owner approved the 16 shot baselines on 2026-10-26: the heading chevron and the agent line padding.
+accept build-machine-strip c5ba12e687fd7d59dc73af2be9c0ccf3cd82ba86d0ebb90d92d57df375e1dc03

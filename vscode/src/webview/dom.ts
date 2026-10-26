@@ -31,9 +31,22 @@ export function setText(node: Node, text: string): void {
   if (node.textContent !== text) node.textContent = text;
 }
 
-/** Makes the nodes of a line of pieces: document strings isolated, the panel's words as text. */
+/** Makes a span that holds `text`. */
+export function textSpan(className: string, text: string): HTMLSpanElement {
+  const element = span(className);
+  element.textContent = text;
+  return element;
+}
+
+/**
+ * Makes the nodes of a line of pieces: document strings isolated, the panel's words as text, in a
+ * span of their class when they have one.
+ */
 export function pieceNodes(pieces: Piece[]): Node[] {
-  return pieces.map((piece) => (piece.from ? bdi(piece.text) : document.createTextNode(piece.text)));
+  return pieces.map((piece) => {
+    if (piece.from) return bdi(piece.text);
+    return piece.className ? textSpan(piece.className, piece.text) : document.createTextNode(piece.text);
+  });
 }
 
 export function line(pieces: Piece[], className = 'line'): HTMLDivElement {

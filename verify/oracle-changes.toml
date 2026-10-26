@@ -1456,3 +1456,40 @@ reason = "The comments of the JS test harness under vscode/test follow the comme
 "vscode/test/support/visual-docs.mjs" = "224c9161a27784824177a30e03dfa7000541cea67b3ed585e681f99986cd4146"
 "vscode/test/support/vscode-app.mjs" = "ee91f5fb94ae001e5412d770b17f669c399d79280db43505a6f4c01dce9ce59b"
 "vscode/test/support/webview.mjs" = "733797656fbc20c4a637ee02f280f7b3fed77fa622117c89413665720830d497"
+
+[[change]]
+id = "p4-oracle-fixes-3"
+reason = "Three e2e checks follow the panel from phase 4. heading__should_name_the_repository_then_the_machine expects, after the repository and the dot, the machine button's text that buttonText of support/jobs.mjs gives for the live document's machine.jobs from phase 4, the machine name alone before; its sandbox's machine.toml sets enforce = off, as the not queued count of the button counts heavy processes of the whole machine, which come and go between the status read and the render. The cases of flow__every_activity_shows and flow__reduced_motion take their expected rows from fixture documents without machine.jobs, so their sandboxes' machine.toml lists cargo as a heavy pattern, as from phase 4 a process is a build only while it matches a heavy pattern or a suggestion, and sets enforce = off, under which a build outside a job reads build: cargo without (not queued). flowSession takes a beforeLaunch function that runs on the fresh sandbox before VS Code starts, and jobs.mjs gains unflaggedCargo, which writes that machine.toml."
+[change.files]
+"vscode/test/e2e/flows-look.spec.mjs" = "586b6441e9afeb713bcd71bddb5737320dc9e226ef9442cd8e0e4f7d172f51e6"
+"vscode/test/e2e/flows-scenarios.spec.mjs" = "2afe91722ac5e751f265423cd341c20304744cba58c2f0e68695f6f9943c55f4"
+"vscode/test/e2e/flows.mjs" = "08ce114d035ef9ca29c1ae4a795306ceb958de8ade0d157e9a2d7f8993321d2f"
+"vscode/test/e2e/headings.spec.mjs" = "4a6537d3a0234e1e3f43f82f9f45a4192695c5a08429bc0537178355cc47a54f"
+"vscode/test/e2e/jobs.mjs" = "56712984e330c6e6fe86440420c8f6a9171353c3e6298fb7caac7e51bbafaf4a"
+
+[[change]]
+id = "watch-process-sample"
+reason = "W10 gains a once a second read of the process table while enforce is not off, so a heavy process started outside a job shows within 1 s; the status line gains revision 31."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "049de1bc2e96e43b87b6671a6f86bf55a7a9244d71f13caabcb08b89bf8891a0"
+
+[[change]]
+id = "build-machine-strip"
+reason = "The owner approved the 16 baselines on 2026-10-26: the heading chevron and the agent line padding."
+[change.files]
+"verify/shots/approved/dark-every_activity_focused_slot-1100.png" = "27ba3de6330d18a3cfb9371fbf4f6b067ba6456990f2920317d139b1602526aa"
+"verify/shots/approved/dark-every_activity_focused_slot-600.png" = "3b49e6f1646217f1305294baeded1963676251163993281737b09e4744230daf"
+"verify/shots/approved/dark-idle_pool-1100.png" = "8c173a0b15aea03b3a058ae9feb8448255b8ba48405f2c95e2adaf8c67d65c86"
+"verify/shots/approved/dark-idle_pool-600.png" = "3241910459d7684d9a6114bd3aa8b695c8bea3a4f3c8d38ac4d5738d739a0a28"
+"verify/shots/approved/dark-permission_wait_and_answer-1100.png" = "aee62ccbc50d454e14e2f9a3c1d2a90e496d7876bf70bc879c1941763c643a0a"
+"verify/shots/approved/dark-permission_wait_and_answer-600.png" = "13a6bd42f281726d44ec094de6318afae524726fef4917fbab4603668d4dd647"
+"verify/shots/approved/dark-several_agents_one_worktree-1100.png" = "ba2b1d2887ed871718b3e5556606f7b31151d3413ac78f3956a021a13c0aea11"
+"verify/shots/approved/high-contrast-idle_pool-1100.png" = "134bec4fa6aaac6fcb86337261b305ad51963c31ddb543881e99d7377951c1ca"
+"verify/shots/approved/high-contrast-light-idle_pool-1100.png" = "98bf49bc5fe127c2d7fe1cd562d34b165ad92e0d2e2f4125b275185856929bd0"
+"verify/shots/approved/high-contrast-light-permission_wait_and_answer-1100.png" = "e122333524003d8d07a6fc5cffe8d083f86a01ef3e0265b7165e34a5ccc99b79"
+"verify/shots/approved/high-contrast-light-several_agents_one_worktree-1100.png" = "5570de523c148e4b7243c82ecf80428e57f2b479334e2bb9513be66b106ec9c0"
+"verify/shots/approved/high-contrast-permission_wait_and_answer-1100.png" = "cdea29d486615d3691d42b855278e4ad534824caf2f50200ae12eec9afbfcba6"
+"verify/shots/approved/high-contrast-several_agents_one_worktree-1100.png" = "098256effc625d8a4eaff6a63dcce5d0c9a0d5752784e944abf92cd7f779430a"
+"verify/shots/approved/light-idle_pool-1100.png" = "cf4efabc211f6f46ad26477f1e6c1ef16511a483d1205edb7cc6da5fb873c512"
+"verify/shots/approved/light-permission_wait_and_answer-1100.png" = "9a95bc47ed7a794e116f6cb3e4517c5214c9a26751a5ffa36fa4924ee56f94cf"
+"verify/shots/approved/light-several_agents_one_worktree-1100.png" = "d5f52efb94a5c9cb7c42e64e9b2a8a539052650b3f1a9c0d44ae6d0bc5512fde"

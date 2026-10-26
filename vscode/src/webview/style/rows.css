@@ -51,7 +51,7 @@ body.vscode-high-contrast .row:hover:not(:focus) {
   color: var(--vscode-descriptionForeground);
 }
 
-.state-waiting > bdi:first-child {
+.state-waiting > bdi:first-of-type {
   color: var(--vscode-list-warningForeground);
 }
 
@@ -83,6 +83,43 @@ body.vscode-high-contrast .row:hover:not(:focus) {
   width: 16px;
   margin-right: 5px;
   text-align: center;
+}
+
+/* The number of agent lines, after the word, in the word's colour. */
+.count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid currentcolor;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 15px;
+  vertical-align: 1px;
+}
+
+/* An agent line's state icon. Its box holds no line box, so its baseline is its bottom edge, and
+ * -2px puts the centre of its 14 px on the centre of the line's capitals. Quiet states take the
+ * line's own colour. */
+.line-icon {
+  position: relative;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 5px;
+  vertical-align: -2px;
+}
+
+.state-working > .line-icon {
+  color: var(--vscode-textLink-foreground);
+}
+
+.state-waiting > .line-icon {
+  color: var(--vscode-list-warningForeground);
+}
+
+.line-icon-error {
+  color: var(--vscode-list-errorForeground);
 }
 
 .group-attention > td:first-child {

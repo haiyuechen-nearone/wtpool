@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
+import { buttonText } from '../support/jobs.mjs';
+import { PHASE, writeMachineToml } from './jobs.mjs';
 import { panelFrame, close, git, launch, pool, runCommand, sandbox, statusJson } from './vscode.mjs';
 
 const GITHUB = 'https://github.com/acme/app.git';
@@ -43,7 +45,10 @@ test('heading__should_name_the_repository_then_the_machine e2e', async () => {
   restore.push(() => git(poolInfo.fg, ['remote', 'set-url', 'origin', local]));
   git(poolInfo.fg, ['remote', 'set-url', 'origin', GITHUB]);
   const dirs = sandbox('headings');
-  const machine = statusJson(dirs, poolInfo).machine.name;
+  // Heavy processes of the whole machine come and go, and `off` leaves their count out of the button.
+  writeMachineToml(dirs, { enforce: 'off' });
+  const { machine: status } = statusJson(dirs, poolInfo);
+  const machine = buttonText(PHASE >= 4 ? status.jobs : undefined, status.name);
   const session = await launch(dirs, poolInfo);
   let onGithub;
   let onLocal;

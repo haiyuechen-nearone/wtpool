@@ -8,6 +8,7 @@ import {
   type ActionType,
   type BranchSlot,
 } from '../shared/protocol';
+import { readJobSettings, type JobSettingsRequest } from './jobs';
 import { isTaskOutputPath } from './outputs';
 
 type DirectActionType = Exclude<ActionType, ConfirmedActionType>;
@@ -39,7 +40,7 @@ interface FollowRequest {
 }
 
 /** A request of the webview, by its message's `type`. */
-export type WebviewRequest = DirectAction | ConfirmedAction | Selection | FollowRequest;
+export type WebviewRequest = DirectAction | ConfirmedAction | Selection | FollowRequest | JobSettingsRequest;
 
 /** Finds the worktree at `path` in the document's first pool, the only one the tab shows. */
 export function worktreeAt(document: StatusDocument | null, path: unknown): Worktree | undefined {
@@ -96,6 +97,9 @@ export function readRequest(
     return undefined;
   }
   const { type, id } = message;
+  if (type === 'jobSettings') {
+    return readJobSettings(message, document);
+  }
   if (Object.keys(message).sort().join() !== 'id,type' || typeof id !== 'string') {
     return undefined;
   }

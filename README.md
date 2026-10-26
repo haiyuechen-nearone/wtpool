@@ -17,6 +17,10 @@ own machine.
   or an operation in progress, or drop commits no ref holds. When git cannot tell, it refuses.
 - **See every agent.** A Claude Code hook records what each session does. The Worktrees tab shows
   which worktree works, builds, waits for you, sits idle or is free.
+- **Heavy jobs take turns.** `wtpool job -- cargo test` runs a build or a test suite under one
+  limit for every agent on the machine. The tab shows what runs, what waits and what runs outside
+  the queue, and Claude Code can refuse a heavy command that skips it:
+  [Heavy jobs](docs/heavy-jobs.md).
 
 ## Why wtpool
 
@@ -94,7 +98,9 @@ Choose user scope ("Install for you"), so the hooks run in every repository and
 the `PATH` that Claude Code's hooks see.
 
 **By hand.** `wtpool hook install` prints a JSON block with an entry for each of 14 Claude Code
-events. Each entry runs this `wtpool` by its absolute path. Merge the entries into the `hooks` of
+events, and one more for the
+[heavy job policy](docs/heavy-jobs.md#claude-code-and-other-agent-tools). Each entry runs this
+`wtpool` by its absolute path. Merge the entries into the `hooks` of
 `~/.claude/settings.json` (or `settings.json` in `$CLAUDE_CONFIG_DIR`), next to the hooks already
 there. wtpool never writes that file. [Status and hook](docs/status-and-hook.md#turning-it-on) has
 the details.
@@ -177,13 +183,15 @@ contract that other IDEs and agent tools can build on: see
 ## Documentation
 
 - [Commands](docs/commands.md): every command, refs, `--refresh` and `--reset`, `wtpool ls`
-  states, safety rules.
+  states, `wtpool job`, `machine.toml`, safety rules.
 - [Configuration](docs/configuration.md): settings and their defaults, `WTPOOL_*` variables,
   `wtpool.toml`, `wtpool config`.
 - [Status and hook](docs/status-and-hook.md): `wtpool status --json`, `--watch` and `--schema`,
   the Claude Code hook, `wtpool-activity/`, `wtpool hook gc`.
-- [Panel](docs/panel.md): the Worktrees tab, its activities, chips and row actions,
-  `wtpool.path`.
+- [Panel](docs/panel.md): the Worktrees tab, its activities, chips and row actions, the machine
+  strip, `wtpool.path`.
+- [Heavy jobs](docs/heavy-jobs.md): why to queue builds and tests, the suggested patterns, the
+  limit, `warn` and `require`, other agent tools.
 - [Troubleshooting](docs/troubleshooting.md): agents off, `spawn wtpool ENOENT`, `gh`, hooks
   that do not fire, `hook.log`, old records and `wtpool hook gc`, a full pool, the old name `wt`.
 - [Privacy and uninstall](docs/privacy-and-uninstall.md): everything wtpool writes, what talks to

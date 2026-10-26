@@ -25,7 +25,8 @@ Fixes land on `main`. There are no release branches yet.
 wtpool runs as you, with your permissions, and has no privileged part. It trusts you, the `git`
 and `gh` on your `PATH`, and Claude Code. A process that already runs as you can change your
 files, settings and `PATH`, so wtpool does not defend against one. The IDs below, such as H3,
-point to rows of the spec, [status-panel.md](docs/design/status-panel/status-panel.md).
+point to rows of the spec, [status-panel.md](docs/design/status-panel/status-panel.md), and those
+of heavy jobs, such as J4, to [jobs.md](docs/design/jobs/jobs.md).
 
 ### The hook runs on every Claude Code event
 
@@ -34,7 +35,7 @@ JSON on stdin. The hook fails open, so a broken or slow hook never blocks or cha
 agent does:
 
 - It prints nothing and exits 0 on every path, panics included (H2, H3). Claude Code reads no
-  text and no block decision from it.
+  text and no block decision from it. The one exception is the heavy job policy, below.
 - A watchdog ends it after 1 s (H4). The block that `wtpool hook install` prints also sets
   `"onFailure": "continue"` on each entry.
 - It runs no shell and no git.
@@ -61,6 +62,47 @@ The plugin runs `wtpool hook` by name, so it runs the first `wtpool` on the `PAT
 Code's hooks see. The block that `wtpool hook install` prints runs one absolute path instead. On
 Windows, a program started by name may be found in the working folder before the `PATH`, so use
 the block there.
+
+### The heavy job policy fails open
+
+The hooks also run `wtpool hook policy` before each Bash, PowerShell and Monitor call. It is the
+one hook that can stop a call: under `enforce = "require"` it refuses a call whose command holds a
+heavy command that `wtpool job` does not wrap, and its reason names the wrapped command to run
+instead (H29, J21). It never rewrites a call.
+
+- It exits 0 on every path, and prints at most that one refusal. On any error it prints nothing,
+  so the call goes on as it would without the hook: a payload, a config or a command it cannot
+  read, no answer before its watchdog, a panic.
+- It writes no file and runs no git and no shell. Under `off` it returns once it has read the
+  policy.
+- Its reason quotes the call's own command back to Claude Code, which sent it. Nothing is stored.
+
+So `require` guides agents that cooperate. It is not a sandbox: a command the hook cannot read, a
+heavy command that a script or an editor starts, and an agent tool without this hook all run
+unrefused, and show as not queued.
+
+### Heavy job settings
+
+- Only you set the limit and the policy, in `machine.toml`, by hand or through `wtpool job`. No
+  environment variable, repository, clone or hook sets them (J4). `limit` or `enforce` in a
+  `wtpool.toml` is an error.
+- A repository can only add heavy patterns, in its own `.git/wtpool.toml`, which no clone
+  carries. It can never lower the limit or relax the policy.
+- A repository's files suggest patterns: the names at its top level and the script names of its
+  `package.json`, which a hostile repository controls. A suggestion only shows, and applies once
+  you add it. A script name that is not a valid pattern is dropped, and a name is only ever the
+  last word after its package manager, so a script can make only its own command heavy (J23,
+  J24). wtpool reads names and one file of at most 256 KiB, never through a symlink, and runs
+  nothing.
+- On Unix, `machine.toml` and its folder must belong to you and be writable by no one else (J5).
+  The job folder must be a real folder that belongs to you, not a symlink, and writable by no
+  one else, or `wtpool job` exits 125 before its command runs (J7). On Windows these checks rely on
+  the access list of your profile folder (J17).
+- `wtpool job` runs its command as given, with no shell. Its own files open close-on-exec, so the
+  command and its children never hold the job's lock (J8).
+- `wtpool job` writes `machine.toml` and `wtpool.toml` through a new file, opened without
+  following symlinks, renamed over the old one. It refuses to write a file that is a symlink
+  (J6).
 
 ### Paths can reach the network
 
@@ -131,7 +173,8 @@ OSC 52 sequence, which writes your clipboard.
 - Two outputs keep such strings as they are: its JSON, and the path that `fg`, `bg` or `path`
   prints when its standard output is not a terminal, so that `cd "$(wtpool bg <ref>)"` names the
   real folder.
-- The output of the `git` commands it runs and of `on_new_slot` passes through as it is.
+- The output of the `git` commands it runs, of `on_new_slot` and of the command that `wtpool job`
+  runs passes through as it is.
 
 ### The VS Code extension
 
@@ -148,7 +191,10 @@ OSC 52 sequence, which writes your clipboard.
 - Command URIs and forms are off, and the page loads resources only from the extension's
   `media/` folder (X9).
 - The extension accepts only a fixed set of messages from the page, and each must name a row or
-  output path of the last status document (X11).
+  output path of the last status document (X11). A `jobSettings` message, from the machine
+  strip, must hold a limit within bounds, a known policy, or one pattern edit that passes the
+  pattern grammar. The extension then runs only `wtpool job limit`, `enforce` or `heavy add|rm`,
+  with each pattern as one argument after `--`, and writes no file itself (X21).
 - It runs only the binary that `wtpool.path` names, with an argument array and no shell (X4).
   That setting has application scope, so a workspace's `.vscode/settings.json` cannot change it.
   A bare name, such as the default `wtpool`, runs the first match in an absolute folder of the
@@ -179,6 +225,9 @@ the command is stored, and nothing inside `$(…)` or backquotes reaches the sum
 Session titles can reflect prompt content. Claude Code generates a title from your conversation,
 and wtpool keeps up to 40 characters of it as the session's label. The panel labels a subagent
 with the description that its parent agent wrote in the Agent call.
+
+A heavy job records its summary, label, folder, pid and times, never its arguments, environment
+or output (J8, J16). Its folder has mode 0700, its files 0600.
 
 [Privacy and uninstall](docs/privacy-and-uninstall.md) lists every file and field.
 

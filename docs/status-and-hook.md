@@ -1,7 +1,8 @@
 # `wtpool status` and the Claude Code hook
 
 [README](../README.md) · [Commands](commands.md) · [Configuration](configuration.md) ·
-**Status and hook** · [Panel](panel.md) · [Development](development.md)
+**Status and hook** · [Panel](panel.md) · [Heavy jobs](heavy-jobs.md) ·
+[Development](development.md)
 
 ## `wtpool status`
 
@@ -22,14 +23,23 @@ changed: a worktree's `HEAD`, index or operation files, the refs, or one activit
 events and git changes show within 1 s. Anything else, such as an edited file, shows within one 10 s
 heartbeat. It exits 0 when stdin closes or stdout fails.
 
-Builds are processes named `cargo`, `cargo-*`, `rustc` or a name in `build_processes`, working in a
-worktree. To count other build tools, add their process names to `build_processes`
-([Configuration](configuration.md)).
+Builds are processes working in a worktree whose command matches a heavy pattern of this machine
+or of this repository, such as `cargo test` or `make` ([Heavy jobs](heavy-jobs.md)). While the
+repository has no patterns of its own, its suggestions count, so a repository with a `Cargo.toml`
+shows `cargo build` and `cargo test` as builds from the start. A build's `name` is the words its
+pattern matched, and `queued` says whether a job holds it.
+
+The document's `machine.jobs` holds this machine's heavy jobs: the limit, the policy and their
+sources, the path of `machine.toml`, the heavy patterns with their sources, this repository's
+suggestions, and the running jobs, the waiting ones in queue order and the heavy processes outside
+any job. Each job or process has its summary, its label, its worktree and agent in this pool, else
+`null`, and since when it runs or waits. None holds an argument or the environment. A `wtpool`
+without `wtpool job` leaves `jobs` out.
 
 A build a session started keeps that session `working`, also after its turn ended, as when it runs
 the build in the background: any build process that descends from the session's Claude Code
 process, wherever it works. The agent line then reads `build: <name>`, the outermost such build,
-such as `build: cargo-nextest`. When the build ends, the session shows its own state again, within
+such as `build: cargo test`. When the build ends, the session shows its own state again, within
 one 10 s heartbeat. Other children of Claude Code, such as MCP servers, never count, and neither
 does a build you start yourself.
 
@@ -75,9 +85,12 @@ An agent is placed by its start directory, then moved by the paths its tools tou
 on `app-wt2`.
 
 The hook prints nothing, runs no shell and no git, exits 0 on every path, and ends itself after 1 s.
-Tool calls wait for no hook but `PermissionRequest`: the other tool call events are async, and the
-remaining sync events have a 2 s timeout. Diagnostics go to `$XDG_STATE_HOME/wtpool/hook.log`, by
-default `~/.local/state/wtpool/hook.log`.
+Tool calls wait for no hook but `PermissionRequest` and the heavy job policy: the other tool call
+events are async, and the remaining sync events have a 2 s timeout. The policy,
+`wtpool hook policy`, runs before each Bash, PowerShell and Monitor call, and prints at most one
+refusal, under `enforce = "require"`, else nothing
+([Heavy jobs](heavy-jobs.md#warn-and-require)). Diagnostics go to
+`$XDG_STATE_HOME/wtpool/hook.log`, by default `~/.local/state/wtpool/hook.log`.
 
 ### Labels
 
@@ -139,8 +152,9 @@ adapter that reads a transcript as the Claude Code one does (H16).
 `wtpool hook install` checks your setup. It reads `settings.json` in `$CLAUDE_CONFIG_DIR`, by
 default `~/.claude/settings.json`, and says on stderr whether Claude Code runs the hooks. The first
 line starts `hooks present:`, `hooks present twice:` or `hooks missing:`. A missing setup is named:
-no settings file, a file that is not valid JSON, the events without a `wtpool hook` entry, or a
-block that runs another `wtpool`. Stdout holds only the block.
+no settings file, a file that is not valid JSON, the events without a `wtpool hook` entry, a
+block without the policy entry, or a block that runs another `wtpool`. Stdout holds only the
+block.
 
 ### The plugin
 
@@ -151,9 +165,10 @@ Run these two lines in Claude Code:
 /plugin install wtpool@wtpool
 ```
 
-The plugin's hooks run `wtpool hook` for the same 14 events, with the same timeouts and async
-flags, as the block below. Like the block, they never hold Claude Code up: a hook that fails or
-times out lets Claude Code go on.
+The plugin's hooks run `wtpool hook` for the same 14 events, and `wtpool hook policy` before shell
+calls, with the same timeouts and async flags, as the block below. The plugin also ships the skill
+`heavy-jobs`, which tells Claude Code to run heavy commands through `wtpool job`. Like the block,
+the hooks never hold Claude Code up: a hook that fails or times out lets Claude Code go on.
 
 **`wtpool` must be on the `PATH` that Claude Code passes to its hooks.** The plugin cannot know
 where you installed `wtpool`, so its hooks run the bare command `wtpool`. `cargo install` puts it in
@@ -206,7 +221,7 @@ block still runs: replace it in `settings.json` with the new one.
 
 If you also install the plugin, every event runs `wtpool hook` twice, and `wtpool hook install`
 says `hooks present twice:`. Remove the block then: delete each entry under `"hooks"` whose
-`"args"` are `["hook"]`, or restore `settings.json.bak`.
+`"args"` are `["hook"]` or `["hook", "policy"]`, or restore `settings.json.bak`.
 
 ## Cleaning up
 

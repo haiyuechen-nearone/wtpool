@@ -45,6 +45,14 @@ export function writeMachineToml(dirs, { limit, enforce, heavy, text } = {}) {
   return file;
 }
 
+/**
+ * Writes a machine.toml under which `cargo` is a heavy pattern and nothing is flagged, so a
+ * `cargo` outside a job reads as it does in a document without `machine.jobs`: `build: cargo`.
+ */
+export function unflaggedCargo(dirs) {
+  writeMachineToml(dirs, { enforce: 'off', heavy: ['cargo'] });
+}
+
 export function readText(file) {
   return existsSync(file) ? readFileSync(file, 'utf8') : null;
 }

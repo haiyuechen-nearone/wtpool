@@ -1,4 +1,4 @@
-import type { Worktree } from '../generated/status';
+import type { Actor, Worktree } from '../generated/status';
 import { visible } from '../shared/invisible';
 import { offeredActions, type ActionType } from '../shared/protocol';
 import { bdi, cell, line, setText, span } from './dom';
@@ -34,6 +34,26 @@ function robot(): Node | null {
 }
 
 /**
+ * Makes the start of an agent line: the icon of `actor`'s state and that state for screen readers,
+ * or an empty icon box for a line of no actor, so every line's text starts at the same x.
+ */
+function lineStart(actor: Actor | undefined): Node[] {
+  const icon = span('line-icon');
+  icon.setAttribute('aria-hidden', 'true');
+  if (!actor) return [icon];
+  const apiError = actor.state === 'idle' && Boolean(actor.error);
+  if (actor.state === 'working') {
+    const drawn = robot();
+    if (drawn) icon.append(drawn);
+  } else {
+    icon.classList.add(`line-icon-${apiError ? 'error' : actor.state}`);
+  }
+  const state = span('visually-hidden');
+  state.textContent = apiError ? 'idle, API error: ' : `${actor.state}: `;
+  return [icon, state];
+}
+
+/**
  * Shows one worktree as a row of the table. It is made once and updated in place, so focus and
  * selection survive every document.
  */
@@ -42,6 +62,8 @@ export class RowView {
   private current: Worktree;
   private readonly icon = span('icon');
   private readonly word = span('word');
+  private readonly count = span('count');
+  private readonly agentCount = span('visually-hidden');
   private readonly name = bdi('', 'name');
   private readonly role = span('role');
   private readonly branch = bdi('');
@@ -53,13 +75,14 @@ export class RowView {
   private times: Array<string | null> = [];
   private actionKey = '';
 
-  constructor(worktree: Worktree, nowMs: number) {
+  constructor(worktree: Worktree, nowMs: number, flagUnqueued: boolean) {
     this.current = worktree;
     this.element = document.createElement('tr');
     this.element.setAttribute('data-row-id', worktree.path);
     this.element.setAttribute('tabindex', '0');
     this.element.setAttribute('aria-selected', 'false');
     this.icon.setAttribute('aria-hidden', 'true');
+    this.count.setAttribute('aria-hidden', 'true');
     const activity = cell('activity');
     activity.append(this.icon, this.word);
     const name = cell('worktree');
@@ -73,7 +96,7 @@ export class RowView {
       text.setAttribute('dir', 'ltr');
     }
     this.element.append(activity, name, branch, git, this.agent, this.last, this.actions);
-    this.update(worktree, nowMs);
+    this.update(worktree, nowMs, flagUnqueued);
   }
 
   /** Gives the row's id: its worktree's path. */
@@ -85,13 +108,17 @@ export class RowView {
     return this.current;
   }
 
-  /** Shows `worktree`, changing only the parts that differ from the row's. */
-  update(worktree: Worktree, nowMs: number): void {
+  /**
+   * Shows `worktree`, changing only the parts that differ from the row's. With `flagUnqueued`, a
+   * build that no job holds is marked.
+   */
+  update(worktree: Worktree, nowMs: number, flagUnqueued: boolean): void {
     this.current = worktree;
     const className = `row activity-${worktree.activity.replaceAll('_', '-')} group-${GROUPS[worktree.activity]}`;
     if (this.element.className !== className) this.element.className = className;
     this.updateIcon(worktree.activity === 'working');
     setText(this.word, WORDS[worktree.activity]);
+    this.updateCount(worktree.actors.length);
     setText(this.name, visible(worktree.name));
     const role = ROLE_TAGS[worktree.role];
     setText(this.role, role);
@@ -99,7 +126,7 @@ export class RowView {
     setText(this.branch, worktree.branch === null ? '(detached)' : visible(worktree.branch));
     this.branch.classList.toggle('detached', worktree.branch === null);
     setText(this.git, gitText(worktree.git));
-    this.updateAgent(worktree);
+    this.updateAgent(worktree, flagUnqueued);
     this.updateLast(worktree, nowMs);
     this.updateActions(offeredActions(worktree));
   }
@@ -121,15 +148,32 @@ export class RowView {
   }
 
   /** Rewrites the agent cell when its lines or their states changed. */
-  private updateAgent(worktree: Worktree): void {
-    const lines = agentLines(worktree);
-    const states = shownActors(worktree).map((actor) => actor.state);
+  private updateAgent(worktree: Worktree, flagUnqueued: boolean): void {
+    const lines = agentLines(worktree, flagUnqueued);
+    const actors = shownActors(worktree);
+    const states = actors.map((actor) => actor.state);
     const key = JSON.stringify([lines, states]);
     if (key === this.agentKey) return;
     this.agentKey = key;
     this.agent.replaceChildren(
-      ...lines.map((pieces, index) => line(pieces, `line state-${states[index] ?? 'none'}`)),
+      ...lines.map((pieces, index) => {
+        const element = line(pieces, `line state-${states[index] ?? 'none'}`);
+        element.prepend(...lineStart(actors.at(index)));
+        return element;
+      }),
     );
+  }
+
+  /** Shows the number of agents after the Activity word when there are two or more. */
+  private updateCount(agents: number): void {
+    if (agents < 2) {
+      this.count.remove();
+      this.agentCount.remove();
+      return;
+    }
+    setText(this.count, `×${agents}`);
+    setText(this.agentCount, `, ${agents} agents`);
+    if (this.word.nextSibling !== this.count) this.word.after(this.count, this.agentCount);
   }
 
   /** Remakes the Last cell's lines when its times changed, then shows their ages. */

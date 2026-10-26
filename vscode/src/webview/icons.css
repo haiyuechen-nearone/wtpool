@@ -11,6 +11,7 @@
 
 /* Every icon: a codicon glyph in ::before, in the colour of its element. */
 .icon::before,
+.line-icon::before,
 .chip::before,
 .connection::before,
 .repo-icon::before,
@@ -121,6 +122,46 @@
   content: "\ea98";
 }
 
+/* Agent lines: a 14 px glyph filling its box, whose em square the font puts wholly above the
+ * baseline. history draws smaller than the other glyphs and check sits high in its square, so
+ * they are scaled and lowered to match. */
+.line-icon::before {
+  position: absolute;
+  inset: 0;
+  font-size: 14px;
+  line-height: 14px;
+  text-align: center;
+}
+
+.line-icon-quiet::before {
+  content: "\ea82";
+  scale: 1.14;
+}
+
+.line-icon-waiting::before {
+  content: "\eaa2";
+}
+
+.line-icon-idle::before {
+  content: "\eba7";
+}
+
+.line-icon-error::before {
+  content: "\ea87";
+}
+
+.line-icon-done::before {
+  content: "\eab2";
+  translate: 0 0.5px;
+}
+
+.line-icon .robot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  translate: 0 0.5px;
+}
+
 /* Working: the robot, an inline SVG in the colour of its cell. Each arm turns about its shoulder,
  * the centre of its top end. At rest both hang 30 degrees out from the body. */
 .icon .robot {
@@ -143,17 +184,18 @@
   rotate: -30deg;
 }
 
-/* The building dial turns and the robot's arms swing in turn, 25 degrees each way of rest, half a
- * loop apart, unless VS Code reduces motion. On auto, VS Code follows the system. */
+/* The building dial turns and the Activity robot's arms swing in turn, 25 degrees each way of
+ * rest, half a loop apart, unless VS Code reduces motion. On auto, VS Code follows the system. An
+ * agent line's robot stays at rest. */
 body:not(.vscode-reduce-motion) .activity-building .icon::before {
   animation: spin 1.6s linear infinite;
 }
 
-body:not(.vscode-reduce-motion) .robot-arm-left {
+body:not(.vscode-reduce-motion) .icon .robot-arm-left {
   animation: swing-left 1.2s ease-in-out infinite;
 }
 
-body:not(.vscode-reduce-motion) .robot-arm-right {
+body:not(.vscode-reduce-motion) .icon .robot-arm-right {
   animation: swing-right 1.2s ease-in-out -0.6s infinite;
 }
 
@@ -200,8 +242,10 @@ body:not(.vscode-reduce-motion) .robot-arm-right {
   content: "\ea85";
 }
 
+/* The copy glyph's ink sits half a pixel left of the middle of its box. */
 .action-copy-path::before {
   content: "\ebcc";
+  translate: 0.5px 0;
 }
 
 .action-free::before {

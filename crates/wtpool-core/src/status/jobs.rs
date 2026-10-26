@@ -12,7 +12,9 @@ use crate::activity::CallKind;
 use crate::clock::Timestamp;
 use crate::error::Error;
 use crate::heavy::{HeavyList, Pattern, Suggestion, Suggestions};
-use crate::jobs::{HeavyTable, JobId, JobPaths, JobRecord, JobState, LIMIT_BOUNDS, MachineJobs};
+use crate::jobs::{
+    Enforce, HeavyTable, JobId, JobPaths, JobRecord, JobState, LIMIT_BOUNDS, MachineJobs,
+};
 use crate::paths::comparable;
 use crate::processes::RunningProcess;
 use crate::settings::RepositoryPatterns;
@@ -84,6 +86,14 @@ impl JobsState {
             Some(ids) => ids.iter().for_each(|id| machine.read_job(id)),
             None => machine.read_jobs(),
         }
+    }
+
+    /// `true` while the machine config flags heavy processes outside a job.
+    #[must_use]
+    pub fn flags_outside(&self) -> bool {
+        self.machine
+            .as_ref()
+            .is_some_and(|machine| machine.config().enforce != Enforce::Off)
     }
 
     /// The machine's patterns, then the repository's.

@@ -13,6 +13,7 @@ import { WORDS, rowOrder } from '../support/grammar.mjs';
 import { SCENARIOS, runDir } from '../support/paths.mjs';
 import { expectedLast, expectedRows, lastMatches, resolved, shownRows, waitForRows } from './rows.mjs';
 import { flowSession } from './flows.mjs';
+import { unflaggedCargo } from './jobs.mjs';
 import { close, git, panelFrame, runCommand, startProcess, statusJson } from './vscode.mjs';
 
 /** The phase the harness runs (WTPOOL_VERIFY_PHASE), 1 by default. */
@@ -63,7 +64,7 @@ function backdate(poolInfo) {
 
 /** Runs one scenario's steps in its own VS Code and gives the panel each document showed. */
 async function showScenario(name) {
-  const session = await flowSession(`flow__every_activity_shows/${name}`, { scenario: name, prepare: backdate });
+  const session = await flowSession(`flow__every_activity_shows/${name}`, { scenario: name, prepare: backdate, beforeLaunch: unflaggedCargo });
   const processes = new Map();
   const seen = [];
   try {

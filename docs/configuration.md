@@ -1,7 +1,8 @@
 # Configuration
 
 [README](../README.md) · [Commands](commands.md) · **Configuration** ·
-[Status and hook](status-and-hook.md) · [Panel](panel.md) · [Development](development.md)
+[Status and hook](status-and-hook.md) · [Panel](panel.md) · [Heavy jobs](heavy-jobs.md) ·
+[Development](development.md)
 
 ## Which repository
 
@@ -32,6 +33,7 @@ or set `WTPOOL_FOREGROUND`.
 | `slot_prefix` | `WTPOOL_SLOT_PREFIX` | the main worktree's folder name, then `-wt` | `main worktree name + -wt` |
 | `slot_count` | `WTPOOL_SLOT_COUNT` | `3` | `default` |
 | `remote` | `WTPOOL_REMOTE` | `origin` | `default` |
+| `heavy` | none | `[]` | not listed |
 | `build_processes` | none | `[]` | not listed |
 | `copy` | none | `[]` | not listed |
 | `on_new_slot` | none | none | not listed |
@@ -55,7 +57,7 @@ foreground and every slot read the same file. Git never reads it and no branch c
 # ~/code/app/.git/wtpool.toml
 slot_count = 4
 remote = "upstream"
-build_processes = ["make", "ninja"]
+heavy = ["cargo test", "make"]
 copy = [".envrc", ".env"]
 on_new_slot = "direnv allow"
 ```
@@ -71,8 +73,15 @@ Each setting takes the first value it finds: the variable, `wtpool.toml`, the de
 - Unknown keys, wrong types, empty values, a slot count of 0, a remote name git would refuse, a
   symlinked or unreadable `wtpool.toml`, and a variable that is set but empty or invalid are errors.
   `wtpool` never falls back to a default.
-- `build_processes` names more processes that `wtpool status` counts as builds. It has no variable,
-  and `wtpool config` does not list it. Neither does it list `copy` or `on_new_slot`.
+- `heavy` lists this repository's heavy commands, as patterns such as `cargo test`: `wtpool status`
+  counts processes that match them as builds, and the heavy job policy judges commands by them
+  ([Commands](commands.md#a-repositorys-heavy-commands)). `limit` and `enforce` are not keys of
+  `wtpool.toml`: they live in this machine's `machine.toml`
+  ([Commands](commands.md#the-machine-config)).
+- `build_processes`, the older key, still counts each of its names as a one-word heavy pattern,
+  and `wtpool config` reports it as replaced by `heavy`.
+- `heavy`, `build_processes`, `copy` and `on_new_slot` have no variable, and `wtpool config` does
+  not list them.
 
 ## New slots: `copy` and `on_new_slot`
 

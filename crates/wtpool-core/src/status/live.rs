@@ -15,6 +15,10 @@ use crate::processes::ListProcesses;
 /// The shortest time between two git refreshes of a worktree after edits.
 const EDIT_REFRESH: Duration = Duration::from_secs(1);
 
+/// The time between two reads of the process table while heavy processes outside a job are
+/// flagged: no file changes when such a process starts.
+const PROCESS_SAMPLE: Duration = Duration::from_secs(1);
+
 /// A [`PoolState`] refreshed with the process table and clock of `sources`.
 pub struct Live<'a, C, P> {
     state: PoolState,
@@ -24,6 +28,8 @@ pub struct Live<'a, C, P> {
     /// The worktrees whose refresh after an edit waits, each with the time it is due.
     waiting: BTreeMap<PathBuf, Instant>,
     folders: Option<JobFolders>,
+    /// The last read of the process table on [`PROCESS_SAMPLE`]'s timer.
+    sampled: Option<Instant>,
 }
 
 impl<'a, C, P> Live<'a, C, P> {
@@ -34,6 +40,7 @@ impl<'a, C, P> Live<'a, C, P> {
             edited: BTreeMap::new(),
             waiting: BTreeMap::new(),
             folders: None,
+            sampled: None,
         }
     }
 
@@ -63,6 +70,16 @@ impl<'a, C, P> Live<'a, C, P> {
                 self.edited.insert(worktree, now);
             }
         }
+    }
+
+    /// The time the process table is next read on its own, at once before its first read. `None`
+    /// while nothing outside a job is flagged, or past the range of [`Instant`].
+    fn next_sample(&self, now: Instant) -> Option<Instant> {
+        if !self.state.flags_outside() {
+            return None;
+        }
+        self.sampled
+            .map_or(Some(now), |last| last.checked_add(PROCESS_SAMPLE))
     }
 }
 
@@ -132,11 +149,19 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
             .state
             .next_change(clock.now())
             .and_then(|at| now.checked_add(clock.until(at)));
-        self.waiting.values().copied().chain(timer).min()
+        let sample = self.next_sample(now);
+        self.waiting
+            .values()
+            .copied()
+            .chain(timer)
+            .chain(sample)
+            .min()
     }
 
-    fn classify(&self, path: &Path) -> Option<Change> {
-        self.folders.as_ref()?.classify(path)
+    fn classify(&self, path: &Path) -> Vec<Change> {
+        self.folders
+            .as_ref()
+            .map_or_else(Vec::new, |folders| folders.classify(path))
     }
 
     fn tick(&mut self, now: Instant) {
@@ -149,8 +174,14 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
         for worktree in due {
             self.edit(worktree, now);
         }
+        if self.next_sample(now).is_some_and(|at| at <= now) {
+            self.state.refresh_processes(&self.sources.processes);
+            self.sampled = Some(now);
+        }
     }
 }
 
+#[cfg(test)]
+mod sample_tests;
 #[cfg(test)]
 mod tests;

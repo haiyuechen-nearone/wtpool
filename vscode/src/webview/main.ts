@@ -1,3 +1,4 @@
+import type { JobSettingsAnswer } from '../shared/jobs';
 import { isRecord, type OutputMessage, type ViewMessage } from '../shared/protocol';
 import { Page, type Host } from './page';
 
@@ -38,6 +39,13 @@ function isOutput(data: unknown): data is OutputMessage {
   );
 }
 
+/** Tells the extension's answer to settings the page sent: ok, or an error, and maybe its list. */
+function isJobSettings(data: unknown): data is JobSettingsAnswer {
+  if (!isRecord(data) || data.type !== 'jobSettings' || data.version !== 1 || typeof data.ok !== 'boolean') return false;
+  const { error, scope } = data;
+  return (error === undefined || typeof error === 'string') && (scope === undefined || scope === 'machine' || scope === 'repository');
+}
+
 const page = new Page(acquireVsCodeApi());
 
 window.wtpoolEarly.attach((data) => {
@@ -45,6 +53,8 @@ window.wtpoolEarly.attach((data) => {
     page.render(data, Date.now());
   } else if (isOutput(data)) {
     page.showOutput(data);
+  } else if (isJobSettings(data)) {
+    page.showJobSettings(data);
   }
 });
 

@@ -9,8 +9,9 @@ import { run, showError } from './actions';
 import { systemClock, type Clock } from './clock';
 import { confirm, type ConfirmContext } from './confirm';
 import { assertIsError } from './errors';
-import { workFolder } from './folder';
+import { isFolderRemote, workFolder } from './folder';
 import { follow } from './follow';
+import { JobSettingsRunner } from './jobs';
 import { readRequest, worktreeAt, type WebviewRequest } from './messages';
 import { OutputWatch } from './outputs';
 import { WatchStream, type DocumentUpdate } from './stream';
@@ -65,6 +66,8 @@ export class StatusPanel {
   private selected: string | null = null;
   /** The tails of the selected row. They run on the system clock, as a file grows in real time. */
   private readonly outputs: OutputWatch;
+  /** The `wtpool job` calls of the webview's settings, one message at a time. */
+  private readonly jobSettings: JobSettingsRunner;
   private readonly subscriptions: vscode.Disposable[];
   private readonly confirmContext: ConfirmContext = {
     latest: (path) => worktreeAt(this.document, path),
@@ -90,6 +93,12 @@ export class StatusPanel {
     this.outputs = new OutputWatch((message) => {
       this.postOutput(message);
     }, systemClock);
+    this.jobSettings = new JobSettingsRunner({
+      clock: context.clock,
+      binary,
+      cwd: () => this.folder,
+      answer: (answer) => void context.post(panel.webview, answer),
+    });
     this.subscriptions = [
       panel.webview.onDidReceiveMessage((message: unknown) => this.receive(message)),
       panel.onDidChangeViewState(() => {
@@ -158,6 +167,9 @@ export class StatusPanel {
       case 'copyPath':
         await run(request);
         break;
+      case 'jobSettings':
+        this.jobSettings.run(request);
+        break;
       default:
     }
   }
@@ -198,7 +210,9 @@ export class StatusPanel {
   /** Posts the tab's view, only while the tab is visible. */
   private post(): void {
     if (this.visible) {
-      this.context.post(this.panel.webview, viewOf(this.stream, this.opened, this.document));
+      const view = viewOf(this.stream, this.opened, this.document);
+      if (isFolderRemote()) view.folder_remote = true;
+      this.context.post(this.panel.webview, view);
     }
   }
 

@@ -89,10 +89,10 @@ pub trait Track {
     fn deadline(&self, now: Instant) -> Option<Instant>;
     /// Does the work due by `now`.
     fn tick(&mut self, now: Instant);
-    /// The change an event at `path` outside the common git directory and the clock's file may
+    /// The changes an event at `path` outside the common git directory and the clock's file may
     /// mean.
-    fn classify(&self, _path: &Path) -> Option<Change> {
-        None
+    fn classify(&self, _path: &Path) -> Vec<Change> {
+        Vec::new()
     }
 }
 
@@ -269,12 +269,13 @@ pub fn run(
                     pending.last = Some(heard);
                 }
                 for path in &paths {
-                    let change = if watched.clock.as_deref() == Some(path.as_path()) {
-                        Some(Change::Clock)
+                    let changes = if watched.clock.as_deref() == Some(path.as_path()) {
+                        vec![Change::Clock]
                     } else {
-                        classify(&watched.roots, path).or_else(|| tracker.classify(path))
+                        classify(&watched.roots, path)
+                            .map_or_else(|| tracker.classify(path), |change| vec![change])
                     };
-                    if let Some(change) = change {
+                    for change in changes {
                         pending.add(change, heard);
                     }
                 }

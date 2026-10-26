@@ -13,3 +13,9 @@ export function workFolder(): string | undefined {
   }
   return first.uri.scheme === 'file' ? first.uri.fsPath : homedir();
 }
+
+/** Tells a window whose first folder is not on this computer, so `wtpool` runs in the home folder. */
+export function isFolderRemote(): boolean {
+  const first = vscode.workspace.workspaceFolders?.[0];
+  return first !== undefined && first.uri.scheme !== 'file';
+}

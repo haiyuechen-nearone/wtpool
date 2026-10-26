@@ -1,5 +1,6 @@
 import type { Actor, Git, Worktree } from '../generated/status';
 import { visible } from '../shared/invisible';
+import { isUnqueued } from '../shared/jobs';
 
 type Activity = Worktree['activity'];
 type Reason = NonNullable<Actor['reason']>;
@@ -106,6 +107,8 @@ export function gitFacts(git: Git): string {
 export interface Piece {
   text: string;
   from?: 'document';
+  /** The class of a span that holds the text, for a part with a colour of its own. */
+  className?: string;
 }
 
 /** Makes a piece of the panel's own words. */
@@ -148,12 +151,23 @@ export function shownActors(worktree: Worktree): Actor[] {
   return [...worktree.actors].sort((a, b) => Date.parse(b.updated) - Date.parse(a.updated));
 }
 
-/** Gives the lines of the agent column, each a list of pieces. */
-export function agentLines(worktree: Worktree): Piece[][] {
+/** The mark after a build that no job holds. */
+const NOT_QUEUED: readonly Piece[] = [own(' '), { text: '(not queued)', className: 'not-queued' }];
+
+/**
+ * Gives the lines of the agent column, each a list of pieces. With `flagUnqueued`, a build that no
+ * job holds is marked, on an actor's line by the build its action names.
+ */
+export function agentLines(worktree: Worktree, flagUnqueued = false): Piece[][] {
+  const mark = (unqueued: boolean): readonly Piece[] => (flagUnqueued && unqueued ? NOT_QUEUED : []);
   if (worktree.actors.length) {
-    return shownActors(worktree).map((actor) => [theirs(actor.label), own(DOT), ...doing(actor)]);
+    return shownActors(worktree).map((actor) => {
+      const building = actor.action?.tool === 'build:' && worktree.builds.some((b) => b.name === actor.action?.target && isUnqueued(b));
+      return [theirs(actor.label), own(DOT), ...doing(actor), ...mark(building)];
+    });
   }
-  if (worktree.builds.length) return [[own('build: '), theirs(worktree.builds[0].name)]];
+  const [build] = worktree.builds;
+  if (build) return [[own('build: '), theirs(build.name), ...mark(isUnqueued(build))]];
   return [[own('no agent')]];
 }
 

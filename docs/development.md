@@ -1,7 +1,8 @@
 # Development
 
 [README](../README.md) · [Commands](commands.md) · [Configuration](configuration.md) ·
-[Status and hook](status-and-hook.md) · [Panel](panel.md) · **Development**
+[Status and hook](status-and-hook.md) · [Panel](panel.md) · [Heavy jobs](heavy-jobs.md) ·
+**Development**
 
 [CONTRIBUTING.md](../CONTRIBUTING.md) has the rules for a change: the oracle files, the file size
 limit and the AI policy. This page has the commands.

@@ -1,0 +1,385 @@
+/* Heavy jobs: the heading's machine button, the machine strip under it, its pattern editor, and a
+ * build outside a job on an agent line. The strip shares the detail strip's box. */
+
+/* The machine button: muted like the machine name it holds, its counts in their group colours. */
+.machine-button {
+  display: inline-block;
+  margin: -2px 0;
+  padding: 1px 4px;
+  border: none;
+  border-radius: 3px;
+  background-color: transparent;
+  color: var(--vscode-descriptionForeground);
+  font: inherit;
+  font-weight: 400;
+  line-height: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.machine-button:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+body.vscode-high-contrast .machine-button:hover:not(:focus-visible) {
+  outline: 1px dashed var(--vscode-contrastActiveBorder);
+  outline-offset: -1px;
+}
+
+.jobs-attention,
+.not-queued,
+.limit-over {
+  color: var(--vscode-list-warningForeground);
+}
+
+.jobs-muted {
+  color: var(--vscode-descriptionForeground);
+}
+
+.jobs-problem,
+.limit-fault,
+.limit-error,
+.heavy-error {
+  color: var(--vscode-list-errorForeground);
+}
+
+/* The machine strip: the settings and the pattern editor on the left, the jobs on the right. */
+.machine-strip {
+  gap: 8px 40px;
+}
+
+.jobs-limit,
+.jobs-lists {
+  min-width: 0;
+}
+
+.limit-row,
+.heavy-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 4px 0 6px;
+}
+
+.limit-row label {
+  margin-right: 2px;
+}
+
+.job-limit,
+.job-enforce,
+.heavy-input {
+  box-sizing: border-box;
+  height: 26px;
+  padding: 3px 6px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font: inherit;
+}
+
+.job-limit {
+  width: 56px;
+  text-align: right;
+}
+
+.job-enforce {
+  padding: 2px 6px;
+  border-color: var(--vscode-dropdown-border, var(--vscode-input-border, transparent));
+  background-color: var(--vscode-dropdown-background, var(--vscode-input-background));
+  color: var(--vscode-dropdown-foreground, var(--vscode-input-foreground));
+}
+
+.heavy-input {
+  width: 250px;
+  max-width: 100%;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+}
+
+.heavy-input::placeholder {
+  color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
+}
+
+/* The ring sits outside the field, on the strip, as the input background leaves it under 3:1. */
+.job-limit:focus,
+.job-enforce:focus,
+.heavy-input:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.job-limit[aria-invalid="true"],
+.heavy-input[aria-invalid="true"] {
+  border-color: var(--vscode-list-errorForeground);
+}
+
+.job-button {
+  min-height: 26px;
+  padding: 2px 12px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 2px;
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.job-button.secondary {
+  border-color: var(--vscode-descriptionForeground);
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.job-button.small {
+  min-height: 24px;
+  padding: 1px 10px;
+}
+
+.policy-meaning,
+.limit-note,
+.limit-hint,
+.heavy-note,
+.heavy-source,
+.heavy-none,
+.suggest-group-label,
+.limit-row .limit-status {
+  color: var(--vscode-descriptionForeground);
+}
+
+.limit-row .limit-status {
+  flex: 1 1 12em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.limit-row .limit-status.failed {
+  color: var(--vscode-list-errorForeground);
+}
+
+.limit-fault,
+.limit-error,
+.limit-over,
+.limit-note,
+.limit-hint,
+.heavy-error {
+  margin: 0 0 4px;
+}
+
+.limit-fault,
+.limit-error,
+.limit-over,
+.limit-note,
+.heavy-error,
+.job-where {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.limit-hint {
+  margin-top: 10px;
+}
+
+.limit-hint code,
+.old-wtpool code {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.old-wtpool {
+  grid-column: 1 / -1;
+}
+
+/* The jobs: per line its position, name, place and age, in columns. */
+.jobs-list {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.jobs-running,
+.jobs-outside {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.jobs-list li {
+  display: contents;
+}
+
+.job-position {
+  color: var(--vscode-descriptionForeground);
+  text-align: right;
+}
+
+.job-summary {
+  font-weight: 500;
+}
+
+.jobs-outside .job-summary {
+  color: var(--vscode-list-warningForeground);
+}
+
+.job-where,
+.job-age {
+  color: var(--vscode-descriptionForeground);
+}
+
+.job-age {
+  text-align: right;
+}
+
+.jobs-none {
+  display: block;
+  margin: 0 0 10px;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* The pattern editor: per list its chips, each with its button, then an input and Add. */
+.heavy-heading {
+  margin-top: 12px;
+}
+
+.heavy-list-heading {
+  margin: 8px 0 4px;
+}
+
+.heavy-chips,
+.heavy-suggested,
+.suggest-chips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.heavy-chips,
+.suggest-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.heavy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 0 2px 0 7px;
+  border: 1px solid var(--vscode-descriptionForeground);
+  border-radius: 10px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.heavy-chip.suggested {
+  border-style: dashed;
+}
+
+.chip-pattern {
+  overflow-wrap: anywhere;
+}
+
+.heavy-tag {
+  margin-left: 2px;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-font-family);
+  font-size: 11px;
+}
+
+.chip-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 9px;
+  background-color: transparent;
+  color: var(--vscode-icon-foreground);
+  cursor: pointer;
+}
+
+.chip-button:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.chip-button:focus-visible {
+  outline-offset: -1px;
+}
+
+body.vscode-high-contrast .chip-button:hover:not(:focus-visible) {
+  outline: 1px dashed var(--vscode-contrastActiveBorder);
+  outline-offset: -1px;
+}
+
+.heavy-none {
+  display: block;
+  margin: 0 0 6px;
+}
+
+.suggest-group {
+  margin: 2px 0;
+}
+
+.suggest-group-label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 12px;
+}
+
+/* The glyphs of heavy jobs, from the codicon font icons.css declares. */
+.machine-button::after,
+.jobs-problem::before,
+.chip-button::before {
+  display: inline-block;
+  font-family: codicon, sans-serif;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+.machine-button::after {
+  content: "\eab4";
+  margin-left: 4px;
+  font-size: 14px;
+  vertical-align: -2px;
+}
+
+.machine-button[aria-expanded="true"]::after {
+  content: "\eab7";
+}
+
+.jobs-problem::before {
+  content: "\ea6c";
+  margin-right: 3px;
+  font-size: 14px;
+  vertical-align: -2px;
+}
+
+.chip-button::before {
+  font-size: 12px;
+}
+
+.chip-remove::before {
+  content: "\ea76";
+}
+
+.suggest-add::before {
+  content: "\ea60";
+}
+
+/* The strip's own display rules would otherwise show its hidden parts. */
+.machine-strip [hidden] {
+  display: none;
+}

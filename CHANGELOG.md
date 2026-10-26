@@ -20,8 +20,8 @@ The first version. It is alpha: tested on macOS; Linux and Windows build but are
   keeps two agents from taking the same slot. `free` and `fg` also refuse while an agent works or
   waits in a worktree they would detach or repoint, unless `--force`.
 - **Settings.** `wtpool.toml` in the git common directory and `WTPOOL_*` variables set the
-  foreground, the slot folder, prefix and count, the remote and extra build processes. `copy` and
-  `on_new_slot` set up each new slot.
+  foreground, the slot folder, prefix and count, the remote and the repository's heavy commands.
+  `copy` and `on_new_slot` set up each new slot.
 - **Output for scripts.** `wtpool bg` and `wtpool fg` print only the worktree's path on stdout. A
   failed `gh` call names the cause, such as `gh` not being logged in.
 - **Status.** `wtpool status --json` prints the pool as one JSON document, `--watch` prints it
@@ -43,10 +43,26 @@ The first version. It is alpha: tested on macOS; Linux and Windows build but are
   patterns and the jobs. The limit, the policy and the machine's patterns live in
   `<config>/wtpool/machine.toml`, a repository adds patterns through `heavy` in its `wtpool.toml`,
   and a job records its summary, never its arguments.
+- **Heavy commands.** A heavy pattern names a command by its first words, such as `cargo test`.
+  wtpool suggests patterns from the files at the top of a repository, such as a `Cargo.toml` or
+  the build and test scripts of a `package.json`, and nothing is heavy until you add it.
+  `wtpool job limit`, `wtpool job enforce` and `wtpool job heavy add`, `rm` and `suggest` print or
+  change the settings, and keep every other byte of the file. `heavy` replaces
+  `build_processes`, whose names still count as patterns of one word.
+- **The heavy job policy.** Under `enforce = "warn"`, the default, a heavy process outside a job
+  shows as not queued. Under `require`, `wtpool hook policy`, a `PreToolUse` hook for Bash,
+  PowerShell and Monitor calls, refuses an agent's heavy command that no job wraps and names the
+  wrapped command to run. It never rewrites a command and fails open. The plugin also ships the
+  skill `heavy-jobs`, which tells Claude Code to run heavy commands through `wtpool job`.
+- **Jobs in the status.** `wtpool status --json` lists this machine's jobs under `machine.jobs`.
+  Builds are the processes that match a heavy pattern, and each says whether a job holds it.
 - **The VS Code extension.** The Worktrees tab shows one row per worktree, with its branch, git
   state and what each agent does, and highlights waits. Its detail strip shows the live tail of
   each background task's output, and Follow streams it into a terminal. Row actions open the
   worktree in a new window or a terminal, copy its path, free a slot or bring its branch to the
   foreground. Free and fg ask first.
+- **The machine strip.** The heading's machine name counts heavy jobs, and opens a strip that
+  sets the limit, the policy and the heavy commands, and lists the running, queued and not queued
+  jobs. Agent lines show `queued:` while a job waits, and an icon of their state.
 - **The verify harness.** `cargo xtask verify` runs the checks of the spec in five parts, from
   lints to end to end checks in a real VS Code and a live Claude Code contract.

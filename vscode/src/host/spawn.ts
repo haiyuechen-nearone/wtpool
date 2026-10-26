@@ -2,10 +2,14 @@ import { spawn, type ChildProcess, type ChildProcessByStdio } from 'node:child_p
 import type { Readable, Writable } from 'node:stream';
 
 import { resolveBinary } from './binary';
+import { systemClock } from './clock';
 import { assertIsError } from './errors';
 
 /** The number of characters kept from the end of a run's stderr. */
 const STDERR_TAIL = 4096;
+
+/** The time a stopped `wtpool` gets to leave after SIGTERM before SIGKILL. */
+const KILL_AFTER_MS = 1_000;
 
 /** Holds a `wtpool` that did not start: spawn threw or reported an error. */
 interface NotStarted {
@@ -89,10 +93,18 @@ export function spawnWatch(
   );
 }
 
-/** Runs `binary` with `args` to its end, with no stdin or stdout. */
-export function runToEnd(binary: string, args: string[], cwd: string | undefined): Promise<RunEnd> {
-  return new Promise((resolve) => {
-    track(
+/** A `wtpool` that runs to its end, with no stdin or stdout, unless its caller stops it first. */
+export interface Run {
+  readonly ended: Promise<RunEnd>;
+  /** Sends SIGTERM, then SIGKILL to one that ignores it. */
+  stop(): void;
+}
+
+/** Starts `binary` with `args`, to run to its end. */
+export function startRun(binary: string, args: string[], cwd: string | undefined): Run {
+  let child: ChildProcess | undefined;
+  const ended = new Promise<RunEnd>((resolve) => {
+    child = track(
       () =>
         spawn(resolveBinary(binary), args, {
           cwd,
@@ -102,4 +114,17 @@ export function runToEnd(binary: string, args: string[], cwd: string | undefined
       resolve,
     );
   });
+  return {
+    ended,
+    stop: () => {
+      child?.kill('SIGTERM');
+      // Process cleanup runs on the system clock, also when the caller's clock is a fake.
+      systemClock.after(KILL_AFTER_MS, () => void child?.kill('SIGKILL'));
+    },
+  };
+}
+
+/** Runs `binary` with `args` to its end, with no stdin or stdout. */
+export function runToEnd(binary: string, args: string[], cwd: string | undefined): Promise<RunEnd> {
+  return startRun(binary, args, cwd).ended;
 }
