@@ -4,6 +4,10 @@
 
 mod support;
 
-mod commands;
+mod config;
+mod ls;
+mod refs;
+mod slots;
 mod startup;
+mod status;
 mod tools;

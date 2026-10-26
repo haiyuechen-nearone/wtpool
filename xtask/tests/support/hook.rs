@@ -14,7 +14,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
-use xtask::pool::{Pool, PoolSpec, WorktreeSpec};
+pub use xtask::pool::catalog_spec;
+use xtask::pool::{Pool, PoolSpec};
 
 use super::{Sandbox, must_repo, must_status_json, must_wtpool_bin, set_executable};
 
@@ -38,37 +39,6 @@ table=$1; parent=$2; started=$3; wtpool=$4; shift 4
 printf '{\"pid\":%s,\"ppid\":%s,\"started\":\"%s\",\"name\":\"wtpool\",\"cwd\":\"/\"}\\n' \"$$\" \"$parent\" \"$started\" >> \"$table\"
 WTPOOL_VERIFY_PROCS=\"$table\" exec \"$wtpool\" \"$@\"
 ";
-
-/// The pool of the scenario catalog.
-pub fn catalog_spec() -> PoolSpec {
-    let detached = WorktreeSpec {
-        detached: true,
-        ..WorktreeSpec::default()
-    };
-    PoolSpec {
-        agents: true,
-        worktrees: BTreeMap::from([
-            (
-                "fg".to_owned(),
-                WorktreeSpec {
-                    branch: Some("main".into()),
-                    upstream: true,
-                    ..WorktreeSpec::default()
-                },
-            ),
-            ("wt1".to_owned(), detached.clone()),
-            ("wt2".to_owned(), detached.clone()),
-            ("wt3".to_owned(), detached),
-            (
-                "x".to_owned(),
-                WorktreeSpec {
-                    branch: Some("side".into()),
-                    ..WorktreeSpec::default()
-                },
-            ),
-        ]),
-    }
-}
 
 /// One process of the fake table.
 #[derive(Clone, Debug)]

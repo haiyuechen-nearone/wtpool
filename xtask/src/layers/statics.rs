@@ -230,8 +230,12 @@ fn html_sink(line: &str) -> Option<String> {
 }
 
 /// The static layer's checks that verify/checks.toml does not list. `--only` still names them.
-pub(super) const UNREGISTERED: [&str; 3] =
-    ["static:ascii_bundles", "static:eslint", "static:stylelint"];
+pub(super) const UNREGISTERED: [&str; 4] = [
+    "static:ascii_bundles",
+    "static:eslint",
+    "static:prettier",
+    "static:stylelint",
+];
 
 pub(super) fn static_checks(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
     let mut results = Vec::new();
@@ -272,6 +276,18 @@ pub(super) fn static_checks(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
                 ctx.command("npx")
                     .current_dir(vscode(ctx))
                     .args(["eslint", "."]),
+                STATIC_LIMIT,
+            ),
+        );
+    }
+    if wanted.check("static:prettier") {
+        results.push(
+            ctx.command_check(
+                "static:prettier",
+                "static",
+                ctx.command("npm")
+                    .current_dir(vscode(ctx))
+                    .args(["run", "format:check"]),
                 STATIC_LIMIT,
             ),
         );

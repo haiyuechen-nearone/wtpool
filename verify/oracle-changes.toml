@@ -1786,3 +1786,18 @@ reason = "A scenario file is parsed by scenario::load alone: trace::load_scenari
 "xtask/src/trace.rs" = "566325159925ce02db3ba135d64793c579d225120b5b89ff6f17ad7050e15a07"
 "xtask/src/web/registry.rs" = "c73b0da9c514ff1c5838fcee03ee91bf2536d342bc249eb6ce2a0e7d9b62691a"
 "xtask/tests/checks/hook_policy.rs" = "91e1bbffc49193a25f4dbd167a77064ca79d890af57f1f235167f3dacd7e3dca"
+
+[[change]]
+id = "rs-sweep"
+reason = "A new static check, static:prettier, runs npm run format:check in vscode/, so unformatted TypeScript fails the quick part; it is listed as UNREGISTERED beside static:eslint and static:stylelint. The hook test support re-exports xtask::pool::catalog_spec instead of keeping a copy. No other check changes."
+[change.files]
+"xtask/src/layers.rs" = "be60a69564c6968cf1b7f384a6e0ba9154b86f4e95708f9b74f678d81109d892"
+"xtask/src/layers/statics.rs" = "81dba30c1a74e15b0b141275a9a6f1b8614623c6136b6ccdee750d138eae4236"
+"xtask/tests/support/hook.rs" = "c2b14826f7a6f6e1adee9a2f4a0c4c10f0abeb4d40e83f17cf45392ac4cf510c"
+
+[[change]]
+id = "rs-cli"
+reason = "The two phase 0 canaries that edit crates/wtpool/src/main.rs carry its current context. The command line is now read by args.rs into one Action that main.rs dispatches in one match, so release-reads-verify-clock reads WTPOOL_VERIFY_CLOCK in the Version arm of that match, and suppress-in-target-module declares its target module beside the other modules and calls it from the same arm. Each canary mutates the same thing it did and the same check catches it: release__should_have_no_verify_feature and lint__no_suppressions."
+[change.files]
+"verify/canaries/phase-0/release-reads-verify-clock.patch" = "816265e3859d0dc24e19e8fc14301fea52c91213cc903fa855fe39ae74073c4a"
+"verify/canaries/phase-0/suppress-in-target-module.patch" = "0bb15654c115831e3766530e7072a778511b1cb224e10fdf597941f3b37174e4"

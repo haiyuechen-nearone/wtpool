@@ -15,10 +15,10 @@ use super::record::{JobDraft, JobId};
 use super::{JOB_VARIABLE, JobError, JobPaths};
 use crate::clock::ReadClock;
 use crate::heavy::{CommandWords, HeavyList, RepositoryPatterns};
-use crate::hook::bash;
 use crate::hook::text::{MAX_LABEL, MAX_TEXT, clean};
 use crate::platform::signals::{Ending, JobSignals, end_by, end_by_number, ending};
 use crate::processes::{ListProcesses, ProcessQuery};
+use crate::shell;
 
 /// The pause between checks for its turn of the first job in line, and of the others.
 const FIRST_IN_LINE_CHECK: Duration = Duration::from_millis(250);
@@ -255,7 +255,7 @@ fn summary(command: &JobCommand, heavy: &HeavyList) -> String {
         .collect();
     let named = heavy
         .name_of(&CommandWords::of_command(&words))
-        .or_else(|| bash::summary_of(&words))
+        .or_else(|| shell::summary_of(&words))
         .unwrap_or_else(|| command.program.to_string_lossy().into_owned());
     clean(&named, MAX_TEXT)
 }

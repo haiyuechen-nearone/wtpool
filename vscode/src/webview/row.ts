@@ -2,7 +2,17 @@ import type { Actor, Worktree } from '../generated/status';
 import { visible } from '../shared/invisible';
 import { offeredActions, type ActionType } from '../shared/protocol';
 import { bdi, button, cell, line, setText, span, type RunTime } from './dom';
-import { GROUPS, WORDS, age, agentLines, gitText, hasApiError, lastTimes, runTime, shownActors } from './text';
+import {
+  GROUPS,
+  WORDS,
+  age,
+  agentLines,
+  gitText,
+  hasApiError,
+  lastTimes,
+  runTime,
+  shownActors,
+} from './text';
 
 /** The label and class suffix of the button of each row action. */
 const ACTIONS: Readonly<Record<ActionType, { label: string; classSuffix: string }>> = {

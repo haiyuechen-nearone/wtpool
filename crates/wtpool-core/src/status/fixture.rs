@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use super::sources::{Host, Sources};
 use super::state::PoolState;
 use crate::activity::ACTIVITY_DIR;
-use crate::clock::{ReadClock, Timestamp};
+use crate::clock::{ClockFile, ReadClock, Timestamp};
 use crate::config::{Config, SlotCount};
 use crate::jobs::JobPaths;
 use crate::names::SlotPrefix;
@@ -66,6 +66,8 @@ impl ReadClock for FixedClock {
         Timestamp::from_seconds(42)
     }
 }
+
+impl ClockFile for FixedClock {}
 
 /// The sources of the machine `machine` with one core and the job settings `jobs`, the
 /// repository named as [`https_path`] names it.

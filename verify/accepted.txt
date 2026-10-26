@@ -258,3 +258,7 @@ accept merge-verification-md 42bb1c37d19ad5f3ea7eef74199731650312d684528c1c6d6f1
 accept hx-replay c7a417f1191710a39ef4012b5437d194e29c51a550733b34ffba898ac9e81563
 # Scenario files load through scenario::load everywhere, the harness document path and short-link folder have one constant each, the hook policy check reuses the shared tree snapshot, and comments no longer cite the design document.
 accept hx-scenarios 51036e1f3d978416b5c30f5e4b0eb1af3b30628b5f123db071c09c28e687fa7c
+# A static:prettier check runs the extension format check, and the hook test support reuses the shared catalog pool.
+accept rs-sweep 91bfc6f16a08c5f43a7166ea27f7b42c2c9293f095ab75d39b43ff947356a0b7
+# The two main.rs canaries carry the context of the one-parser main.rs; each mutates and is caught as before.
+accept rs-cli 9073d51a9b0c600e72d53165f59a1855a0e0f125824ce0d2db52b6f0422e507c

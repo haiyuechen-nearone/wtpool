@@ -1,8 +1,7 @@
 //! The pool state `wtpool status --watch` keeps up to date: the reads each change asks for, the
 //! git refresh after a call that edits files, and the timers of the actors.
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::OsString;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -125,7 +124,7 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
         }
         if pending.jobs_changed() {
             self.state
-                .refresh_jobs(&job_names(pending), &self.sources.processes);
+                .refresh_jobs(&pending.jobs, pending.all_jobs, &self.sources.processes);
         }
         if pending.rescan_records {
             self.state.rescan_records();
@@ -180,19 +179,6 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
             self.sampled = Some(now);
         }
     }
-}
-
-/// The names [`PoolState::refresh_jobs`] reads again: the ids of the changed jobs, or else an
-/// empty name, read as every job.
-fn job_names(pending: &Pending) -> BTreeSet<OsString> {
-    if pending.all_jobs {
-        return BTreeSet::from([OsString::new()]);
-    }
-    pending
-        .jobs
-        .iter()
-        .map(|id| OsString::from(id.to_string()))
-        .collect()
 }
 
 #[cfg(test)]

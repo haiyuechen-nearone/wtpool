@@ -123,16 +123,6 @@ pub fn ending(status: ExitStatus) -> Ending {
     Ending::Code(status.code().map_or(1, code_byte))
 }
 
-/// The exit code of a job whose command ended with `status`, by its [`ending`]. An ending by a
-/// signal ends this process by it and never returns.
-#[must_use]
-pub fn exit_code_like(status: ExitStatus) -> u8 {
-    match ending(status) {
-        Ending::Code(code) => code,
-        Ending::Signal(signal) => end_by_number(signal),
-    }
-}
-
 /// The low byte of `code`, as a shell reads an exit status.
 fn code_byte(code: i32) -> u8 {
     u8::try_from(code & 0xff).unwrap_or(1)
@@ -164,33 +154,6 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-
-    #[rstest]
-    #[case::zero(0, 0)]
-    #[case::three(3, 3)]
-    #[case::two_five_five(255, 255)]
-    fn exit_code_like__should_pass_an_exit_code_through(#[case] code: i32, #[case] expected: u8) {
-        // Given
-        let status = ExitStatus::from_raw(code << 8);
-
-        // When
-        let mirrored = exit_code_like(status);
-
-        // Then
-        assert_eq!(mirrored, expected);
-    }
-
-    #[test]
-    fn exit_code_like__should_add_128_to_a_signal_it_does_not_mirror() {
-        // Given
-        let status = ExitStatus::from_raw(libc::SIGALRM);
-
-        // When
-        let mirrored = exit_code_like(status);
-
-        // Then
-        assert_eq!(i32::from(mirrored), 128 + libc::SIGALRM);
-    }
 
     #[rstest]
     #[case::exit_code(3 << 8, Ending::Code(3))]

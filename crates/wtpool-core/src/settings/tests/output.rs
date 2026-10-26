@@ -56,55 +56,6 @@ fn describe__should_name_where_the_value_came_from(#[case] source: Source, #[cas
 }
 
 #[test]
-fn to_text__should_align_each_setting_with_its_source() {
-    // Given
-    let settings = sample_settings(Source::MainWorktree, Some("/code/app/.git"));
-
-    // When
-    let text = settings.to_text();
-
-    // Then
-    assert_eq!(
-        text,
-        "SETTING      VALUE      SOURCE\n\
-         foreground   /code/app  main worktree\n\
-         slot_dir     /code      parent of the main worktree\n\
-         slot_prefix  app-wt     main worktree name + -wt\n\
-         slot_count   3          /code/app/.git/wtpool.toml\n\
-         remote       origin     env WTPOOL_REMOTE\n"
-    );
-}
-
-#[test]
-fn to_json__should_give_each_setting_its_value_and_source() {
-    // Given
-    let settings = sample_settings(Source::Default, Some("/code/app/.git"));
-
-    // When
-    let json = settings.to_json();
-
-    // Then
-    assert_eq!(
-        json,
-        "{\n  \"version\": 1,\n  \
-         \"foreground\": {\"value\": \"/code/app\", \"source\": \"default\"},\n  \
-         \"slot_dir\": {\"value\": \"/code\", \"source\": \"parent of the main worktree\"},\n  \
-         \"slot_prefix\": {\"value\": \"app-wt\", \"source\": \"main worktree name + -wt\"},\n  \
-         \"slot_count\": {\"value\": 3, \"source\": \"/code/app/.git/wtpool.toml\"},\n  \
-         \"remote\": {\"value\": \"origin\", \"source\": \"env WTPOOL_REMOTE\"}\n}\n"
-    );
-}
-
-#[test]
-fn json_string__should_escape_the_characters_json_does_not_allow_in_a_string() {
-    // When
-    let json = json_string("a\"b\\c\nd\te\u{1}é\u{7f}");
-
-    // Then
-    assert_eq!(json, "\"a\\\"b\\\\c\\nd\\te\\u0001é\u{7f}\"");
-}
-
-#[test]
 fn require_repository__should_return_the_repository_when_one_was_found() {
     // Given
     let settings = sample_settings(Source::MainWorktree, Some("/code/app/.git"));

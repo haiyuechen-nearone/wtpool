@@ -1,20 +1,20 @@
 //! `wtpool job limit`, `enforce` and `heavy`: each prints its setting with the source, or sets it
 //! in place and prints the new value.
 
-use wtpool_core::heavy::{
-    HeavyList, Pattern, PatternSource, Suggestion, Suggestions, suggested_json,
-};
+use wtpool_core::heavy::{HeavyList, Pattern, PatternSource, Suggestion, Suggestions};
 use wtpool_core::jobs::{
-    self, ConfigSource, Enforce, LIMIT_BOUNDS, Limit, ListChange, MachineConfig, RepositoryChange,
+    self, ConfigSource, Enforce, Limit, ListChange, MachineConfig, RepositoryChange,
     RepositoryLists,
 };
 
-use super::listing::{enforce_line, heavy_lines, limit_line, setting_line, shown, suggested_lines};
-use super::{cores, paths, repository_files, this_repository};
+use super::listing::{
+    enforce_line, heavy_lines, limit_line, setting_line, shown, suggested_json, suggested_lines,
+};
+use super::{JobCliError, cores, paths, repository_files, this_repository};
 
 /// A settings command line, checked.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) enum Command {
+pub(crate) enum Command {
     ShowLimit,
     /// `None` resets it to the default.
     SetLimit(Option<Limit>),
@@ -35,14 +35,7 @@ pub(super) enum Command {
     },
 }
 
-/// Why a command line was refused.
-#[derive(Debug, PartialEq, Eq)]
-pub(super) enum Refusal {
-    Usage,
-    Value(String),
-}
-
-/// What a command prints: `out` on stdout, each note on stderr.
+/// A command's output: `out` on stdout, each note on stderr.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(super) struct Printed {
     pub out: String,
@@ -50,11 +43,10 @@ pub(super) struct Printed {
 }
 
 const DEFAULT: &str = "default";
-const NO_REPOSITORY: &str = "no repository: --repo edits the wtpool.toml of the repository WTPOOL_FOREGROUND names, else of the one you are in";
 
 /// The command `wtpool job <setting> <args>` names, `setting` one of `limit`, `enforce` and
 /// `heavy`. An argument that is not Unicode is `None`.
-pub(super) fn parse(setting: &str, args: &[Option<&str>]) -> Result<Command, Refusal> {
+pub(super) fn parse(setting: &str, args: &[Option<&str>]) -> Result<Command, JobCliError> {
     match (setting, args) {
         ("limit", []) => Ok(Command::ShowLimit),
         ("limit", [Some(value)]) => parse_limit(value).map(Command::SetLimit),
@@ -64,13 +56,13 @@ pub(super) fn parse(setting: &str, args: &[Option<&str>]) -> Result<Command, Ref
         ("heavy", [Some("suggest")]) => Ok(Command::Suggest { json: false }),
         ("heavy", [Some("suggest"), Some("--json")]) => Ok(Command::Suggest { json: true }),
         ("heavy", [Some(edit @ ("add" | "rm")), rest @ ..]) => parse_edit(edit, rest),
-        _ => Err(Refusal::Usage),
+        _ => Err(JobCliError::Usage),
     }
 }
 
 /// Runs `command` on this user's machine config, and with `--repo` on the `wtpool.toml` of this
 /// repository.
-pub(super) fn run(command: Command) -> Result<Printed, String> {
+pub(super) fn run(command: Command) -> Result<Printed, JobCliError> {
     let config_path = || paths().map(|paths| paths.config);
     let out = |lines: Vec<String>| Printed {
         out: shown(&lines),
@@ -79,7 +71,7 @@ pub(super) fn run(command: Command) -> Result<Printed, String> {
     match command {
         Command::ShowLimit => Ok(out(vec![limit_line(&read_config()?)])),
         Command::SetLimit(limit) => {
-            jobs::set_limit(&config_path()?, limit).map_err(|error| error.to_string())?;
+            jobs::set_limit(&config_path()?, limit)?;
             let line = match limit {
                 Some(limit) => setting_line("limit", limit, ConfigSource::Machine),
                 None => setting_line("limit", Limit::default_for(cores()), ConfigSource::Default),
@@ -88,7 +80,7 @@ pub(super) fn run(command: Command) -> Result<Printed, String> {
         }
         Command::ShowEnforce => Ok(out(vec![enforce_line(&read_config()?)])),
         Command::SetEnforce(enforce) => {
-            jobs::set_enforce(&config_path()?, enforce).map_err(|error| error.to_string())?;
+            jobs::set_enforce(&config_path()?, enforce)?;
             let line = match enforce {
                 Some(enforce) => setting_line("enforce", enforce, ConfigSource::Machine),
                 None => setting_line("enforce", Enforce::default(), ConfigSource::Default),
@@ -97,13 +89,11 @@ pub(super) fn run(command: Command) -> Result<Printed, String> {
         }
         Command::ShowHeavy => Ok(out(show_heavy()?)),
         Command::AddToMachine(patterns) => {
-            let listed = jobs::edit_machine_heavy(&config_path()?, &ListChange::Add(patterns))
-                .map_err(|error| error.to_string())?;
+            let listed = jobs::edit_machine_heavy(&config_path()?, &ListChange::Add(patterns))?;
             Ok(out(machine_lines(&listed)))
         }
         Command::RemoveFromMachine(patterns) => {
-            let listed = jobs::edit_machine_heavy(&config_path()?, &ListChange::Remove(patterns))
-                .map_err(|error| error.to_string())?;
+            let listed = jobs::edit_machine_heavy(&config_path()?, &ListChange::Remove(patterns))?;
             Ok(out(machine_lines(&listed)))
         }
         Command::AddToRepository {
@@ -144,36 +134,31 @@ pub(super) fn run(command: Command) -> Result<Printed, String> {
     }
 }
 
-fn parse_limit(value: &str) -> Result<Option<Limit>, Refusal> {
+fn parse_limit(value: &str) -> Result<Option<Limit>, JobCliError> {
     if value == DEFAULT {
         return Ok(None);
     }
-    let whole = !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit());
-    whole
-        .then(|| value.parse::<i64>().ok().and_then(Limit::new))
-        .flatten()
-        .map(Some)
-        .ok_or_else(|| {
-            Refusal::Value(format!(
-                "limit {value:?}: the limit is a whole number from {} to {}, or default",
-                LIMIT_BOUNDS.0, LIMIT_BOUNDS.1
-            ))
-        })
-}
-
-fn parse_enforce(value: &str) -> Result<Option<Enforce>, Refusal> {
-    if value == DEFAULT {
-        return Ok(None);
-    }
-    Enforce::from_name(value).map(Some).ok_or_else(|| {
-        Refusal::Value(format!(
-            "enforce {value:?}: the policy is off, warn or require, or default"
-        ))
+    value.parse().map(Some).map_err(|error| JobCliError::Limit {
+        value: value.to_owned(),
+        error,
     })
 }
 
+fn parse_enforce(value: &str) -> Result<Option<Enforce>, JobCliError> {
+    if value == DEFAULT {
+        return Ok(None);
+    }
+    value
+        .parse()
+        .map(Some)
+        .map_err(|error| JobCliError::Enforce {
+            value: value.to_owned(),
+            error,
+        })
+}
+
 /// `add [--repo] [--suggested] [--] <pattern>…` or `rm [--repo] [--] <pattern>…`.
-fn parse_edit(edit: &str, args: &[Option<&str>]) -> Result<Command, Refusal> {
+fn parse_edit(edit: &str, args: &[Option<&str>]) -> Result<Command, JobCliError> {
     let mut repo = false;
     let mut suggested = false;
     let mut rest = args;
@@ -185,17 +170,17 @@ fn parse_edit(edit: &str, args: &[Option<&str>]) -> Result<Command, Refusal> {
                 rest = after;
                 break;
             }
-            option if option.starts_with('-') => return Err(Refusal::Usage),
+            option if option.starts_with('-') => return Err(JobCliError::Usage),
             _ => break,
         }
         rest = after;
     }
     let names: Vec<&str> = rest
         .iter()
-        .map(|name| name.ok_or(Refusal::Usage))
+        .map(|name| name.ok_or(JobCliError::Usage))
         .collect::<Result<_, _>>()?;
     if (names.is_empty() && !suggested) || (suggested && !repo) {
-        return Err(Refusal::Usage);
+        return Err(JobCliError::Usage);
     }
     if edit == "rm" && repo {
         return Ok(Command::RemoveFromRepository(
@@ -206,7 +191,7 @@ fn parse_edit(edit: &str, args: &[Option<&str>]) -> Result<Command, Refusal> {
         .into_iter()
         .map(Pattern::parse)
         .collect::<Result<_, _>>()
-        .map_err(|error| Refusal::Value(error.to_string()))?;
+        .map_err(JobCliError::Pattern)?;
     Ok(match (edit, repo) {
         ("add", true) => Command::AddToRepository {
             patterns,
@@ -217,12 +202,12 @@ fn parse_edit(edit: &str, args: &[Option<&str>]) -> Result<Command, Refusal> {
     })
 }
 
-fn read_config() -> Result<MachineConfig, String> {
-    MachineConfig::read(&paths()?.config, cores()).map_err(|error| error.to_string())
+fn read_config() -> Result<MachineConfig, JobCliError> {
+    MachineConfig::read(&paths()?.config, cores()).map_err(JobCliError::Config)
 }
 
 /// The heavy list of this machine and this repository.
-fn show_heavy() -> Result<Vec<String>, String> {
+fn show_heavy() -> Result<Vec<String>, JobCliError> {
     let config = read_config()?;
     let repository = this_repository()?.unwrap_or_default().patterns;
     let heavy = HeavyList::of(&config, &repository);
@@ -235,8 +220,8 @@ fn show_heavy() -> Result<Vec<String>, String> {
 }
 
 /// This repository's suggestions that the heavy list of this machine and this repository lacks,
-/// and why `package.json` gave none.
-fn suggestions() -> Result<(Vec<Suggestion>, Option<String>), String> {
+/// and the fault of a `package.json` that gave none.
+fn suggestions() -> Result<(Vec<Suggestion>, Option<String>), JobCliError> {
     let config = read_config()?;
     let Some(repository) = this_repository()? else {
         return Ok((Vec::new(), None));
@@ -253,9 +238,9 @@ fn suggestions() -> Result<(Vec<Suggestion>, Option<String>), String> {
     ))
 }
 
-fn edit_repository(change: &RepositoryChange) -> Result<RepositoryLists, String> {
-    let files = repository_files()?.ok_or_else(|| NO_REPOSITORY.to_owned())?;
-    jobs::edit_repository_heavy(&files.common, change).map_err(|error| error.to_string())
+fn edit_repository(change: &RepositoryChange) -> Result<RepositoryLists, JobCliError> {
+    let files = repository_files()?.ok_or(JobCliError::NoRepository)?;
+    Ok(jobs::edit_repository_heavy(&files.common, change)?)
 }
 
 fn machine_lines(listed: &[String]) -> Vec<String> {
@@ -316,7 +301,7 @@ mod tests {
         let command = parse(setting, &words(args));
 
         // Then
-        assert_eq!(command, Ok(expected));
+        assert_eq!(command.unwrap(), expected);
     }
 
     #[rstest]
@@ -336,7 +321,15 @@ mod tests {
         let command = parse(setting, &words(args));
 
         // Then
-        assert!(matches!(command, Err(Refusal::Value(_))), "{command:?}");
+        assert!(
+            matches!(
+                command,
+                Err(JobCliError::Limit { .. }
+                    | JobCliError::Enforce { .. }
+                    | JobCliError::Pattern(_))
+            ),
+            "{command:?}"
+        );
     }
 
     #[rstest]
@@ -352,6 +345,6 @@ mod tests {
         let command = parse(setting, &words(args));
 
         // Then
-        assert_eq!(command, Err(Refusal::Usage));
+        assert!(matches!(command, Err(JobCliError::Usage)), "{command:?}");
     }
 }

@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use crate::error::{Error, GitError};
+use crate::error::{CommandError, Error};
 use crate::git::command::REPOSITORY_ENV;
 use crate::platform;
 use crate::report::Report;
@@ -37,7 +37,7 @@ impl Ran {
         if self.success {
             Ok(())
         } else {
-            Err(GitError::CommandFailed {
+            Err(CommandError::Failed {
                 program: self.program.clone(),
                 code: self.code,
             }
@@ -50,13 +50,13 @@ impl Ran {
 ///
 /// # Errors
 ///
-/// [`GitError::Spawn`] when the command cannot start.
+/// [`CommandError::Spawn`] when the command cannot start.
 pub fn run(command: &mut Command) -> Result<Ran, Error> {
     let program = program_name(command);
     let output = command
         .stdin(Stdio::null())
         .output()
-        .map_err(|source| GitError::Spawn {
+        .map_err(|source| CommandError::Spawn {
             program: program.clone(),
             source,
         })?;

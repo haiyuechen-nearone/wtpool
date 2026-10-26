@@ -25,8 +25,8 @@ pub struct HeavyTable<'a> {
     table: &'a [RunningProcess],
     parents: HashMap<u32, u32>,
     names: HashMap<u32, HeavyName>,
-    /// The job each job process runs, and its index in the job list.
-    jobs: HashMap<u32, (usize, &'a JobRecord)>,
+    /// The job each job process runs.
+    jobs: HashMap<u32, &'a JobRecord>,
 }
 
 impl<'a> HeavyTable<'a> {
@@ -64,11 +64,8 @@ impl<'a> HeavyTable<'a> {
         let jobs = table
             .iter()
             .filter_map(|process| {
-                let (index, job) = jobs
-                    .iter()
-                    .enumerate()
-                    .find(|(_, job)| runs(job, process))?;
-                Some((process.pid, (index, *job)))
+                let job = jobs.iter().find(|job| runs(job, process))?;
+                Some((process.pid, *job))
             })
             .collect();
         Self {
@@ -97,16 +94,6 @@ impl<'a> HeavyTable<'a> {
     /// The job whose process is `pid` or the nearest of its ancestors.
     #[must_use]
     pub fn holding_job(&self, pid: u32) -> Option<&'a JobRecord> {
-        self.held_by(pid).map(|(_, job)| job)
-    }
-
-    /// The index in the job list of [`HeavyTable::holding_job`].
-    #[must_use]
-    pub fn holder(&self, pid: u32) -> Option<usize> {
-        self.held_by(pid).map(|(index, _)| index)
-    }
-
-    fn held_by(&self, pid: u32) -> Option<(usize, &'a JobRecord)> {
         std::iter::once(pid)
             .chain(self.ancestors(pid))
             .find_map(|pid| self.jobs.get(&pid).copied())
@@ -212,7 +199,7 @@ mod tests {
     }
 
     #[test]
-    fn heavy_table_holder__should_find_the_nearest_job_with_its_start() {
+    fn heavy_table_holding_job__should_find_the_nearest_job_with_its_start() {
         // Given
         let at = "2026-10-20T11:00:00Z";
         let table = [
@@ -229,14 +216,11 @@ mod tests {
         let heavy = HeavyTable::new(&table, &list(&["make"]), &list(&[]), &jobs);
 
         // Then
-        let holders: Vec<Option<(usize, u32)>> = [20, 21, 22, 31]
+        let holders: Vec<Option<u32>> = [20, 21, 22, 31]
             .iter()
-            .map(|pid| Some((heavy.holder(*pid)?, heavy.holding_job(*pid)?.pid)))
+            .map(|pid| Some(heavy.holding_job(*pid)?.pid))
             .collect();
-        assert_eq!(
-            holders,
-            vec![Some((0, 20)), Some((0, 20)), Some((0, 20)), None]
-        );
+        assert_eq!(holders, vec![Some(20), Some(20), Some(20), None]);
     }
 
     #[test]

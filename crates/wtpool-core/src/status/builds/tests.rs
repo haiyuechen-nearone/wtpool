@@ -40,7 +40,7 @@ fn builds_by_worktree__should_place_builds_in_the_deepest_worktree_by_pid() {
         process(8, None, "cargo", "/elsewhere"),
     ];
     let table = HeavyTable::new(&processes, &list(&["cargo", "rustc"]), &list(&[]), &[]);
-    let builds = build_processes(&table, &[]);
+    let builds = build_processes(&table, &BTreeMap::new());
 
     // When
     let placed = builds_by_worktree(&builds, &worktrees);
@@ -71,7 +71,7 @@ fn build_processes__should_queue_suggested_builds() {
     let table = HeavyTable::new(&processes, &list(&["cargo"]), &list(&["make"]), &[]);
 
     // When
-    let builds = build_processes(&table, &[]);
+    let builds = build_processes(&table, &BTreeMap::new());
 
     // Then
     let found: Vec<(u32, &str, bool)> = builds
@@ -109,7 +109,7 @@ fn builds_below__should_order_the_builds_of_each_ancestor_nearest_first() {
         &list(&[]),
         &[],
     );
-    let builds = build_processes(&table, &[]);
+    let builds = build_processes(&table, &BTreeMap::new());
 
     // When
     let below = builds_below(&processes, &builds);
@@ -146,7 +146,7 @@ fn builds_below__should_stop_where_a_chain_comes_back() {
         child(7, 6, "claude"),
     ];
     let table = HeavyTable::new(&processes, &list(&["cargo"]), &list(&[]), &[]);
-    let builds = build_processes(&table, &[]);
+    let builds = build_processes(&table, &BTreeMap::new());
 
     // When
     let below = builds_below(&processes, &builds);

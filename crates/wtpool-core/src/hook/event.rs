@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 
 use super::adapter::Adapter;
 use super::apply::{self, Agent, Change, Found, Fresh, Place, Titles, Writer};
-use super::bash;
 use super::env::{HookEnv, Me};
 use super::gc;
 use super::input::{CallFacts, Event, HookInput};
@@ -20,6 +19,7 @@ use crate::activity::{ActorKey, PlacedBy, State};
 use crate::clock::{ReadClock, Timestamp};
 use crate::paths::comparable;
 use crate::platform::zone;
+use crate::shell;
 
 /// One event's facts that need the file system, worked out before any lock is taken.
 struct Context<'a, A> {
@@ -233,7 +233,7 @@ impl<A: Adapter> Context<'_, A> {
             }
             ToolPath::Command { command, shell } => {
                 let parsed = match shell {
-                    Shell::Posix => bash::parse(command, &self.cwd, self.env.home.as_deref()),
+                    Shell::Posix => shell::parse(command, &self.cwd, self.env.home.as_deref()),
                 };
                 let moved = self.command_place(&parsed);
                 (text::clean(&parsed.summary, MAX_TEXT), moved)
@@ -242,7 +242,7 @@ impl<A: Adapter> Context<'_, A> {
         }
     }
 
-    fn command_place(&self, parsed: &bash::Command) -> Option<String> {
+    fn command_place(&self, parsed: &shell::Command) -> Option<String> {
         if let Some(last) = parsed.cds.last() {
             return self.in_pool(last).map(|w| path_text(&w.root));
         }

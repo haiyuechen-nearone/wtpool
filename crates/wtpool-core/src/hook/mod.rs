@@ -23,7 +23,6 @@ mod store;
 mod tasks;
 
 pub use crate::activity::text;
-pub(crate) use crate::shell as bash;
 
 pub use adapter::{Adapter, TranscriptTitles, WaitingTools};
 pub use call_input::CallInput;

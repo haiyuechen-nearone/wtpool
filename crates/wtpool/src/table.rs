@@ -14,10 +14,10 @@ pub struct Style {
 
 const BOLD: &str = "\x1b[1m";
 const DIM: &str = "\x1b[2m";
-const RED: &str = "\x1b[31m";
+pub(crate) const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
-const YELLOW: &str = "\x1b[33m";
-const RESET: &str = "\x1b[0m";
+pub(crate) const YELLOW: &str = "\x1b[33m";
+pub(crate) const RESET: &str = "\x1b[0m";
 const BOLD_GREEN: &str = "\x1b[1m\x1b[32m";
 
 const GAP: &str = "  ";
@@ -200,7 +200,7 @@ mod tests {
 
     const LONG: &str = "1234-check-widget-cache-health-before-each-deploy";
 
-    fn must_row(worktree: &str, branch: Option<&str>, role: Role, state: State) -> Row {
+    fn row(worktree: &str, branch: Option<&str>, role: Role, state: State) -> Row {
         Row {
             worktree: worktree.to_owned(),
             branch: branch.map(|b| BranchName::try_new(b).unwrap()),
@@ -211,8 +211,8 @@ mod tests {
 
     fn pool() -> Vec<Row> {
         vec![
-            must_row("app", Some(LONG), Role::Foreground, State::default()),
-            must_row(
+            row("app", Some(LONG), Role::Foreground, State::default()),
+            row(
                 "app-wt1",
                 Some("build-widget-cache-generation-per-region"),
                 Role::Slot,
@@ -225,7 +225,7 @@ mod tests {
                     ..State::default()
                 },
             ),
-            must_row("app-release", None, Role::Unmanaged, State::default()),
+            row("app-release", None, Role::Unmanaged, State::default()),
         ]
     }
 
@@ -326,13 +326,13 @@ mod tests {
     fn render__should_show_controls_in_names_as_escapes_and_align_after_them() {
         // Given
         let rows = [
-            must_row(
+            row(
                 "w\u{200b}t",
                 Some("x\u{9d}52;c;aGk=\u{9c}\u{202e}"),
                 Role::Slot,
                 State::default(),
             ),
-            must_row("app", Some("main"), Role::Foreground, State::default()),
+            row("app", Some("main"), Role::Foreground, State::default()),
         ];
 
         // When
@@ -357,7 +357,7 @@ mod tests {
         #[case] paint: &str,
     ) {
         // Given
-        let rows = [must_row("w", None, role, State::default())];
+        let rows = [row("w", None, role, State::default())];
 
         // When
         let plain = render(&rows, Style::default());
@@ -455,7 +455,7 @@ mod tests {
         #[case] tokens: &[(&str, &str)],
     ) {
         // Given
-        let rows = [must_row("w", Some("b"), Role::Slot, state)];
+        let rows = [row("w", Some("b"), Role::Slot, state)];
 
         // When
         let plain = render(&rows, Style::default());

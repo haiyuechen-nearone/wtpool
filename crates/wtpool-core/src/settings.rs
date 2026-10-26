@@ -175,47 +175,6 @@ impl Settings {
         })
     }
 
-    /// One line per setting under a header: name, value and source, in columns.
-    #[must_use]
-    pub fn to_text(&self) -> String {
-        let mut rows = vec![[
-            "SETTING".to_owned(),
-            "VALUE".to_owned(),
-            "SOURCE".to_owned(),
-        ]];
-        rows.extend(self.rows().map(|(key, value, source)| {
-            [key.name().to_owned(), value.to_string(), source.to_string()]
-        }));
-        let name_width = rows.iter().map(|[name, ..]| name.chars().count()).max();
-        let value_width = rows.iter().map(|[_, value, _]| value.chars().count()).max();
-        let (name_width, value_width) = (name_width.unwrap_or(0), value_width.unwrap_or(0));
-        rows.iter()
-            .map(|[name, value, source]| {
-                format!("{name:<name_width$}  {value:<value_width$}  {source}\n")
-            })
-            .collect()
-    }
-
-    /// The settings as a JSON object: `version`, then each setting with its
-    /// `value` and its `source` as [`Settings::to_text`] shows it.
-    #[must_use]
-    pub fn to_json(&self) -> String {
-        let mut json = "{\n  \"version\": 1".to_owned();
-        for (key, value, source) in self.rows() {
-            let value = match value {
-                Value::Text(text) => json_string(&text),
-                Value::Number(number) => number.to_string(),
-            };
-            json.push_str(&format!(
-                ",\n  \"{}\": {{\"value\": {value}, \"source\": {}}}",
-                key.name(),
-                json_string(&source.to_string())
-            ));
-        }
-        json.push_str("\n}\n");
-        json
-    }
-
     /// Refuses a foreground that is not a worktree of `repository`, as git in `git_mode` finds.
     fn check_foreground(&self, repository: &AbsolutePath, git_mode: GitMode) -> Result<(), Error> {
         let foreground = &self.foreground;
@@ -230,30 +189,32 @@ impl Settings {
         ))
     }
 
-    fn rows(&self) -> [(Key, Value, &Source); 5] {
+    /// Each setting `wtpool config` shows, in its order: the name, the value and its source.
+    #[must_use]
+    pub fn rows(&self) -> [(&'static str, Value, &Source); 5] {
         [
             (
-                Key::Foreground,
+                Key::Foreground.name(),
                 Value::Text(self.foreground.value.display().to_string()),
                 &self.foreground.source,
             ),
             (
-                Key::SlotDir,
+                Key::SlotDir.name(),
                 Value::Text(self.slot_dir.value.display().to_string()),
                 &self.slot_dir.source,
             ),
             (
-                Key::SlotPrefix,
+                Key::SlotPrefix.name(),
                 Value::Text(self.slot_prefix.value.as_str().to_owned()),
                 &self.slot_prefix.source,
             ),
             (
-                Key::SlotCount,
+                Key::SlotCount.name(),
                 Value::Number(self.slot_count.value.get()),
                 &self.slot_count.source,
             ),
             (
-                Key::Remote,
+                Key::Remote.name(),
                 Value::Text(self.remote.value.as_str().to_owned()),
                 &self.remote.source,
             ),
@@ -261,7 +222,9 @@ impl Settings {
     }
 }
 
-enum Value {
+/// A setting's value as `wtpool config` prints it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Value {
     Text(String),
     Number(usize),
 }
@@ -417,13 +380,6 @@ fn resolve(
         main_worktree,
         repository,
     })
-}
-
-/// `text` as a JSON string.
-fn json_string(text: &str) -> String {
-    // Serializing a `str` into memory cannot fail. `null` keeps the document valid JSON
-    // all the same.
-    serde_json::to_string(text).unwrap_or_else(|_| "null".to_owned())
 }
 
 #[cfg(test)]

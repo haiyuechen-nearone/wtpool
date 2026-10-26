@@ -33,7 +33,7 @@ fn on_new_slot(slot: &str, code: Option<i32>) -> Error {
 }
 
 fn command_failed(code: Option<i32>) -> Error {
-    GitError::CommandFailed {
+    CommandError::Failed {
         program: "git".to_owned(),
         code,
     }
@@ -41,8 +41,6 @@ fn command_failed(code: Option<i32>) -> Error {
 }
 
 #[rstest]
-#[case::usage(Error::Usage("usage: wtpool ls"), &["usage: wtpool ls"], 1)]
-#[case::unknown_flag(Error::UnknownFlag("--x".to_owned()), &["unknown flag '--x'"], 1)]
 #[case::invalid_ref(
     Error::InvalidRef {
         reference: "a..b".to_owned(),
@@ -110,7 +108,7 @@ fn command_failed(code: Option<i32>) -> Error {
     Error::NotResolved {
         reference: "a".to_owned(),
         consequence: "no slot changed",
-        cause: Some(Box::new(GitError::Spawn { program: "gh".to_owned(), source: io_error("denied") }.into())),
+        cause: Some(Box::new(CommandError::Spawn { program: "gh".to_owned(), source: io_error("denied") }.into())),
     },
     &["could not run gh: denied", "'a': no slot changed"],
     1
@@ -133,7 +131,7 @@ fn command_failed(code: Option<i32>) -> Error {
             Error::Copy { path: ".env".to_owned(), slot: path("/w/app-wt3"), source: io_error("disk full") },
             GitError::IgnoreUnknown { path: ".env".to_owned(), main: path("/w/app") }.into(),
             Error::NoMainWorktree(path("/w/app-wt4")),
-            GitError::Spawn { program: "sh".to_owned(), source: io_error("not found") }.into(),
+            CommandError::Spawn { program: "sh".to_owned(), source: io_error("not found") }.into(),
             command_failed(Some(2)),
         ],
     },
@@ -332,7 +330,7 @@ fn command_failed(code: Option<i32>) -> Error {
     1
 )]
 #[case::spawn(
-    GitError::Spawn { program: "git".to_owned(), source: io_error("not found") }.into(),
+    CommandError::Spawn { program: "git".to_owned(), source: io_error("not found") }.into(),
     &["could not run git: not found"],
     1
 )]
@@ -394,7 +392,7 @@ fn error__should_print_its_lines_and_exit_with_its_code(
     Some("a slot name cannot start with '-'")
 )]
 #[case::io_error_through_a_group(
-    GitError::Spawn { program: "git".to_owned(), source: io_error("not found") }.into(),
+    CommandError::Spawn { program: "git".to_owned(), source: io_error("not found") }.into(),
     Some("not found")
 )]
 #[case::refusal(Refusal::DetachForeground.into(), None)]

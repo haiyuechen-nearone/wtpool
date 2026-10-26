@@ -265,3 +265,45 @@ pub(crate) fn must_outcome(command: &mut Command) -> Outcome {
         stderr: String::from_utf8(output.stderr).unwrap(),
     }
 }
+
+/// `wtpool` run in `dir` without any `WTPOOL_*` variable.
+pub(crate) fn wtpool_in(sandbox: &Sandbox, dir: &Path, args: &[&str]) -> Command {
+    let mut command = sandbox.wtpool(args, &[]);
+    command
+        .current_dir(dir)
+        .env_remove("WTPOOL_FOREGROUND")
+        .env_remove("WTPOOL_SLOT_DIR")
+        .env_remove("WTPOOL_SLOT_PREFIX")
+        .env_remove("WTPOOL_SLOT_COUNT");
+    command
+}
+
+/// The output of `wtpool` on a terminal of `size` columns, if any, with `COLUMNS` set to
+/// `columns`, if any.
+#[cfg(target_os = "macos")]
+pub(crate) fn must_run_on_a_terminal(
+    sandbox: &Sandbox,
+    args: &[&str],
+    size: Option<u16>,
+    columns: Option<&str>,
+) -> String {
+    let stty = size.map_or_else(String::new, |cols| format!("stty cols {cols} rows 20; "));
+    let mut command = sandbox.wtpool(&[], &[]);
+    if let Some(columns) = columns {
+        command.env("COLUMNS", columns);
+    }
+    let mut script = Command::new("/usr/bin/script");
+    script
+        .args(["-q", "/dev/null", "/bin/sh", "-c"])
+        .arg(format!(r#"{stty}exec "$0" "$@""#))
+        .arg(env!("CARGO_BIN_EXE_wtpool"))
+        .args(args)
+        .env_clear()
+        .envs(
+            command
+                .get_envs()
+                .filter_map(|(name, value)| Some((name.to_owned(), value?.to_owned()))),
+        );
+    let outcome = must_outcome(&mut script);
+    outcome.stdout.replace('\r', "")
+}

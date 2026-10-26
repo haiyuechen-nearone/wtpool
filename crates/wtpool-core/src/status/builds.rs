@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use super::document::Build;
-use crate::jobs::HeavyTable;
+use crate::jobs::{HeavyTable, JobId};
 use crate::processes::{ProcessQuery, RunningProcess};
 
 /// The facts `wtpool status` reads of every process: names, arguments and folders for the
@@ -39,26 +39,23 @@ pub struct BuildBelow {
     pub owner: Option<String>,
 }
 
-/// Each process of `table` a heavy pattern names, with `owners`, the actor of each job by its
-/// index in the job list.
+/// Each process of `table` a heavy pattern names, with `owners`, the actor of each job by its id.
 #[must_use]
 pub fn build_processes<'a>(
     table: &'a HeavyTable<'a>,
-    owners: &'a [Option<String>],
+    owners: &BTreeMap<&JobId, &'a str>,
 ) -> Vec<BuildProcess<'a>> {
     table
         .processes()
         .iter()
         .filter_map(|process| {
             let name = table.name(process.pid)?;
-            let holder = table.holder(process.pid);
+            let holder = table.holding_job(process.pid);
             Some(BuildProcess {
                 process,
                 name: &name.name,
                 queued: holder.is_some() || name.suggested,
-                owner: holder
-                    .and_then(|index| owners.get(index))
-                    .and_then(Option::as_deref),
+                owner: holder.and_then(|job| owners.get(&job.id).copied()),
             })
         })
         .collect()

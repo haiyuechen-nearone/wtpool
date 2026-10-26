@@ -3,23 +3,21 @@
 
 use std::path::PathBuf;
 
-use serde::Serialize;
-
 use super::JobPaths;
-use super::config::{LIMIT_BOUNDS, MachineConfig};
+use super::config::MachineConfig;
 use super::heavy_table::HeavyTable;
 use super::machine::MachineJobs;
 use super::record::JobRecord;
 use crate::clock::Timestamp;
-use crate::heavy::{HeavyList, RepositoryPatterns, Suggestion, SuggestionJson, Suggestions};
+use crate::heavy::{HeavyList, RepositoryPatterns, Suggestion, Suggestions};
 use crate::processes::{ListProcesses, ProcessQuery};
 
-/// What `wtpool job ls` shows. The job folder is only read, and a dead job's record skipped.
+/// The content of `wtpool job ls`. The job folder is only read, and a dead job's record skipped.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JobListing {
     /// The defaults while [`error`](Self::error) names a fault of the machine config.
     pub config: MachineConfig,
-    /// Why the machine config or the job folder cannot be read.
+    /// The fault that keeps the machine config or the job folder from being read.
     pub error: Option<String>,
     config_valid: bool,
     pub heavy: HeavyList,
@@ -80,88 +78,6 @@ impl JobListing {
     pub fn limit(&self) -> Option<u32> {
         self.config_valid.then_some(self.config.limit.get())
     }
-
-    /// One line of JSON, the fields in the listing's order.
-    #[must_use]
-    pub fn to_json(&self) -> String {
-        fn entries(jobs: &[ListedJob]) -> Vec<EntryJson<'_>> {
-            jobs.iter()
-                .map(|job| EntryJson {
-                    id: &job.id,
-                    summary: &job.summary,
-                    label: job.label.as_deref(),
-                    folder: job.folder.to_string_lossy().into_owned(),
-                    since: job.since,
-                })
-                .collect()
-        }
-        let document = ListingJson {
-            limit: self.limit(),
-            default: self.config.default_limit.get(),
-            min: LIMIT_BOUNDS.0,
-            max: LIMIT_BOUNDS.1,
-            enforce: self.config.enforce.as_str(),
-            source: SourceJson {
-                limit: self.config.limit_source.as_str(),
-                enforce: self.config.enforce_source.as_str(),
-            },
-            config: self.config.path.to_string_lossy().into_owned(),
-            error: self.error.as_deref(),
-            heavy: self
-                .heavy
-                .patterns()
-                .iter()
-                .map(|listed| HeavyJson {
-                    pattern: listed.pattern.as_str(),
-                    source: listed.source.as_str(),
-                })
-                .collect(),
-            suggested: self.suggested.iter().map(SuggestionJson::from).collect(),
-            running: entries(&self.running),
-            waiting: entries(&self.waiting),
-            outside: entries(&self.outside),
-        };
-        // A document of strings and numbers always serializes; `{}` keeps the line JSON.
-        serde_json::to_string(&document).unwrap_or_else(|_| "{}".to_owned()) + "\n"
-    }
-}
-
-#[derive(Serialize)]
-struct ListingJson<'a> {
-    limit: Option<u32>,
-    default: u32,
-    min: u32,
-    max: u32,
-    enforce: &'a str,
-    source: SourceJson,
-    config: String,
-    error: Option<&'a str>,
-    heavy: Vec<HeavyJson<'a>>,
-    suggested: Vec<SuggestionJson<'a>>,
-    running: Vec<EntryJson<'a>>,
-    waiting: Vec<EntryJson<'a>>,
-    outside: Vec<EntryJson<'a>>,
-}
-
-#[derive(Serialize)]
-struct SourceJson {
-    limit: &'static str,
-    enforce: &'static str,
-}
-
-#[derive(Serialize)]
-struct HeavyJson<'a> {
-    pattern: &'a str,
-    source: &'static str,
-}
-
-#[derive(Serialize)]
-struct EntryJson<'a> {
-    id: &'a str,
-    summary: &'a str,
-    label: Option<&'a str>,
-    folder: String,
-    since: Timestamp,
 }
 
 /// `records` as the listing shows them, in their order.

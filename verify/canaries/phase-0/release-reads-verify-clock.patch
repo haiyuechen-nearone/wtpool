@@ -7,12 +7,15 @@ Reads WTPOOL_VERIFY_CLOCK in every build, so the release binary holds a test hoo
 diff --git a/crates/wtpool/src/main.rs b/crates/wtpool/src/main.rs
 --- a/crates/wtpool/src/main.rs
 +++ b/crates/wtpool/src/main.rs
-@@ -327,7 +327,7 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
-     }
-     let action = match cli.command {
-         _ if cli.help => Action::Help,
--        _ if cli.version => {
-+        _ if cli.version && std::env::var_os("WTPOOL_VERIFY_CLOCK").is_none() || cli.version => {
-             terminal.out(&version_text(&BUILD));
-             return Ok(());
-         }
+@@ -139,7 +139,10 @@ fn main() -> ExitCode {
+ fn run(argv: &[OsString], terminal: &mut Terminal) -> Result<(), Failure> {
+     match args::parse(argv)? {
+         Action::Help => terminal.out(HELP),
+-        Action::Version => terminal.out(&version_text(&BUILD)),
++        Action::Version => {
++            let _ = std::env::var_os("WTPOOL_VERIFY_CLOCK");
++            terminal.out(&version_text(&BUILD));
++        }
+         Action::HookEvent => hook::run_hook(),
+         Action::HookPolicy => hook::run_policy(),
+         Action::HookInstall => {

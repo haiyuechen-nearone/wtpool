@@ -1,11 +1,15 @@
-//! The text of `wtpool job ls` and of the settings `wtpool job` prints: the rules first, then
-//! the jobs, each line as [`visible`] shows it.
+//! The output of `wtpool job ls` and of the settings `wtpool job` prints. The text gives the
+//! rules first, then the jobs, each line as [`visible`] shows it. The JSON serves
+//! `wtpool job ls --json` and `wtpool job heavy suggest --json`.
 
 use std::fmt::Display;
 
+use serde::Serialize;
 use wtpool_core::clock::Timestamp;
 use wtpool_core::heavy::{PatternSource, Suggestion};
-use wtpool_core::jobs::{ConfigSource, Enforce, JobListing, ListedJob, MachineConfig};
+use wtpool_core::jobs::{
+    ConfigSource, Enforce, JobListing, LIMIT_BOUNDS, ListedJob, MachineConfig,
+};
 
 use crate::text::visible;
 
@@ -43,7 +47,7 @@ pub(super) fn heavy_lines<'a>(
     }
 }
 
-/// `suggested: make (Makefile)`, a line a suggestion, then how to add them; else
+/// `suggested: make (Makefile)`, a line a suggestion, then the command that adds them, else
 /// `suggested: none`.
 pub(super) fn suggested_lines(suggested: &[Suggestion]) -> Vec<String> {
     if suggested.is_empty() {
@@ -137,6 +141,119 @@ fn job_line(prefix: &str, job: &ListedJob, now: Timestamp) -> String {
     )
 }
 
+/// One line of JSON, the fields in the listing's order.
+pub(super) fn json(listing: &JobListing) -> String {
+    fn entries(jobs: &[ListedJob]) -> Vec<EntryJson<'_>> {
+        jobs.iter()
+            .map(|job| EntryJson {
+                id: &job.id,
+                summary: &job.summary,
+                label: job.label.as_deref(),
+                folder: job.folder.to_string_lossy().into_owned(),
+                since: job.since,
+            })
+            .collect()
+    }
+    let config = &listing.config;
+    let document = ListingJson {
+        limit: listing.limit(),
+        default: config.default_limit.get(),
+        min: LIMIT_BOUNDS.0,
+        max: LIMIT_BOUNDS.1,
+        enforce: config.enforce.as_str(),
+        source: SourceJson {
+            limit: config.limit_source.as_str(),
+            enforce: config.enforce_source.as_str(),
+        },
+        config: config.path.to_string_lossy().into_owned(),
+        error: listing.error.as_deref(),
+        heavy: listing
+            .heavy
+            .patterns()
+            .iter()
+            .map(|listed| HeavyJson {
+                pattern: listed.pattern.as_str(),
+                source: listed.source.as_str(),
+            })
+            .collect(),
+        suggested: listing.suggested.iter().map(SuggestionJson::from).collect(),
+        running: entries(&listing.running),
+        waiting: entries(&listing.waiting),
+        outside: entries(&listing.outside),
+    };
+    json_line(&document)
+}
+
+/// `suggestions` as one line of JSON, `{"suggested": [{"pattern": …, "from": …}, …]}`.
+pub(super) fn suggested_json(suggestions: &[Suggestion]) -> String {
+    json_line(&SuggestedJson {
+        suggested: suggestions.iter().map(SuggestionJson::from).collect(),
+    })
+}
+
+fn json_line(document: &impl Serialize) -> String {
+    // A document of strings and numbers always serializes, and `{}` keeps the line JSON.
+    serde_json::to_string(document).unwrap_or_else(|_| "{}".to_owned()) + "\n"
+}
+
+#[derive(Serialize)]
+struct ListingJson<'a> {
+    limit: Option<u32>,
+    default: u32,
+    min: u32,
+    max: u32,
+    enforce: &'a str,
+    source: SourceJson,
+    config: String,
+    error: Option<&'a str>,
+    heavy: Vec<HeavyJson<'a>>,
+    suggested: Vec<SuggestionJson<'a>>,
+    running: Vec<EntryJson<'a>>,
+    waiting: Vec<EntryJson<'a>>,
+    outside: Vec<EntryJson<'a>>,
+}
+
+#[derive(Serialize)]
+struct SourceJson {
+    limit: &'static str,
+    enforce: &'static str,
+}
+
+#[derive(Serialize)]
+struct HeavyJson<'a> {
+    pattern: &'a str,
+    source: &'static str,
+}
+
+#[derive(Serialize)]
+struct EntryJson<'a> {
+    id: &'a str,
+    summary: &'a str,
+    label: Option<&'a str>,
+    folder: String,
+    since: Timestamp,
+}
+
+#[derive(Serialize)]
+struct SuggestedJson<'a> {
+    suggested: Vec<SuggestionJson<'a>>,
+}
+
+#[derive(Serialize)]
+struct SuggestionJson<'a> {
+    pattern: &'a str,
+    from: &'a str,
+}
+
+impl<'a> From<&'a Suggestion> for SuggestionJson<'a> {
+    fn from(suggestion: &'a Suggestion) -> Self {
+        Self {
+            pattern: suggestion.pattern.as_str(),
+            from: &suggestion.from,
+        }
+    }
+}
+
 /// `12 s`, `3 m`, `2 h` or `1 d`, rounded down.
 fn age(seconds: i64) -> String {
     let seconds = seconds.max(0);
@@ -151,8 +268,110 @@ fn age(seconds: i64) -> String {
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
+    use wtpool_core::heavy::{Pattern, RepositoryPatterns};
+    use wtpool_core::jobs::JobPaths;
+    use wtpool_core::processes::{ListProcesses, ProcessQuery, RunningProcess};
 
     use super::*;
+
+    /// A process table without a process.
+    struct NoProcesses;
+
+    impl ListProcesses for NoProcesses {
+        fn list(&self, _: &ProcessQuery<'_>) -> Vec<RunningProcess> {
+            Vec::new()
+        }
+    }
+
+    fn suggestion(pattern: &str, from: &str) -> Suggestion {
+        Suggestion {
+            pattern: Pattern::parse(pattern).unwrap(),
+            from: from.to_owned(),
+        }
+    }
+
+    /// The listing of an empty job folder in `dir`, under the machine config `config` if there
+    /// is one, with `repository`'s patterns and `suggested`.
+    fn gathered(
+        dir: &std::path::Path,
+        config: Option<&str>,
+        repository: RepositoryPatterns,
+        suggested: Vec<Suggestion>,
+    ) -> JobListing {
+        let paths = JobPaths {
+            config: dir.join("machine.toml"),
+            folder: dir.join("jobs"),
+        };
+        if let Some(config) = config {
+            std::fs::write(&paths.config, config).unwrap();
+        }
+        JobListing::gather(
+            &paths,
+            16,
+            &repository,
+            suggested,
+            &NoProcesses,
+            Timestamp::from_seconds(0),
+        )
+    }
+
+    #[test]
+    fn json__should_keep_the_order_of_the_listing() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let repository = RepositoryPatterns {
+            heavy: vec![Pattern::parse("make").unwrap()],
+            build_processes: vec!["protoc".to_owned()],
+        };
+        let suggested = vec![
+            suggestion("make", "Makefile"),
+            suggestion("cargo build", "Cargo.toml"),
+        ];
+        let listing = gathered(dir.path(), None, repository, suggested);
+
+        // When
+        let json = json(&listing);
+
+        // Then
+        let config = serde_json::to_string(&dir.path().join("machine.toml")).unwrap();
+        assert_eq!(
+            json,
+            format!(
+                "{{\"limit\":4,\"default\":4,\"min\":1,\"max\":64,\"enforce\":\"warn\",\"source\":{{\"limit\":\"default\",\"enforce\":\"default\"}},\"config\":{config},\"error\":null,\"heavy\":[{{\"pattern\":\"make\",\"source\":\"repository\"}},{{\"pattern\":\"protoc\",\"source\":\"build_processes\"}}],\"suggested\":[{{\"pattern\":\"cargo build\",\"from\":\"Cargo.toml\"}}],\"running\":[],\"waiting\":[],\"outside\":[]}}\n"
+            )
+        );
+    }
+
+    #[test]
+    fn json__should_give_no_limit_for_an_invalid_config() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let listing = gathered(
+            dir.path(),
+            Some("[jobs]\nlimit = 0\n"),
+            RepositoryPatterns::default(),
+            Vec::new(),
+        );
+
+        // When
+        let json = json(&listing);
+
+        // Then
+        assert!(json.starts_with("{\"limit\":null,"), "{json}");
+        assert!(json.contains("limit = 0"), "{json}");
+    }
+
+    #[test]
+    fn suggested_json__should_name_each_pattern_and_its_marker() {
+        // When
+        let json = suggested_json(&[suggestion("make", "Makefile")]);
+
+        // Then
+        assert_eq!(
+            json,
+            "{\"suggested\":[{\"pattern\":\"make\",\"from\":\"Makefile\"}]}\n"
+        );
+    }
 
     #[rstest]
     #[case::seconds(59, "59 s")]

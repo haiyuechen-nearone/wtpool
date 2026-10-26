@@ -3,7 +3,7 @@ use std::io;
 use std::path::Path;
 
 use rstest::rstest;
-use wtpool_core::{GitError, ObjectId, RemoteName};
+use wtpool_core::{CommandError, ObjectId, RemoteName};
 
 use super::*;
 
@@ -225,7 +225,7 @@ fn repository__should_name_only_a_github_remote(#[case] url: &str, #[case] expec
     &["acme/app #42"]
 )]
 #[case::gh_cannot_run(
-    Err(ViewPrError::from(Error::from(GitError::Spawn {
+    Err(ViewPrError::from(Error::from(CommandError::Spawn {
         program: "gh".to_owned(),
         source: io::Error::from(io::ErrorKind::PermissionDenied),
     }))),

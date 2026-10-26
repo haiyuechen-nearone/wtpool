@@ -3,7 +3,6 @@ use std::path::Path;
 use super::*;
 use crate::heavy::Pattern;
 use crate::jobs::JobState;
-use crate::jobs::record::{JobId, RECORD_VERSION};
 use crate::processes::{RunningProcess, StartTime};
 
 /// A process table of fixed processes.
@@ -28,17 +27,12 @@ fn process(pid: u32, parent: u32, cmd: &[&str], started: &str) -> RunningProcess
 
 fn job(pid: u32, ticket: u64, state: JobState) -> JobRecord {
     JobRecord {
-        version: RECORD_VERSION,
-        id: JobId::new(pid),
-        pid,
-        started: None,
         summary: "cargo test".to_owned(),
-        label: None,
-        cwd: PathBuf::from("/w"),
         ticket,
         state,
         queued: Timestamp::from_seconds(10),
         since: Timestamp::from_seconds(20),
+        ..JobRecord::sample(pid)
     }
 }
 
@@ -108,50 +102,6 @@ fn outside_jobs__should_read_no_table_without_a_pattern() {
 }
 
 #[test]
-fn job_listing_to_json__should_keep_the_order_of_the_listing() {
-    // Given
-    let dir = tempfile::tempdir().unwrap();
-    let paths = JobPaths {
-        config: dir.path().join("machine.toml"),
-        folder: dir.path().join("jobs"),
-    };
-    let repository = RepositoryPatterns {
-        heavy: vec![Pattern::parse("make").unwrap()],
-        build_processes: vec!["protoc".to_owned()],
-    };
-    let suggested = vec![
-        Suggestion {
-            pattern: Pattern::parse("make").unwrap(),
-            from: "Makefile".to_owned(),
-        },
-        Suggestion {
-            pattern: Pattern::parse("cargo build").unwrap(),
-            from: "Cargo.toml".to_owned(),
-        },
-    ];
-
-    // When
-    let listing = JobListing::gather(
-        &paths,
-        16,
-        &repository,
-        suggested,
-        &Table(Vec::new()),
-        Timestamp::from_seconds(0),
-    );
-
-    // Then
-    let config = paths.config.to_string_lossy();
-    assert_eq!(
-        listing.to_json(),
-        format!(
-            "{{\"limit\":4,\"default\":4,\"min\":1,\"max\":64,\"enforce\":\"warn\",\"source\":{{\"limit\":\"default\",\"enforce\":\"default\"}},\"config\":{},\"error\":null,\"heavy\":[{{\"pattern\":\"make\",\"source\":\"repository\"}},{{\"pattern\":\"protoc\",\"source\":\"build_processes\"}}],\"suggested\":[{{\"pattern\":\"cargo build\",\"from\":\"Cargo.toml\"}}],\"running\":[],\"waiting\":[],\"outside\":[]}}\n",
-            serde_json::to_string(&config).unwrap()
-        )
-    );
-}
-
-#[test]
 fn job_listing_gather__should_report_an_invalid_config_without_a_limit() {
     // Given
     let dir = tempfile::tempdir().unwrap();
@@ -179,5 +129,4 @@ fn job_listing_gather__should_report_an_invalid_config_without_a_limit() {
             .as_deref()
             .is_some_and(|error| error.contains("limit = 0"))
     );
-    assert!(listing.to_json().starts_with("{\"limit\":null,"));
 }

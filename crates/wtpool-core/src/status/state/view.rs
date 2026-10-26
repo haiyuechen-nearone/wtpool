@@ -9,7 +9,7 @@ use crate::config::Config;
 use crate::error::Error;
 use crate::git::GitMode;
 use crate::heavy::HeavyList;
-use crate::jobs::{HeavyTable, JobRecord};
+use crate::jobs::{HeavyTable, JobId, JobRecord};
 use crate::paths;
 use crate::processes::ListProcesses;
 use crate::status::agents::{self, ActorJob, Context};
@@ -172,7 +172,13 @@ impl PoolState {
             .iter()
             .map(|job| harnesses.actor_of(job.pid, &job.summary, &table))
             .collect();
-        let build_list = build_processes(&table, &owners);
+        let owner_of: BTreeMap<&JobId, &str> = lists
+            .records
+            .iter()
+            .zip(&owners)
+            .filter_map(|(job, owner)| Some((&job.id, owner.as_deref()?)))
+            .collect();
+        let build_list = build_processes(&table, &owner_of);
         let paths: Vec<PathBuf> = self
             .worktrees
             .iter()

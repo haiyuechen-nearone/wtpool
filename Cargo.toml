@@ -22,7 +22,6 @@ publish = false
 wtpool-core = { path = "crates/wtpool-core" }
 wtpool-claude-code = { path = "crates/wtpool-claude-code" }
 wtpool-github = { path = "crates/wtpool-github" }
-clap = { version = "=4.6.7", default-features = false, features = ["std", "derive", "error-context"] }
 terminal_size = "=0.4.4"
 libc = "=0.2.190"
 thiserror = "=2.0.21"

@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use super::*;
 use crate::activity::PlacedBy;
-use crate::jobs::JobId;
 use crate::processes::{RecordedProcess, StartTime};
 use crate::status::record_time::RecordTime;
 use crate::status::records::{RecordKey, RecordState, RecordedCall, ToolTarget};
@@ -63,17 +62,12 @@ fn process(pid: u32, parent: u32, cmd: &[&str]) -> RunningProcess {
 
 fn job(pid: u32, ticket: u64, state: JobState, label: Option<&str>) -> JobRecord {
     JobRecord {
-        version: 1,
-        id: JobId::new(pid),
-        pid,
-        started: None,
         summary: "cargo test".to_owned(),
         label: label.map(str::to_owned),
         cwd: PathBuf::from("/p/wt1"),
         ticket,
         state,
-        queued: Timestamp::from_seconds(0),
-        since: Timestamp::from_seconds(0),
+        ..JobRecord::sample(pid)
     }
 }
 

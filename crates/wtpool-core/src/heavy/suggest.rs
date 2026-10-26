@@ -4,8 +4,6 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
-
 use super::scripts::{self, PACKAGE_JSON, PackageFault};
 use super::{HeavyList, Pattern};
 
@@ -191,37 +189,6 @@ impl Suggestions {
     }
 }
 
-#[derive(Serialize)]
-struct SuggestedJson<'a> {
-    suggested: Vec<SuggestionJson<'a>>,
-}
-
-/// One suggestion in the JSON of `job heavy suggest` and `job ls`.
-#[derive(Serialize)]
-pub(crate) struct SuggestionJson<'a> {
-    pattern: &'a str,
-    from: &'a str,
-}
-
-impl<'a> From<&'a Suggestion> for SuggestionJson<'a> {
-    fn from(suggestion: &'a Suggestion) -> Self {
-        Self {
-            pattern: suggestion.pattern.as_str(),
-            from: &suggestion.from,
-        }
-    }
-}
-
-/// `suggestions` as one line of JSON, `{"suggested": [{"pattern": …, "from": …}, …]}`.
-#[must_use]
-pub fn suggested_json(suggestions: &[Suggestion]) -> String {
-    let document = SuggestedJson {
-        suggested: suggestions.iter().map(SuggestionJson::from).collect(),
-    };
-    // A document of strings always serializes. `{}` keeps the line JSON.
-    serde_json::to_string(&document).unwrap_or_else(|_| "{}".to_owned()) + "\n"
-}
-
 /// The sorted names of the first [`MAX_ENTRIES`] entries of `folder`, none when it cannot be
 /// listed. A name that is not Unicode is no marker.
 fn top_names(folder: &Path) -> Vec<String> {
@@ -357,21 +324,6 @@ mod tests {
             .map(|fault| fault.to_string())
             .unwrap_or_default();
         assert!(fault.contains("package.json"), "{fault}");
-    }
-
-    #[test]
-    fn suggested_json__should_name_each_pattern_and_its_marker() {
-        // Given
-        let suggestions = Suggestions::from_names(&names(&["Makefile"]));
-
-        // When
-        let json = suggested_json(&suggestions.found);
-
-        // Then
-        assert_eq!(
-            json,
-            "{\"suggested\":[{\"pattern\":\"make\",\"from\":\"Makefile\"}]}\n"
-        );
     }
 
     #[test]

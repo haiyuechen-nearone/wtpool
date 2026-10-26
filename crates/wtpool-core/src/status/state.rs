@@ -4,7 +4,7 @@
 mod view;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::thread;
 
@@ -21,6 +21,7 @@ use crate::clock::Timestamp;
 use crate::config::Config;
 use crate::error::Error;
 use crate::git::{Git, GitMode, layout};
+use crate::jobs::JobId;
 use crate::paths::comparable;
 use crate::processes::{ListProcesses, Liveness, RunningProcess};
 use crate::report::Discard;
@@ -174,10 +175,15 @@ impl PoolState {
         self.jobs.flags_outside()
     }
 
-    /// Reads again the jobs whose files are called `stems`, and the process table, as a job's
-    /// start or end changes it.
-    pub fn refresh_jobs(&mut self, stems: &BTreeSet<OsString>, processes: &impl ListProcesses) {
-        self.jobs.refresh_jobs(stems);
+    /// Reads again the jobs `ids` name, or every job when `all` is set, and the process table,
+    /// as a job's start or end changes it.
+    pub fn refresh_jobs(
+        &mut self,
+        ids: &BTreeSet<JobId>,
+        all: bool,
+        processes: &impl ListProcesses,
+    ) {
+        self.jobs.refresh_jobs(ids, all);
         self.processes = processes.list(&builds::query());
     }
 

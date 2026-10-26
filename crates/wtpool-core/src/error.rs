@@ -13,11 +13,9 @@ pub enum Error {
     #[error(transparent)]
     Git(#[from] GitError),
     #[error(transparent)]
+    Command(#[from] CommandError),
+    #[error(transparent)]
     Refusal(#[from] Refusal),
-    #[error("{0}")]
-    Usage(&'static str),
-    #[error("unknown flag '{0}'")]
-    UnknownFlag(String),
     /// A `<ref>` that names no change of the forge, whose forms `forms` lists, and no valid
     /// branch.
     #[error("'{reference}' is not {forms} or a valid branch name")]
@@ -158,18 +156,22 @@ pub enum ReadFault {
     NotUtf8,
 }
 
-/// git, or another command `wtpool` runs, that could not start, failed, or answered in a way
-/// `wtpool` cannot use.
+/// A command `wtpool` runs, git, `gh` or `on_new_slot`, that could not start or failed.
 #[derive(Debug, thiserror::Error)]
 #[must_use]
-pub enum GitError {
-    /// Any command `wtpool` runs, `gh` and `on_new_slot` included.
+pub enum CommandError {
     #[error("could not run {program}")]
     Spawn { program: String, source: io::Error },
     /// A command that failed after printing its own error. Callers exit with
     /// its status and add no message of their own.
     #[error("{program} exited with status {code:?}")]
-    CommandFailed { program: String, code: Option<i32> },
+    Failed { program: String, code: Option<i32> },
+}
+
+/// git that answered in a way `wtpool` cannot use.
+#[derive(Debug, thiserror::Error)]
+#[must_use]
+pub enum GitError {
     /// `git worktree list` failed, so no worktree can be told apart from a free one.
     #[error("could not list the worktrees of {}", .0.display())]
     ListWorktrees(PathBuf),
@@ -298,13 +300,13 @@ pub enum Refusal {
 
 impl Error {
     /// The `wtpool: <message>` lines to print, innermost cause first. Empty for
-    /// [`GitError::CommandFailed`], as the command printed its own error. An error's
+    /// [`CommandError::Failed`], as the command printed its own error. An error's
     /// [`source`](std::error::Error::source) ends its line, except the cause of
     /// [`Error::NotResolved`]: its lines come first.
     #[must_use]
     pub fn messages(&self) -> Vec<String> {
         match self {
-            Error::Git(GitError::CommandFailed { .. }) => Vec::new(),
+            Error::Command(CommandError::Failed { .. }) => Vec::new(),
             Error::NotResolved { cause, .. } => cause
                 .iter()
                 .flat_map(|cause| cause.messages())
@@ -328,7 +330,7 @@ impl Error {
     #[must_use]
     pub fn exit_code(&self) -> i32 {
         match self {
-            Error::Git(GitError::CommandFailed {
+            Error::Command(CommandError::Failed {
                 code: Some(code), ..
             }) if *code != 0 => *code,
             _ => 1,

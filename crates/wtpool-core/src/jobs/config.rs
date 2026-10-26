@@ -151,12 +151,6 @@ impl fmt::Display for Limit {
 impl Enforce {
     pub const ALL: [Self; 3] = [Self::Off, Self::Warn, Self::Require];
 
-    /// The policy `off`, `warn` or `require` names, as the machine config writes it.
-    #[must_use]
-    pub fn from_name(name: &str) -> Option<Self> {
-        name.parse().ok()
-    }
-
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {

@@ -2,7 +2,6 @@
 //! process belongs to, and their effect on the builds and actors of the pool.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use super::agents::ActorJob;
@@ -71,19 +70,15 @@ impl JobsState {
         }
     }
 
-    /// Reads again the jobs whose files are called `stems`, every job for a name that is no
-    /// job's.
-    pub fn refresh_jobs(&mut self, stems: &BTreeSet<OsString>) {
+    /// Reads again the jobs `ids` name, or every job when `all` is set.
+    pub fn refresh_jobs(&mut self, ids: &BTreeSet<JobId>, all: bool) {
         let Some(machine) = &mut self.machine else {
             return;
         };
-        let ids: Option<Vec<JobId>> = stems
-            .iter()
-            .map(|stem| stem.to_str().and_then(JobId::parse))
-            .collect();
-        match ids {
-            Some(ids) => ids.iter().for_each(|id| machine.read_job(id)),
-            None => machine.read_jobs(),
+        if all {
+            machine.read_jobs();
+        } else {
+            ids.iter().for_each(|id| machine.read_job(id));
         }
     }
 

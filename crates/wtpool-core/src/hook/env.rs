@@ -48,7 +48,7 @@ impl HookEnv {
         processes: Option<PathBuf>,
         var: impl Fn(&str) -> Option<OsString>,
     ) -> Self {
-        let home = dirs::home_folder(var("HOME"), std::env::home_dir);
+        let home = dirs::home_from(&var);
         let state_home = var("XDG_STATE_HOME").map(PathBuf::from);
         let clock = Clock::from_file(clock);
         Self {

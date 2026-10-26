@@ -7,22 +7,26 @@ Allows clippy::indexing_slicing in a product module that lives in a folder named
 diff --git a/crates/wtpool/src/main.rs b/crates/wtpool/src/main.rs
 --- a/crates/wtpool/src/main.rs
 +++ b/crates/wtpool/src/main.rs
-@@ -9,6 +9,7 @@ use wtpool_core::{AbsolutePath, Config, Error, Pool, RefArgs, Report, Settings, Slot
- use version::{BUILD, version_text};
- 
+@@ -20,6 +20,7 @@ mod help;
  mod hook;
+ mod job;
+ mod table;
 +mod target;
+ mod text;
  mod version;
  
- const HELP: &str = "\
-@@ -328,6 +329,7 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
-     let action = match cli.command {
-         _ if cli.help => Action::Help,
-         _ if cli.version => {
+@@ -139,7 +140,10 @@ fn main() -> ExitCode {
+ fn run(argv: &[OsString], terminal: &mut Terminal) -> Result<(), Failure> {
+     match args::parse(argv)? {
+         Action::Help => terminal.out(HELP),
+-        Action::Version => terminal.out(&version_text(&BUILD)),
++        Action::Version => {
 +            let _ = target::first(&["wtpool"]);
-             terminal.out(&version_text(&BUILD));
-             return Ok(());
-         }
++            terminal.out(&version_text(&BUILD));
++        }
+         Action::HookEvent => hook::run_hook(),
+         Action::HookPolicy => hook::run_policy(),
+         Action::HookInstall => {
 diff --git a/crates/wtpool/src/target/mod.rs b/crates/wtpool/src/target/mod.rs
 new file mode 100644
 --- /dev/null

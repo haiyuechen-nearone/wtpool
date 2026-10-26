@@ -114,6 +114,7 @@ mod tests {
     #[case::every_layer_without_only(None, "static", true)]
     #[case::a_static_check_no_registry_lists(Some("static:ascii_bundles"), "static", true)]
     #[case::eslint(Some("static:eslint"), "static", true)]
+    #[case::prettier(Some("static:prettier"), "static", true)]
     #[case::stylelint(Some("static:stylelint"), "static", true)]
     #[case::no_other_layer(Some("static:ascii_bundles"), "render", false)]
     #[case::a_rust_check_the_part_runs(Some("static:fmt"), "static", false)]

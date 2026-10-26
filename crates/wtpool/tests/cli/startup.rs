@@ -5,10 +5,12 @@ use std::process::Command;
 
 use rstest::rstest;
 
+#[cfg(target_os = "macos")]
+use crate::support::must_run_on_a_terminal;
 use crate::support::{Outcome, Sandbox, must_outcome};
 
 const HELP: &str = "\
-wtpool — git worktree pool: one foreground worktree you live in, N background
+wtpool - git worktree pool: one foreground worktree you live in, N background
 slots agents park branches in.
 
   wtpool ls                  what is parked where
@@ -435,5 +437,39 @@ fn hook_install__should_refuse_a_build_under_target() {
         outcome.stderr.contains("is a build under a target folder"),
         "{}",
         outcome.stderr
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn errors__should_be_coloured_on_a_terminal() {
+    // Given
+    let sandbox = Sandbox::must_new_empty();
+
+    // When
+    let printed = must_run_on_a_terminal(&sandbox, &["frobnicate"], None, None);
+
+    // Then
+    assert!(
+        printed
+            .ends_with("\x1b[31mwtpool:\x1b[0m unknown command 'frobnicate'; try: wtpool help\n"),
+        "{printed:?}"
+    );
+}
+
+#[test]
+fn errors__should_show_controls_as_escapes() {
+    // Given
+    let sandbox = Sandbox::must_new_empty();
+
+    // When
+    let outcome = sandbox.must_run(&["frob\u{1b}]52;c;aGk=\u{7}\u{202e}"]);
+
+    // Then
+    assert_eq!(
+        outcome,
+        Outcome::failed(
+            "wtpool: unknown command 'frob\\u{001B}]52;c;aGk=\\u{0007}\\u{202E}'; try: wtpool help\n"
+        )
     );
 }

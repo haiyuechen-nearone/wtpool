@@ -100,7 +100,6 @@ fn enforce_from_str__should_take_the_name_the_config_writes(
 
     // Then
     assert_eq!(enforce, expected);
-    assert_eq!(Enforce::from_name(name), expected.ok());
 }
 
 #[test]

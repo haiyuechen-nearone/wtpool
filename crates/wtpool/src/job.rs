@@ -5,19 +5,19 @@ mod listing;
 mod settings;
 
 use std::ffi::OsString;
+use std::fmt;
 use std::io::{self, Write};
 use std::num::NonZeroUsize;
 use std::process::ExitCode;
 
 use wtpool_core::clock::{Clock, ReadClock as _};
-use wtpool_core::heavy::Suggestions;
+use wtpool_core::heavy::{InvalidPattern, Suggestions};
 use wtpool_core::jobs::{
-    JOB_VARIABLE, JobCommand, JobContext, JobError, JobListing, JobPaths, run_job,
+    EditError, InvalidEnforce, InvalidLimit, JOB_VARIABLE, JobCommand, JobContext, JobError,
+    JobListing, JobPaths, MachineConfigError, run_job,
 };
 use wtpool_core::processes::{ProcessTable, SystemProcesses};
-use wtpool_core::{RepositoryFiles, RepositoryHeavy};
-
-use settings::Refusal;
+use wtpool_core::{Error, RepositoryFiles, RepositoryHeavy};
 
 use crate::text::visible;
 use crate::verify_files;
@@ -36,46 +36,77 @@ const OWN_FAILURE: u8 = 125;
 
 /// A `wtpool job` command line, checked.
 #[derive(Debug, PartialEq, Eq)]
-enum JobAction {
+pub enum JobAction {
     Run(JobCommand),
     List { json: bool },
     Settings(settings::Command),
 }
 
-/// Runs `wtpool job` with `args`, the arguments after `job`.
-pub fn main(args: &[OsString]) -> ExitCode {
-    let action = match parse(args) {
-        Ok(action) => action,
-        Err(Refusal::Usage) => {
-            let _ = writeln!(std::io::stderr().lock(), "{USAGE}");
-            return ExitCode::from(OWN_FAILURE);
-        }
-        Err(Refusal::Value(message)) => {
-            fail(&message);
-            return ExitCode::from(OWN_FAILURE);
-        }
-    };
-    let outcome = match action {
-        JobAction::Run(command) => run(&command),
-        JobAction::List { json } => list(json),
-        JobAction::Settings(command) => settings::run(command).map(|printed| {
-            out(&printed.out);
-            for note in &printed.notes {
-                fail(note);
-            }
-            0
-        }),
-    };
-    match outcome {
-        Ok(code) => ExitCode::from(code),
-        Err(message) => {
-            fail(&message);
-            ExitCode::from(OWN_FAILURE)
+/// Everything `wtpool job` stops for. [`report`] prints it as `wtpool job: <line>` and exits
+/// [`OWN_FAILURE`], except [`JobCliError::Usage`], answered by the usage alone, and
+/// [`JobCliError::CommandFailed`], printed as nothing.
+#[derive(Debug)]
+#[must_use]
+pub enum JobCliError {
+    Usage,
+    Limit {
+        value: String,
+        error: InvalidLimit,
+    },
+    Enforce {
+        value: String,
+        error: InvalidEnforce,
+    },
+    Pattern(InvalidPattern),
+    Job(JobError),
+    Config(MachineConfigError),
+    Edit(EditError),
+    /// The repository `WTPOOL_FOREGROUND` or the working folder names cannot be read.
+    Repository(Error),
+    /// `--repo` outside any repository.
+    NoRepository,
+    /// The working folder of a job cannot be read.
+    NoWorkingFolder(io::Error),
+    /// The job's command failed after printing its own error. `wtpool job` exits with its status
+    /// and adds nothing.
+    CommandFailed(u8),
+}
+
+impl fmt::Display for JobCliError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Usage => f.write_str(USAGE),
+            Self::Limit { value, error } => write!(f, "limit {value:?}: {error}, or default"),
+            Self::Enforce { value, error } => write!(f, "enforce {value:?}: {error}, or default"),
+            Self::Pattern(error) => error.fmt(f),
+            Self::Job(error) => error.fmt(f),
+            Self::Config(error) => error.fmt(f),
+            Self::Edit(error) => error.fmt(f),
+            Self::Repository(error) => f.write_str(&error.messages().join("; ")),
+            Self::NoRepository => f.write_str(
+                "no repository: --repo edits the wtpool.toml of the repository WTPOOL_FOREGROUND \
+                 names, else of the one you are in",
+            ),
+            Self::NoWorkingFolder(error) => write!(f, "cannot tell the working folder: {error}"),
+            Self::CommandFailed(code) => write!(f, "the command exited with status {code}"),
         }
     }
 }
 
-fn parse(args: &[OsString]) -> Result<JobAction, Refusal> {
+impl From<JobError> for JobCliError {
+    fn from(error: JobError) -> Self {
+        Self::Job(error)
+    }
+}
+
+impl From<EditError> for JobCliError {
+    fn from(error: EditError) -> Self {
+        Self::Edit(error)
+    }
+}
+
+/// The action `args`, the arguments after `job`, ask for.
+pub fn parse(args: &[OsString]) -> Result<JobAction, JobCliError> {
     let words: Vec<Option<&str>> = args.iter().map(|arg| arg.to_str()).collect();
     match words.as_slice() {
         [Some("ls")] => Ok(JobAction::List { json: false }),
@@ -83,7 +114,9 @@ fn parse(args: &[OsString]) -> Result<JobAction, Refusal> {
         [Some(setting @ ("limit" | "enforce" | "heavy")), rest @ ..] => {
             settings::parse(setting, rest).map(JobAction::Settings)
         }
-        _ => parse_run(args).map(JobAction::Run).ok_or(Refusal::Usage),
+        _ => parse_run(args)
+            .map(JobAction::Run)
+            .ok_or(JobCliError::Usage),
     }
 }
 
@@ -108,10 +141,41 @@ fn parse_run(args: &[OsString]) -> Option<JobCommand> {
     })
 }
 
-fn run(command: &JobCommand) -> Result<u8, String> {
+/// Runs `action`. A job's command that fails ends in [`JobCliError::CommandFailed`].
+pub fn run(action: JobAction) -> Result<(), JobCliError> {
+    match action {
+        JobAction::Run(command) => match run_command(&command)? {
+            0 => Ok(()),
+            code => Err(JobCliError::CommandFailed(code)),
+        },
+        JobAction::List { json } => list(json),
+        JobAction::Settings(command) => {
+            let printed = settings::run(command)?;
+            out(&printed.out);
+            for note in &printed.notes {
+                fail(note);
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Prints `error` as `wtpool job` reports its own failures, and gives the exit code.
+pub fn report(error: &JobCliError) -> ExitCode {
+    match error {
+        JobCliError::Usage => {
+            let _ = writeln!(std::io::stderr().lock(), "{USAGE}");
+        }
+        JobCliError::CommandFailed(code) => return ExitCode::from(*code),
+        _ => fail(&error.to_string()),
+    }
+    ExitCode::from(OWN_FAILURE)
+}
+
+fn run_command(command: &JobCommand) -> Result<u8, JobCliError> {
     let (clock, _) = verify_files();
     let clock = Clock::from_file(clock);
-    let cwd = std::env::current_dir().unwrap_or_default();
+    let cwd = std::env::current_dir().map_err(JobCliError::NoWorkingFolder)?;
     let repository = this_repository()?.unwrap_or_default().patterns;
     let context = JobContext {
         paths: paths()?,
@@ -123,9 +187,9 @@ fn run(command: &JobCommand) -> Result<u8, String> {
         processes: &SystemProcesses,
     };
     let mut notes = VisibleLines::new(std::io::stderr());
-    let ended = run_job(command, &context, &mut notes).map_err(|error| error.to_string());
+    let ended = run_job(command, &context, &mut notes);
     let _ = notes.flush();
-    ended
+    Ok(ended?)
 }
 
 /// A writer that passes each line on as [`visible`] shows it, so a program name or an error
@@ -170,7 +234,7 @@ impl<W: Write> Write for VisibleLines<W> {
     }
 }
 
-fn list(json: bool) -> Result<u8, String> {
+fn list(json: bool) -> Result<(), JobCliError> {
     let (clock, processes) = verify_files();
     let clock = Clock::from_file(clock);
     let repository = this_repository()?.unwrap_or_default();
@@ -189,35 +253,35 @@ fn list(json: bool) -> Result<u8, String> {
         now,
     );
     let text = if json {
-        listing.to_json()
+        listing::json(&listing)
     } else {
         listing::text(&listing, now)
     };
     out(&text);
-    Ok(0)
+    Ok(())
 }
 
 /// The repository `WTPOOL_FOREGROUND` names, else the one holding the current folder, found
 /// without git.
-fn repository_files() -> Result<Option<RepositoryFiles>, String> {
+fn repository_files() -> Result<Option<RepositoryFiles>, JobCliError> {
     let cwd = std::env::current_dir().ok();
     RepositoryFiles::find(&|name| std::env::var_os(name), cwd.as_deref())
-        .map_err(|error| error.messages().join("; "))
+        .map_err(JobCliError::Repository)
 }
 
 /// The heavy patterns of [`repository_files`]'s `wtpool.toml`, and its marker folder.
-fn this_repository() -> Result<Option<RepositoryHeavy>, String> {
+fn this_repository() -> Result<Option<RepositoryHeavy>, JobCliError> {
     let Some(files) = repository_files()? else {
         return Ok(None);
     };
     files
         .read(&|name| std::env::var_os(name))
         .map(Some)
-        .map_err(|error| error.messages().join("; "))
+        .map_err(JobCliError::Repository)
 }
 
-fn paths() -> Result<JobPaths, String> {
-    JobPaths::from_env(|name| std::env::var_os(name)).map_err(|error: JobError| error.to_string())
+fn paths() -> Result<JobPaths, JobCliError> {
+    Ok(JobPaths::from_env(|name| std::env::var_os(name))?)
 }
 
 /// The cores the default limit is a quarter of: those the system lets this process use, or in
@@ -269,7 +333,7 @@ mod tests {
         let action = parse(&args(words));
 
         // Then
-        assert_eq!(action, Err(Refusal::Usage));
+        assert!(matches!(action, Err(JobCliError::Usage)), "{action:?}");
     }
 
     #[test]
@@ -281,13 +345,13 @@ mod tests {
 
         // Then
         assert_eq!(
-            action,
-            Ok(JobAction::Run(JobCommand {
+            action.unwrap(),
+            JobAction::Run(JobCommand {
                 program: OsString::from("cargo"),
                 args: args(&["--", "-x"]),
                 label: Some("unit".to_owned()),
                 quiet: true,
-            }))
+            })
         );
     }
 
@@ -302,7 +366,31 @@ mod tests {
         let action = parse(&args(words));
 
         // Then
-        assert_eq!(action, Ok(expected));
+        assert_eq!(action.unwrap(), expected);
+    }
+
+    #[rstest]
+    #[case::limit(
+        JobCliError::Limit { value: "0".to_owned(), error: InvalidLimit },
+        "limit \"0\": the limit is a whole number from 1 to 64, or default"
+    )]
+    #[case::enforce(
+        JobCliError::Enforce { value: "strict".to_owned(), error: InvalidEnforce },
+        "enforce \"strict\": the policy is off, warn or require, or default"
+    )]
+    #[case::no_repository(
+        JobCliError::NoRepository,
+        "no repository: --repo edits the wtpool.toml of the repository WTPOOL_FOREGROUND names, else of the one you are in"
+    )]
+    fn job_cli_error__should_name_the_value_and_the_way_out(
+        #[case] error: JobCliError,
+        #[case] expected: &str,
+    ) {
+        // When
+        let shown = error.to_string();
+
+        // Then
+        assert_eq!(shown, expected);
     }
 
     fn shown(writes: &[&[u8]]) -> String {
