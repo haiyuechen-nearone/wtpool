@@ -5,7 +5,7 @@ use super::adapter::WaitingTools;
 use super::input::{CallFacts, Event};
 use super::record::{
     Action, Call, Ended, HarnessProcess, MAX_DONE_IDS, MAX_IN_FLIGHT, MAX_SUBAGENTS, Record,
-    SubagentTitle, Title, TitleBy, Wait,
+    SubagentTitle, Title, TitleBy, Wait, push_bounded,
 };
 use crate::activity::{CallId, Harness, PlacedBy, RECORD_VERSION, State, WaitReason};
 
@@ -115,13 +115,7 @@ pub fn apply(current: Option<&Record>, event: &Event, change: &Change) -> Record
         }
         Event::Notified(reason) => {
             if record.waiting.is_none() {
-                record.waiting = Some(Wait {
-                    reason: *reason,
-                    tool: None,
-                    target: None,
-                    input_hash: None,
-                    call: None,
-                });
+                record.waiting = Some(Wait::notified(*reason));
                 state = State::Waiting;
             }
         }
@@ -277,10 +271,7 @@ fn retitle(record: &mut Record, titles: &Titles) {
 /// past [`MAX_SUBAGENTS`].
 fn remember(subagents: &mut Vec<SubagentTitle>, subagent: &SubagentTitle) {
     subagents.retain(|known| known.agent_id != subagent.agent_id);
-    subagents.push(subagent.clone());
-    while subagents.len() > MAX_SUBAGENTS {
-        subagents.remove(0);
-    }
+    push_bounded(subagents, subagent.clone(), MAX_SUBAGENTS);
 }
 
 fn action_of(call: &CallFacts) -> Action {
@@ -298,17 +289,15 @@ fn add_call(record: &mut Record, call: &CallFacts, now: &str) {
     if is_done(&record.done_ids, id) || record.in_flight.iter().any(|c| c.id == id.as_str()) {
         return;
     }
-    record.in_flight.push(Call {
+    let flying = Call {
         id: id.as_str().to_owned(),
         tool: call.tool.clone(),
         kind: Some(call.kind),
         target: call.target.clone(),
         since: now.to_owned(),
         input_hash: Some(call.input_hash.clone()),
-    });
-    while record.in_flight.len() > MAX_IN_FLIGHT {
-        record.in_flight.remove(0);
-    }
+    };
+    push_bounded(&mut record.in_flight, flying, MAX_IN_FLIGHT);
 }
 
 /// The state after a [`Event::CallStart`]: a call that asks the user (a question or plan, as
@@ -325,19 +314,17 @@ fn pre(record: &mut Record, call: &CallFacts, waiting_tools: WaitingTools) -> St
         && record.waiting.is_none()
         && !ended
     {
-        record.waiting = Some(Wait {
+        record.waiting = Some(Wait::on_call(
             reason,
-            tool: Some(call.tool.clone()),
-            target: Some(call.target.clone()),
-            input_hash: Some(call.input_hash.clone()),
-            call: call.id.as_ref().map(|id| id.as_str().to_owned()),
-        });
+            &call.tool,
+            &call.target,
+            Some(&call.input_hash),
+            call.id.as_ref().map(CallId::as_str),
+        ));
         return State::Waiting;
     }
     if let Some(wait) = &mut record.waiting
-        && wait.call.is_none()
-        && wait.tool.as_deref() == Some(call.tool.as_str())
-        && wait.input_hash.as_deref() == Some(call.input_hash.as_str())
+        && is_unbound_wait_for(wait, call)
         && let Some(id) = call.id.as_ref().filter(|id| !is_done(&record.done_ids, id))
     {
         wait.call = Some(id.as_str().to_owned());
@@ -358,25 +345,21 @@ fn ask_permission(record: &mut Record, call: &CallFacts) {
     let bound = record
         .in_flight
         .iter()
-        .find(|c| c.tool == call.tool && c.input_hash.as_deref() == Some(call.input_hash.as_str()))
-        .map(|c| c.id.clone());
-    record.waiting = Some(Wait {
-        reason: WaitReason::Permission,
-        tool: Some(call.tool.clone()),
-        target: Some(call.target.clone()),
-        input_hash: Some(call.input_hash.clone()),
-        call: bound,
-    });
+        .find(|c| same_tool_and_input(Some(&c.tool), c.input_hash.as_deref(), call));
+    record.waiting = Some(Wait::on_call(
+        WaitReason::Permission,
+        &call.tool,
+        &call.target,
+        Some(&call.input_hash),
+        bound.map(|c| c.id.as_str()),
+    ));
 }
 
 /// Ends the call `id`: out of `in_flight`, into `done_ids`, and its wait ends (H12, H13).
 fn end_call(record: &mut Record, id: &str) {
     record.in_flight.retain(|call| call.id != id);
     if !record.done_ids.iter().any(|done| done == id) {
-        record.done_ids.push(id.to_owned());
-        while record.done_ids.len() > MAX_DONE_IDS {
-            record.done_ids.remove(0);
-        }
+        push_bounded(&mut record.done_ids, id.to_owned(), MAX_DONE_IDS);
     }
     if record
         .waiting
@@ -392,11 +375,11 @@ fn end_listed(record: &mut Record, call: &CallFacts) {
     if let Some(id) = &call.id {
         end_call(record, id.as_str());
     }
-    if record.waiting.as_ref().is_some_and(|wait| {
-        wait.call.is_none()
-            && wait.tool.as_deref() == Some(call.tool.as_str())
-            && wait.input_hash.as_deref() == Some(call.input_hash.as_str())
-    }) {
+    if record
+        .waiting
+        .as_ref()
+        .is_some_and(|wait| is_unbound_wait_for(wait, call))
+    {
         record.waiting = None;
     }
 }
@@ -409,13 +392,13 @@ fn wait_on_a_question(record: &mut Record, was_waiting: bool, waiting_tools: Wai
     }
     record.waiting = record.in_flight.iter().find_map(|call| {
         let reason = waiting_tools.reason(&call.tool)?;
-        Some(Wait {
+        Some(Wait::on_call(
             reason,
-            tool: Some(call.tool.clone()),
-            target: Some(call.target.clone()),
-            input_hash: call.input_hash.clone(),
-            call: Some(call.id.clone()),
-        })
+            &call.tool,
+            &call.target,
+            call.input_hash.as_deref(),
+            Some(&call.id),
+        ))
     });
 }
 
@@ -439,6 +422,17 @@ fn end_turn(record: &mut Record) {
 /// `true` when `done_ids` holds the call `id`, so it ended already (H12).
 fn is_done(done_ids: &[String], id: &CallId) -> bool {
     done_ids.iter().any(|done| done == id.as_str())
+}
+
+/// `true` when `wait` is bound to no call yet and names the tool and input of `call`.
+fn is_unbound_wait_for(wait: &Wait, call: &CallFacts) -> bool {
+    wait.call.is_none()
+        && same_tool_and_input(wait.tool.as_deref(), wait.input_hash.as_deref(), call)
+}
+
+/// `true` when `tool` and `input_hash` are those of `call`.
+fn same_tool_and_input(tool: Option<&str>, input_hash: Option<&str>, call: &CallFacts) -> bool {
+    tool == Some(call.tool.as_str()) && input_hash == Some(call.input_hash.as_str())
 }
 
 fn active_state(record: &Record) -> State {

@@ -1,6 +1,6 @@
 use std::io;
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 /// A path that means the same directory whatever the current directory is, so
 /// git run with `-C` elsewhere sees the same place as this process.
@@ -79,6 +79,18 @@ fn resolved(path: &Path) -> Option<PathBuf> {
 #[must_use]
 pub(crate) fn comparable(path: &Path) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// `true` when `path` is absolute with only normal components after its root: no `.` or `..`.
+#[must_use]
+pub fn is_plain_absolute(path: &Path) -> bool {
+    path.is_absolute()
+        && path.components().all(|component| {
+            matches!(
+                component,
+                Component::Prefix(_) | Component::RootDir | Component::Normal(_)
+            )
+        })
 }
 
 #[cfg(test)]

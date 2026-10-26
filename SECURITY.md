@@ -42,8 +42,10 @@ agent does:
   Malformed input writes nothing (H5). Session and agent ids must match a fixed pattern, or
   nothing is written (H17).
 - Apart from its log (H23), it writes only into an existing `wtpool-activity/` folder that is a
-  real folder, not a symlink, and never creates it (H6). Each write goes to a new temporary file,
-  opened without following symlinks, then renamed over the record (H18).
+  real folder, not a symlink, and never creates it (H6). On Windows, where wtpool cannot read a
+  folder's owner, it does not check that `wtpool-activity/` belongs to you; it relies on the
+  folder's permissions. Each write goes to a new temporary file, opened without following
+  symlinks, then renamed over the record (H18).
 - Stored strings lose control, bidi and zero width characters and keep at most 80 characters
   (H15). Worktree paths and the folder a session started in are the exception: they are stored
   as they are.

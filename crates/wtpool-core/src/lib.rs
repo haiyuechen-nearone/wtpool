@@ -14,11 +14,12 @@ pub mod clock;
 mod config;
 mod config_file;
 mod error;
-mod fs;
+mod git;
 mod github;
 pub mod hook;
 mod names;
 mod paths;
+pub mod platform;
 mod pool;
 pub mod processes;
 mod refs;
@@ -32,16 +33,16 @@ mod worktree;
 mod worktree_state;
 
 pub use config::{Config, CopyPath, InvalidCopyPath, InvalidSlotCount, SlotCount, SlotSetup};
-pub use error::Error;
+pub use error::{Error, GitError, Refusal, SettingsError};
+pub use git::GitMode;
 pub use github::{GhCli, PrView, ViewPr, ViewPrError};
 pub use names::{
     BranchName, InvalidBranchName, InvalidRemoteName, InvalidSlotName, ObjectId, PrNumber,
     RemoteName, RepoSlug, SlotName, SlotPrefix,
 };
-pub use paths::AbsolutePath;
+pub use paths::{AbsolutePath, is_plain_absolute};
 pub use pool::{AgentGuard, Pool};
 pub use refs::{RefArgs, SyncMode, Target};
 pub use report::Report;
-pub use run::read_only_git;
 pub use settings::{Setting, Settings, Source};
 pub use worktree_state::{Operation, Role, Row, State, Uncommitted, Unreferenced, Upstream};

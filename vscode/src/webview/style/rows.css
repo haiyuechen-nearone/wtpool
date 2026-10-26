@@ -1,0 +1,102 @@
+/* Rows. Hover and selection follow VS Code's lists: the high contrast themes have no hover or
+ * selection background and mark both with a contrastActiveBorder outline instead. */
+
+.row {
+  cursor: default;
+}
+
+.row:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.row[aria-selected="true"] {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+  outline: 1px dotted var(--vscode-contrastActiveBorder, transparent);
+  outline-offset: -1px;
+}
+
+.row:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+body.vscode-high-contrast .row:hover:not(:focus) {
+  outline: 1px dashed var(--vscode-contrastActiveBorder);
+  outline-offset: -1px;
+}
+
+.worktree,
+.branch {
+  font-weight: 500;
+}
+
+.role {
+  margin-left: 3px;
+  padding: 0 4px;
+  border: 1px solid currentcolor;
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 14px;
+  vertical-align: 1px;
+}
+
+.detached,
+.last .line + .line,
+.state-quiet,
+.state-idle,
+.state-done {
+  color: var(--vscode-descriptionForeground);
+}
+
+.state-waiting > bdi:first-child {
+  color: var(--vscode-list-warningForeground);
+}
+
+.last {
+  text-align: right;
+}
+
+/* Activity: an icon and a word per value, coloured by group. */
+
+.group-attention .activity {
+  color: var(--vscode-list-warningForeground);
+  font-weight: 600;
+}
+
+.group-active .activity {
+  color: var(--vscode-textLink-foreground);
+}
+
+.group-quiet .activity {
+  color: var(--vscode-descriptionForeground);
+}
+
+.group-problem .activity {
+  color: var(--vscode-list-errorForeground);
+}
+
+.icon {
+  display: inline-block;
+  width: 16px;
+  margin-right: 5px;
+  text-align: center;
+}
+
+.group-attention > td:first-child {
+  box-shadow: inset 3px 0 0 var(--vscode-list-warningForeground);
+}
+
+/* A selected row's muted text takes the selection foreground, as in VS Code's lists, since
+ * descriptionForeground does not reach 4.5:1 on every selection background. */
+.row[aria-selected="true"] .role,
+.row[aria-selected="true"] .detached,
+.row[aria-selected="true"] .last .line + .line,
+.row[aria-selected="true"] .state-quiet,
+.row[aria-selected="true"] .state-idle,
+.row[aria-selected="true"] .state-done,
+.row[aria-selected="true"].group-quiet .activity {
+  color: inherit;
+}

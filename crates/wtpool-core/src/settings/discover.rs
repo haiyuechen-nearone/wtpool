@@ -4,7 +4,8 @@ use std::ffi::OsStr;
 
 use crate::config::Key;
 use crate::config_file;
-use crate::error::Error;
+use crate::error::{Error, SettingsError};
+use crate::git::GitMode;
 use crate::names::SlotPrefix;
 use crate::paths::{self, AbsolutePath};
 use crate::repository::Repository;
@@ -40,13 +41,16 @@ impl Main {
     pub(super) fn worktree(&self, key: Key) -> Result<&AbsolutePath, Error> {
         match self {
             Main::Worktree(path) => Ok(path),
-            Main::Bare { path, file } => Err(Error::BareRepository {
+            Main::Bare { path, file } => Err(SettingsError::BareRepository {
                 repository: path.to_path_buf(),
                 file: file.to_path_buf(),
                 key: key.name(),
                 var: key.var(),
-            }),
-            Main::Unknown(foreground) => Err(Error::NoRepositoryAt(foreground.to_path_buf())),
+            }
+            .into()),
+            Main::Unknown(foreground) => {
+                Err(SettingsError::NoRepositoryAt(foreground.to_path_buf()).into())
+            }
         }
     }
 
@@ -82,9 +86,10 @@ pub(super) fn prefix_of(main: &AbsolutePath) -> Result<SlotPrefix, Error> {
     })
 }
 
-/// The repository that `WTPOOL_FOREGROUND` names as `foreground`, if any.
-pub(super) fn named(foreground: &AbsolutePath) -> Result<Found, Error> {
-    Ok(match Repository::at(foreground)? {
+/// The repository that `WTPOOL_FOREGROUND` names as `foreground`, if any, found by git in
+/// `git_mode`.
+pub(super) fn named(foreground: &AbsolutePath, git_mode: GitMode) -> Result<Found, Error> {
+    Ok(match Repository::at(foreground, git_mode)? {
         Some(repository) => Found {
             main: main_of(&repository)?,
             repository: Some(repository),
@@ -96,7 +101,7 @@ pub(super) fn named(foreground: &AbsolutePath) -> Result<Found, Error> {
     })
 }
 
-/// The repository holding `cwd`, refused when there is none.
+/// The repository holding `cwd`, found by git in `git_mode`, refused when there is none.
 ///
 /// A bare repository that holds `cwd` and lies inside a worktree of another repository is
 /// refused too, before its `wtpool.toml` is read: a clone can carry one as plain files, and
@@ -105,14 +110,16 @@ pub(super) fn named(foreground: &AbsolutePath) -> Result<Found, Error> {
 pub(super) fn enclosing(
     cwd: Option<&AbsolutePath>,
     ceiling: Option<&OsStr>,
+    git_mode: GitMode,
 ) -> Result<Found, Error> {
     let Some(cwd) = cwd else {
-        return Err(Error::NoRepository);
+        return Err(SettingsError::NoRepository.into());
     };
-    let repository = Repository::enclosing(cwd, ceiling)?.ok_or(Error::NoRepository)?;
+    let repository =
+        Repository::enclosing(cwd, ceiling, git_mode)?.ok_or(SettingsError::NoRepository)?;
     let main = main_of(&repository)?;
-    if is_embedded(&repository, &main, cwd, ceiling)? {
-        return Err(Error::RepositoryUnknown(cwd.to_path_buf()));
+    if is_embedded(&repository, &main, cwd, ceiling, git_mode)? {
+        return Err(SettingsError::RepositoryUnknown(cwd.to_path_buf()).into());
     }
     Ok(Found {
         repository: Some(repository),
@@ -127,12 +134,13 @@ fn is_embedded(
     main: &Main,
     cwd: &AbsolutePath,
     ceiling: Option<&OsStr>,
+    git_mode: GitMode,
 ) -> Result<bool, Error> {
     let common = repository.common_dir();
     if !main.is_git_dir(common) || !paths::comparable(cwd).starts_with(paths::comparable(common)) {
         return Ok(false);
     }
-    let outer = Repository::enclosing(&common.parent_dir(), ceiling)?;
+    let outer = Repository::enclosing(&common.parent_dir(), ceiling, git_mode)?;
     Ok(outer.is_some_and(|outer| outer.common_dir() != common))
 }
 

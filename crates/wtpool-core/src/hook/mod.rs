@@ -9,6 +9,8 @@ mod bash;
 mod call_input;
 mod env;
 mod event;
+#[cfg(test)]
+mod fixture;
 mod gc;
 mod input;
 mod install;
@@ -20,7 +22,6 @@ mod store;
 mod tasks;
 pub mod text;
 
-pub use crate::fs::{home_folder, open_without_following};
 pub use adapter::{Adapter, TranscriptTitles, WaitingTools};
 pub use call_input::CallInput;
 pub use env::HookEnv;

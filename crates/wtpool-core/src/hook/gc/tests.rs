@@ -1,21 +1,23 @@
 use rstest::rstest;
 
 use super::super::record::{HarnessProcess, Record};
-use super::super::store::tests::{eventually, must_record};
 use super::*;
+use crate::hook::fixture::{self, NOW, eventually, later, must_activity};
 use crate::processes::ProcessFile;
 
-const NOW: Timestamp = Timestamp::from_seconds(1_792_497_600);
 const CLAUDE: &str =
     r#"{"pid":7001,"ppid":1,"started":"2026-10-20T11:00:00Z","name":"claude","cwd":"/"}"#;
 
-/// The time `seconds` after [`NOW`], before it when negative.
-fn later(seconds: i64) -> Timestamp {
-    Timestamp::from_seconds(NOW.seconds() + seconds)
+/// An empty `wtpool-activity/` and a process table that lists the live claude.
+fn must_activity_with_claude() -> (tempfile::TempDir, Activity, ProcessFile) {
+    let (dir, activity) = must_activity();
+    let procs = dir.path().join("procs");
+    std::fs::write(&procs, CLAUDE).unwrap();
+    (dir, activity, ProcessFile::new(procs))
 }
 
 fn record(session: &str, agent: Option<&str>, state: State, age: i64, alive: bool) -> Record {
-    let mut record = must_record(session);
+    let mut record = fixture::record(session);
     record.agent_id = agent.map(str::to_owned);
     record.state = state;
     record.updated = later(-age).to_rfc3339();
@@ -37,11 +39,7 @@ fn collect__should_delete_only_old_dead_or_ended_records(
     #[case] kept: bool,
 ) {
     // Given
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir(dir.path().join("wtpool-activity")).unwrap();
-    let procs = dir.path().join("procs");
-    std::fs::write(&procs, CLAUDE).unwrap();
-    let activity = Activity::open(dir.path()).unwrap();
+    let (dir, activity, table) = must_activity_with_claude();
     let stem = match &record.agent_id {
         Some(agent) => format!("{}.{agent}", record.session_id),
         None => record.session_id.clone(),
@@ -50,7 +48,7 @@ fn collect__should_delete_only_old_dead_or_ended_records(
     std::fs::write(dir.path().join("wtpool-activity/orphan.json.lock"), "").unwrap();
 
     // When
-    let collected = collect(&activity, NOW, &ProcessFile::new(procs), None);
+    let collected = collect(&activity, NOW, &table, None);
 
     // Then
     assert_eq!(activity.read(&stem).is_some(), kept);
@@ -61,11 +59,7 @@ fn collect__should_delete_only_old_dead_or_ended_records(
 #[test]
 fn collect__should_keep_the_newest_done_subagent_of_each_worktree() {
     // Given
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir(dir.path().join("wtpool-activity")).unwrap();
-    let procs = dir.path().join("procs");
-    std::fs::write(&procs, CLAUDE).unwrap();
-    let activity = Activity::open(dir.path()).unwrap();
+    let (_dir, activity, table) = must_activity_with_claude();
     for (agent, worktree, age) in [
         ("a1", "/p/wt1", 30),
         ("a2", "/p/wt1", 20),
@@ -77,7 +71,7 @@ fn collect__should_keep_the_newest_done_subagent_of_each_worktree() {
     }
 
     // When
-    let collected = collect(&activity, NOW, &ProcessFile::new(procs), None);
+    let collected = collect(&activity, NOW, &table, None);
 
     // Then
     assert_eq!(
@@ -96,17 +90,13 @@ fn collect__should_keep_the_newest_done_subagent_of_each_worktree() {
 
 /// A pool of `count` sessions that ended 8 days ago, and the table of their live claude.
 fn ended_week_old(count: usize) -> (tempfile::TempDir, Activity, ProcessFile) {
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir(dir.path().join("wtpool-activity")).unwrap();
-    let procs = dir.path().join("procs");
-    std::fs::write(&procs, CLAUDE).unwrap();
-    let activity = Activity::open(dir.path()).unwrap();
+    let (dir, activity, table) = must_activity_with_claude();
     for n in 0..count {
         let session = format!("s{n}");
         let ended = record(&session, None, State::Ended, 8 * 86_400, true);
         activity.write(&session, &ended).unwrap();
     }
-    (dir, activity, ProcessFile::new(procs))
+    (dir, activity, table)
 }
 
 #[rstest]

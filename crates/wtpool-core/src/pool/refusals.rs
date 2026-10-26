@@ -3,9 +3,9 @@
 
 use std::path::Path;
 
-use crate::error::Error;
+use crate::error::{Error, Refusal};
+use crate::git::Git;
 use crate::names::{BranchName, ObjectId};
-use crate::run::Git;
 use crate::worktree::{self, Worktree};
 use crate::worktree_state::{Operation, Role, Uncommitted, Unreferenced};
 
@@ -34,7 +34,7 @@ impl WorktreeState {
 
 /// The refusal of the detached slot `name` that `bg` would reuse: uncommitted files first, then
 /// an operation in progress, then commits on no branch.
-pub(super) fn refusal(name: &str, state: &WorktreeState) -> Option<Error> {
+pub(super) fn refusal(name: &str, state: &WorktreeState) -> Option<Refusal> {
     dirty_refusal(name, state.dirty)
         .or_else(|| operation_refusal(name, state.operation))
         .or_else(|| unreferenced_refusal(name, state.unreferenced, state.head_commit.as_ref()))
@@ -42,14 +42,14 @@ pub(super) fn refusal(name: &str, state: &WorktreeState) -> Option<Error> {
 
 /// The refusal of the worktree `name` that `free` would detach. Its commits on no branch stay in
 /// its `HEAD` reflog, so they do not count.
-pub(super) fn detach_refusal(name: &str, state: &WorktreeState) -> Option<Error> {
+pub(super) fn detach_refusal(name: &str, state: &WorktreeState) -> Option<Refusal> {
     dirty_refusal(name, state.dirty).or_else(|| operation_refusal(name, state.operation))
 }
 
 /// The refusal of the worktree `name` that `rm` would remove. A worktree whose directory is
 /// `gone` holds no files to lose, but its `HEAD` reflog may be the last record of commits on no
 /// branch.
-pub(super) fn removal_refusal(name: &str, gone: bool, state: &WorktreeState) -> Option<Error> {
+pub(super) fn removal_refusal(name: &str, gone: bool, state: &WorktreeState) -> Option<Refusal> {
     if gone {
         unreferenced_refusal(name, state.unreferenced, state.head_commit.as_ref())
     } else {
@@ -62,14 +62,14 @@ pub(super) fn foreground_refusal(
     reference: &str,
     name: &str,
     state: &WorktreeState,
-) -> Option<Error> {
+) -> Option<Refusal> {
     let dirty = match state.dirty {
         Uncommitted::Files(0) => None,
-        Uncommitted::Files(count) => Some(Error::ForegroundDirty {
+        Uncommitted::Files(count) => Some(Refusal::ForegroundDirty {
             count,
             reference: reference.to_owned(),
         }),
-        Uncommitted::Unknown => Some(Error::StatusUnknown(name.to_owned())),
+        Uncommitted::Unknown => Some(Refusal::StatusUnknown(name.to_owned())),
     };
     dirty
         .or_else(|| operation_refusal(name, state.operation))
@@ -83,19 +83,19 @@ pub(super) fn release_refusal(
     holder: &Path,
     role: Role,
     state: &WorktreeState,
-) -> Option<Error> {
+) -> Option<Refusal> {
     if role == Role::Unmanaged {
         return Some(held_by_unmanaged(branch, holder));
     }
     let name = worktree::basename(holder);
     let dirty = match state.dirty {
         Uncommitted::Files(0) => None,
-        Uncommitted::Files(count) => Some(Error::HolderDirty {
+        Uncommitted::Files(count) => Some(Refusal::HolderDirty {
             branch: branch.to_string(),
             holder: name.clone(),
             count,
         }),
-        Uncommitted::Unknown => Some(Error::StatusUnknown(name.clone())),
+        Uncommitted::Unknown => Some(Refusal::StatusUnknown(name.clone())),
     };
     dirty.or_else(|| operation_refusal(&name, state.operation))
 }
@@ -106,10 +106,10 @@ pub(super) fn outside_slots_refusal(
     branch: &BranchName,
     holder: &Path,
     role: Role,
-) -> Option<Error> {
+) -> Option<Refusal> {
     match role {
         Role::Slot => None,
-        Role::Foreground => Some(Error::HeldByForeground {
+        Role::Foreground => Some(Refusal::HeldByForeground {
             branch: branch.to_string(),
             path: holder.to_path_buf(),
         }),
@@ -117,30 +117,30 @@ pub(super) fn outside_slots_refusal(
     }
 }
 
-fn held_by_unmanaged(branch: &BranchName, holder: &Path) -> Error {
-    Error::HeldByUnmanaged {
+fn held_by_unmanaged(branch: &BranchName, holder: &Path) -> Refusal {
+    Refusal::HeldByUnmanaged {
         branch: branch.to_string(),
         worktree: worktree::basename(holder),
         path: holder.to_path_buf(),
     }
 }
 
-fn dirty_refusal(name: &str, dirty: Uncommitted) -> Option<Error> {
+fn dirty_refusal(name: &str, dirty: Uncommitted) -> Option<Refusal> {
     match dirty {
         Uncommitted::Files(0) => None,
-        Uncommitted::Files(count) => Some(Error::SlotDirty {
-            slot: name.to_owned(),
+        Uncommitted::Files(count) => Some(Refusal::WorktreeDirty {
+            worktree: name.to_owned(),
             count,
         }),
-        Uncommitted::Unknown => Some(Error::StatusUnknown(name.to_owned())),
+        Uncommitted::Unknown => Some(Refusal::StatusUnknown(name.to_owned())),
     }
 }
 
-fn operation_refusal(name: &str, operation: Operation) -> Option<Error> {
+fn operation_refusal(name: &str, operation: Operation) -> Option<Refusal> {
     if operation == Operation::Unknown {
-        return Some(Error::OperationUnknown(name.to_owned()));
+        return Some(Refusal::OperationUnknown(name.to_owned()));
     }
-    operation.label().map(|label| Error::OperationInProgress {
+    operation.label().map(|label| Refusal::OperationInProgress {
         worktree: name.to_owned(),
         operation: label,
     })
@@ -151,16 +151,16 @@ fn unreferenced_refusal(
     name: &str,
     unreferenced: Unreferenced,
     head: Option<&ObjectId>,
-) -> Option<Error> {
+) -> Option<Refusal> {
     match (unreferenced, head) {
         (Unreferenced::Commits(0), _) => None,
-        (Unreferenced::Commits(count), Some(head)) => Some(Error::Unreferenced {
+        (Unreferenced::Commits(count), Some(head)) => Some(Refusal::Unreferenced {
             worktree: name.to_owned(),
             count,
             head: head.to_string(),
         }),
         (Unreferenced::Commits(_), None) | (Unreferenced::Unknown, _) => {
-            Some(Error::UnreferencedUnknown(name.to_owned()))
+            Some(Refusal::UnreferencedUnknown(name.to_owned()))
         }
     }
 }
@@ -188,7 +188,7 @@ mod tests {
         }
     }
 
-    fn message(refusal: Option<Error>) -> Option<String> {
+    fn message(refusal: Option<Refusal>) -> Option<String> {
         refusal.map(|error| error.to_string())
     }
 

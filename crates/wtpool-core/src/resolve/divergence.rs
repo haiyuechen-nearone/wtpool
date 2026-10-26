@@ -2,9 +2,9 @@
 //! move `--refresh` or `--reset` makes, and the warning about a stale branch.
 
 use crate::error::Error;
+use crate::git::Git;
 use crate::names::{BranchName, ObjectId};
 use crate::refs::SyncMode;
-use crate::run::Git;
 use crate::worktree_state::{Role, Uncommitted};
 
 /// The commits only on the left and only on the right of a `<left>...<right>` range.

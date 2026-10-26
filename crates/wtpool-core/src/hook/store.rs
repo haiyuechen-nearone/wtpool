@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use super::record::Record;
 use crate::activity::{ACTIVITY_DIR, ActorKey, Stem, read_record_file};
+use crate::platform::fs::{open_private, owner, same_file};
 
 /// How often a writer takes the lock again after finding it replaced.
 const LOCK_ATTEMPTS: usize = 64;
@@ -15,7 +16,7 @@ const LOCK_ATTEMPTS: usize = 64;
 #[derive(Debug, Clone)]
 pub struct Activity {
     dir: PathBuf,
-    owner: u32,
+    owner: Option<u32>,
 }
 
 /// The lock of one record, held until dropped.
@@ -26,8 +27,8 @@ pub struct Locked {
 }
 
 impl Activity {
-    /// The folder `<common>/wtpool-activity` when it exists as a real folder, not a symlink (H6).
-    /// It is never created here.
+    /// The folder `<common>/wtpool-activity` when it exists as a real folder, not a symlink. It is
+    /// never created here.
     #[must_use]
     pub fn open(common: &Path) -> Option<Self> {
         let dir = common.join(ACTIVITY_DIR);
@@ -38,11 +39,18 @@ impl Activity {
         })
     }
 
-    /// The user who owns the folder, whom H6 makes the one the hook runs as, and whose
-    /// files a harness's adapter may name (H27).
+    /// The user who owns the folder, the one the hook runs as, whose files a harness's adapter
+    /// may name. `None` where the system tells no owner.
     #[must_use]
-    pub fn owner(&self) -> u32 {
+    pub fn owner(&self) -> Option<u32> {
         self.owner
+    }
+
+    /// Whether the file `meta` describes belongs to the folder's owner. Where the system tells no
+    /// owner, as on Windows, nothing is checked, so the hook still writes there: the folder's
+    /// permissions alone keep other users' files out.
+    fn owns(&self, meta: &Metadata) -> bool {
+        self.owner.is_none() || owner(meta) == self.owner
     }
 
     /// Whether the folder marks a sandbox pool (H6).
@@ -88,18 +96,19 @@ impl Activity {
                 .create(true)
                 .truncate(false),
             path,
-            true,
         )
         .ok()?;
         let held = file.metadata().ok()?;
-        (owner(&held) == self.owner && held.is_file()).then_some(())?;
+        (self.owns(&held) && held.is_file()).then_some(())?;
         if wait {
             file.lock().ok()?;
         } else {
             file.try_lock().ok()?;
         }
         let named = path.symlink_metadata().ok()?;
-        same_file(&named, &held).then(|| Locked {
+        // Where the system tells no file identity, as on Windows, the lock file still in place
+        // counts as the one locked.
+        same_file(&named, &held).unwrap_or(true).then(|| Locked {
             _file: file,
             path: path.to_path_buf(),
         })
@@ -115,11 +124,11 @@ impl Activity {
         for _ in 0..2 {
             let mut options = OpenOptions::new();
             options.read(true).write(true).create(true).truncate(false);
-            let replace = match open_private(&mut options, &path, true) {
+            let replace = match open_private(&mut options, &path) {
                 Ok(file) => {
                     let meta = file.metadata().ok()?;
                     if meta.is_file() {
-                        return (owner(&meta) == self.owner).then_some(file);
+                        return self.owns(&meta).then_some(file);
                     }
                     true
                 }
@@ -154,7 +163,7 @@ impl Activity {
         let _ = std::fs::remove_file(&temp);
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
-        let mut file = open_private(&mut options, &temp, false)?;
+        let mut file = open_private(&mut options, &temp)?;
         let written = file
             .write_all(&text)
             .and_then(|()| std::fs::rename(&temp, self.record_path(stem)));
@@ -218,55 +227,6 @@ impl Activity {
             })
             .collect()
     }
-}
-
-/// Opens `path` with `options`, created with mode 0600, never through a symlink, and with
-/// `nonblocking` never blocking on a FIFO.
-#[cfg(unix)]
-fn open_private(options: &mut OpenOptions, path: &Path, nonblocking: bool) -> io::Result<File> {
-    use std::os::unix::fs::OpenOptionsExt;
-    let flags = if nonblocking {
-        libc::O_NOFOLLOW | libc::O_NONBLOCK
-    } else {
-        libc::O_NOFOLLOW
-    };
-    options.mode(0o600).custom_flags(flags).open(path)
-}
-
-/// Opens `path` with `options`, refusing a symlink, which the open itself cannot do here.
-#[cfg(not(unix))]
-fn open_private(options: &mut OpenOptions, path: &Path, _nonblocking: bool) -> io::Result<File> {
-    if path.symlink_metadata().is_ok_and(|meta| meta.is_symlink()) {
-        return Err(io::Error::other("symlink"));
-    }
-    options.open(path)
-}
-
-/// The user that owns a file.
-#[cfg(unix)]
-fn owner(meta: &Metadata) -> u32 {
-    use std::os::unix::fs::MetadataExt;
-    meta.uid()
-}
-
-/// Without Unix owners every file counts as the user's own.
-#[cfg(not(unix))]
-fn owner(_: &Metadata) -> u32 {
-    0
-}
-
-/// Whether `a` and `b` describe one file, by device and inode.
-#[cfg(unix)]
-fn same_file(a: &Metadata, b: &Metadata) -> bool {
-    use std::os::unix::fs::MetadataExt;
-    a.ino() == b.ino() && a.dev() == b.dev()
-}
-
-/// The standard library tells no file identity here, so a lock file still in place counts as
-/// the one locked.
-#[cfg(not(unix))]
-fn same_file(_: &Metadata, _: &Metadata) -> bool {
-    true
 }
 
 /// `true` for the stem of a record (H17, H25).

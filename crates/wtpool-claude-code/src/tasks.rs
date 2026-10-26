@@ -7,7 +7,7 @@
 //! included. TaskStop, and KillShell before it, stops one. The hook never opens an output file.
 
 use std::ffi::OsStr;
-use std::path::{Component, Path};
+use std::path::Path;
 
 use serde_json::Value;
 use wtpool_core::activity::TaskId;
@@ -127,18 +127,11 @@ pub fn task_file(
 /// invisible characters, and at most [`MAX_TASK_PATH`] bytes long.
 #[must_use]
 pub fn is_task_file(path: &Path, folder: &Path, id: &str) -> bool {
-    let normal = path.components().all(|component| {
-        matches!(
-            component,
-            Component::Prefix(_) | Component::RootDir | Component::Normal(_)
-        )
-    });
     let name = format!("{id}.output");
     let visible = path
         .to_str()
         .is_some_and(|text| text::clean(text, MAX_TASK_PATH) == text);
-    path.is_absolute()
-        && normal
+    wtpool_core::is_plain_absolute(path)
         && visible
         && path.parent() == Some(folder)
         && path.file_name() == Some(OsStr::new(&name))

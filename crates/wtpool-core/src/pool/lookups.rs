@@ -3,12 +3,12 @@
 
 use std::path::Path;
 
-use crate::error::Error;
+use crate::error::{Error, Refusal};
+use crate::git::Git;
 use crate::github::ViewPr;
 use crate::names::{BranchName, SlotName};
 use crate::paths;
 use crate::report::{Discard, Report};
-use crate::run::Git;
 use crate::worktree::{Head, Worktree};
 
 use super::Pool;
@@ -59,15 +59,15 @@ impl<V: ViewPr> Pool<V> {
         Ok(slots)
     }
 
-    pub(crate) fn gone_error(&self, worktree: &Worktree) -> Error {
+    pub(crate) fn gone_error(&self, worktree: &Worktree) -> Refusal {
         let remove = self.remove_arg(worktree);
         match worktree.head() {
-            Head::Branch(branch) => Error::HolderGone {
+            Head::Branch(branch) => Refusal::HolderGone {
                 holder: worktree.name(),
                 branch: branch.clone(),
                 remove,
             },
-            Head::Detached | Head::Unknown => Error::WorktreeGone {
+            Head::Detached | Head::Unknown => Refusal::WorktreeGone {
                 worktree: worktree.name(),
                 remove,
             },
@@ -75,7 +75,7 @@ impl<V: ViewPr> Pool<V> {
     }
 
     pub(super) fn gone_warning(&self, worktree: &Worktree) -> String {
-        Error::WorktreeGone {
+        Refusal::WorktreeGone {
             worktree: worktree.name(),
             remove: self.remove_arg(worktree),
         }

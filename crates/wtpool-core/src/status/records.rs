@@ -15,6 +15,7 @@ use crate::activity::{
     CallKind, Harness, PlacedBy, RECORD_VERSION, Stem, legacy_kind, read_record_file,
 };
 use crate::clock::Timestamp;
+use crate::platform::fs::{self, FileId};
 use crate::processes::RecordedProcess;
 
 /// Only the newest records by modification time count, and older ones of live sessions (S5).
@@ -112,11 +113,11 @@ struct CallFields {
     kind: Option<CallKind>,
 }
 
-/// The file state a record was read at. A change of mode alone keeps the stamp.
+/// The file state a record was read at. A change of mode alone keeps the stamp, and where the
+/// system tells no file id, size and time alone make it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Stamp {
-    device: u64,
-    inode: u64,
+    id: Option<FileId>,
     size: u64,
     modified: (i64, i64),
 }
@@ -297,45 +298,12 @@ pub fn is_record_name(name: &OsStr) -> bool {
         .is_some()
 }
 
-#[cfg(unix)]
-fn stamp(meta: &Metadata) -> Stamp {
-    use std::os::unix::fs::MetadataExt;
-    Stamp {
-        device: meta.dev(),
-        inode: meta.ino(),
-        size: meta.size(),
-        modified: modified(meta),
-    }
-}
-
-/// The standard library tells no file identity here, so size and time make the stamp.
-#[cfg(not(unix))]
 fn stamp(meta: &Metadata) -> Stamp {
     Stamp {
-        device: 0,
-        inode: 0,
+        id: fs::file_id(meta),
         size: meta.len(),
-        modified: modified(meta),
+        modified: fs::modified(meta),
     }
-}
-
-#[cfg(unix)]
-fn modified(meta: &Metadata) -> (i64, i64) {
-    use std::os::unix::fs::MetadataExt;
-    (meta.mtime(), meta.mtime_nsec())
-}
-
-#[cfg(not(unix))]
-fn modified(meta: &Metadata) -> (i64, i64) {
-    let since = meta
-        .modified()
-        .ok()
-        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-        .unwrap_or_default();
-    (
-        i64::try_from(since.as_secs()).unwrap_or(i64::MAX),
-        i64::from(since.subsec_nanos()),
-    )
 }
 
 /// Reads one record without following a symlink or blocking on a FIFO.

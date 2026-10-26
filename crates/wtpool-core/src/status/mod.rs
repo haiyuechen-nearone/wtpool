@@ -33,6 +33,7 @@ pub use watch::watch as watch_status;
 use crate::clock::ReadClock;
 use crate::config::Config;
 use crate::error::Error;
+use crate::git::GitMode;
 use crate::paths;
 use crate::processes::ListProcesses;
 use state::PoolState;
@@ -52,14 +53,17 @@ pub fn status_line<C: ReadClock, P: ListProcesses>(
 }
 
 /// Per path of `paths`, the actors of that worktree as the document of the pool of `config`,
-/// whose common git directory is `common`, shows them at the time of `sources`.
+/// whose common git directory is `common`, shows them at the time of `sources`, read through
+/// git in `git_mode`.
 pub(crate) fn actors_at(
     config: Config,
     common: PathBuf,
     sources: &Sources,
     paths: &[&Path],
+    git_mode: GitMode,
 ) -> Result<Vec<Vec<Actor>>, Error> {
-    let state = PoolState::load(config, common, &sources.processes, sources.machine.clone())?;
+    let machine = sources.machine.clone();
+    let state = PoolState::load_with(git_mode, config, common, &sources.processes, machine)?;
     let document = state.document(sources.clock.now());
     let worktrees: Vec<WorktreeStatus> = document
         .pools

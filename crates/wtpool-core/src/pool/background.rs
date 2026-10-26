@@ -3,12 +3,12 @@
 use std::path::PathBuf;
 
 use crate::error::Error;
+use crate::git::Git;
 use crate::github::ViewPr;
 use crate::names::BranchName;
 use crate::refs::SyncMode;
 use crate::report::{Discard, Report};
 use crate::resolve::Unresolved;
-use crate::run::Git;
 use crate::worktree::{self, Worktree};
 
 use super::{Pool, git, parking, refusals, slots};
@@ -78,7 +78,7 @@ impl<V: ViewPr> Pool<V> {
         if let Some(holder) = self.holder_of(branch)? {
             let role = self.config.role_of(&holder);
             return refusals::outside_slots_refusal(branch, holder.path(), role)
-                .map_or(Ok(Parking::Held(holder)), Err);
+                .map_or(Ok(Parking::Held(holder)), |refusal| Err(refusal.into()));
         }
         let facts = self.slot_facts(report)?;
         Ok(

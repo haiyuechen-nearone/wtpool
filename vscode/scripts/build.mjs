@@ -36,9 +36,25 @@ async function bundle() {
   ]);
 }
 
+/** The sheets style.css imports, in its order. It holds only imports, so a page can link it unbuilt. */
+function styleParts(dir) {
+  return readFileSync(path.join(dir, 'style.css'), 'utf8')
+    .trimEnd()
+    .split('\n')
+    .map((line) => {
+      const part = /^@import url\("(.+)"\);$/.exec(line)?.[1];
+      if (part === undefined) {
+        process.stderr.write(`build: style.css holds more than imports: ${line}\n`);
+        process.exit(1);
+      }
+      return part;
+    });
+}
+
 function writeStyleSheet() {
   // The webview page links a single stylesheet.
-  const sheets = ['icons.css', 'style.css'].map((file) => readFileSync(path.join(VSCODE, 'src/webview', file), 'utf8'));
+  const dir = path.join(VSCODE, 'src/webview');
+  const sheets = ['icons.css', ...styleParts(dir)].map((file) => readFileSync(path.join(dir, file), 'utf8'));
   writeFileSync(path.join(VSCODE, 'media/webview.css'), sheets.join('\n'));
 }
 

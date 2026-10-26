@@ -1,0 +1,84 @@
+/* The table. Every column is as wide as its content, and nothing is cut or ends in an ellipsis.
+ * A tab narrower than the table scrolls it sideways inside .scroller. The px widths are minimums
+ * that keep the columns still while words and ages change. The agent column takes the rest. */
+
+/* .scroller fills the page's column to the tab's bottom edge, so its horizontal scrollbar sits
+ * there at any tab height, never under a short table, and rows that do not fit scroll down inside
+ * it under the header. position: relative holds the hidden "Actions" header label inside it, so
+ * the page itself never scrolls sideways. */
+.scroller {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  container-type: inline-size;
+}
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.col-activity {
+  width: 118px;
+}
+
+.col-worktree {
+  width: 96px;
+}
+
+.col-branch {
+  width: 1px;
+}
+
+.col-git {
+  width: 104px;
+}
+
+.col-last {
+  width: 52px;
+}
+
+.col-actions {
+  width: 132px;
+}
+
+th {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+th:nth-child(6) {
+  text-align: right;
+}
+
+td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  vertical-align: top;
+  line-height: 19px;
+  white-space: nowrap;
+}
+
+/* The pool's heading row: the repository in the text colour, then the machine muted, both at 4.5:1
+ * on the page in every theme. */
+.pool-heading td {
+  padding-top: 10px;
+  font-weight: 600;
+}
+
+.repo-icon {
+  margin-right: 7px;
+}
+
+.heading-machine {
+  color: var(--vscode-descriptionForeground);
+  font-weight: 400;
+}

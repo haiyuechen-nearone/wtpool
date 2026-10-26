@@ -1,5 +1,5 @@
 //! The pool state `wtpool status --watch` keeps up to date: what each change asks to read again,
-//! the git refresh after an edit tool or Bash call (W4), and the timers of the actors (W6).
+//! the git refresh after an edit tool or Bash call, and the timers of the actors.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -12,7 +12,7 @@ use super::watch::{Pending, Track};
 use crate::clock::ReadClock;
 use crate::processes::ListProcesses;
 
-/// The git facts of a worktree refresh after edits at most this often (W4).
+/// The git facts of a worktree refresh after edits at most this often.
 const EDIT_REFRESH: Duration = Duration::from_secs(1);
 
 /// A [`PoolState`] refreshed with the process table and clock of `sources`.
@@ -38,9 +38,13 @@ impl<'a, C, P> Live<'a, C, P> {
     /// Refreshes the git facts of `worktree` after an edit at `now`, or schedules it a second
     /// after the last such refresh.
     fn edit(&mut self, worktree: PathBuf, now: Instant) {
-        match self.edited.get(&worktree) {
-            Some(last) if now < *last + EDIT_REFRESH => {
-                self.waiting.insert(worktree, *last + EDIT_REFRESH);
+        let next = self
+            .edited
+            .get(&worktree)
+            .and_then(|last| last.checked_add(EDIT_REFRESH));
+        match next {
+            Some(next) if now < next => {
+                self.waiting.insert(worktree, next);
             }
             _ => {
                 self.state.refresh_worktree(&worktree);
@@ -57,7 +61,7 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
         let _ = self.state.refresh_all(&self.sources.processes);
     }
 
-    fn refresh(&mut self, pending: &Pending) {
+    fn refresh(&mut self, pending: &Pending, now: Instant) {
         if pending.all || (pending.worktrees && self.state.git_dirs_changed()) {
             self.refresh_all();
             return;
@@ -79,7 +83,7 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
             for name in &pending.records {
                 let edited = self.state.refresh_record(name, &self.sources.processes);
                 if let Some(worktree) = edited {
-                    self.edit(worktree, Instant::now());
+                    self.edit(worktree, now);
                 }
             }
         }
@@ -89,12 +93,13 @@ impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
         self.state.document(self.sources.clock.now())
     }
 
-    fn deadline(&self) -> Option<Instant> {
+    /// A timer past the range of [`Instant`] never comes.
+    fn deadline(&self, now: Instant) -> Option<Instant> {
         let clock = &self.sources.clock;
         let timer = self
             .state
             .next_change(clock.now())
-            .map(|at| Instant::now() + clock.until(at));
+            .and_then(|at| now.checked_add(clock.until(at)));
         self.waiting.values().copied().chain(timer).min()
     }
 

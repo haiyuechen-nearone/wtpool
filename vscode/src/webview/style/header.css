@@ -1,0 +1,98 @@
+/* Header: title, chips, connection, and wtpool's error while paused. It stays put while the table
+ * scrolls sideways or down, and wraps in a narrow tab rather than cut anything. */
+
+.header {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin-bottom: 6px;
+}
+
+.title {
+  margin: 0 6px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Each chip shows its count in the colour of the group it counts, inside a 1 px border of that
+ * colour. The border keeps its shape at 3:1 in every theme where a fill would not. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border: 1px solid currentcolor;
+  border-radius: 10px;
+  background-color: transparent;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.chip[hidden] {
+  display: none;
+}
+
+.chip-free {
+  color: var(--vscode-descriptionForeground);
+}
+
+.chip-working {
+  color: var(--vscode-textLink-foreground);
+}
+
+.chip-waiting {
+  color: var(--vscode-list-warningForeground);
+  cursor: pointer;
+}
+
+.connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.connection[hidden] {
+  display: none;
+}
+
+.connection-paused {
+  padding: 1px 7px;
+  border: 1px dashed var(--vscode-descriptionForeground);
+  border-radius: 3px;
+}
+
+/* wtpool's last stderr line, on a line of its own under the connection and aligned with it. It wraps
+ * anywhere, a long path too, so none of it is cut. The problem token reads at 4.5:1 on the page in
+ * every theme. */
+.wtpool-error {
+  flex-basis: 100%;
+  min-width: 0;
+  margin: 0;
+  color: var(--vscode-list-errorForeground);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* No top margin: margins do not collapse in the page's column, and the header's 6 px is the gap. */
+.no-folder,
+.agents-off {
+  flex: none;
+  margin: 0 0 10px;
+  color: var(--vscode-descriptionForeground);
+}

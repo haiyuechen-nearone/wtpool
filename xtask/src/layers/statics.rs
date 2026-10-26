@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use super::Wanted;
 use super::builds::{oracle_js, vscode};
+use crate::cmd::Ran;
 use crate::parts::Ctx;
 use crate::results::CheckResult;
 
@@ -90,19 +91,24 @@ fn built_bundles(ctx: &Ctx) -> Vec<Named<String>> {
 
 /// Runs an ESLint or stylelint group of vscode/test/lint/check.mjs over vscode/src and media/.
 fn lint_group(ctx: &Ctx, group: &str) -> Result<Vec<Problem>, Problem> {
-    let ran = ctx
-        .run_logged(
-            &format!("lint_{group}"),
-            ctx.command("node")
-                .current_dir(oracle_js(ctx))
-                .arg("lint/check.mjs")
-                .arg(group),
-            STATIC_LIMIT,
-        )
-        .map_err(Problem::Finding)?;
+    let ran = ctx.run_logged(
+        &format!("lint_{group}"),
+        ctx.command("node")
+            .current_dir(oracle_js(ctx))
+            .arg("lint/check.mjs")
+            .arg(group),
+        STATIC_LIMIT,
+    );
+    group_findings(group, ran)
+}
+
+/// The findings of one run of a lint group.
+fn group_findings(group: &str, ran: Result<Ran, String>) -> Result<Vec<Problem>, Problem> {
+    let ran =
+        ran.map_err(|error| Problem::Setup(format!("the {group} lint did not start: {error}")))?;
     if ran.timed_out() {
-        return Err(Problem::Finding(format!(
-            "the {group} lint ran past {} s",
+        return Err(Problem::Setup(format!(
+            "the {group} lint timed out after {} s",
             STATIC_LIMIT.as_secs()
         )));
     }
@@ -299,6 +305,7 @@ mod tests {
     use super::*;
     use crate::results::{FailKind, Outcome};
     use rstest::rstest;
+    use std::process::ExitStatus;
 
     #[rstest]
     #[case::none(&[], Outcome::Pass, None, "")]
@@ -327,6 +334,52 @@ mod tests {
         assert_eq!(
             (result.outcome, result.kind, result.message.as_str()),
             (outcome, kind, message)
+        );
+    }
+
+    fn ran(status: Option<ExitStatus>, stdout: &str) -> Ran {
+        Ran {
+            status,
+            stdout: stdout.to_owned(),
+            stderr: String::new(),
+            seconds: 0.0,
+        }
+    }
+
+    #[rstest]
+    #[case::did_not_start(
+        Err("cannot start \"node\": No such file or directory".to_owned()),
+        "the colour lint did not start: cannot start \"node\": No such file or directory"
+    )]
+    #[case::timed_out(Ok(ran(None, "")), "the colour lint timed out after 60 s")]
+    fn group_findings__should_make_a_runner_that_did_not_finish_a_setup_problem(
+        #[case] run: Result<Ran, String>,
+        #[case] message: &str,
+    ) {
+        // When
+        let found = group_findings("colour", run);
+
+        // Then
+        assert_eq!(found, Err(Problem::Setup(message.to_owned())));
+    }
+
+    #[test]
+    fn group_findings__should_keep_a_reported_finding_a_finding() {
+        // Given
+        let run = Ok(ran(
+            Some(ExitStatus::default()),
+            r#"{"findings": ["src/panel.css:3: color-no-hex"]}"#,
+        ));
+
+        // When
+        let found = group_findings("colour", run);
+
+        // Then
+        assert_eq!(
+            found,
+            Ok(vec![Problem::Finding(
+                "src/panel.css:3: color-no-hex".to_owned()
+            )])
         );
     }
 

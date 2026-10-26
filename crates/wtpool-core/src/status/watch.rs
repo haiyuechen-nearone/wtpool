@@ -1,5 +1,5 @@
-//! `wtpool status --watch`: a document at once and per change, an alive line per heartbeat (W1 to
-//! W9). Folder events say what changed, so only that is read again.
+//! `wtpool status --watch`: a document at once and per change, an alive line per heartbeat.
+//! Folder events say what changed, so only that is read again.
 
 use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
@@ -17,13 +17,14 @@ use crate::activity::ACTIVITY_DIR;
 use crate::clock::ReadClock;
 use crate::config::Config;
 use crate::error::Error;
+use crate::git::layout;
 use crate::paths::comparable;
 use crate::processes::ListProcesses;
 
 /// What the watch loop hears: changed paths from the folder watch, or the end of its input.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
-    /// `rescan` says events were lost, so everything must be read again (W7).
+    /// `rescan` says events were lost, so everything must be read again.
     Paths {
         paths: Vec<PathBuf>,
         rescan: bool,
@@ -48,7 +49,7 @@ pub enum Change {
     Clock,
 }
 
-/// The changes heard since the last refresh, merged (W5).
+/// The changes heard since the last refresh, merged.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Pending {
     since: Option<Instant>,
@@ -65,13 +66,32 @@ pub struct Pending {
 /// Refreshes what changed and describes the result.
 pub trait Track {
     fn refresh_all(&mut self);
-    fn refresh(&mut self, pending: &Pending);
+    /// Reads again what `pending` names, at `now`.
+    fn refresh(&mut self, pending: &Pending, now: Instant);
     fn document(&self) -> Document;
-    /// When the tracker next has work of its own: a timer (W6) or a refresh that waits (W4).
-    fn deadline(&self) -> Option<Instant>;
+    /// When the tracker next has work of its own, as seen at `now`: a timer or a refresh that
+    /// waits.
+    fn deadline(&self, now: Instant) -> Option<Instant>;
     /// Does the work due by `now`.
     fn tick(&mut self, now: Instant);
 }
+
+/// The monotonic time the watch loop schedules by, and its waits.
+pub trait Timer {
+    fn now(&self) -> Instant;
+    fn sleep(&self, duration: Duration);
+    /// The next message, or [`RecvTimeoutError::Timeout`] once the time reaches `until`. Without
+    /// `until`, only a message or the end of the senders ends the wait.
+    fn receive(
+        &self,
+        messages: &Receiver<Message>,
+        until: Option<Instant>,
+    ) -> Result<Message, RecvTimeoutError>;
+}
+
+/// The system's monotonic clock.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SystemTimer;
 
 /// The paths the loop hears about: spellings of the common git directory, and the clock's
 /// file.
@@ -99,21 +119,8 @@ pub const TIMING: Timing = Timing {
     settle: Duration::from_millis(100),
 };
 
-/// Files in a git folder whose change changes the worktree's facts.
-const GIT_DIR_FILES: [&str; 9] = [
-    "HEAD",
-    "index",
-    "MERGE_HEAD",
-    "CHERRY_PICK_HEAD",
-    "REVERT_HEAD",
-    "BISECT_LOG",
-    "rebase-merge",
-    "rebase-apply",
-    "sequencer",
-];
-
 /// Runs `wtpool status --watch` on the pool of `config`, whose common git directory is `common`,
-/// until `input` ends or `output` fails, which both end it cleanly (W8). The folder watch
+/// until `input` ends or `output` fails, which both end it cleanly. The folder watch
 /// starts before the first read, so no change slips between them.
 pub fn watch<C: ReadClock, P: ListProcesses>(
     config: Config,
@@ -132,12 +139,12 @@ pub fn watch<C: ReadClock, P: ListProcesses>(
     };
     let state = PoolState::load(config, common, &sources.processes, sources.machine.clone())?;
     let mut live = Live::new(state, sources);
-    run(&mut live, &messages, output, &watched, TIMING);
+    run(&mut live, &messages, output, &watched, TIMING, &SystemTimer);
     Ok(())
 }
 
 /// Watches the common git directory and everything below it, and the folder of the clock's
-/// file. The events are filtered by [`classify`], which keeps those of the folders W2 names.
+/// file. [`classify`] keeps the events of the watched names.
 fn start_watcher(
     common: &Path,
     clock: Option<&Path>,
@@ -192,48 +199,51 @@ pub fn run(
     output: &mut impl Write,
     watched: &Watched,
     timing: Timing,
+    timer: &impl Timer,
 ) {
     let mut shown = tracker.document();
     if !print_document(output, &shown) {
         return;
     }
     let mut pending = Pending::default();
-    let mut beat = Instant::now() + timing.heartbeat;
+    let mut beat = timer.now().checked_add(timing.heartbeat);
     let mut seq: u64 = 0;
     loop {
-        let now = Instant::now();
-        if now >= beat {
+        let now = timer.now();
+        if let Some(due) = beat.filter(|due| now >= *due) {
             tracker.refresh_all();
-            std::thread::sleep(timing.settle);
+            timer.sleep(timing.settle);
             pending = Pending::default();
             seq = seq.saturating_add(1);
             let alive = format!("{{\"type\":\"alive\",\"seq\":{seq}}}");
             if !print_changes(tracker, &mut shown, output) || !print_line(output, &alive) {
                 return;
             }
-            beat = next_beat(beat, timing.heartbeat, Instant::now());
+            beat = next_beat(due, timing.heartbeat, timer.now());
         } else if pending.due(timing.merge).is_some_and(|due| now >= due) {
-            tracker.refresh(&pending);
+            tracker.refresh(&pending, now);
             pending = Pending::default();
             if !print_changes(tracker, &mut shown, output) {
                 return;
             }
-        } else if tracker.deadline().is_some_and(|due| now >= due) {
+        } else if tracker.deadline(now).is_some_and(|due| now >= due) {
             tracker.tick(now);
             if !print_changes(tracker, &mut shown, output) {
                 return;
             }
         }
-        let wake = [pending.due(timing.merge), tracker.deadline()]
+        let now = timer.now();
+        let wake = [beat, pending.due(timing.merge), tracker.deadline(now)]
             .into_iter()
             .flatten()
-            .fold(beat, Instant::min);
-        match messages.recv_timeout(wake.saturating_duration_since(Instant::now())) {
+            .min();
+        match timer.receive(messages, wake) {
             Ok(Message::Paths { paths, rescan }) => {
+                let heard = timer.now();
                 if rescan {
                     pending.all = true;
-                    pending.since.get_or_insert_with(Instant::now);
-                    pending.last = Some(Instant::now());
+                    pending.since.get_or_insert(heard);
+                    pending.last = Some(heard);
                 }
                 for path in &paths {
                     let change = if watched.clock.as_deref() == Some(path.as_path()) {
@@ -242,7 +252,7 @@ pub fn run(
                         classify(&watched.roots, path)
                     };
                     if let Some(change) = change {
-                        pending.add(change, Instant::now());
+                        pending.add(change, heard);
                     }
                 }
             }
@@ -253,10 +263,12 @@ pub fn run(
 }
 
 /// The heartbeat after the one due at `beat`: a steady period from the first, so the time a
-/// round takes never shifts the next, unless the loop fell a whole period behind.
-fn next_beat(beat: Instant, heartbeat: Duration, now: Instant) -> Instant {
-    let next = beat + heartbeat;
-    if next > now { next } else { now + heartbeat }
+/// round takes never shifts the next, unless the loop fell a whole period behind. `None` past the
+/// range of [`Instant`], a heartbeat that never comes.
+fn next_beat(beat: Instant, heartbeat: Duration, now: Instant) -> Option<Instant> {
+    beat.checked_add(heartbeat)
+        .filter(|next| *next > now)
+        .or_else(|| now.checked_add(heartbeat))
 }
 
 /// Prints the tracker's document when it says something new. `false` when output failed.
@@ -300,14 +312,38 @@ impl Pending {
     /// When the merged changes are due: `merge` after the first, or half of it after the last
     /// if that comes sooner. `None` without changes.
     fn due(&self, merge: Duration) -> Option<Instant> {
-        let quiet = self.last.map(|last| last + merge / 2);
-        self.since
-            .map(|since| quiet.map_or(since + merge, |quiet| quiet.min(since + merge)))
+        let since = self.since?;
+        // Past the range of `Instant` the window closes at once, so no change waits forever.
+        let window = since.checked_add(merge).unwrap_or(since);
+        let quiet = self.last.and_then(|last| last.checked_add(merge / 2));
+        Some(quiet.map_or(window, |quiet| quiet.min(window)))
     }
 }
 
-/// What the event at `path` may have changed, `None` for the lock, temp and other files W3
-/// drops. `roots` are spellings of the common git directory.
+impl Timer for SystemTimer {
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+
+    fn sleep(&self, duration: Duration) {
+        std::thread::sleep(duration);
+    }
+
+    /// [`Duration::MAX`] makes [`Receiver::recv_timeout`] wait without a timeout.
+    fn receive(
+        &self,
+        messages: &Receiver<Message>,
+        until: Option<Instant>,
+    ) -> Result<Message, RecvTimeoutError> {
+        let wait = until.map_or(Duration::MAX, |until| {
+            until.saturating_duration_since(Instant::now())
+        });
+        messages.recv_timeout(wait)
+    }
+}
+
+/// What the event at `path` may have changed, `None` for lock, temp and other files.
+/// `roots` are spellings of the common git directory.
 #[must_use]
 pub fn classify(roots: &[PathBuf], path: &Path) -> Option<Change> {
     let (root, relative) = roots
@@ -321,18 +357,20 @@ pub fn classify(roots: &[PathBuf], path: &Path) -> Option<Change> {
         })
         .collect::<Option<_>>()?;
     let is = |part: &OsStr, name: &str| part == OsStr::new(name);
-    let git_dir_file = |part: &OsStr| GIT_DIR_FILES.iter().any(|name| is(part, name));
+    let state_entry = |part: &OsStr| layout::STATE_ENTRIES.iter().any(|name| is(part, name));
     match parts.as_slice() {
-        [name] if git_dir_file(name) => Some(Change::GitDir(root.clone())),
-        [name] if is(name, "packed-refs") || is(name, "config") => Some(Change::Refs),
-        [name] if is(name, "worktrees") => Some(Change::Worktrees),
+        [name] if state_entry(name) => Some(Change::GitDir(root.clone())),
+        [name] if is(name, layout::PACKED_REFS) || is(name, layout::CONFIG) => Some(Change::Refs),
+        [name] if is(name, layout::WORKTREES) => Some(Change::Worktrees),
         [name] if is(name, ACTIVITY_DIR) => Some(Change::Records),
-        [first, .., last] if is(first, "refs") && !is_lock_or_temp(last) && !path.is_dir() => {
+        [first, .., last]
+            if is(first, layout::REFS) && !is_lock_or_temp(last) && !path.is_dir() =>
+        {
             Some(Change::Refs)
         }
-        [first, _] if is(first, "worktrees") => Some(Change::Worktrees),
-        [first, id, name] if is(first, "worktrees") && git_dir_file(name) => {
-            Some(Change::GitDir(root.join("worktrees").join(id)))
+        [first, _] if is(first, layout::WORKTREES) => Some(Change::Worktrees),
+        [first, id, name] if is(first, layout::WORKTREES) && state_entry(name) => {
+            Some(Change::GitDir(layout::linked_git_dir(root, id)))
         }
         [first, name] if is(first, ACTIVITY_DIR) && is_record_name(name) => {
             Some(Change::Record(name.to_os_string()))

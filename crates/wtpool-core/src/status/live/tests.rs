@@ -147,7 +147,7 @@ fn live_refresh__should_read_again_only_what_changed(
     let pending = make(&fixture.common);
 
     // When
-    live.refresh(&pending);
+    live.refresh(&pending, Instant::now());
 
     // Then
     let document = live.document();
@@ -345,20 +345,22 @@ fn live_refresh__should_refresh_git_after_an_edit_at_most_once_a_second() {
     .unwrap();
     let mut live = Live::new(state, &sources);
     let wt1 = fixture.root.join("wt1");
+    let start = Instant::now();
+    let next = start + EDIT_REFRESH;
 
     // When
     std::fs::write(wt1.join("a.txt"), "x").unwrap();
     write_call(&fixture, Some("t1"), "2026-10-20T12:00:01Z");
-    live.refresh(&records("s1.json"));
+    live.refresh(&records("s1.json"), start);
     let first = dirty(&live);
     std::fs::write(wt1.join("b.txt"), "x").unwrap();
     write_call(&fixture, Some("t2"), "2026-10-20T12:00:03Z");
-    live.refresh(&records("s1.json"));
+    live.refresh(&records("s1.json"), start + EDIT_REFRESH / 2);
     let held = dirty(&live);
     let due = live.waiting.get(&wt1).copied();
-    live.tick(Instant::now());
+    live.tick(next - Duration::from_millis(1));
     let early = dirty(&live);
-    live.tick(due.unwrap());
+    live.tick(next);
     let later = dirty(&live);
 
     // Then
@@ -366,8 +368,8 @@ fn live_refresh__should_refresh_git_after_an_edit_at_most_once_a_second() {
         (first, held, early, later),
         (Some(1), Some(1), Some(1), Some(2))
     );
-    let last = live.edited.get(&wt1).copied().unwrap();
-    assert!(last >= due.unwrap(), "{last:?} before {due:?}");
+    assert_eq!(due, Some(next));
+    assert_eq!(live.edited.get(&wt1), Some(&next));
     assert!(live.waiting.is_empty());
 }
 
@@ -389,23 +391,20 @@ fn live_deadline__should_be_the_next_timer_or_waiting_refresh() {
     )
     .unwrap();
     let mut live = Live::new(state, &sources);
-    let none = live.deadline();
+    let now = Instant::now();
+    let none = live.deadline(now);
     write_call(&fixture, None, "1970-01-01T00:00:30Z");
-    live.refresh(&records("s1.json"));
+    live.refresh(&records("s1.json"), now);
 
     // When
-    let timer = live.deadline();
-    let soon = Instant::now() + Duration::from_secs(3);
+    let timer = live.deadline(now);
+    let soon = now + Duration::from_secs(3);
     live.waiting.insert(fixture.root.join("wt1"), soon);
-    let waiting = live.deadline();
+    let waiting = live.deadline(now);
 
     // Then
     assert_eq!(none, None);
-    let timer = timer.unwrap().saturating_duration_since(Instant::now());
-    assert!(
-        timer > Duration::from_secs(100) && timer <= Duration::from_secs(108),
-        "{timer:?}"
-    );
+    assert_eq!(timer, Some(now + Duration::from_secs(108)));
     assert_eq!(waiting, Some(soon));
 }
 

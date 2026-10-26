@@ -89,7 +89,7 @@ describe('title', () => {
     // When
     await openStatus();
     const panel = statusPanel();
-    const counted = await titleBecomes(panel, 'Worktrees (1)', 3_000);
+    const counted = await titleBecomes(panel, 'Worktrees (1)');
     const dropped = await titleBecomes(panel, 'Worktrees', 8_000);
 
     // Then

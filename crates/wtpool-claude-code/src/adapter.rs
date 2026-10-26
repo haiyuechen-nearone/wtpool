@@ -3,7 +3,8 @@
 use std::path::{Path, PathBuf};
 
 use wtpool_core::activity::{Harness, TaskId};
-use wtpool_core::hook::{Adapter, HookInput, Printed, TranscriptTitles, WaitingTools, home_folder};
+use wtpool_core::hook::{Adapter, HookInput, Printed, TranscriptTitles, WaitingTools};
+use wtpool_core::platform::dirs;
 
 use crate::{events, install, tasks, tools, transcript};
 
@@ -26,7 +27,7 @@ impl ClaudeCode {
                 .filter(|value| !value.is_empty())
                 .map(PathBuf::from),
             config_dir: std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from),
-            home: home_folder(std::env::var_os("HOME"), std::env::home_dir),
+            home: dirs::home(),
         }
     }
 }

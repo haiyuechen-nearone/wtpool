@@ -12,9 +12,10 @@ wtpool — git worktree pool: one foreground worktree you live in, N background
 slots agents park branches in.
 
   wtpool ls                  what is parked where
-  wtpool fg   <ref> [--refresh|--reset]  bring a branch/PR into the foreground worktree
+  wtpool fg   <ref> [--refresh|--reset] [--force]
+                             bring a branch/PR into the foreground worktree
   wtpool bg   <ref> [--refresh|--reset]  park a branch/PR in a slot, print its path
-  wtpool free <slot|branch>  release a slot's branch (leaves files, detaches)
+  wtpool free <slot|branch> [--force]  release a slot's branch (leaves files, detaches)
   wtpool path <branch>       print the worktree holding <branch>, if any
   wtpool new  [name]         add a slot ([name] must start with slot_prefix)
   wtpool rm   <slot>         remove a slot
@@ -36,6 +37,8 @@ diverged from the remote head.
 --refresh fetches and fast-forwards an existing local branch to the remote head.
 --reset   also moves a diverged branch (a rebased PR) to the remote head, after
           saving its old tip under refs/wtpool-backup/<branch>/<sha>.
+--force   lets fg and free detach or move a worktree where an agent works or
+          waits.
 bg prints the slot that already holds the branch, if any. It refuses a branch
 that the foreground or an unmanaged worktree has checked out. It never makes a
 new branch: for one that exists neither here nor on the remote, run
@@ -119,19 +122,19 @@ fn unknown_command__should_point_to_help(#[case] command: &str) {
 #[rstest]
 #[case::fg_without_a_reference(
     &["fg"],
-    "usage: wtpool fg <pr-number|pr-url|branch> [--refresh|--reset]"
+    "usage: wtpool fg <pr-number|pr-url|branch> [--refresh|--reset] [--force]"
 )]
 #[case::bg_without_a_reference(
     &["bg"],
     "usage: wtpool bg <pr-number|pr-url|branch> [--refresh|--reset]"
 )]
-#[case::free_without_an_argument(&["free"], "usage: wtpool free <slot|branch>")]
-#[case::free_with_an_empty_argument(&["free", ""], "usage: wtpool free <slot|branch>")]
+#[case::free_without_an_argument(&["free"], "usage: wtpool free <slot|branch> [--force]")]
+#[case::free_with_an_empty_argument(&["free", ""], "usage: wtpool free <slot|branch> [--force]")]
 #[case::rm_without_an_argument(&["rm"], "usage: wtpool rm <slot>")]
 #[case::path_without_an_argument(&["path"], "usage: wtpool path <branch>")]
 #[case::ls_with_an_argument(&["ls", "junk"], "usage: wtpool ls")]
 #[case::list_with_an_argument(&["list", "junk"], "usage: wtpool ls")]
-#[case::free_with_two_arguments(&["free", "app-wt1", "junk"], "usage: wtpool free <slot|branch>")]
+#[case::free_with_two_arguments(&["free", "app-wt1", "junk"], "usage: wtpool free <slot|branch> [--force]")]
 #[case::rm_with_two_arguments(&["rm", "app-wt1", "junk"], "usage: wtpool rm <slot>")]
 #[case::remove_with_two_arguments(&["remove", "app-wt1", "junk"], "usage: wtpool rm <slot>")]
 #[case::path_with_two_arguments(&["path", "feature", "junk"], "usage: wtpool path <branch>")]

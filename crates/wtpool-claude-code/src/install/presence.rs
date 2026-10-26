@@ -3,8 +3,7 @@
 //! Its first line starts with `hooks present:`, `hooks present twice:` or `hooks missing:`.
 
 use std::collections::BTreeMap;
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde_json::{Value, json};
 
@@ -13,16 +12,6 @@ use crate::events::HookEvent;
 
 /// The marketplace that publishes the plugin.
 const MARKETPLACE: &str = "haiyuechen-nearone/wtpool";
-
-/// The `wtpool` that a hook with the bare command `wtpool` starts: the first file of that name in
-/// `path`, the value of `PATH`.
-#[must_use]
-pub(super) fn on_path(path: Option<&OsStr>) -> Option<PathBuf> {
-    let name = format!("wtpool{}", std::env::consts::EXE_SUFFIX);
-    std::env::split_paths(path?)
-        .map(|dir| dir.join(&name))
-        .find(|file| file.is_file())
-}
 
 /// The `wtpool hook` entries of a settings file, by event.
 struct Hooks<'a> {
@@ -282,31 +271,5 @@ mod tests {
                 "hooks missing: ~/.claude/settings.json holds no wtpool hook for Stop.\n{HINT}"
             )
         );
-    }
-
-    #[test]
-    fn on_path__should_find_the_first_wtpool() {
-        // Given
-        let dir = tempfile::tempdir().unwrap();
-        let (empty, first, second) = (
-            dir.path().join("a"),
-            dir.path().join("b"),
-            dir.path().join("c"),
-        );
-        for folder in [&empty, &first, &second] {
-            std::fs::create_dir(folder).unwrap();
-        }
-        let name = format!("wtpool{}", std::env::consts::EXE_SUFFIX);
-        std::fs::write(first.join(&name), "").unwrap();
-        std::fs::write(second.join(&name), "").unwrap();
-        let path = std::env::join_paths([&empty, &first, &second]).unwrap();
-
-        // When
-        let found = on_path(Some(&path));
-
-        // Then
-        assert_eq!(found, Some(first.join(name)));
-        assert_eq!(on_path(Some(empty.as_os_str())), None);
-        assert_eq!(on_path(None), None);
     }
 }

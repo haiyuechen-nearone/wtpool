@@ -99,7 +99,9 @@ pub fn install_text() -> Result<hook::Printed, String> {
     Ok(Adapter::from_process().install(&binary.to_string_lossy()))
 }
 
-/// The hook's clock and process table: the system's, or the [`verify_files`].
+/// The inputs of `wtpool hook` and `wtpool hook gc` besides the payload: this process's
+/// environment, and the system's clock and process table unless [`verify_files`] names files for
+/// them.
 fn hook_env() -> HookEnv {
     let (clock, processes) = verify_files();
     HookEnv::from_process(clock, processes)

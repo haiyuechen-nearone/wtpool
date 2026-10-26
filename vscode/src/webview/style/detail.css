@@ -1,0 +1,66 @@
+/* The detail strip: a boxed panel, its 1 px descriptionForeground border at 3:1 against the page in
+ * every theme. It keeps to the visible width of the scroller and stays in view while a wide table
+ * scrolls sideways. */
+
+.detail-cell {
+  padding: 0 0 0 4px;
+  white-space: normal;
+}
+
+.strip {
+  display: grid;
+  position: sticky;
+  left: 0;
+  box-sizing: border-box;
+  max-width: calc(100cqw - 4px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 32px;
+  padding: 10px 16px 12px;
+  border: 1px solid var(--vscode-descriptionForeground);
+  background-color: var(--vscode-textBlockQuote-background);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 24px;
+  align-content: start;
+}
+
+.fact-label {
+  color: var(--vscode-descriptionForeground);
+}
+
+.fact-value {
+  overflow-wrap: anywhere;
+}
+
+.agents-heading {
+  margin-bottom: 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.actor {
+  margin-bottom: 6px;
+}
+
+.actor-state,
+.actor-facts {
+  overflow-wrap: anywhere;
+}
+
+.actor-facts {
+  color: var(--vscode-descriptionForeground);
+}
+
+.actor .actor-label {
+  color: var(--vscode-foreground);
+}
+
+.actor.state-waiting .actor-label {
+  color: var(--vscode-list-warningForeground);
+}

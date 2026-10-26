@@ -1,31 +1,53 @@
 //! Strings from git, records and settings as the terminal shows them. A branch name may carry
 //! controls such as OSC 52 that a terminal runs, or bidi overrides that reorder the line.
 
-/// The control, bidi, zero width and other invisible characters, as inclusive ranges.
-const INVISIBLE: [(char, char); 11] = [
-    ('\u{0}', '\u{1f}'),        // C0 controls
-    ('\u{7f}', '\u{9f}'),       // DEL and C1 controls
-    ('\u{ad}', '\u{ad}'),       // soft hyphen
-    ('\u{61c}', '\u{61c}'),     // Arabic letter mark
-    ('\u{180e}', '\u{180e}'),   // Mongolian vowel separator
-    ('\u{200b}', '\u{200f}'),   // zero width space and joiners, LRM, RLM
-    ('\u{202a}', '\u{202e}'),   // bidi embeddings and overrides
-    ('\u{2060}', '\u{2064}'),   // word joiner and invisible operators
-    ('\u{2066}', '\u{2069}'),   // bidi isolates
-    ('\u{feff}', '\u{feff}'),   // byte order mark
-    ('\u{e0000}', '\u{e007f}'), // tags
+/// The format (Cf) characters of Unicode 17.0, the version of the Node in VS Code 1.143, as sorted
+/// inclusive ranges. `xtask/tests/checks/cli_text.rs` compares them with the `\p{Cf}` of the Node
+/// on `PATH`, and prints this table anew when they differ.
+const FORMAT: [(char, char); 21] = [
+    ('\u{ad}', '\u{ad}'),
+    ('\u{600}', '\u{605}'),
+    ('\u{61c}', '\u{61c}'),
+    ('\u{6dd}', '\u{6dd}'),
+    ('\u{70f}', '\u{70f}'),
+    ('\u{890}', '\u{891}'),
+    ('\u{8e2}', '\u{8e2}'),
+    ('\u{180e}', '\u{180e}'),
+    ('\u{200b}', '\u{200f}'),
+    ('\u{202a}', '\u{202e}'),
+    ('\u{2060}', '\u{2064}'),
+    ('\u{2066}', '\u{206f}'),
+    ('\u{feff}', '\u{feff}'),
+    ('\u{fff9}', '\u{fffb}'),
+    ('\u{110bd}', '\u{110bd}'),
+    ('\u{110cd}', '\u{110cd}'),
+    ('\u{13430}', '\u{1343f}'),
+    ('\u{1bca0}', '\u{1bca3}'),
+    ('\u{1d173}', '\u{1d17a}'),
+    ('\u{e0001}', '\u{e0001}'),
+    ('\u{e0020}', '\u{e007f}'),
 ];
 
-/// `text` with each control, bidi and zero width character as `\u{XXXX}`, in upper case hex of at
-/// least four digits.
+fn is_format(c: char) -> bool {
+    let next = FORMAT.partition_point(|&(_, high)| high < c);
+    FORMAT.get(next).is_some_and(|&(low, _)| low <= c)
+}
+
+/// Control (Cc) and format (Cf) characters, the line and paragraph separators, and the whole tag
+/// block, the code points it has not assigned yet included.
+fn is_invisible(c: char) -> bool {
+    c.is_control()
+        || is_format(c)
+        || matches!(c, '\u{2028}' | '\u{2029}' | '\u{e0000}'..='\u{e007f}')
+}
+
+/// `text` with each control, format, line separator, paragraph separator and tag character as
+/// `\u{XXXX}`, in upper case hex of at least four digits.
 #[must_use]
 pub fn visible(text: &str) -> String {
     let mut shown = String::with_capacity(text.len());
     for c in text.chars() {
-        if INVISIBLE
-            .iter()
-            .any(|&(low, high)| (low..=high).contains(&c))
-        {
+        if is_invisible(c) {
             shown.push_str(&format!("\\u{{{:04X}}}", u32::from(c)));
         } else {
             shown.push(c);
@@ -46,10 +68,12 @@ mod tests {
 
     use super::*;
 
-    /// The characters just outside each range of [`INVISIBLE`].
+    /// The characters just outside each range of the characters [`visible`] escapes.
     const NEIGHBOURS: &str = concat!(
-        " ~\u{a0}\u{ac}\u{ae}\u{61b}\u{61d}\u{180d}\u{180f}\u{200a}\u{2010}\u{2029}",
-        "\u{202f}\u{205f}\u{2065}\u{206a}\u{fefe}\u{ff00}\u{dffff}\u{e0080}",
+        " ~\u{a0}\u{ac}\u{ae}\u{5ff}\u{606}\u{61b}\u{61d}\u{6dc}\u{6de}\u{70e}\u{710}\u{88f}",
+        "\u{892}\u{8e1}\u{8e3}\u{180d}\u{180f}\u{200a}\u{2010}\u{2027}\u{202f}\u{205f}\u{2065}",
+        "\u{2070}\u{fefe}\u{ff00}\u{fff8}\u{fffc}\u{110bc}\u{110be}\u{110cc}\u{110ce}\u{1342f}",
+        "\u{13440}\u{1bc9f}\u{1bca4}\u{1d172}\u{1d17b}\u{dffff}\u{e0080}",
     );
 
     #[rstest]
@@ -64,20 +88,35 @@ mod tests {
         "\u{7f}\u{80}\u{9b}\u{9c}\u{9d}\u{9f}",
         "\\u{007F}\\u{0080}\\u{009B}\\u{009C}\\u{009D}\\u{009F}"
     )]
-    #[case::soft_hyphen_letter_mark_and_vowel_separator(
-        "\u{ad}\u{61c}\u{180e}",
-        "\\u{00AD}\\u{061C}\\u{180E}"
+    #[case::soft_hyphen_and_vowel_separator("\u{ad}\u{180e}", "\\u{00AD}\\u{180E}")]
+    #[case::arabic_and_syriac_signs_and_letter_mark(
+        "\u{600}\u{605}\u{61c}\u{6dd}\u{70f}\u{890}\u{891}\u{8e2}",
+        "\\u{0600}\\u{0605}\\u{061C}\\u{06DD}\\u{070F}\\u{0890}\\u{0891}\\u{08E2}"
     )]
     #[case::zero_width_and_marks(
         "\u{200b}\u{200c}\u{200d}\u{200e}\u{200f}",
         "\\u{200B}\\u{200C}\\u{200D}\\u{200E}\\u{200F}"
     )]
-    #[case::embeddings_and_overrides("\u{202a}\u{202e}", "\\u{202A}\\u{202E}")]
+    #[case::separators_embeddings_and_overrides(
+        "\u{2028}\u{2029}\u{202a}\u{202e}",
+        "\\u{2028}\\u{2029}\\u{202A}\\u{202E}"
+    )]
     #[case::word_joiner_and_invisible_operators("\u{2060}\u{2064}", "\\u{2060}\\u{2064}")]
-    #[case::isolates("\u{2066}\u{2069}", "\\u{2066}\\u{2069}")]
+    #[case::isolates_and_deprecated_formats(
+        "\u{2066}\u{2069}\u{206a}\u{206f}",
+        "\\u{2066}\\u{2069}\\u{206A}\\u{206F}"
+    )]
     #[case::byte_order_mark("a\u{feff}b", "a\\u{FEFF}b")]
-    #[case::tags("\u{e0000}\u{e0041}\u{e007f}", "\\u{E0000}\\u{E0041}\\u{E007F}")]
-    fn visible__should_escape_controls_bidi_and_zero_width_only(
+    #[case::interlinear_annotations("\u{fff9}\u{fffb}", "\\u{FFF9}\\u{FFFB}")]
+    #[case::formats_outside_the_basic_plane(
+        "\u{110bd}\u{110cd}\u{13430}\u{1343f}\u{1bca0}\u{1bca3}\u{1d173}\u{1d17a}",
+        "\\u{110BD}\\u{110CD}\\u{13430}\\u{1343F}\\u{1BCA0}\\u{1BCA3}\\u{1D173}\\u{1D17A}"
+    )]
+    #[case::tags_assigned_or_not(
+        "\u{e0000}\u{e0001}\u{e0002}\u{e001f}\u{e0020}\u{e0041}\u{e007f}",
+        "\\u{E0000}\\u{E0001}\\u{E0002}\\u{E001F}\\u{E0020}\\u{E0041}\\u{E007F}"
+    )]
+    fn visible__should_escape_the_invisible_characters_only(
         #[case] text: &str,
         #[case] expected: &str,
     ) {
@@ -86,6 +125,17 @@ mod tests {
 
         // Then
         assert_eq!(shown, expected);
+    }
+
+    #[test]
+    fn format__should_hold_sorted_disjoint_ranges() {
+        // Then
+        assert!(FORMAT.iter().all(|&(low, high)| low <= high));
+        assert!(
+            FORMAT
+                .windows(2)
+                .all(|pair| matches!(pair, [(_, high), (low, _)] if high < low))
+        );
     }
 
     #[rstest]

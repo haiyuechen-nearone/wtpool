@@ -1,18 +1,12 @@
-// The webview's HTML (X8): the CSP of the template with a fresh nonce, two nonce scripts, the
-// first inline and the second from media/ like the one stylesheet, and no inline style. It imports
-// only types from `vscode`, so the render layer loads it in Node.
-//
-// VS Code hands the messages it queued for a loading page over at the page's `load` event or
-// after 200 ms, whichever comes first, and a message with no listener yet is lost. So the first
-// script in <head> is inline, {@link EARLY}: it listens as the page is parsed, before any file
-// loads, and keeps the latest messages until webview.js takes over.
+// Imports only types from `vscode`, so plain Node can load this module.
 import type { Webview } from 'vscode';
 
 /**
- * The page's first script. The host posts the last view once, on show (X7), so this keeps the
- * latest message of each type, the view and the output tails (R12), and hands them over in the
- * order they came to the consumer webview.js attaches through `window.wtpoolEarly`, then passes
- * every message on. It sends nothing to the host (X11).
+ * The page's first script, inline at the top of <head>. VS Code hands the messages it queued for
+ * a loading page over at the page's `load` event or after 200 ms, and a message with no listener
+ * yet is lost, while the host posts the last view only once, on show. So this listens as the page
+ * is parsed, keeps the latest message of each type, and hands them over in the order they came to
+ * the consumer webview.js attaches through `window.wtpoolEarly`, then passes every message on.
  */
 const EARLY = `(() => {
   let consumer = null;
@@ -33,10 +27,10 @@ const EARLY = `(() => {
 })();`;
 
 /**
- * The working icon (U6): a robot drawn for wtpool, MIT like the rest of the extension, no third-party
- * source. Static markup in a <template>, which the rows copy (webview/row.ts), so no code creates
- * an element of a namespace that could link or load (X10). One 16 px grid, about 1 px lines, in
- * `currentColor`; each arm is its own path, which icons.css swings about its shoulder.
+ * The working icon: a robot drawn for wtpool, MIT like the rest of the extension, from no
+ * third-party source. It is static markup in a <template> that the rows copy, so no code creates
+ * an element of a namespace that could link or load. One 16 px grid, about 1 px lines, in
+ * `currentColor`. Each arm is its own path, so icons.css can swing it about its shoulder.
  */
 const ROBOT = [
   '<svg class="robot" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">',
@@ -47,9 +41,10 @@ const ROBOT = [
   '</svg>',
 ].join('');
 
-/** The page of the Worktrees tab. `webview.options.localResourceRoots[0]` is vscode/media (X9). */
+/** The page of the Worktrees tab. `webview.options.localResourceRoots[0]` must be vscode/media. */
 export function buildHtml(webview: Webview, nonce: string): string {
   const [media] = webview.options.localResourceRoots ?? [];
+  if (!media) throw new Error('the webview has no local resource root');
   const asset = (file: string) => webview.asWebviewUri(media.with({ path: `${media.path}/${file}` })).toString();
   const csp = [
     "default-src 'none'",

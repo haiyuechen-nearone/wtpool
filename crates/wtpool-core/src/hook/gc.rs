@@ -28,6 +28,17 @@ pub struct Collected {
     pub stopped: bool,
 }
 
+impl Collected {
+    fn count(&mut self, deleted: bool) {
+        let counter = if deleted {
+            &mut self.deleted
+        } else {
+            &mut self.kept
+        };
+        *counter = counter.saturating_add(1);
+    }
+}
+
 /// `wtpool hook gc` on the pool whose common git directory is `common`. It runs whatever the
 /// stamp says, and stamps the pool (H21).
 #[must_use]
@@ -109,7 +120,7 @@ pub fn collect(
             (gone && age > WEEK) || stale_done
         };
         if !doomed(record) {
-            collected.kept += 1;
+            collected.count(false);
             continue;
         }
         // A hook may have written the record since it was listed: decide again under its lock.
@@ -117,8 +128,7 @@ pub fn collect(
             let still = activity.read(stem).is_none_or(|current| doomed(&current));
             still.then(|| activity.delete(stem, lock))
         });
-        collected.deleted += usize::from(deleted.is_some());
-        collected.kept += usize::from(deleted.is_none());
+        collected.count(deleted.is_some());
     }
     let orphans = if collected.stopped {
         Vec::new()

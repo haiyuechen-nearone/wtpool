@@ -5,15 +5,14 @@
 
 mod file;
 mod liveness;
-mod system;
 
 use std::path::PathBuf;
 
 pub use file::ProcessFile;
 pub use liveness::{Liveness, RecordedProcess};
-pub use system::{SystemProcesses, host_name};
 
 use crate::clock::Timestamp;
+pub use crate::platform::processes::{SystemProcesses, host_name};
 
 /// Lists the processes that run now.
 pub trait ListProcesses: Send + Sync {

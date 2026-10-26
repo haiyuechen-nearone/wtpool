@@ -3,6 +3,9 @@ use rstest::rstest;
 use super::*;
 use crate::activity::CallKind;
 
+mod merge;
+mod titles;
+
 /// The tools of a harness that wait for the user: `ask` for an answer, `plan` for a plan's
 /// approval.
 const WAITING: WaitingTools =
@@ -75,6 +78,13 @@ fn permission_wait() -> Vec<Event> {
 fn with(mut events: Vec<Event>, more: &[Event]) -> Vec<Event> {
     events.extend_from_slice(more);
     events
+}
+
+fn subagent(agent: &str, title: &str) -> SubagentTitle {
+    SubagentTitle {
+        agent_id: agent.to_owned(),
+        title: title.to_owned(),
+    }
 }
 
 #[rstest]
@@ -289,25 +299,6 @@ fn apply__should_move_only_to_another_worktree(
     assert_eq!(record.process, first.process);
 }
 
-#[test]
-fn merge_older__should_keep_the_state_and_take_the_calls() {
-    // Given
-    let newer = run(&[Event::CallStart(call("q", "ask", "h"))]);
-    let older_result = apply(
-        Some(&newer),
-        &Event::TurnEnd(None),
-        &change("2026-10-20T12:00:09Z"),
-    );
-
-    // When
-    let merged = merge_older(&newer, older_result, WAITING);
-
-    // Then
-    assert_eq!(merged.state, State::Waiting);
-    assert!(merged.in_flight.is_empty());
-    assert_eq!(merged.updated, "2026-10-20T12:00:09Z");
-}
-
 #[rstest]
 #[case::question_during_a_permission_wait(
     with(permission_wait(), &[Event::CallStart(call("q", "ask", "a"))]),
@@ -380,64 +371,6 @@ fn apply__should_leave_a_standing_wait_and_ended_calls_alone(
     assert_eq!(record.waiting.and_then(|w| w.call).as_deref(), call);
 }
 
-#[rstest]
-#[case::wait_on_the_ended_call(call("c1", "run", "h"), false, State::Working, None)]
-#[case::wait_on_another_call(
-    call("c2", "read", "r"),
-    false,
-    State::Waiting,
-    Some(WaitReason::Permission)
-)]
-#[case::question_still_in_flight(
-    call("c1", "run", "h"),
-    true,
-    State::Waiting,
-    Some(WaitReason::Question)
-)]
-fn merge_older__should_end_a_wait_whose_call_the_older_writer_ended(
-    #[case] ended: CallFacts,
-    #[case] question: bool,
-    #[case] state: State,
-    #[case] reason: Option<WaitReason>,
-) {
-    // Given
-    let before = run(&[
-        Event::CallStart(call("c1", "run", "h")),
-        Event::CallStart(call("c2", "read", "r")),
-    ]);
-    let mut newer = apply(
-        Some(&before),
-        &Event::PermissionAsked(CallFacts {
-            id: None,
-            ..call("", "run", "h")
-        }),
-        &change("2026-10-20T12:00:05Z"),
-    );
-    if question {
-        let pre = Event::CallStart(call("q", "ask", "a"));
-        newer = apply(Some(&newer), &pre, &change("2026-10-20T12:00:05Z"));
-    }
-    let older = apply(
-        Some(&newer),
-        &Event::CallEnd(ended.clone()),
-        &change("2026-10-20T12:00:06Z"),
-    );
-
-    // When
-    let merged = merge_older(&newer, older, WAITING);
-
-    // Then
-    assert_eq!(merged.state, state);
-    assert_eq!(merged.waiting.map(|w| w.reason), reason);
-    assert!(merged.done_ids.contains(&ended.id.unwrap().to_string()));
-    let since = if state == State::Waiting && !question {
-        "2026-10-20T12:00:05Z"
-    } else {
-        "2026-10-20T12:00:06Z"
-    };
-    assert_eq!(merged.since, since);
-}
-
 #[test]
 fn finish_subagent__should_mark_done() {
     // Given
@@ -452,134 +385,4 @@ fn finish_subagent__should_mark_done() {
     assert_eq!(done.state, State::Done);
     assert_eq!(done.since, "2026-10-20T12:00:05Z");
     assert_eq!(done.agent_id.as_deref(), Some("a1"));
-}
-
-fn titles(user: Option<&str>, generated: Option<&str>) -> Titles {
-    Titles {
-        user: user.map(str::to_owned),
-        generated: generated.map(str::to_owned),
-    }
-}
-
-#[rstest]
-#[case::none(&[], "session 12:00", None)]
-#[case::generated(&[titles(None, Some("Bind"))], "Bind", Some(TitleBy::Harness))]
-#[case::generated_again(&[titles(None, Some("Bind")), titles(None, Some("Bound"))], "Bound", Some(TitleBy::Harness))]
-#[case::given(&[titles(None, Some("Bind")), titles(Some("Mine"), None)], "Mine", Some(TitleBy::User))]
-#[case::given_over_generated_at_once(&[titles(Some("Mine"), Some("Bind"))], "Mine", Some(TitleBy::User))]
-#[case::generated_after_given(&[titles(Some("Mine"), None), titles(None, Some("Bind"))], "Mine", Some(TitleBy::User))]
-#[case::given_again(&[titles(Some("Mine"), None), titles(Some("Ours"), None)], "Ours", Some(TitleBy::User))]
-#[case::nothing_found_keeps(&[titles(None, Some("Bind")), titles(None, None)], "Bind", Some(TitleBy::Harness))]
-fn apply__should_label_a_session_with_its_title(
-    #[case] found: &[Titles],
-    #[case] label: &str,
-    #[case] by: Option<TitleBy>,
-) {
-    // Given
-    let mut record = apply(None, &Event::TurnStart, &change("2026-10-20T12:00:00Z"));
-
-    // When
-    for titles in found {
-        let mut next = change("2026-10-20T12:00:01Z");
-        next.titles = titles.clone();
-        record = apply(Some(&record), &Event::TurnEnd(None), &next);
-    }
-
-    // Then
-    assert_eq!(record.label, label);
-    assert_eq!(record.title.map(|title| title.by), by);
-}
-
-#[test]
-fn apply__should_keep_the_transcript_offset_until_a_read_moves_it() {
-    // Given
-    let mut read = change("2026-10-20T12:00:00Z");
-    read.transcript_offset = Some(4096);
-    let first = apply(None, &Event::TurnStart, &read);
-
-    // When
-    let unread = apply(
-        Some(&first),
-        &Event::TurnEnd(None),
-        &change("2026-10-20T12:00:01Z"),
-    );
-
-    // Then
-    assert_eq!(
-        (first.transcript_offset, unread.transcript_offset),
-        (4096, 4096)
-    );
-}
-
-fn subagent(agent: &str, title: &str) -> SubagentTitle {
-    SubagentTitle {
-        agent_id: agent.to_owned(),
-        title: title.to_owned(),
-    }
-}
-
-#[test]
-fn apply__should_keep_the_newest_16_subagent_titles() {
-    // Given
-    let mut record = apply(None, &Event::TurnStart, &change("2026-10-20T12:00:00Z"));
-
-    // When
-    for n in 0..20 {
-        let mut next = change("2026-10-20T12:00:01Z");
-        next.subagent = Some(subagent(&format!("a{n}"), &format!("Task {n}")));
-        record = apply(
-            Some(&record),
-            &Event::CallEnd(call("c", "spawn", "h")),
-            &next,
-        );
-    }
-    let mut again = change("2026-10-20T12:00:02Z");
-    again.subagent = Some(subagent("a10", "Task ten"));
-    record = apply(
-        Some(&record),
-        &Event::CallEnd(call("c", "spawn", "h")),
-        &again,
-    );
-
-    // Then
-    let ids: Vec<&str> = record
-        .subagents
-        .iter()
-        .map(|known| known.agent_id.as_str())
-        .collect();
-    assert_eq!(ids.len(), MAX_SUBAGENTS);
-    assert_eq!(ids.first(), Some(&"a4"));
-    assert_eq!(record.subagents.last(), Some(&subagent("a10", "Task ten")));
-}
-
-#[test]
-fn merge_older__should_keep_the_subagent_titles_of_both_writers() {
-    // Given
-    let mut learnt = change("2026-10-20T12:00:00Z");
-    learnt.subagent = Some(subagent("a1", "Find"));
-    let base = apply(None, &Event::TurnStart, &learnt);
-    let mut newer_change = change("2026-10-20T12:00:02Z");
-    newer_change.subagent = Some(subagent("a2", "read"));
-    let newer = apply(Some(&base), &Event::TurnEnd(None), &newer_change);
-    let mut older_change = change("2026-10-20T12:00:01Z");
-    older_change.subagent = Some(subagent("a3", "Test"));
-    let older = apply(
-        Some(&base),
-        &Event::CallEnd(call("c", "spawn", "h")),
-        &older_change,
-    );
-
-    // When
-    let merged = merge_older(&newer, older, WAITING);
-
-    // Then
-    assert_eq!(
-        merged.subagents,
-        vec![
-            subagent("a1", "Find"),
-            subagent("a2", "read"),
-            subagent("a3", "Test")
-        ]
-    );
-    assert_eq!(merged.state, State::Idle);
 }

@@ -1,6 +1,6 @@
 //! Resolving a `<ref>` to a [`Plan`] with lookups only.
 
-use crate::error::{self, Error};
+use crate::error::{self, Error, GitError};
 use crate::github::{ViewPr, ViewPrError};
 use crate::names::{BranchName, ObjectId, PrNumber, RepoSlug};
 use crate::pool::Pool;
@@ -232,10 +232,11 @@ impl<V: ViewPr> Pool<V> {
             Some(2) => Ok(Some(false)),
             _ => {
                 ran.forward_stderr(report);
-                Err(Error::LookUpRemote {
+                Err(GitError::LookUpRemote {
                     branch: branch.to_string(),
                     remote: remote.to_string(),
-                })
+                }
+                .into())
             }
         }
     }
@@ -298,7 +299,7 @@ mod tests {
     #[rstest]
     #[case::quiet(Unresolved::Quiet, &["'42': no slot changed"])]
     #[case::fatal_cause_first(
-        Unresolved::Fatal(Error::FetchFailed),
+        Unresolved::Fatal(GitError::Fetch.into()),
         &["fetch failed", "'42': no slot changed"]
     )]
     fn into_error__should_name_the_reference_and_what_stayed_unchanged(

@@ -113,14 +113,19 @@ fn compress(state: &mut [u32; 8], block: &[u8; 64]) {
     for (word, bytes) in w.iter_mut().zip(block.as_chunks::<4>().0) {
         *word = u32::from_be_bytes(*bytes);
     }
-    for i in 16..64 {
-        let at = |n: usize| w.get(n).copied().unwrap_or_default();
-        let (w15, w2) = (at(i - 15), at(i - 2));
+    for i in 16_usize..64 {
+        let back = |n: usize| {
+            i.checked_sub(n)
+                .and_then(|at| w.get(at))
+                .copied()
+                .unwrap_or_default()
+        };
+        let (w15, w2) = (back(15), back(2));
         let s0 = w15.rotate_right(7) ^ w15.rotate_right(18) ^ (w15 >> 3);
         let s1 = w2.rotate_right(17) ^ w2.rotate_right(19) ^ (w2 >> 10);
-        let value = at(i - 16)
+        let value = back(16)
             .wrapping_add(s0)
-            .wrapping_add(at(i - 7))
+            .wrapping_add(back(7))
             .wrapping_add(s1);
         if let Some(slot) = w.get_mut(i) {
             *slot = value;

@@ -106,7 +106,7 @@ export class RowView {
 
   /** Recomputes the ages of the Last cell, nothing else. */
   tick(nowMs: number): void {
-    this.times.forEach((time, index) => setText(this.last.children[index], age(time, nowMs)));
+    this.times.forEach((time, index) => void setText(this.last.children[index], age(time, nowMs)));
   }
 
   /** Shows the robot while working, else the codicon glyph of the icon's ::before. */

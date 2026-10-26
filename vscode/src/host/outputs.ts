@@ -91,7 +91,7 @@ export class OutputWatch {
     // Added files post once read, so only an unchanged set needs a post for a fresh webview.
     if (fresh && !added.length) this.schedule();
     this.cancelPoll?.();
-    this.cancelPoll = this.clock.after(POLL_MS, () => this.poll());
+    this.cancelPoll = this.clock.after(POLL_MS, () => void this.poll());
   }
 
   /** Stops every watch and timer. */
@@ -121,7 +121,7 @@ export class OutputWatch {
   /** Watches a file once a read found it a regular file. The poll covers a file without a watch. */
   private watchFile(path: string, file: Watched): void {
     try {
-      file.watcher = watch(path, { persistent: false }, () => this.read(path));
+      file.watcher = watch(path, { persistent: false }, () => void this.read(path));
       file.watcher.on('error', () => {
         file.watcher?.close();
         file.watcher = undefined;
@@ -152,7 +152,7 @@ export class OutputWatch {
         },
       );
     }
-    this.cancelPoll = this.clock.after(POLL_MS, () => this.poll());
+    this.cancelPoll = this.clock.after(POLL_MS, () => void this.poll());
   }
 
   /** Reads the tail of `path` again, one read at a time per file, and posts it when it changed. */

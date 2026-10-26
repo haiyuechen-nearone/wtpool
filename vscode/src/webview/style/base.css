@@ -1,0 +1,32 @@
+/*
+ * The Worktrees tab. Colours come only from --vscode-* variables. Each activity group has one
+ * token, chosen so its text reads at 4.5:1 on plain, hovered and selected rows in the light, dark
+ * and high contrast themes: attention list-warningForeground, active textLink-foreground, quiet
+ * descriptionForeground, problem list-errorForeground. The build puts icons.css in front of this
+ * sheet.
+ */
+
+/* The page is a column as tall as the tab: the header and notes keep their height at the
+ * top, and the box that scrolls the table takes the rest, down to the tab's bottom edge. */
+html {
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  padding: 12px 20px 0;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

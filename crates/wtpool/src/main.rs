@@ -5,7 +5,7 @@ use clap::{Args, Parser, Subcommand};
 use terminal_size::Width;
 use wtpool_core::status::{self, Sources};
 use wtpool_core::{
-    AbsolutePath, AgentGuard, Config, Error, Pool, RefArgs, Report, Settings, SlotName,
+    AbsolutePath, AgentGuard, Config, Error, GitMode, Pool, RefArgs, Report, Settings, SlotName,
 };
 
 use table::Style;
@@ -22,9 +22,10 @@ wtpool — git worktree pool: one foreground worktree you live in, N background
 slots agents park branches in.
 
   wtpool ls                  what is parked where
-  wtpool fg   <ref> [--refresh|--reset]  bring a branch/PR into the foreground worktree
+  wtpool fg   <ref> [--refresh|--reset] [--force]
+                             bring a branch/PR into the foreground worktree
   wtpool bg   <ref> [--refresh|--reset]  park a branch/PR in a slot, print its path
-  wtpool free <slot|branch>  release a slot's branch (leaves files, detaches)
+  wtpool free <slot|branch> [--force]  release a slot's branch (leaves files, detaches)
   wtpool path <branch>       print the worktree holding <branch>, if any
   wtpool new  [name]         add a slot ([name] must start with slot_prefix)
   wtpool rm   <slot>         remove a slot
@@ -46,6 +47,8 @@ diverged from the remote head.
 --refresh fetches and fast-forwards an existing local branch to the remote head.
 --reset   also moves a diverged branch (a rebased PR) to the remote head, after
           saving its old tip under refs/wtpool-backup/<branch>/<sha>.
+--force   lets fg and free detach or move a worktree where an agent works or
+          waits.
 bg prints the slot that already holds the branch, if any. It refuses a branch
 that the foreground or an unmanaged worktree has checked out. It never makes a
 new branch: for one that exists neither here nor on the remote, run
@@ -215,7 +218,8 @@ impl Action {
             }
             Command::Fg(rest) => {
                 let (args, force) = rest.without_force();
-                let usage = "usage: wtpool fg <pr-number|pr-url|branch> [--refresh|--reset]";
+                let usage =
+                    "usage: wtpool fg <pr-number|pr-url|branch> [--refresh|--reset] [--force]";
                 Self::Foreground {
                     args: RefArgs::parse(&args, usage)?,
                     force,
@@ -227,7 +231,7 @@ impl Action {
             )?),
             Command::Free(rest) => {
                 let (args, force) = rest.without_force();
-                let usage = "usage: wtpool free <slot|branch>";
+                let usage = "usage: wtpool free <slot|branch> [--force]";
                 Self::Free {
                     arg: at_most_one(args, usage)?.ok_or(Error::Usage(usage))?,
                     force,
@@ -400,13 +404,15 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
         return Ok(());
     }
 
-    if let Action::Status(_) = action {
-        wtpool_core::read_only_git();
-    }
+    let git_mode = if let Action::Status(_) = action {
+        GitMode::ReadOnly
+    } else {
+        GitMode::Writing
+    };
     let cwd = std::env::current_dir()
         .ok()
         .and_then(|cwd| AbsolutePath::try_new(cwd).ok());
-    let settings = Settings::load(|name| std::env::var_os(name), cwd.as_ref())?;
+    let settings = Settings::load(|name| std::env::var_os(name), cwd.as_ref(), git_mode)?;
     if let Action::ShowConfig(format) = action {
         settings.require_repository()?;
         terminal.out(&match format {
@@ -488,7 +494,8 @@ fn run_status(
     }
 }
 
-/// The agent guard of `fg` and `free`, read through `sources` unless `--force` skips it.
+/// `fg` and `free` go ahead with `--force`. Without it they refuse while an agent works or waits
+/// in a worktree they would detach or move, judged by the clock and process table of `sources`.
 fn agent_guard(force: bool, sources: &Sources) -> AgentGuard<'_> {
     if force {
         AgentGuard::Force
@@ -497,14 +504,16 @@ fn agent_guard(force: bool, sources: &Sources) -> AgentGuard<'_> {
     }
 }
 
-/// The clock and process table of `wtpool status`: the system's, or the [`verify_files`].
+/// The clock and process table that `status`, `fg` and `free` judge agents by: the system's,
+/// unless [`verify_files`] names files for them.
 fn status_sources() -> Sources {
     let (clock, processes) = verify_files();
     Sources::from_files(clock, processes)
 }
 
-/// In a `verify` build, the clock and process table files that `WTPOOL_VERIFY_CLOCK` and
-/// `WTPOOL_VERIFY_PROCS` name (the test interface of the status panel). None in a release build.
+/// The clock file and the process table file that `WTPOOL_VERIFY_CLOCK` and `WTPOOL_VERIFY_PROCS`
+/// name, so tests can fix the time and the processes. Both `None` without the `verify` feature, so
+/// a release build never reads them.
 fn verify_files() -> (Option<PathBuf>, Option<PathBuf>) {
     #[cfg(feature = "verify")]
     let files = (

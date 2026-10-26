@@ -122,11 +122,8 @@ pub fn check(root: &Path, phase: u8, results: &[CheckResult]) -> CheckResult {
             .collect(),
         Err(error) => return CheckResult::error(NAME, LAYER, error),
     };
-    let outcomes: BTreeMap<String, Outcome> = crate::web::merge(results.to_vec())
-        .into_iter()
-        .filter(|result| result.check.starts_with(PREFIX))
-        .map(|result| (result.check, result.outcome))
-        .collect();
+    let mut outcomes = crate::web::worst_outcomes(results);
+    outcomes.retain(|check, _| check.starts_with(PREFIX));
     let found = problems(&flows, phase, &registered, &outcomes);
     if found.is_empty() {
         let count = flows.iter().filter(|flow| flow.phase <= phase).count();

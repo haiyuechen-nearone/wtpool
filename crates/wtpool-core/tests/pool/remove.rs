@@ -139,8 +139,8 @@ fn remove__should_match_no_worktree(#[case] arg: &str, #[case] expected: &str) {
 
     // Then
     assert_eq!(
-        result.unwrap_err().to_string(),
-        expected.replace("{root}", &root)
+        result.unwrap_err().messages(),
+        [expected.replace("{root}", &root)]
     );
     assert!(fixture.foreground.join("crates").exists());
 }

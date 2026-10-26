@@ -5,9 +5,10 @@
 
 ```
 wtpool ls                              what is parked where (also plain `wtpool`)
-wtpool fg   <ref> [--refresh|--reset]  bring a branch or PR into the foreground, print its path
+wtpool fg   <ref> [--refresh|--reset] [--force]
+                                       bring a branch or PR into the foreground, print its path
 wtpool bg   <ref> [--refresh|--reset]  park a branch or PR in a slot, print its path
-wtpool free <slot|branch>              detach a slot from its branch (files stay)
+wtpool free <slot|branch> [--force]    detach a slot from its branch (files stay)
 wtpool path <branch>                   print the worktree that holds <branch>
 wtpool new  [name]                     add a slot (the name must start with slot_prefix)
 wtpool rm   <slot>                     remove a slot

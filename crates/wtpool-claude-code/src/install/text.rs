@@ -1,6 +1,7 @@
 //! The output of `wtpool hook install` for Claude Code.
 
 use wtpool_core::hook::Printed;
+use wtpool_core::platform::shell::find_on_path;
 
 use super::block::block;
 use super::presence;
@@ -12,7 +13,7 @@ use super::presence;
 #[must_use]
 pub fn text(binary: &str, shown: &str, settings: Option<&str>) -> Printed {
     let block = serde_json::to_string_pretty(&block(binary)).unwrap_or_default();
-    let on_path = presence::on_path(std::env::var_os("PATH").as_deref());
+    let on_path = find_on_path("wtpool");
     Printed {
         stdout: format!("{block}\n"),
         stderr: presence::note(binary, shown, settings, on_path.as_deref()),

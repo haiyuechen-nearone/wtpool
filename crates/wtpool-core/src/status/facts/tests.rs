@@ -1,11 +1,11 @@
 use std::path::Path;
-use std::process::Command;
 
 use rstest::rstest;
 
 use super::*;
 use crate::paths::AbsolutePath;
 use crate::report::Discard;
+use crate::status::fixture::must_git;
 
 fn facts(dirty: Uncommitted, operation: Operation, unreferenced: Unreferenced) -> Facts {
     Facts {
@@ -282,22 +282,6 @@ fn activity__should_follow_the_precedence(
 
     // Then
     assert_eq!(activity, expected);
-}
-
-fn must_git(dir: &Path, args: &[&str]) -> String {
-    let output = Command::new("git")
-        .current_dir(dir)
-        .args(args)
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_AUTHOR_NAME", "t")
-        .env("GIT_AUTHOR_EMAIL", "t@example.invalid")
-        .env("GIT_COMMITTER_NAME", "t")
-        .env("GIT_COMMITTER_EMAIL", "t@example.invalid")
-        .output()
-        .unwrap();
-    assert!(output.status.success(), "git {args:?}: {output:?}");
-    String::from_utf8(output.stdout).unwrap()
 }
 
 fn must_worktree(path: &Path) -> Worktree {

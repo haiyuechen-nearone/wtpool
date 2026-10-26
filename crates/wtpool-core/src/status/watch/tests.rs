@@ -163,7 +163,7 @@ fn next_beat__should_keep_a_steady_period_unless_a_whole_one_passed() {
     let exact = next_beat(beat, period, beat + period);
 
     // Then
-    assert_eq!(steady, beat + period);
-    assert_eq!(behind, beat + Duration::from_secs(35));
-    assert_eq!(exact, beat + period * 2);
+    assert_eq!(steady, Some(beat + period));
+    assert_eq!(behind, Some(beat + Duration::from_secs(35)));
+    assert_eq!(exact, Some(beat + period * 2));
 }

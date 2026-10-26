@@ -1,6 +1,6 @@
 //! Fetching, creating or syncing the branch of a [`CheckedPlan`], and setting its upstream.
 
-use crate::error::Error;
+use crate::error::{Error, GitError, Refusal};
 use crate::github::ViewPr;
 use crate::names::{BranchName, ObjectId, PrNumber};
 use crate::pool::{self, Pool};
@@ -43,7 +43,7 @@ impl<V: ViewPr> Pool<V> {
                         Some(true) => {
                             let fetched = self
                                 .fetch(&plan::branch_ref(branch), report)?
-                                .ok_or(Unresolved::Fatal(Error::FetchFailed))?;
+                                .ok_or(Unresolved::Fatal(GitError::Fetch.into()))?;
                             self.sync_branch(branch, &fetched, sync, report)?;
                         }
                         Some(false) => report.warn(&format!(
@@ -72,7 +72,7 @@ impl<V: ViewPr> Pool<V> {
                     };
                     let fetched = self
                         .fetch(&refspec, report)?
-                        .ok_or(Unresolved::Fatal(Error::FetchFailed))?;
+                        .ok_or(Unresolved::Fatal(GitError::Fetch.into()))?;
                     self.sync_branch(branch, &fetched, sync, report)?;
                 }
                 self.adopt_upstream(branch, report)?;
@@ -84,7 +84,9 @@ impl<V: ViewPr> Pool<V> {
                 let args = ["fetch", "--quiet", remote, refspec.as_str()];
                 let ran = pool::run_reported(&self.git(), args, report)?;
                 if !ran.success {
-                    return Err(Unresolved::Fatal(Error::FetchBranch(branch.to_string())));
+                    return Err(Unresolved::Fatal(
+                        GitError::FetchBranch(branch.to_string()).into(),
+                    ));
                 }
                 self.track_remote(branch, report)?;
             }
@@ -104,7 +106,7 @@ impl<V: ViewPr> Pool<V> {
                     let args = ["fetch", "--quiet", remote, refspec.as_str()];
                     let ran = pool::run_reported(&self.git(), args, report)?;
                     if !ran.success {
-                        return Err(Unresolved::Fatal(Error::FetchPr(number.clone())));
+                        return Err(Unresolved::Fatal(GitError::FetchPr(number.clone()).into()));
                     }
                     report.warn(&format!(
                         "{branch} comes from a fork: no upstream set, git pull will not work there"
@@ -126,7 +128,9 @@ impl<V: ViewPr> Pool<V> {
         if ran.success {
             Ok(())
         } else {
-            Err(Unresolved::Fatal(Error::CreateBranch(branch.to_string())))
+            Err(Unresolved::Fatal(
+                GitError::CreateBranch(branch.to_string()).into(),
+            ))
         }
     }
 
@@ -255,14 +259,17 @@ impl<V: ViewPr> Pool<V> {
                 );
                 Err(Unresolved::Quiet)
             }
-            SyncStep::HeldByUnmanaged(holder) => Err(Unresolved::Fatal(Error::HeldByUnmanaged {
-                branch: branch.to_string(),
-                worktree: holder.name(),
-                path: holder.path().to_path_buf(),
-            })),
-            SyncStep::HolderUnknown(holder) => {
-                Err(Unresolved::Fatal(Error::StatusUnknown(holder.name())))
-            }
+            SyncStep::HeldByUnmanaged(holder) => Err(Unresolved::Fatal(
+                Refusal::HeldByUnmanaged {
+                    branch: branch.to_string(),
+                    worktree: holder.name(),
+                    path: holder.path().to_path_buf(),
+                }
+                .into(),
+            )),
+            SyncStep::HolderUnknown(holder) => Err(Unresolved::Fatal(
+                Refusal::StatusUnknown(holder.name()).into(),
+            )),
             SyncStep::HolderDirty(holder) => {
                 report.warn(&format!(
                     "{branch} is checked out dirty in {}; not refreshed",

@@ -1,0 +1,37 @@
+/* A narrow tab: tighter padding and minimums. The table scrolls sideways when it still does not fit. */
+
+@media (width <= 760px) {
+  body {
+    padding: 8px 10px 0;
+  }
+
+  .col-activity {
+    width: 112px;
+  }
+
+  .col-worktree {
+    width: 88px;
+  }
+
+  .col-git {
+    width: 60px;
+  }
+
+  .col-last {
+    width: 44px;
+  }
+
+  .col-actions {
+    width: 128px;
+  }
+
+  th,
+  td {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

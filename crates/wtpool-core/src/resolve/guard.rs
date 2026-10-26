@@ -1,6 +1,6 @@
 //! The guard a [`Plan`] passes before it is applied.
 
-use crate::error::Error;
+use crate::error::{Error, Refusal};
 use crate::github::ViewPr;
 use crate::names::BranchName;
 use crate::pool::Pool;
@@ -66,12 +66,13 @@ impl<V: ViewPr> Pool<V> {
             };
             return Err(match risk {
                 CheckoutRisk::Gone => self.gone_error(&worktree),
-                CheckoutRisk::OperationUnknown => Error::OperationUnknown(worktree.name()),
-                CheckoutRisk::InProgress(operation) => Error::OperationInProgress {
+                CheckoutRisk::OperationUnknown => Refusal::OperationUnknown(worktree.name()),
+                CheckoutRisk::InProgress(operation) => Refusal::OperationInProgress {
                     worktree: worktree.name(),
                     operation,
                 },
-            });
+            }
+            .into());
         }
         Ok(CheckedPlan { plan, sync })
     }

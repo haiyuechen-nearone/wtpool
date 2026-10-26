@@ -161,7 +161,7 @@ impl<A: Adapter> Context<'_, A> {
         let started = match (event, &self.input.task_start) {
             (Event::CallEnd(call), Some(task)) => self
                 .adapter
-                .task_file(self.input, task, self.activity.owner())
+                .task_file(self.input, task, self.activity.owner().unwrap_or(0))
                 .map(|path| Started {
                     id: task.clone(),
                     path,
@@ -219,7 +219,7 @@ impl<A: Adapter> Context<'_, A> {
                 let found = self.in_pool(&path);
                 let root = found.as_ref().map_or(base, |w| w.root.as_path());
                 let target = file_target(text, &path, root);
-                (target, found.map(|w| w.root.to_string_lossy().into_owned()))
+                (target, found.map(|w| path_text(&w.root)))
             }
             ToolPath::Command { command, shell } => {
                 let parsed = match shell {
@@ -235,9 +235,7 @@ impl<A: Adapter> Context<'_, A> {
     /// The last `cd` wins, else a single worktree among the path words, else none (H9).
     fn command_place(&self, parsed: &bash::Command) -> Option<String> {
         if let Some(last) = parsed.cds.last() {
-            return self
-                .in_pool(last)
-                .map(|w| w.root.to_string_lossy().into_owned());
+            return self.in_pool(last).map(|w| path_text(&w.root));
         }
         let mut found: Vec<PathBuf> = parsed
             .paths
@@ -248,7 +246,7 @@ impl<A: Adapter> Context<'_, A> {
         found.sort();
         found.dedup();
         match found.as_slice() {
-            [only] => Some(only.to_string_lossy().into_owned()),
+            [only] => Some(path_text(only)),
             _ => None,
         }
     }
@@ -269,8 +267,7 @@ impl<A: Adapter> Context<'_, A> {
         {
             return None;
         }
-        self.in_pool(new_cwd)
-            .map(|w| w.root.to_string_lossy().into_owned())
+        self.in_pool(new_cwd).map(|w| path_text(&w.root))
     }
 
     fn change(&self, current: Option<&Record>, moved_to: Option<String>) -> Change {
@@ -296,10 +293,7 @@ impl<A: Adapter> Context<'_, A> {
         };
         let first_place = match (&agent, current) {
             (Some(_), None) => self.parent_place(),
-            _ => (
-                self.cwd_worktree.root.to_string_lossy().into_owned(),
-                PlacedBy::Cwd,
-            ),
+            _ => self.cwd_place(),
         };
         Change {
             harness: A::HARNESS,
@@ -349,11 +343,12 @@ impl<A: Adapter> Context<'_, A> {
     fn parent_place(&self) -> (String, PlacedBy) {
         match self.activity.read(&self.key.session_key().stem()) {
             Some(parent) => (parent.worktree, parent.placed_by),
-            None => (
-                self.cwd_worktree.root.to_string_lossy().into_owned(),
-                PlacedBy::Cwd,
-            ),
+            None => self.cwd_place(),
         }
+    }
+
+    fn cwd_place(&self) -> (String, PlacedBy) {
+        (path_text(&self.cwd_worktree.root), PlacedBy::Cwd)
     }
 
     /// What an event does to other records: [`Event::Idle`] finishes the subagents, the session's
@@ -396,6 +391,11 @@ impl<A: Adapter> Context<'_, A> {
     }
 }
 
+/// `path` as a record stores it.
+fn path_text(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
 /// `text` as a label stores it (H15), `None` when nothing is left.
 fn label_text(text: &str) -> Option<String> {
     Some(text::clean(text, MAX_LABEL)).filter(|text| !text.is_empty())
@@ -410,10 +410,7 @@ fn file_target(text: &str, path: &Path, root: &Path) -> String {
         .map(str::to_owned)
         .or_else(|| {
             let resolved = place::local(path).map(resolve)?;
-            resolved
-                .strip_prefix(root)
-                .ok()
-                .map(|rest| rest.to_string_lossy().into_owned())
+            resolved.strip_prefix(root).ok().map(path_text)
         })
         .unwrap_or_else(|| {
             path.file_name()

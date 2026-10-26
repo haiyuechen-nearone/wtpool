@@ -27,9 +27,9 @@ pub trait Adapter {
     /// how far it was read (H16). `None` when it cannot be read as a regular file.
     fn titles(&self, transcript: &Path, offset: u64) -> Option<TranscriptTitles>;
 
-    /// The file the output of background task `task` goes to, which the call of `input` started
-    /// (H27), checked to lie in the harness's task folder of the session. `owner` is the user
-    /// who owns `wtpool-activity/`, 0 without Unix owners.
+    /// The file the output of background task `task` goes to, which the call of `input` started,
+    /// checked to lie in the harness's task folder of the session. `owner` is the user who owns
+    /// `wtpool-activity/`, 0 where the system tells no owner.
     fn task_file(&self, input: &HookInput, task: &TaskId, owner: u32) -> Option<String>;
 
     /// The text `wtpool hook install` prints so that the harness runs `binary` on its hook

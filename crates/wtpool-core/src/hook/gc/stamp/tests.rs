@@ -2,38 +2,45 @@ use std::sync::{Arc, Barrier};
 
 use rstest::rstest;
 
-use super::super::super::store::tests::eventually;
 use super::*;
-
-const NOW: Timestamp = Timestamp::from_seconds(1_792_497_600);
-
-/// The time `seconds` after [`NOW`], before it when negative.
-fn later(seconds: i64) -> Timestamp {
-    Timestamp::from_seconds(NOW.seconds() + seconds)
-}
-
-fn must_activity() -> (tempfile::TempDir, Activity) {
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir(dir.path().join("wtpool-activity")).unwrap();
-    let activity = Activity::open(dir.path()).unwrap();
-    (dir, activity)
-}
+use crate::hook::fixture::{NOW, eventually, later, must_activity};
 
 fn stamp_text(activity: &Activity) -> Option<String> {
     std::fs::read_to_string(activity.file_path(STAMP)).ok()
 }
 
+/// The stamp a claim at [`NOW`] writes.
+fn claimed_now() -> Option<String> {
+    Some(format!("{}\n", NOW.to_rfc3339()))
+}
+
 #[rstest]
-#[case::missing(None, true)]
-#[case::an_hour_ago(Some(later(-3600).to_rfc3339()), false)]
-#[case::a_second_short_of_a_day(Some(later(1 - DAY).to_rfc3339()), false)]
-#[case::a_day_ago(Some(later(-DAY).to_rfc3339()), true)]
-#[case::a_week_ago(Some(later(-(7 * DAY)).to_rfc3339()), true)]
-#[case::now(Some(NOW.to_rfc3339()), false)]
-#[case::later_than_now(Some(later(60).to_rfc3339()), true)]
-#[case::garbage(Some("soon".to_owned()), true)]
-#[case::too_long(Some(format!("{}{}", NOW.to_rfc3339(), " ".repeat(64))), true)]
-fn claim__should_run_once_a_day(#[case] stamp: Option<String>, #[case] due: bool) {
+#[case::missing(None, true, claimed_now())]
+#[case::an_hour_ago(
+    Some(later(-3600).to_rfc3339()),
+    false,
+    Some(later(-3600).to_rfc3339())
+)]
+#[case::a_second_short_of_a_day(
+    Some(later(1 - DAY).to_rfc3339()),
+    false,
+    Some(later(1 - DAY).to_rfc3339())
+)]
+#[case::a_day_ago(Some(later(-DAY).to_rfc3339()), true, claimed_now())]
+#[case::a_week_ago(Some(later(-(7 * DAY)).to_rfc3339()), true, claimed_now())]
+#[case::now(Some(NOW.to_rfc3339()), false, Some(NOW.to_rfc3339()))]
+#[case::later_than_now(Some(later(60).to_rfc3339()), true, claimed_now())]
+#[case::garbage(Some("soon".to_owned()), true, claimed_now())]
+#[case::too_long(
+    Some(format!("{}{}", NOW.to_rfc3339(), " ".repeat(64))),
+    true,
+    claimed_now()
+)]
+fn claim__should_run_once_a_day(
+    #[case] stamp: Option<String>,
+    #[case] due: bool,
+    #[case] expected: Option<String>,
+) {
     // Given
     let (_dir, activity) = must_activity();
     if let Some(text) = &stamp {
@@ -45,11 +52,6 @@ fn claim__should_run_once_a_day(#[case] stamp: Option<String>, #[case] due: bool
 
     // Then
     assert_eq!(claimed, due);
-    let expected = if due {
-        Some(format!("{}\n", NOW.to_rfc3339()))
-    } else {
-        stamp
-    };
     assert_eq!(stamp_text(&activity), expected);
 }
 

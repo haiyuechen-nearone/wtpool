@@ -3,13 +3,11 @@
 //! (`WTPOOL_VERIFY_CLOCK`).
 
 mod timestamp;
-mod zone;
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub use timestamp::Timestamp;
-pub(crate) use zone::local_time;
 
 /// Reads the current time.
 pub trait ReadClock: Send + Sync {

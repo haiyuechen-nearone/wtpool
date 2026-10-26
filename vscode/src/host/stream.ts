@@ -196,7 +196,7 @@ export class WatchStream {
     } else {
       // Also the next restart a paused stream shows, until the restarted `wtpool` prints a line.
       this.nextStartAt = this.clock.now() + RESTART_MS - silent;
-      this.cancelTimer = this.clock.after(RESTART_MS - silent, () => this.fail('30 s without a line'));
+      this.cancelTimer = this.clock.after(RESTART_MS - silent, () => void this.fail('30 s without a line'));
     }
   }
 
@@ -209,7 +209,7 @@ export class WatchStream {
     this.nextStartAt = this.clock.now() + this.backoff;
     const detail = error === undefined ? reason : `${reason}: ${error}`;
     this.events.log(`restarting wtpool status --watch in ${this.backoff / 1000} s: ${detail}`);
-    this.cancelTimer = this.clock.after(this.backoff, () => this.start());
+    this.cancelTimer = this.clock.after(this.backoff, () => void this.start());
     this.backoff = Math.min(this.backoff * 2, MAX_BACKOFF_MS);
     this.events.changed();
   }

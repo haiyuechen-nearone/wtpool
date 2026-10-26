@@ -261,13 +261,15 @@ async function menuCommand(window, command) {
 
 /**
  * Opens the quick input with `keys` and fills in `text`. A webview that takes focus late closes
- * a quick input that just opened, and focus in a webview's frame may swallow the keys, so it
- * tries again, from the second try on through the menu command `fallback` unless `keyboardOnly`.
+ * a quick input that just opened, and the keys may never reach the workbench: a webview frame can
+ * hold the keyboard while the workbench's active element is its body, and the workbench then
+ * drops every key the webview forwards. So it tries again, from the second try on through the
+ * menu command `fallback`, which a keyboard reaches through the menu bar as well.
  */
-async function quickInput(window, keys, text, { keyboardOnly = false, fallback }) {
+async function quickInput(window, keys, text, { fallback }) {
   const input = window.locator('.quick-input-widget input');
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    if (attempt > 0 && !keyboardOnly) await menuCommand(window, fallback);
+    if (attempt > 0) await menuCommand(window, fallback);
     else await window.keyboard.press(keys);
     if (!(await input.waitFor({ timeout: 3_000 }).then(() => true, () => false))) continue;
     await sleep(400);
@@ -309,11 +311,11 @@ async function pick(window, keys, text, matches, options) {
 
 /**
  * Runs a command through the Command Palette, as a user types it: the title, arrow keys down
- * to the entry whose label is exactly `title`, Enter. `keyboardOnly` never uses the mouse.
+ * to the entry whose label is exactly `title`, Enter. It never uses the mouse.
  */
-export async function runCommand(window, title, { keyboardOnly = false } = {}) {
+export async function runCommand(window, title) {
   const fallback = 'workbench.action.showCommands';
-  const { index, seen } = await pick(window, 'Meta+Shift+P', `>${title}`, (label) => label === title, { keyboardOnly, fallback });
+  const { index, seen } = await pick(window, 'Meta+Shift+P', `>${title}`, (label) => label === title, { fallback });
   // A missing "Worktrees: Open Status" is the product's failure, so this is an assertion.
   if (index < 0) assert.fail(`the Command Palette lists no "${title}": ${JSON.stringify(seen)}`);
   for (let step = 0; step < index; step += 1) await window.keyboard.press('ArrowDown');

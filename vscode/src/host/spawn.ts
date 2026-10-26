@@ -47,7 +47,7 @@ function track<T extends ChildProcess & { stderr: Readable }>(
     child = start();
   } catch (error: unknown) {
     assertIsError(error);
-    queueMicrotask(() => ended({ started: false, error }));
+    queueMicrotask(() => void ended({ started: false, error }));
     return undefined;
   }
   let stderr = '';
@@ -62,9 +62,9 @@ function track<T extends ChildProcess & { stderr: Readable }>(
   child.stderr.on('data', (chunk: string) => {
     stderr = (stderr + chunk).slice(-STDERR_TAIL);
   });
-  child.on('error', (error) => end({ started: false, error }));
+  child.on('error', (error) => void end({ started: false, error }));
   // 'close' comes once stderr has ended, so the tail holds all that wtpool printed.
-  child.on('close', (code, signal) => end({ started: true, code, signal, stderr }));
+  child.on('close', (code, signal) => void end({ started: true, code, signal, stderr }));
   return child;
 }
 

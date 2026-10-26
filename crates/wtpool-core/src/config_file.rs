@@ -5,12 +5,10 @@ use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
 use crate::config::{CopyPath, Key, SlotCount, SlotSetup};
-use crate::error::Error;
-use crate::fs;
+use crate::error::{Error, SettingsError};
 use crate::names::{RemoteName, SlotPrefix};
 use crate::paths::AbsolutePath;
-
-pub(crate) use crate::fs::open_without_following;
+use crate::platform::fs::open_without_following;
 
 /// The settings that a variable and `wtpool.toml` both set, one per [`Key`], with paths made
 /// absolute and names checked.
@@ -93,16 +91,18 @@ where
 /// The text of the config file at `path`, `None` when there is none. A symlink,
 /// anything but a regular file, and text that is not UTF-8 are refused.
 pub(crate) fn read(path: &Path) -> Result<Option<String>, Error> {
-    let unreadable = |reason: String| Error::ReadConfig {
-        path: path.to_path_buf(),
-        reason,
+    let unreadable = |reason: String| {
+        Error::from(SettingsError::ReadConfig {
+            path: path.to_path_buf(),
+            reason,
+        })
     };
     let io_error = |error: io::Error| unreadable(error.to_string());
-    let mut file = match fs::open_without_following(path) {
+    let mut file = match open_without_following(path) {
         Ok(file) => file,
         Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
         Err(_) if path.symlink_metadata().is_ok_and(|meta| meta.is_symlink()) => {
-            return Err(Error::ConfigSymlink(path.to_path_buf()));
+            return Err(SettingsError::ConfigSymlink(path.to_path_buf()).into());
         }
         Err(error) => return Err(io_error(error)),
     };
@@ -123,11 +123,12 @@ fn from_toml<T: DeserializeOwned>(text: &str, file: &Path) -> Result<T, Error> {
         let mut detail = error;
         detail.set_input(None);
         let reason = detail.to_string().trim_end().replace('\n', " ");
-        Error::ConfigSyntax {
+        SettingsError::ConfigSyntax {
             path: file.to_path_buf(),
             line,
             reason,
         }
+        .into()
     })
 }
 
@@ -146,12 +147,13 @@ where
     H: Fn() -> Result<AbsolutePath, Error>,
 {
     fn invalid(&self, key: &'static str, value: impl ToString, reason: &str) -> Error {
-        Error::InvalidSetting {
+        SettingsError::InvalidValue {
             key,
             value: value.to_string(),
             origin: format!("in {}", self.file.display()),
             reason: reason.to_owned(),
         }
+        .into()
     }
 
     fn text(&self, key: &'static str, value: Option<String>) -> Result<Option<String>, Error> {
@@ -233,11 +235,12 @@ mod tests {
     }
 
     fn no_home() -> Result<AbsolutePath, Error> {
-        Err(Error::InvalidConfig {
+        Err(SettingsError::InvalidVariable {
             var: "HOME",
             value: String::new(),
             reason: "not set".to_owned(),
-        })
+        }
+        .into())
     }
 
     fn base() -> AbsolutePath {
@@ -453,7 +456,7 @@ mod tests {
         #[case] expected: &str,
     ) {
         // Given
-        let error = Error::ConfigSyntax {
+        let error = SettingsError::ConfigSyntax {
             path: PathBuf::from(FILE),
             line,
             reason: "oops".to_owned(),

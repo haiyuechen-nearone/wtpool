@@ -123,6 +123,39 @@ pub struct Wait {
     pub call: Option<String>,
 }
 
+impl Wait {
+    /// A wait that names no call, as a notification sets one.
+    #[must_use]
+    pub fn notified(reason: WaitReason) -> Self {
+        Self {
+            reason,
+            tool: None,
+            target: None,
+            input_hash: None,
+            call: None,
+        }
+    }
+
+    /// A wait on a call of `tool` at `target` whose input hashes to `input_hash`, bound to the
+    /// call `id` once known.
+    #[must_use]
+    pub fn on_call(
+        reason: WaitReason,
+        tool: &str,
+        target: &str,
+        input_hash: Option<&str>,
+        id: Option<&str>,
+    ) -> Self {
+        Self {
+            reason,
+            tool: Some(tool.to_owned()),
+            target: Some(target.to_owned()),
+            input_hash: input_hash.map(str::to_owned),
+            call: id.map(str::to_owned),
+        }
+    }
+}
+
 /// A tool and its target (H14).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Action {
@@ -199,6 +232,13 @@ impl Record {
     }
 }
 
+/// Appends `item` to `items`, then drops the oldest past `cap`.
+pub fn push_bounded<T>(items: &mut Vec<T>, item: T, cap: usize) {
+    items.push(item);
+    let excess = items.len().saturating_sub(cap);
+    items.drain(..excess);
+}
+
 /// Drops the first of `items`: `false` when there is none.
 fn drop_first<T>(items: &mut Vec<T>) -> bool {
     let first = items.len().min(1);
@@ -210,40 +250,12 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-
-    fn must_record() -> Record {
-        Record {
-            version: 1,
-            harness: Harness::ClaudeCode,
-            session_id: "s1".to_owned(),
-            agent_id: None,
-            agent_type: None,
-            label: "session 12:00".to_owned(),
-            worktree: "/p/fg".to_owned(),
-            placed_by: PlacedBy::Cwd,
-            state: State::Working,
-            waiting: None,
-            action: None,
-            in_flight: Vec::new(),
-            done_ids: Vec::new(),
-            error: None,
-            since: "2026-10-20T12:00:00Z".to_owned(),
-            updated: "2026-10-20T12:00:00Z".to_owned(),
-            writer_started: 1,
-            process: None,
-            first_cwd: None,
-            ended: None,
-            title: None,
-            transcript_offset: 0,
-            subagents: Vec::new(),
-            tasks: Vec::new(),
-        }
-    }
+    use crate::hook::fixture;
 
     #[test]
     fn to_json__should_round_trip() {
         // Given
-        let mut record = must_record();
+        let mut record = fixture::record("s1");
         record.title = Some(Title {
             text: "Fix the build".to_owned(),
             by: TitleBy::User,
@@ -268,7 +280,7 @@ mod tests {
         assert_eq!(parsed, Some(record));
     }
 
-    fn must_call(id: &str) -> Call {
+    fn call(id: &str) -> Call {
         Call {
             id: id.to_owned(),
             tool: "Read".to_owned(),
@@ -288,11 +300,9 @@ mod tests {
         #[case] keeps_every_call: bool,
     ) {
         // Given
-        let mut record = must_record();
+        let mut record = fixture::record("s1");
         record.done_ids = (0..done).map(|n| format!("{n:0>128}")).collect();
-        record.in_flight = (0..calls)
-            .map(|n| must_call(&format!("{n:0>128}")))
-            .collect();
+        record.in_flight = (0..calls).map(|n| call(&format!("{n:0>128}"))).collect();
 
         // When
         let text = record.to_json().unwrap();
@@ -307,7 +317,7 @@ mod tests {
     #[test]
     fn to_json__should_write_a_record_that_fits_as_it_is() {
         // Given
-        let mut record = must_record();
+        let mut record = fixture::record("s1");
         record.done_ids = (0..64).map(|n| format!("toolu_{n:02}")).collect();
 
         // When
@@ -320,10 +330,10 @@ mod tests {
     #[test]
     fn to_json__should_refuse_a_record_that_cannot_fit() {
         // Given
-        let mut record = must_record();
+        let mut record = fixture::record("s1");
         record.first_cwd = Some(format!("/p/fg/{}", "d".repeat(MAX_RECORD_BYTES)));
         record.done_ids = vec!["toolu_1".to_owned()];
-        record.in_flight = vec![must_call("toolu_2")];
+        record.in_flight = vec![call("toolu_2")];
 
         // When
         let error = record.to_json().unwrap_err();
@@ -335,8 +345,8 @@ mod tests {
     #[test]
     fn to_json__should_drop_ended_ids_before_calls() {
         // Given
-        let mut record = must_record();
-        record.in_flight = (0..3).map(|n| must_call(&format!("toolu_c{n}"))).collect();
+        let mut record = fixture::record("s1");
+        record.in_flight = (0..3).map(|n| call(&format!("toolu_c{n}"))).collect();
         let without_ids = serde_json::to_vec(&record).unwrap().len();
         record.first_cwd = Some("d".repeat(MAX_RECORD_BYTES - without_ids - 100));
         record.done_ids = (0..64).map(|n| format!("toolu_{n:02}")).collect();
@@ -367,7 +377,7 @@ mod tests {
     #[test]
     fn from_json__should_map_the_tools_of_an_older_record() {
         // Given
-        let mut record = must_record();
+        let mut record = fixture::record("s1");
         let call = |id: &str, tool: &str, kind: Option<CallKind>| Call {
             id: id.to_owned(),
             tool: tool.to_owned(),
@@ -417,7 +427,7 @@ mod tests {
     #[case::not_json("{")]
     fn from_json__should_refuse_other_versions_and_garbage(#[case] change: &str) {
         // Given
-        let text = String::from_utf8(must_record().to_json().unwrap())
+        let text = String::from_utf8(fixture::record("s1").to_json().unwrap())
             .unwrap()
             .replace(r#""version":1"#, change);
 

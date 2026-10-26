@@ -1,35 +1,13 @@
-//! File system helpers that the settings and the hook share: an open that never follows a
-//! symlink, and the home folder.
+//! The user's home and state folders.
 
 use std::ffi::OsString;
-use std::fs::{File, OpenOptions};
-use std::io;
 use std::path::{Path, PathBuf};
-
-/// Opens `path` for reading, failing when it is a symlink. A FIFO does not block
-/// the open, so the regular file check after it can refuse one.
-#[cfg(unix)]
-pub fn open_without_following(path: &Path) -> io::Result<File> {
-    use std::os::unix::fs::OpenOptionsExt;
-    OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(path)
-}
-
-#[cfg(not(unix))]
-pub fn open_without_following(path: &Path) -> io::Result<File> {
-    if path.symlink_metadata()?.is_symlink() {
-        return Err(io::Error::other("symlink"));
-    }
-    OpenOptions::new().read(true).open(path)
-}
 
 /// The home folder: `home`, the value of `HOME`, else the folder `system` names, as on Windows,
 /// where `HOME` is usually unset. `None` when neither is absolute.
 ///
-/// An empty or relative `HOME` counts as unset, so a `~/` path or the hook log never resolves
-/// against the current folder, as that may be a worktree.
+/// An empty or relative `HOME` counts as unset, so no path built on it resolves against the
+/// current folder, as that may be a worktree.
 #[must_use]
 pub fn home_folder(
     home: Option<OsString>,
@@ -38,6 +16,25 @@ pub fn home_folder(
     home.map(PathBuf::from)
         .filter(|home| home.is_absolute())
         .or_else(|| system().filter(|folder| folder.is_absolute()))
+}
+
+/// The [`home_folder`] of this process.
+#[must_use]
+pub fn home() -> Option<PathBuf> {
+    home_folder(std::env::var_os("HOME"), std::env::home_dir)
+}
+
+/// The folder for state files: `state_home`, the value of `XDG_STATE_HOME`, else `.local/state`
+/// in `home`. A relative or empty folder counts as unset, as in [`home_folder`].
+#[must_use]
+pub fn state_folder(state_home: Option<&Path>, home: Option<&Path>) -> Option<PathBuf> {
+    state_home
+        .filter(|path| path.is_absolute())
+        .map(Path::to_path_buf)
+        .or_else(|| {
+            home.filter(|path| path.is_absolute())
+                .map(|home| home.join(".local/state"))
+        })
 }
 
 #[cfg(test)]
@@ -84,22 +81,27 @@ mod tests {
         assert_eq!(folder, expected);
     }
 
-    #[cfg(unix)]
-    #[test]
-    fn open_without_following__should_refuse_a_symlink() {
-        // Given
-        let dir = tempfile::tempdir().unwrap();
-        let target = dir.path().join("target");
-        std::fs::write(&target, "text").unwrap();
-        let link = dir.path().join("link");
-        std::os::unix::fs::symlink(&target, &link).unwrap();
-
+    #[rstest]
+    #[case::state_home(Some(absolute("s")), Some(absolute("h")), Some(absolute("s")))]
+    #[case::relative_state_home(
+        Some(PathBuf::from("s")),
+        Some(absolute("h")),
+        Some(absolute("h").join(".local/state"))
+    )]
+    #[case::home_only(None, Some(absolute("h")), Some(absolute("h").join(".local/state")))]
+    #[case::relative_home(None, Some(PathBuf::from("h")), None)]
+    #[case::empty_home(None, Some(PathBuf::new()), None)]
+    #[case::relative_state_home_and_home(Some(PathBuf::from("s")), Some(PathBuf::from("h")), None)]
+    #[case::neither(None, None, None)]
+    fn state_folder__should_follow_xdg(
+        #[case] state_home: Option<PathBuf>,
+        #[case] home: Option<PathBuf>,
+        #[case] expected: Option<PathBuf>,
+    ) {
         // When
-        let through_link = open_without_following(&link);
-        let direct = open_without_following(&target);
+        let folder = state_folder(state_home.as_deref(), home.as_deref());
 
         // Then
-        assert!(through_link.is_err());
-        assert!(direct.is_ok());
+        assert_eq!(folder, expected);
     }
 }

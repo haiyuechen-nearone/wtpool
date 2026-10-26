@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use rstest::rstest;
-use wtpool_core::{Error, SyncMode};
+use wtpool_core::{Error, Refusal, SyncMode};
 
 use crate::states::{must_break_status, must_stop_a_rebase};
 use crate::support::{Fixture, Recorder, Setup, git_command, must_git};
@@ -68,7 +68,10 @@ fn background__should_refuse_a_branch_the_foreground_takes_during_the_fetch() {
 
     // Then
     assert!(
-        matches!(result, Err(Error::HeldByForeground { ref branch, .. }) if branch == "a"),
+        matches!(
+            result,
+            Err(Error::Refusal(Refusal::HeldByForeground { ref branch, .. })) if branch == "a"
+        ),
         "{result:?}"
     );
     assert_eq!(report.out, "");

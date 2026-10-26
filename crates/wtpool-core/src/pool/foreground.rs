@@ -96,6 +96,7 @@ impl<V: ViewPr> Pool<V> {
     fn refuse_release(&self, branch: &BranchName, holder: &Worktree) -> Result<(), Error> {
         let state = WorktreeState::read(holder, &self.git())?;
         let role = self.config.role_of(holder);
-        refusals::release_refusal(branch, holder.path(), role, &state).map_or(Ok(()), Err)
+        refusals::release_refusal(branch, holder.path(), role, &state)
+            .map_or(Ok(()), |refusal| Err(refusal.into()))
     }
 }

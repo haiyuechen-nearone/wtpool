@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use super::log;
 use super::record::HarnessProcess;
 use crate::clock::{self, Clock};
-use crate::fs::home_folder;
+use crate::platform::dirs;
 use crate::processes::{ListProcesses, ProcessQuery, ProcessTable, StartTime};
 
 /// What a hook run reads besides its input.
@@ -37,7 +37,7 @@ impl HookEnv {
     /// files when they are given.
     #[must_use]
     pub fn from_process(clock: Option<PathBuf>, processes: Option<PathBuf>) -> Self {
-        let home = home_folder(std::env::var_os("HOME"), std::env::home_dir);
+        let home = dirs::home();
         let state_home = std::env::var_os("XDG_STATE_HOME").map(PathBuf::from);
         Self {
             clock: Clock::from_file(clock),

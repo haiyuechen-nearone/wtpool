@@ -320,9 +320,14 @@ describe('tab', () => {
     // Given
     await resetFake({ scenario: 'folder_missing' });
     const verify = await verifyApi();
+    // The scenario checks posted folder_missing too, so only views of this tab count.
+    const from = (await views()).length;
     await openStatus();
     const final = scenarioDocuments('folder_missing').at(-1);
-    const shown = await waitFor(async () => (await views()).some((v) => JSON.stringify(v.status) === JSON.stringify(final)), 10_000);
+    const shown = await waitFor(
+      async () => (await views()).slice(from).some((v) => JSON.stringify(v.status) === JSON.stringify(final)),
+      10_000,
+    );
     assert.ok(shown, 'setup: the document never reached the webview');
     const wt1 = final.pools[0].worktrees.find((w) => w.name === 'wt1').path;
     const wt3 = final.pools[0].worktrees.find((w) => w.name === 'wt3').path;
@@ -402,9 +407,16 @@ describe('tab', () => {
   it('hidden_then_shown', async () => {
     // Given
     await resetFake({ scenario: 'idle_pool', aliveMs: 0 });
+    const from = (await views()).length;
     const opened = await openStatus();
     const docs = scenarioDocuments('idle_pool');
-    await waitFor(async () => (await views()).length > 0, 10_000);
+    // The fake reads control lines only once it has printed its documents, and earlier checks
+    // posted idle_pool too, so only a view of this tab counts.
+    const first = await waitFor(
+      async () => (await views()).slice(from).some((v) => JSON.stringify(v.status) === JSON.stringify(docs.at(-1))),
+      10_000,
+    );
+    assert.ok(first, 'setup: the document never reached the webview');
     await textEditor(opened.group.viewColumn);
     await sleep(500);
     const hiddenFrom = (await posted()).length;

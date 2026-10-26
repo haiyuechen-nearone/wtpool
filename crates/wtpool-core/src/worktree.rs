@@ -1,39 +1,16 @@
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use crate::error::Error;
+use crate::error::{Error, GitError};
+use crate::git::layout::{self, Marker};
+use crate::git::{Git, GitMode};
 use crate::names::{BranchName, ObjectId};
 use crate::paths::AbsolutePath;
 use crate::report::Report;
-use crate::run::Git;
 use crate::worktree_state::{Operation, Uncommitted, Unreferenced};
 
-/// The files that mark a stopped operation, by `git rev-parse --git-path` name.
-/// The first one present names the operation.
-const OPERATION_MARKERS: [(&str, Marker); 8] = [
-    ("rebase-merge", Marker::Of(Operation::Rebase)),
-    // `git am` also keeps its state in `rebase-apply`.
-    ("rebase-apply/applying", Marker::Of(Operation::Am)),
-    ("rebase-apply", Marker::Of(Operation::Rebase)),
-    ("MERGE_HEAD", Marker::Of(Operation::Merge)),
-    ("CHERRY_PICK_HEAD", Marker::Of(Operation::CherryPick)),
-    ("REVERT_HEAD", Marker::Of(Operation::Revert)),
-    // Outlives `CHERRY_PICK_HEAD` and `REVERT_HEAD` once the stopped pick is committed.
-    ("sequencer/todo", Marker::Sequencer),
-    ("BISECT_LOG", Marker::Of(Operation::Bisect)),
-];
-
-/// The files that name the branches a stopped rebase or bisect returns to or
-/// moves, which git counts as checked out in that worktree.
-const OPERATION_BRANCH_FILES: [&str; 4] = [
-    "rebase-merge/head-name",
-    "rebase-apply/head-name",
-    "rebase-merge/update-refs",
-    "BISECT_START",
-];
-
 /// A worktree that `git worktree list` reports for the pool's repository. It
-/// can only be obtained from [`Worktree::list`], so a path that merely lies
+/// can only be obtained from [`Worktree::list_with`], so a path that merely lies
 /// inside a worktree, or in another repository, never becomes one.
 #[derive(Debug, Clone)]
 pub(crate) struct Worktree {
@@ -47,13 +24,8 @@ pub(crate) struct Worktree {
     prunable: bool,
     /// The entry is a bare repository, listed in place of a main worktree.
     bare: bool,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Marker {
-    Of(Operation),
-    /// A cherry-pick or revert of several commits; its todo list names which.
-    Sequencer,
+    /// The mode of the git that listed it, and of every git run in it.
+    mode: GitMode,
 }
 
 /// The `HEAD` of a worktree, as the repository records it.
@@ -70,12 +42,18 @@ pub(crate) enum Head {
 impl Worktree {
     /// Every worktree of the repository `dir` is in, in `git worktree list` order.
     pub fn list(dir: &AbsolutePath, report: &mut impl Report) -> Result<Vec<Self>, Error> {
-        let ran = Git::at(dir).run(["worktree", "list", "--porcelain", "-z"])?;
+        Self::list_with(&Git::at(dir), report)
+    }
+
+    /// [`Worktree::list`] for the directory of `git`, in its mode.
+    pub fn list_with(git: &Git, report: &mut impl Report) -> Result<Vec<Self>, Error> {
+        let ran = git.run(["worktree", "list", "--porcelain", "-z"])?;
         ran.forward_stderr(report);
+        let unlisted = || -> Error { GitError::ListWorktrees(git.dir().to_path_buf()).into() };
         if !ran.success {
-            return Err(Error::ListWorktrees(dir.to_path_buf()));
+            return Err(unlisted());
         }
-        parse_list(&ran.stdout).ok_or_else(|| Error::ListWorktrees(dir.to_path_buf()))
+        parse_list(&ran.stdout, git.mode()).ok_or_else(unlisted)
     }
 
     pub fn path(&self) -> &AbsolutePath {
@@ -91,7 +69,7 @@ impl Worktree {
     }
 
     pub fn git(&self) -> Git {
-        Git::at(&self.path)
+        Git::at(&self.path).with_mode(self.mode)
     }
 
     pub fn is_bare(&self) -> bool {
@@ -172,11 +150,11 @@ impl Worktree {
         if self.prunable {
             return Ok(Operation::Unknown);
         }
-        let markers = OPERATION_MARKERS.map(|(marker, _)| marker);
+        let markers = layout::OPERATION_MARKERS.map(|(marker, _)| marker);
         let Some(paths) = self.git_paths(&markers)? else {
             return Ok(Operation::Unknown);
         };
-        for (path, (_, marker)) in paths.iter().zip(OPERATION_MARKERS) {
+        for (path, (_, marker)) in paths.iter().zip(layout::OPERATION_MARKERS) {
             match (path.try_exists(), marker) {
                 (Ok(false), _) => {}
                 (Ok(true), Marker::Of(operation)) => return Ok(operation),
@@ -196,7 +174,7 @@ impl Worktree {
         if self.prunable {
             return Ok(None);
         }
-        let Some(paths) = self.git_paths(&OPERATION_BRANCH_FILES)? else {
+        let Some(paths) = self.git_paths(&layout::OPERATION_BRANCH_FILES)? else {
             return Ok(None);
         };
         let mut branches = Vec::new();
@@ -226,7 +204,7 @@ impl Worktree {
     }
 }
 
-/// The branch a line of [`OPERATION_BRANCH_FILES`] may name. `BISECT_START`
+/// The branch a line of [`layout::OPERATION_BRANCH_FILES`] may name. `BISECT_START`
 /// holds a short name, the others full refs. Lines that name no branch, such as
 /// the commits in `update-refs`, come through too: they can only match a branch
 /// of the same name, and refusing then is safe.
@@ -251,7 +229,7 @@ fn sequencer_operation(todo: &Path) -> Operation {
 /// Reads `git worktree list --porcelain -z`. The branch comes from git's own
 /// record, which stays right when the worktree's `.git` link is broken. `None`
 /// when a listed path is not absolute.
-fn parse_list(listing: &str) -> Option<Vec<Worktree>> {
+fn parse_list(listing: &str, mode: GitMode) -> Option<Vec<Worktree>> {
     let mut worktrees: Vec<Worktree> = Vec::new();
     for field in listing.split('\0') {
         if let Some(path) = field.strip_prefix("worktree ") {
@@ -264,6 +242,7 @@ fn parse_list(listing: &str) -> Option<Vec<Worktree>> {
                 head_commit: None,
                 prunable: false,
                 bare: false,
+                mode,
             });
         } else if let Some(current) = worktrees.last_mut() {
             if let Some(commit) = field.strip_prefix("HEAD ") {
@@ -306,7 +285,7 @@ mod tests {
             listing.push('\0');
         }
         listing.push('\0');
-        let mut worktrees = parse_list(&listing).unwrap();
+        let mut worktrees = parse_list(&listing, GitMode::Writing).unwrap();
         assert_eq!(worktrees.len(), 1);
         worktrees.remove(0)
     }
@@ -341,7 +320,7 @@ mod tests {
         .join("\0");
 
         // When
-        let worktrees = parse_list(&listing).unwrap();
+        let worktrees = parse_list(&listing, GitMode::Writing).unwrap();
 
         // Then
         let summary: Vec<(String, Head, Option<&str>, bool, bool)> = worktrees
@@ -392,7 +371,7 @@ mod tests {
         let listing = format!("HEAD {HEAD}\0detached\0\0");
 
         // When
-        let worktrees = parse_list(&listing).unwrap();
+        let worktrees = parse_list(&listing, GitMode::Writing).unwrap();
 
         // Then
         assert!(worktrees.is_empty());
@@ -404,7 +383,7 @@ mod tests {
         let listing = format!("worktree app\0HEAD {HEAD}\0detached\0\0");
 
         // When
-        let worktrees = parse_list(&listing);
+        let worktrees = parse_list(&listing, GitMode::Writing);
 
         // Then
         assert!(worktrees.is_none());

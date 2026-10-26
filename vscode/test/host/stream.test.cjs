@@ -17,6 +17,9 @@ const {
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
+/** The longest a restarted fake wtpool may take to log its start and print a line: seconds on a loaded machine. */
+const RESTART_MS = 10_000;
+
 async function viewsSince(from) {
   return (await posted()).slice(from).filter((m) => m && m.type === 'view');
 }
@@ -34,6 +37,8 @@ async function restartAfter(fault) {
   const first = await waitFor(() => starts()[0], 10_000);
   assert.ok(first, 'wtpool did not start');
   const leadShown = await waitFor(async () => (await viewsSince(from)).find((v) => same(v.status, expected)), 10_000);
+  // The fault pauses the stream, which sets its restart on the fake clock.
+  await waitFor(async () => (await viewsSince(from)).some((v) => v.connection === 'paused'), 10_000);
   await sleep(1500);
   const beforeBackoff = starts().length;
   const pausedViews = (await viewsSince(from)).filter((v) => v.connection === 'paused');
@@ -42,10 +47,10 @@ async function restartAfter(fault) {
   const atNearlyOneSecond = starts().length;
   const fromRestart = (await posted()).length;
   await advance(1);
-  const restarted = await waitFor(() => starts().length >= 2, 3_000);
+  const restarted = await waitFor(() => starts().length >= 2, RESTART_MS);
   const live = await waitFor(async () =>
     (await viewsSince(fromRestart)).find((v) => v.connection === 'live' && same(v.status, expected)),
-  3_000);
+  RESTART_MS);
   const retry = await secondRetry(pausedViews, fromRestart);
   return { from, first, leadShown, beforeBackoff, pausedViews, atNearlyOneSecond, restarted, live, retry };
 }
@@ -58,7 +63,7 @@ async function restartAfter(fault) {
  */
 async function secondRetry(pausedViews, fromRestart) {
   const firstAt = Date.parse(pausedViews[0]?.retry_at);
-  const second = await waitFor(async () => (await viewsSince(fromRestart)).find((v) => v.connection === 'paused'), 3_000);
+  const second = await waitFor(async () => (await viewsSince(fromRestart)).find((v) => v.connection === 'paused'), RESTART_MS);
   const secondAt = Date.parse(second?.retry_at);
   if (!Number.isFinite(firstAt) || !Number.isFinite(secondAt) || secondAt <= firstAt) {
     return { firstAt, secondAt, early: undefined, onTime: undefined };
@@ -68,7 +73,7 @@ async function secondRetry(pausedViews, fromRestart) {
   await sleep(500);
   const early = starts().length - count;
   await advance(2000);
-  const onTime = await waitFor(() => starts().length > count, 3_000);
+  const onTime = await waitFor(() => starts().length > count, RESTART_MS);
   return { firstAt, secondAt, early, onTime: Boolean(onTime) };
 }
 
@@ -139,21 +144,22 @@ describe('stream', () => {
   it('early_exit', async () => {
     // Given
     await resetFake({ scenario: 'idle_pool', faults: ['early_exit'] });
+    const from = (await posted()).length;
     await openStatus();
     await waitFor(() => starts().length >= 1, 10_000);
     const delays = [1000, 2000, 4000, 8000, 16000, 30000, 30000];
 
     // When
     const seen = [];
-    for (const delay of delays) {
+    for (const [exits, delay] of delays.entries()) {
       const count = starts().length;
-      await waitFor(() => ended(starts().at(-1).pid), 3_000);
-      await sleep(300);
+      // Each exit pauses the stream, which sets its restart on the fake clock.
+      await waitFor(async () => (await viewsSince(from)).filter((v) => v.connection === 'paused').length > exits, 10_000);
       await advance(delay - 1);
       await sleep(400);
       const early = starts().length;
       await advance(1);
-      const late = await waitFor(() => starts().length > count && starts().length, 3_000);
+      const late = await waitFor(() => starts().length > count && starts().length, RESTART_MS);
       seen.push({ delay, early: early - count, late: (late || count) - count });
     }
 

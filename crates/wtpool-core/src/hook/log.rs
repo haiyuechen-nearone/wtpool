@@ -1,22 +1,19 @@
 //! The hook's diagnostics (H23): `$XDG_STATE_HOME/wtpool/hook.log`, at most 1 MiB, rotated once to
 //! `hook.log.1`. Never inside a git directory, which a watcher may watch.
 
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use crate::platform::dirs;
+use crate::platform::fs::open_private;
+
 const MAX_LOG: u64 = 1024 * 1024;
 
-/// The log folder: `$XDG_STATE_HOME/wtpool`, else `$HOME/.local/state/wtpool`. A relative or
-/// empty folder counts as unset, so the log never lands in the current folder, as that may be a
-/// worktree.
+/// The log folder: `wtpool` in the [`dirs::state_folder`] of `state_home` and `home`.
 #[must_use]
 pub fn log_dir(state_home: Option<&Path>, home: Option<&Path>) -> Option<PathBuf> {
-    let state = match state_home.filter(|path| path.is_absolute()) {
-        Some(path) => path.to_path_buf(),
-        None => home.filter(|path| path.is_absolute())?.join(".local/state"),
-    };
-    Some(state.join("wtpool"))
+    Some(dirs::state_folder(state_home, home)?.join("wtpool"))
 }
 
 /// Appends `line` to `hook.log` in `dir`, rotating first when it would pass 1 MiB. Writes
@@ -31,36 +28,11 @@ pub fn append(dir: &Path, line: &str) {
     if size.saturating_add(length).saturating_add(1) > MAX_LOG {
         let _ = std::fs::rename(&log, dir.join("hook.log.1"));
     }
-    if let Ok(mut file) = open_log(&log) {
+    if let Ok(mut file) = open_private(OpenOptions::new().create(true).append(true), &log) {
         let mut text: String = line.chars().take(4096).collect();
         text.push('\n');
         let _ = file.write_all(text.as_bytes());
     }
-}
-
-/// Opens `log` to append, created with mode 0600, never through a symlink or blocking on a
-/// FIFO.
-#[cfg(unix)]
-fn open_log(log: &Path) -> std::io::Result<File> {
-    use std::os::unix::fs::OpenOptionsExt;
-    std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .mode(0o600)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(log)
-}
-
-/// Opens `log` to append, refusing a symlink, which the open itself cannot do here.
-#[cfg(not(unix))]
-fn open_log(log: &Path) -> std::io::Result<File> {
-    if log.symlink_metadata().is_ok_and(|meta| meta.is_symlink()) {
-        return Err(std::io::Error::other("symlink"));
-    }
-    std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log)
 }
 
 /// Whether `dir` or one of its ancestors is a git directory: a folder holding `HEAD`.
@@ -76,26 +48,6 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-
-    #[rstest]
-    #[case::state_home(Some("/s"), Some("/h"), Some("/s/wtpool"))]
-    #[case::relative_state_home(Some("s"), Some("/h"), Some("/h/.local/state/wtpool"))]
-    #[case::home_only(None, Some("/h"), Some("/h/.local/state/wtpool"))]
-    #[case::relative_home(None, Some("h"), None)]
-    #[case::empty_home(None, Some(""), None)]
-    #[case::relative_state_home_and_home(Some("s"), Some("h"), None)]
-    #[case::neither(None, None, None)]
-    fn log_dir__should_follow_xdg(
-        #[case] state: Option<&str>,
-        #[case] home: Option<&str>,
-        #[case] expected: Option<&str>,
-    ) {
-        // When
-        let dir = log_dir(state.map(Path::new), home.map(Path::new));
-
-        // Then
-        assert_eq!(dir, expected.map(PathBuf::from));
-    }
 
     #[test]
     fn append__should_rotate_once_past_one_mib() {

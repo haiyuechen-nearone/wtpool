@@ -9,8 +9,8 @@ use std::time::{Duration, Instant};
 
 use tempfile::TempDir;
 use wtpool_core::{
-    AbsolutePath, Config, CopyPath, Error, ObjectId, Pool, PrNumber, PrView, RemoteName, RepoSlug,
-    Report, SlotCount, SlotPrefix, SlotSetup, Source, ViewPr, ViewPrError,
+    AbsolutePath, Config, CopyPath, Error, GitError, ObjectId, Pool, PrNumber, PrView, RemoteName,
+    RepoSlug, Report, SlotCount, SlotPrefix, SlotSetup, Source, ViewPr, ViewPrError,
 };
 
 /// A [`ViewPr`] that gives the same [`PrAnswer`] to every lookup.
@@ -31,10 +31,13 @@ impl ViewPr for FakePr {
             }),
             PrAnswer::NotFound => Err(ViewPrError::NotFound),
             PrAnswer::Malformed => Err(ViewPrError::Malformed),
-            PrAnswer::Fails => Err(ViewPrError::Failed(Error::Spawn {
-                program: "gh".to_owned(),
-                source: io::Error::from(io::ErrorKind::PermissionDenied),
-            })),
+            PrAnswer::Fails => Err(ViewPrError::Failed(
+                GitError::Spawn {
+                    program: "gh".to_owned(),
+                    source: io::Error::from(io::ErrorKind::PermissionDenied),
+                }
+                .into(),
+            )),
         }
     }
 }

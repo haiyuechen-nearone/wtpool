@@ -126,7 +126,7 @@ export async function terminalFolder(window, dirs, { keyboard = false } = {}) {
   // No terminal is the product's failure, which the caller asserts.
   if (!(await screen.waitFor({ timeout: 15_000 }).then(() => true, () => false))) return undefined;
   await sleep(1500);
-  if (keyboard) await runCommand(window, 'Terminal: Focus Terminal', { keyboardOnly: true });
+  if (keyboard) await runCommand(window, 'Terminal: Focus Terminal');
   else await screen.click();
   await window.keyboard.type(`pwd -P > '${out}'`);
   await window.keyboard.press('Enter');

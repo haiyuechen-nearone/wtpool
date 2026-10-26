@@ -162,6 +162,87 @@ test('flow__hide_and_show', async () => {
   });
 });
 
+/** The header a page shows before any view reaches it. */
+const STARTING = 'starting…';
+/** The pause between hiding the tab and showing it again, one per switch. */
+const RESHOW_PAUSES_MS = [0, 0, 50, 0, 150, 0, 300, 0, 50, 0];
+const RESHOW_BOUND_MS = 2_000;
+/** A show that misses the bound is watched this much longer, to tell a late table from a lost view. */
+const RESHOW_GRACE_MS = 8_000;
+
+/** Clicks the label of the editor tab `name` in the editor tab bar. */
+async function clickTab(window, name) {
+  await window.locator(`.tabs-container .tab[aria-label^="${name}"]`).first().click();
+}
+
+/** Every frame of the window that holds the Worktrees page, rows or none. */
+async function pageFrames(window) {
+  const found = [];
+  for (const frame of window.frames()) {
+    try {
+      if (await frame.locator('header .connection').count()) found.push(frame);
+    } catch {
+      // A frame that navigates away cannot be queried; the next round finds the new one.
+    }
+  }
+  return found;
+}
+
+/**
+ * Watches the tab from `shownAt` until a page other than `before` shows `expected` under a header
+ * past starting, or the bound and the grace run out. Returns that page's frame, its header and
+ * rows, and the milliseconds it took to fill, null when it never did.
+ */
+async function watchShow(window, expected, before, shownAt) {
+  const deadline = shownAt + RESHOW_BOUND_MS + RESHOW_GRACE_MS;
+  let seen = { frame: undefined, connection: null, rows: [], filledMs: null };
+  for (;;) {
+    for (const frame of await pageFrames(window)) {
+      if (frame === before) continue;
+      const connection = await frame.locator('header .connection').textContent().catch(() => null);
+      const rows = await rowsWithoutLast(frame).catch(() => []);
+      seen = { frame, connection, rows, filledMs: null };
+      if (connection !== STARTING && JSON.stringify(rows) === JSON.stringify(expected)) {
+        return { ...seen, filledMs: Date.now() - shownAt };
+      }
+    }
+    if (Date.now() >= deadline) return seen;
+    await sleep(50);
+  }
+}
+
+test('reshow__should_fill_the_table_every_time', async () => {
+  await withFlow('reshow__should_fill_the_table_every_time', {}, async (session) => {
+    // Given
+    const { window } = session;
+    let before = await openStatus(session);
+    await clickStatusTab(window);
+    await openTextFile(window, session.dirs, 'notes.txt');
+    const expected = scenarioRows(session);
+
+    // When
+    const shows = [];
+    for (const pauseMs of RESHOW_PAUSES_MS) {
+      if (pauseMs) await sleep(pauseMs);
+      await clickStatusTab(window);
+      const seen = await watchShow(window, expected, before, Date.now());
+      shows.push({ pauseMs, filledMs: seen.filledMs, connection: seen.connection, rows: seen.rows.length });
+      before = seen.frame ?? before;
+      await clickTab(window, 'notes.txt');
+    }
+    test.info().annotations.push({ type: 'shows', description: JSON.stringify(shows) });
+
+    // Then
+    const all = JSON.stringify(shows);
+    const unreloaded = shows.filter((show) => show.connection === null);
+    const starting = shows.filter((show) => show.connection === STARTING);
+    const late = shows.filter((show) => show.filledMs === null || show.filledMs > RESHOW_BOUND_MS);
+    assert.deepEqual(unreloaded, [], `setup: a show reloaded no page, so the tab was not hidden before it: ${all}`);
+    assert.deepEqual(starting, [], `a shown tab stayed at "${STARTING}" while the extension held a document: ${all}`);
+    assert.deepEqual(late, [], `a shown tab did not show the pool within ${RESHOW_BOUND_MS} ms: ${all}`);
+  });
+});
+
 test('flow__close_stops_watch', async () => {
   await withFlow('flow__close_stops_watch', {}, async (session) => {
     // Given

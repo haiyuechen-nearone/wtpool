@@ -4,7 +4,8 @@ use std::path::PathBuf;
 
 use crate::config::{Config, Key, SlotCount, SlotSetup};
 use crate::config_file::{RepoOnly, Values};
-use crate::error::Error;
+use crate::error::{Error, SettingsError};
+use crate::git::GitMode;
 use crate::names::{RemoteName, SlotPrefix};
 use crate::paths::AbsolutePath;
 use crate::repository::Repository;
@@ -92,7 +93,7 @@ struct RepoLayer {
 
 impl Settings {
     /// Reads the settings through `var`, for example [`std::env::var_os`], and
-    /// the `wtpool.toml` of the repository found as below.
+    /// the `wtpool.toml` of the repository found as below, by git in `git_mode`.
     ///
     /// A `WTPOOL_*` variable that is set but empty or not valid Unicode is refused.
     /// Relative paths in variables resolve against the current directory. `HOME`
@@ -101,10 +102,10 @@ impl Settings {
     ///
     /// The repository is the one `WTPOOL_FOREGROUND` names when it is set, so the
     /// repository of `cwd` then plays no part. Else it is the one holding `cwd`,
-    /// found from any of its worktrees, else [`Error::NoRepository`].
+    /// found from any of its worktrees, else [`SettingsError::NoRepository`].
     /// `GIT_CEILING_DIRECTORIES` limits the search above `cwd` as it limits git.
     /// A bare repository found there inside a worktree of another repository is
-    /// refused with [`Error::RepositoryUnknown`] before its `wtpool.toml` is read.
+    /// refused with [`SettingsError::RepositoryUnknown`] before its `wtpool.toml` is read.
     ///
     /// A default that comes from the main worktree is refused when there is
     /// none: in a bare repository, and when `WTPOOL_FOREGROUND` names no repository.
@@ -113,13 +114,14 @@ impl Settings {
     pub fn load(
         var: impl Fn(&str) -> Option<OsString>,
         cwd: Option<&AbsolutePath>,
+        git_mode: GitMode,
     ) -> Result<Self, Error> {
         let env = env::env_values(&var)?;
         let home = || env::home_dir(&var, std::env::home_dir);
         let ceiling = var("GIT_CEILING_DIRECTORIES");
         let found = match &env.foreground {
-            Some(foreground) => discover::named(foreground)?,
-            None => discover::enclosing(cwd, ceiling.as_deref())?,
+            Some(foreground) => discover::named(foreground, git_mode)?,
+            None => discover::enclosing(cwd, ceiling.as_deref(), git_mode)?,
         };
         let repo = match &found.repository {
             Some(repository) => discover::repo_layer(repository, &found.main, &home)?,
@@ -139,7 +141,7 @@ impl Settings {
         if let Source::RepoFile(_) = settings.foreground.source
             && let Some(repository) = &settings.repository
         {
-            settings.check_foreground(repository)?;
+            settings.check_foreground(repository, git_mode)?;
         }
         Ok(settings)
     }
@@ -165,9 +167,9 @@ impl Settings {
     /// The common git directory of [`repository`](Self::repository). Refused when
     /// `WTPOOL_FOREGROUND` names no repository, so no `wtpool.toml` could be read.
     pub fn require_repository(&self) -> Result<&AbsolutePath, Error> {
-        self.repository
-            .as_ref()
-            .ok_or_else(|| Error::NoRepositoryAt(self.foreground.value.to_path_buf()))
+        self.repository.as_ref().ok_or_else(|| {
+            SettingsError::NoRepositoryAt(self.foreground.value.to_path_buf()).into()
+        })
     }
 
     /// One line per setting under a header: name, value and source, in columns.
@@ -211,10 +213,10 @@ impl Settings {
         json
     }
 
-    /// Refuses a foreground that is not a worktree of `repository`.
-    fn check_foreground(&self, repository: &AbsolutePath) -> Result<(), Error> {
+    /// Refuses a foreground that is not a worktree of `repository`, as git in `git_mode` finds.
+    fn check_foreground(&self, repository: &AbsolutePath, git_mode: GitMode) -> Result<(), Error> {
         let foreground = &self.foreground;
-        let actual = Repository::at(&foreground.value)?;
+        let actual = Repository::at(&foreground.value, git_mode)?;
         if actual.as_ref().map(Repository::common_dir) == Some(repository) {
             return Ok(());
         }
@@ -287,14 +289,15 @@ impl Source {
         reason: String,
     ) -> Error {
         match self.origin() {
-            None => Error::InvalidConfig { var, value, reason },
-            Some(origin) => Error::InvalidSetting {
+            None => SettingsError::InvalidVariable { var, value, reason },
+            Some(origin) => SettingsError::InvalidValue {
                 key,
                 value,
                 origin,
                 reason,
             },
         }
+        .into()
     }
 
     /// The words a message names the setting `key` by, with its value as `shown`,

@@ -2,10 +2,10 @@ use rstest::rstest;
 
 use super::super::adapter::{TranscriptTitles, WaitingTools};
 use super::super::install::Printed;
-use super::super::place::tests::must_pool;
 use super::*;
 use crate::activity::{ActorId, CallId, CallKind, Harness, TaskId, WaitReason};
 use crate::clock::Clock;
+use crate::hook::fixture::must_pool;
 use crate::processes::ProcessTable;
 
 /// An adapter that reads every input as the hook input it holds, finds `titles` in every
@@ -206,7 +206,10 @@ fn handle__should_wait_on_a_tool_the_adapter_names() {
 fn handle__should_record_a_task_in_the_file_the_adapter_names() {
     // Given
     let pool = Pool::must_new();
-    let owner = Activity::open(&pool.root.join("fg/.git")).unwrap().owner();
+    let owner = Activity::open(&pool.root.join("fg/.git"))
+        .unwrap()
+        .owner()
+        .unwrap_or(0);
     let started = HookInput {
         task_start: Some(TaskId::try_from("b1").unwrap()),
         ..pool.input(Event::CallEnd(call("c1", "run", CallKind::Shell)))

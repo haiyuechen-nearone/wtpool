@@ -2,54 +2,8 @@
 use rstest::rstest;
 
 use super::*;
-use crate::activity::{ActorId, Harness, PlacedBy, State};
-
-pub(crate) fn must_record(session: &str) -> Record {
-    Record {
-        version: 1,
-        harness: Harness::ClaudeCode,
-        session_id: session.to_owned(),
-        agent_id: None,
-        agent_type: None,
-        label: "l".to_owned(),
-        worktree: "/p/fg".to_owned(),
-        placed_by: PlacedBy::Cwd,
-        state: State::Working,
-        waiting: None,
-        action: None,
-        in_flight: Vec::new(),
-        done_ids: Vec::new(),
-        error: None,
-        since: "2026-10-20T12:00:00Z".to_owned(),
-        updated: "2026-10-20T12:00:00Z".to_owned(),
-        writer_started: 1,
-        process: None,
-        first_cwd: None,
-        ended: None,
-        title: None,
-        transcript_offset: 0,
-        subagents: Vec::new(),
-        tasks: Vec::new(),
-    }
-}
-
-/// Whether `attempt` succeeds within a second. A process another test spawns holds a copy of
-/// every open file until its exec closes them, so a lock just let go may stay held a moment.
-pub(crate) fn eventually(mut attempt: impl FnMut() -> bool) -> bool {
-    (0..200).any(|_| {
-        attempt() || {
-            std::thread::sleep(std::time::Duration::from_millis(5));
-            false
-        }
-    })
-}
-
-fn must_activity() -> (tempfile::TempDir, Activity) {
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir(dir.path().join("wtpool-activity")).unwrap();
-    let activity = Activity::open(dir.path()).unwrap();
-    (dir, activity)
-}
+use crate::activity::{ActorId, Harness};
+use crate::hook::fixture::{self, eventually, must_activity};
 
 #[cfg(unix)]
 #[rstest]
@@ -79,7 +33,7 @@ fn open__should_take_only_a_real_folder(#[case] kind: Option<&str>, #[case] open
 fn write__should_round_trip_and_leave_no_temp_file() {
     // Given
     let (_dir, activity) = must_activity();
-    let record = must_record("s1");
+    let record = fixture::record("s1");
 
     // When
     let lock = activity.lock("s1").unwrap();
@@ -120,7 +74,7 @@ fn write__should_replace_what_it_cannot_read(#[case] kind: &str) {
 
     // When
     let before = activity.read("s1");
-    activity.write("s1", &must_record("s1")).unwrap();
+    activity.write("s1", &fixture::record("s1")).unwrap();
 
     // Then
     assert_eq!(before, None);
@@ -136,7 +90,7 @@ fn write__should_remove_its_temp_file_when_the_rename_fails() {
     std::fs::write(activity.record_path("s1").join("x"), "").unwrap();
 
     // When
-    let written = activity.write("s1", &must_record("s1"));
+    let written = activity.write("s1", &fixture::record("s1"));
 
     // Then
     assert!(written.is_err());
@@ -151,9 +105,9 @@ fn write__should_remove_its_temp_file_when_the_rename_fails() {
 fn write__should_leave_the_record_when_the_next_cannot_fit() {
     // Given
     let (_dir, activity) = must_activity();
-    let record = must_record("s1");
+    let record = fixture::record("s1");
     activity.write("s1", &record).unwrap();
-    let mut large = must_record("s1");
+    let mut large = fixture::record("s1");
     large.first_cwd = Some("d".repeat(crate::activity::MAX_RECORD_BYTES));
 
     // When
@@ -172,7 +126,7 @@ fn write__should_leave_the_record_when_the_next_cannot_fit() {
 fn delete__should_remove_the_record_and_its_lock() {
     // Given
     let (_dir, activity) = must_activity();
-    activity.write("s1.a1", &must_record("s1")).unwrap();
+    activity.write("s1.a1", &fixture::record("s1")).unwrap();
     std::fs::write(activity.record_path("s1").with_extension("json.lock"), "").unwrap();
     let lock = activity.lock("s1.a1").unwrap();
 
@@ -213,15 +167,23 @@ fn lock__should_refuse_a_lock_that_is_no_file() {
 }
 
 #[cfg(unix)]
+fn regular_file_mode(path: &Path) -> Option<u32> {
+    use std::os::unix::fs::PermissionsExt;
+    let meta = path.symlink_metadata().ok()?;
+    meta.is_file().then(|| meta.permissions().mode() & 0o777)
+}
+
+#[cfg(unix)]
 #[rstest]
-#[case::missing(None, Some(""))]
-#[case::file(Some("file"), Some("kept"))]
-#[case::symlink(Some("symlink"), Some(""))]
-#[case::fifo(Some("fifo"), Some(""))]
-#[case::folder(Some("folder"), None)]
+#[case::missing(None, Some(""), Some(0o600))]
+#[case::file(Some("file"), Some("kept"), Some(0o644))]
+#[case::symlink(Some("symlink"), Some(""), Some(0o600))]
+#[case::fifo(Some("fifo"), Some(""), Some(0o600))]
+#[case::folder(Some("folder"), None, None)]
 fn open_file__should_open_a_regular_file_and_replace_the_rest(
     #[case] kind: Option<&str>,
     #[case] expected: Option<&str>,
+    #[case] mode: Option<u32>,
 ) {
     use std::io::Read;
     use std::os::unix::fs::PermissionsExt;
@@ -231,7 +193,10 @@ fn open_file__should_open_a_regular_file_and_replace_the_rest(
     let outside = dir.path().join("outside");
     std::fs::write(&outside, "outside").unwrap();
     match kind {
-        Some("file") => std::fs::write(&path, "kept").unwrap(),
+        Some("file") => {
+            std::fs::write(&path, "kept").unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        }
         Some("symlink") => std::os::unix::fs::symlink(&outside, &path).unwrap(),
         Some("fifo") => {
             let made = std::process::Command::new("mkfifo")
@@ -254,11 +219,7 @@ fn open_file__should_open_a_regular_file_and_replace_the_rest(
     // Then
     assert_eq!(opened.as_deref(), expected);
     assert_eq!(std::fs::read_to_string(&outside).unwrap(), "outside");
-    if expected == Some("") {
-        let meta = path.symlink_metadata().unwrap();
-        assert!(meta.is_file());
-        assert_eq!(meta.permissions().mode() & 0o777, 0o600);
-    }
+    assert_eq!(regular_file_mode(&path), mode);
 }
 
 #[test]

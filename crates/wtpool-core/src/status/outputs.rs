@@ -2,12 +2,13 @@
 //! tasks, newest first, then the one that ended last. wtpool lists where each task's output goes,
 //! never the output; a consumer reads the file on its own machine.
 
-use std::path::{Component, Path};
+use std::path::Path;
 
 use serde::Deserialize;
 
 use super::document::Output;
 use super::record_time::RecordTime;
+use crate::paths;
 
 /// A task as a record holds it.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -37,7 +38,7 @@ pub struct Task {
 pub fn tasks(fields: Vec<TaskFields>) -> Vec<Task> {
     fields
         .into_iter()
-        .filter(|task| !task.id.is_empty() && is_plain_absolute(Path::new(&task.path)))
+        .filter(|task| !task.id.is_empty() && paths::is_plain_absolute(Path::new(&task.path)))
         .filter_map(|task| {
             let ended = match task.ended.as_deref() {
                 Some(ended) => Some(RecordTime::parse(ended)?),
@@ -77,17 +78,6 @@ fn output(task: &Task) -> Output {
         started: task.started.clone(),
         ended: task.ended.clone(),
     }
-}
-
-/// Whether `path` is absolute with only normal components after its root: no `.` or `..`.
-fn is_plain_absolute(path: &Path) -> bool {
-    path.is_absolute()
-        && path.components().all(|component| {
-            matches!(
-                component,
-                Component::Prefix(_) | Component::RootDir | Component::Normal(_)
-            )
-        })
 }
 
 #[cfg(test)]

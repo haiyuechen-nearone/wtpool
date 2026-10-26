@@ -2,6 +2,7 @@ use std::process::Command;
 
 use crate::error::Error;
 use crate::names::{ObjectId, PrNumber, RepoSlug};
+use crate::platform::shell::find_on_path;
 use crate::run;
 
 /// Looks pull requests up on GitHub.
@@ -50,7 +51,7 @@ pub struct GhCli;
 
 impl ViewPr for GhCli {
     fn view_pr(&self, repo: &RepoSlug, number: &PrNumber) -> Result<PrView, ViewPrError> {
-        if !run::on_path("gh") {
+        if find_on_path("gh").is_none() {
             return Err(ViewPrError::Unavailable);
         }
         let repo = repo.to_string();

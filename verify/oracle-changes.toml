@@ -1023,3 +1023,54 @@ id = "comments-ts"
 reason = "The static layer of the quick part gains static:ascii_bundles: every line of the built bundles, out/*.js and media/*.js, holds only ASCII characters, and a finding names the file, the line, the first other character as U+XXXX and its column. The coverage converter of render and host stops when a bundle's size in bytes differs from the length V8 measured in UTF-16 units, as a raw U+00B7 in a JSDoc that esbuild keeps once made it, so the check names the cause in the quick part instead. A unit test of the static layer covers an ASCII line, a U+00B7 and a character outside the BMP."
 [change.files]
 "xtask/src/layers/statics.rs" = "75313b8cb362bda9e1c6a05a1c5782fa1a3837e34c6aa22ab97da47e4b8d9532"
+
+[[change]]
+id = "cli-invisible"
+reason = "The CLI escapes the characters the extension escapes: every control (Cc) and format (Cf) character, U+2028, U+2029 and the whole tag block. The four int checks of xtask/tests/checks/cli_text.rs take that set from the Unicode tables of the Node on PATH instead of a hand-written list, and assert that stdout and stderr hold none of it raw but the line feed. The branch of the ls and bg checks also holds U+2028 and U+FFF9, which the old list left out. The slot_dir of the config check holds every character of the set but NUL and the line feed, and each code point just outside a run of it, and the check asserts that each character of the set shows as \\u{XXXX} and every other one as it is; on a failure it prints the format characters of that Node's Unicode version as a Rust table of inclusive ranges."
+[change.files]
+"xtask/tests/checks/cli_text.rs" = "14e1c937711415ef6d112aad323f758efad4792ee5cdbe30ecbb1d8020c9ce53"
+
+[[change]]
+id = "reshow-guard"
+reason = "A new e2e check, reshow__should_fill_the_table_every_time in vscode/test/e2e/flows-tab.spec.mjs, guards X7 against a view lost on a show: on idle_pool it hides the Worktrees tab behind a text editor and shows it again ten times in a row, with pauses of 0, 50, 150 and 300 ms between hiding and showing, and asserts that each show reloads the page, that its header never stays at starting… while the extension holds a document, and that the reloaded page shows the pool's rows within 2 s. verify/checks.toml registers it for e2e, and verify/trace.toml lists it under X7. What the other checks judge is unchanged."
+[change.files]
+"verify/checks.toml" = "6ecc0efda5662093f3d8ed11ea908674cfa2fa2a5bba9100dcaadc86e3e11dba"
+"verify/trace.toml" = "4b15ece7bbbc2834767c1455fb8587426571ada83af071036076d82d19b10af4"
+"vscode/test/e2e/flows-tab.spec.mjs" = "71064d31fc12d9f8dc6b2e6bc8c56f3832aaad190b9daf6ac1da27c03e493f0f"
+
+[[change]]
+id = "harness-followups"
+reason = "A lint group of the static layer whose runner does not start or runs past its limit is a setup problem: its check fails as an error whose message says the lint did not start or timed out, where it was an assertion before. A finding the runner reports stays an assertion. Unit tests cover a runner that did not start, a runner that timed out and a reported finding. flows__should_each_have_an_e2e_check reads the outcome of each flow__ check through web::worst_outcomes instead of merging the results itself, with the same outcomes."
+[change.files]
+"xtask/src/flows.rs" = "75222771af6dc0d230a675b4709dd3c5f7aaa5c434403373b7a79d20d92436cc"
+"xtask/src/layers/statics.rs" = "712aa4347cbc841c25faca5a616a51faa956696ad1c2d013bb797dcd085132b5"
+
+[[change]]
+id = "comments-ts2"
+reason = "A comment cleanup of vscode/src/host/panel.ts removes its file header and the spec IDs of its comments, so changed(update) starts six lines earlier, at line 179, and the last context line of both title canaries drops its (R12). The canaries title-keeps-the-count.patch and title-only-while-visible.patch carry the new hunk position and context and the new blob hashes, and change the same line in the same way as before."
+[change.files]
+"verify/canaries/phase-2/title-keeps-the-count.patch" = "f8e5bf53e9aac311ecb04dbc3579743411dd9ba95d8231121a7c74cc025f8c67"
+"verify/canaries/phase-2/title-only-while-visible.patch" = "db6c896808e1686b69bfb150bd37a539bbedb19e2fee797f94d5d01634aa3cb3"
+
+[[change]]
+id = "eslint-p8"
+reason = "vscode/eslint.config.mjs adds the rules of the Google TypeScript Style Guide that ESLint can check, each at zero findings on the extension's sources. For every linted file: eqeqeq with == null allowed, prefer-const, curly multi-line, as an if that fits on one line may elide its block, no-duplicate-imports with separate type imports allowed, and no-restricted-syntax entries for a top-level arrow function or function expression without a type annotation, a field typed | undefined, a #private member, a const enum and a loop body that is not a block, joined with the entries of the oracle's rulesOf(). For TypeScript files: array-type array-simple, consistent-type-assertions with as and no object literal assertions, consistent-type-definitions interface, consistent-type-imports, explicit-member-accessibility no-public, no-non-null-assertion and parameter-properties. Type-aware over the two tsconfig programs of src/: no-confusing-void-expression with the void operator allowed, no-floating-promises, no-misused-promises, only-throw-error, prefer-readonly and unbound-method. naming-convention, no-unnecessary-condition and switch-exhaustiveness-check stay off. The oracle's lint groups and the checks that run them are unchanged."
+[change.files]
+"vscode/eslint.config.mjs" = "6b3c30e76408ed293f09bead09b04acb183171eb2ebae1242613b0f8ec97844b"
+
+[[change]]
+id = "status-lines-3"
+reason = "status-panel.md moves to revision 29, which records behaviour merged since revision 28 in row sentences that say what the code does. H6: a lock file or the stamp that the hook opens in wtpool-activity/ must belong to the folder's owner; where the system tells no file owner, as on Windows, that check is skipped, and where it tells no file identity a lock file still in place counts as the one locked. H18: on Windows, which has no O_NOFOLLOW, each open of wtpool that never follows a symlink opens the link itself and refuses it from the opened handle. H21 names gc's liveness rule, same start: a record's process runs only while the process table lists its pid with the start the record holds. A1 names the liveness rule of wtpool status, unless gone: a record's process runs unless the table shows it gone, its pid unlisted or listed with a different start where the record and the table both hold one. R2: the CLI's escaped set is X10's, every Cc and Cf character, U+2028, U+2029 and the tag block. H22: the note names the first runnable wtpool in an entry of PATH. No check, scenario or behaviour changes."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "94e6e428b9ad1d635c46cd73d398f8998af96cbc8afdfa09de95ea40a7aeec8f"
+
+[[change]]
+id = "flake-fixes"
+reason = "Eight host and e2e checks wait for the state their next step needs instead of a fixed moment that passes under load; their assertions stay as they were. The Command Palette helper of the e2e layer opens the palette through the View menu's command from its second try on for every caller, flow__keyboard_only and the keyboard terminal step included, as a webview frame could hold the keyboard while the workbench's active element was its body, where the workbench dropped the palette's keys and the palette never opened. flow__narrow_scroll gives the page keyboard focus from the webview frame around it and waits until the workbench and that frame have the page's frame as their focused element, as document.hasFocus() of a window that is never active can stay false. messages__should_ignore_everything_outside_the_set and hidden_then_shown wait for a view of their own tab: the host scenario checks posted folder_missing and idle_pool earlier, so the first sent its messages before the tab had a document and every one was ignored, and the second wrote its control lines before the fake wtpool read them, which drops them. early_exit waits for the paused view of each exit, and oversize_line, garbage_line and unknown_version for the paused view of the fault, before moving the fake clock, as a restart set after the clock moved never came, and these restart checks give a restarted fake wtpool 10 s instead of 3 s to log its start and print a line, which takes seconds on a loaded machine. title__should_drop_the_count_when_a_wait_ends waits up to 10 s for the first document, as the fake may start later than 3 s after the tab opens."
+[change.files]
+"vscode/test/e2e/flows-exclusive.spec.mjs" = "0e512cc8ecff3751b16730ad7624f667542951f670f57d469ee4b307975e6832"
+"vscode/test/e2e/flows.mjs" = "4d34781c47db4a4ff13510f36ec2d1d5dd79ee064bf89579cdb2d37d530ba6a6"
+"vscode/test/e2e/vscode.mjs" = "1c0804687b7dafd2b46b4b105f1ff317894bd99af818a6fe1d28f0a5d649d178"
+"vscode/test/host/stream.test.cjs" = "6a54eaf5e10c1f46735455c4c6adcb79de6d182f3a4b42ecaaf8116bb298e918"
+"vscode/test/host/tab.test.cjs" = "34f59742dfe0df1650d479fae405ed3da979c758f9c8b7a3f03cd71005de2dfe"
+"vscode/test/host/title.test.cjs" = "d084d2c391ee26350aa2373d67f0c0fe33f64ef2b27cda6d8edd71c5d68d5584"

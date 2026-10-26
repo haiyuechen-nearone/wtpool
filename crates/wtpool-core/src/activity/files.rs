@@ -3,7 +3,7 @@
 use std::io::Read;
 use std::path::Path;
 
-use crate::fs::open_without_following;
+use crate::platform::fs::open_without_following;
 
 /// The folder in the common git directory that holds the activity records.
 pub const ACTIVITY_DIR: &str = "wtpool-activity";

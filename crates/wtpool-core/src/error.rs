@@ -8,22 +8,170 @@ use crate::names::{InvalidSlotName, PrNumber};
 #[derive(Debug, thiserror::Error)]
 #[must_use]
 pub enum Error {
+    #[error(transparent)]
+    Settings(#[from] SettingsError),
+    #[error(transparent)]
+    Git(#[from] GitError),
+    #[error(transparent)]
+    Refusal(#[from] Refusal),
     #[error("{0}")]
     Usage(&'static str),
     #[error("unknown flag '{0}'")]
     UnknownFlag(String),
-    #[error(
-        "foreground has {count} uncommitted file(s); commit, stash, or use: wtpool bg {reference}"
-    )]
-    ForegroundDirty { count: usize, reference: String },
-    /// A ref that could not be resolved. `cause` is the fatal error met on the way,
-    /// if any; warnings were already reported otherwise.
+    #[error("'{0}' is not a PR number, a github.com PR URL or a valid branch name")]
+    InvalidRef(String),
+    #[error("invalid slot name '{name}'")]
+    InvalidSlotName {
+        name: String,
+        #[source]
+        reason: InvalidSlotName,
+    },
+    #[error("no worktree matches '{0}'")]
+    NoMatch(String),
+    #[error("{0} is not checked out in any worktree")]
+    NotCheckedOut(String),
+    /// No local branch has the name, and the remote has none either or does not
+    /// exist (`remote` is `None`).
+    #[error("{}", no_such_branch(branch, remote.as_deref()))]
+    NoSuchBranch {
+        branch: String,
+        remote: Option<String>,
+    },
+    /// A ref that could not be resolved. `cause` is the fatal error met on the way.
+    /// Without one, the warnings were reported already.
     #[error("'{reference}': {consequence}")]
     NotResolved {
         reference: String,
         consequence: &'static str,
+        #[source]
         cause: Option<Box<Error>>,
     },
+    #[error("could not lock {}", path.display())]
+    Lock { path: PathBuf, source: io::Error },
+    #[error("could not watch {}: {reason}", path.display())]
+    Watch { path: PathBuf, reason: String },
+    /// `copy` or `on_new_slot` failed in slots that `wtpool` created or filled in,
+    /// each failure in `failures`. The slots were kept.
+    #[error("copy or on_new_slot failed as shown above; the slots were kept")]
+    SlotSetup { failures: Vec<Error> },
+    #[error("could not copy {path} into {}", slot.display())]
+    Copy {
+        path: String,
+        slot: PathBuf,
+        source: io::Error,
+    },
+    #[error("nothing copied into {}: the repository has no main worktree to copy from", .0.display())]
+    NoMainWorktree(PathBuf),
+    #[error("on_new_slot '{command}' failed in {}: {}", slot.display(), exit_status(*code))]
+    OnNewSlot {
+        command: String,
+        slot: PathBuf,
+        code: Option<i32>,
+    },
+}
+
+/// A setting that cannot be read or used, or a repository that cannot be found.
+#[derive(Debug, thiserror::Error)]
+#[must_use]
+pub enum SettingsError {
+    /// A value named by its variable: one the environment gave, or a built in default.
+    #[error("invalid {var}='{value}': {reason}")]
+    InvalidVariable {
+        var: &'static str,
+        value: String,
+        reason: String,
+    },
+    /// A value named by its key: one a config file gave, or the main worktree stood in for.
+    #[error("invalid {key}='{value}' {origin}: {reason}")]
+    InvalidValue {
+        key: &'static str,
+        value: String,
+        /// Where the value came from, such as `in /repo/.git/wtpool.toml`.
+        origin: String,
+        reason: String,
+    },
+    #[error("invalid {}: {}{reason}", path.display(), at_line(*line))]
+    ConfigSyntax {
+        path: PathBuf,
+        line: Option<usize>,
+        reason: String,
+    },
+    #[error("could not read {}: {reason}", path.display())]
+    ReadConfig { path: PathBuf, reason: String },
+    #[error("refusing to read {}: it is a symlink", .0.display())]
+    ConfigSymlink(PathBuf),
+    /// Neither `WTPOOL_FOREGROUND` nor the current directory names a repository.
+    #[error("not inside a git repository: run wtpool in your repository or set WTPOOL_FOREGROUND")]
+    NoRepository,
+    /// `WTPOOL_FOREGROUND` names a directory that is no repository.
+    #[error("no git repository at {} (foreground from env WTPOOL_FOREGROUND)", .0.display())]
+    NoRepositoryAt(PathBuf),
+    /// git failed although a `.git` entry shows a repository, so the pool of the
+    /// directory is unknown, and another repository must not stand in.
+    #[error(
+        "could not tell which git repository {} belongs to, so wtpool cannot find its pool. Run wtpool from another directory, or set WTPOOL_FOREGROUND to the foreground worktree",
+        .0.display()
+    )]
+    RepositoryUnknown(PathBuf),
+    /// A setting whose default comes from the main worktree, in a repository without one.
+    #[error(
+        "{} is a bare repository, so it has no main worktree to derive {key} from; set {var}, or {key} in {}",
+        repository.display(),
+        file.display()
+    )]
+    BareRepository {
+        repository: PathBuf,
+        file: PathBuf,
+        key: &'static str,
+        var: &'static str,
+    },
+    #[error("foreground worktree {} does not exist", .0.display())]
+    ForegroundMissing(PathBuf),
+}
+
+/// git, or another command `wtpool` runs, that could not start, failed, or answered in a way
+/// `wtpool` cannot use.
+#[derive(Debug, thiserror::Error)]
+#[must_use]
+pub enum GitError {
+    /// Any command `wtpool` runs, `gh` and `on_new_slot` included.
+    #[error("could not run {program}")]
+    Spawn { program: String, source: io::Error },
+    /// A command that failed after printing its own error. Callers exit with
+    /// its status and add no message of their own.
+    #[error("{program} exited with status {code:?}")]
+    CommandFailed { program: String, code: Option<i32> },
+    /// `git worktree list` failed, so no worktree can be told apart from a free one.
+    #[error("could not list the worktrees of {}", .0.display())]
+    ListWorktrees(PathBuf),
+    #[error("could not find the git directory of {}", .0.display())]
+    NoGitDir(PathBuf),
+    #[error("could not create worktree at {}", .0.display())]
+    AddWorktree(PathBuf),
+    #[error("fetch failed")]
+    Fetch,
+    #[error("could not create branch {0}")]
+    CreateBranch(String),
+    #[error("could not fetch PR #{0}")]
+    FetchPr(PrNumber),
+    #[error("could not fetch branch {0}")]
+    FetchBranch(String),
+    /// `git ls-remote` failed, so the remote may or may not have the branch.
+    #[error("could not look up branch '{branch}' on {remote}")]
+    LookUpRemote { branch: String, remote: String },
+    #[error("could not tell whether git ignores {path} in {}; not copied", main.display())]
+    IgnoreUnknown { path: String, main: PathBuf },
+}
+
+/// A change `wtpool` will not make, as it could lose or interrupt work or take a worktree outside
+/// the pool, or as git cannot read the state that makes it safe.
+#[derive(Debug, thiserror::Error)]
+#[must_use]
+pub enum Refusal {
+    #[error(
+        "foreground has {count} uncommitted file(s); commit, stash, or use: wtpool bg {reference}"
+    )]
+    ForegroundDirty { count: usize, reference: String },
     #[error(
         "{branch} is checked out in {holder} with {count} uncommitted file(s); commit or stash them there first"
     )]
@@ -46,25 +194,23 @@ pub enum Error {
         worktree: String,
         path: PathBuf,
     },
-    /// `blocked` says why each slot is busy, one line per slot.
+    /// `blocked` gives the reason each slot is busy, one line per slot.
     #[error(
         "no free slot and the pool is at its {limit} slot limit; release one with 'wtpool free <slot>' (see 'wtpool ls')"
     )]
-    PoolFull { limit: usize, blocked: Vec<Error> },
+    PoolFull { limit: usize, blocked: Vec<Refusal> },
     /// A slot that holds a branch, so `wtpool bg` cannot reuse it before `wtpool free`.
     #[error("{slot} holds branch {branch}")]
     SlotHoldsBranch { slot: String, branch: String },
-    /// git could not read what a worktree has checked out.
+    /// git could not read the branch or commit a worktree has checked out.
     #[error("could not tell what {0} has checked out; not reusing it")]
     HeadUnknown(String),
-    #[error("no worktree matches '{0}'")]
-    NoMatch(String),
     #[error("refusing to detach the foreground worktree")]
     DetachForeground,
     #[error("refusing to remove the foreground worktree")]
     RemoveForeground,
-    #[error("{slot} has {count} uncommitted file(s)")]
-    SlotDirty { slot: String, count: usize },
+    #[error("{worktree} has {count} uncommitted file(s)")]
+    WorktreeDirty { worktree: String, count: usize },
     /// Agents that work or wait in a worktree `free` or `fg` would detach or repoint, each as
     /// `<label> (<state>)`.
     #[error(
@@ -110,157 +256,41 @@ pub enum Error {
         "{worktree} is registered as a worktree but its directory is gone; run 'wtpool rm {remove}'"
     )]
     WorktreeGone { worktree: String, remove: String },
-    #[error("{0} is not checked out in any worktree")]
-    NotCheckedOut(String),
-    #[error("foreground worktree {} does not exist", .0.display())]
-    ForegroundMissing(PathBuf),
-    /// `git worktree list` failed, so no worktree can be told apart from a free one.
-    #[error("could not list the worktrees of {}", .0.display())]
-    ListWorktrees(PathBuf),
-    #[error("could not find the git directory of {}", .0.display())]
-    NoGitDir(PathBuf),
-    #[error("could not lock {}: {source}", path.display())]
-    Lock { path: PathBuf, source: io::Error },
     #[error("{} already exists", .0.display())]
     PathExists(PathBuf),
-    #[error("could not create worktree at {}", .0.display())]
-    WorktreeAdd(PathBuf),
     /// The foreground's branch has no commit yet, so a new slot has nothing to start from.
     #[error(
         "{} has no commits yet, so a slot has nothing to check out; make a first commit, then try again",
         .0.display()
     )]
     NoCommits(PathBuf),
-    #[error("fetch failed")]
-    FetchFailed,
-    #[error("could not create branch {0}")]
-    CreateBranch(String),
-    #[error("could not fetch PR #{0}")]
-    FetchPr(PrNumber),
-    #[error("could not fetch branch {0}")]
-    FetchBranch(String),
-    /// No local branch has the name, and the remote has none either or does not
-    /// exist (`remote` is `None`).
-    #[error("{}", no_such_branch(branch, remote.as_deref()))]
-    NoSuchBranch {
-        branch: String,
-        remote: Option<String>,
-    },
-    /// `git ls-remote` failed, so whether the remote has the branch is unknown.
-    #[error("could not look up branch '{branch}' on {remote}")]
-    LookUpRemote { branch: String, remote: String },
-    #[error("'{0}' is not a PR number, a github.com PR URL or a valid branch name")]
-    InvalidRef(String),
-    #[error("invalid slot name '{name}': {reason}")]
-    InvalidSlotName {
-        name: String,
-        reason: InvalidSlotName,
-    },
-    #[error("invalid {var}='{value}': {reason}")]
-    InvalidConfig {
-        var: &'static str,
-        value: String,
-        reason: String,
-    },
-    /// A setting a config file gave, or the main worktree stood in for.
-    #[error("invalid {key}='{value}' {origin}: {reason}")]
-    InvalidSetting {
-        key: &'static str,
-        value: String,
-        /// Where the value came from, such as `in /repo/.git/wtpool.toml`.
-        origin: String,
-        reason: String,
-    },
-    #[error("invalid {}: {}{reason}", path.display(), at_line(*line))]
-    ConfigSyntax {
-        path: PathBuf,
-        line: Option<usize>,
-        reason: String,
-    },
-    #[error("could not read {}: {reason}", path.display())]
-    ReadConfig { path: PathBuf, reason: String },
-    #[error("could not watch {}: {reason}", path.display())]
-    Watch { path: PathBuf, reason: String },
-    #[error("refusing to read {}: it is a symlink", .0.display())]
-    ConfigSymlink(PathBuf),
-    /// Neither `WTPOOL_FOREGROUND` nor the current directory names a repository.
-    #[error("not inside a git repository: run wtpool in your repository or set WTPOOL_FOREGROUND")]
-    NoRepository,
-    /// `WTPOOL_FOREGROUND` names a directory that is no repository.
-    #[error("no git repository at {} (foreground from env WTPOOL_FOREGROUND)", .0.display())]
-    NoRepositoryAt(PathBuf),
-    /// git failed although a `.git` entry shows a repository, so which pool the
-    /// directory belongs to is unknown, and another repository must not stand in.
-    #[error(
-        "could not tell which git repository {} belongs to, so wtpool cannot find its pool. Run wtpool from another directory, or set WTPOOL_FOREGROUND to the foreground worktree",
-        .0.display()
-    )]
-    RepositoryUnknown(PathBuf),
-    /// A setting whose default comes from the main worktree, in a repository without one.
-    #[error(
-        "{} is a bare repository, so it has no main worktree to derive {key} from; set {var}, or {key} in {}",
-        repository.display(),
-        file.display()
-    )]
-    BareRepository {
-        repository: PathBuf,
-        file: PathBuf,
-        key: &'static str,
-        var: &'static str,
-    },
-    #[error("could not run {program}: {source}")]
-    Spawn { program: String, source: io::Error },
-    #[error("could not write {}: {source}", path.display())]
-    Write { path: PathBuf, source: io::Error },
-    /// An external command failed after printing its own error. Callers exit with
-    /// its status and add no message of their own.
-    #[error("{program} exited with status {code:?}")]
-    CommandFailed { program: String, code: Option<i32> },
-    /// `copy` or `on_new_slot` failed in slots that `wtpool` created or filled in,
-    /// each failure in `failures`. The slots were kept.
-    #[error("copy or on_new_slot failed as shown above; the slots were kept")]
-    SlotSetup { failures: Vec<Error> },
-    #[error("could not copy {path} into {}: {source}", slot.display())]
-    Copy {
-        path: String,
-        slot: PathBuf,
-        source: io::Error,
-    },
-    #[error("could not tell whether git ignores {path} in {}; not copied", main.display())]
-    IgnoreUnknown { path: String, main: PathBuf },
-    #[error("nothing copied into {}: the repository has no main worktree to copy from", .0.display())]
-    NoMainWorktree(PathBuf),
-    #[error("on_new_slot '{command}' failed in {}: {}", slot.display(), exit_status(*code))]
-    OnNewSlot {
-        command: String,
-        slot: PathBuf,
-        code: Option<i32>,
-    },
 }
 
 impl Error {
     /// The `wtpool: <message>` lines to print, innermost cause first. Empty for
-    /// [`Error::CommandFailed`], which already printed its own error.
+    /// [`GitError::CommandFailed`], as the command printed its own error. An error's
+    /// [`source`](std::error::Error::source) ends its line, except the cause of
+    /// [`Error::NotResolved`]: its lines come first.
     #[must_use]
     pub fn messages(&self) -> Vec<String> {
         match self {
-            Error::CommandFailed { .. } => Vec::new(),
-            Error::NotResolved {
-                cause: Some(cause), ..
-            } => {
-                let mut lines = cause.messages();
-                lines.push(self.to_string());
-                lines
-            }
-            Error::PoolFull {
-                blocked: causes, ..
-            }
-            | Error::SlotSetup { failures: causes } => causes
+            Error::Git(GitError::CommandFailed { .. }) => Vec::new(),
+            Error::NotResolved { cause, .. } => cause
+                .iter()
+                .flat_map(|cause| cause.messages())
+                .chain([self.to_string()])
+                .collect(),
+            Error::Refusal(Refusal::PoolFull { blocked, .. }) => blocked
+                .iter()
+                .map(Refusal::to_string)
+                .chain([self.to_string()])
+                .collect(),
+            Error::SlotSetup { failures } => failures
                 .iter()
                 .flat_map(Error::messages)
                 .chain([self.to_string()])
                 .collect(),
-            _ => vec![self.to_string()],
+            _ => vec![self.with_source()],
         }
     }
 
@@ -268,10 +298,17 @@ impl Error {
     #[must_use]
     pub fn exit_code(&self) -> i32 {
         match self {
-            Error::CommandFailed {
+            Error::Git(GitError::CommandFailed {
                 code: Some(code), ..
-            } if *code != 0 => *code,
+            }) if *code != 0 => *code,
             _ => 1,
+        }
+    }
+
+    fn with_source(&self) -> String {
+        match std::error::Error::source(self) {
+            Some(source) => format!("{self}: {source}"),
+            None => self.to_string(),
         }
     }
 }
@@ -304,144 +341,4 @@ fn article(noun: &str) -> &'static str {
 }
 
 #[cfg(test)]
-mod tests {
-    use rstest::rstest;
-
-    use super::*;
-
-    fn dirty(slot: &str) -> Error {
-        Error::SlotDirty {
-            slot: slot.to_owned(),
-            count: 1,
-        }
-    }
-
-    #[rstest]
-    #[case::one_line(dirty("app-wt1"), &["app-wt1 has 1 uncommitted file(s)"])]
-    #[case::busy_agents(
-        Error::AgentsBusy {
-            worktree: "app-wt1".to_owned(),
-            agents: vec!["Fix login (working)".to_owned(), "Explore (waiting)".to_owned()],
-        },
-        &["app-wt1 has 2 agent(s) working or waiting: Fix login (working), Explore (waiting); wait until they are idle, or use --force"]
-    )]
-    #[case::command_that_printed_its_own_error(
-        Error::CommandFailed { program: "git".to_owned(), code: Some(128) },
-        &[]
-    )]
-    #[case::unresolved_without_a_cause(
-        Error::NotResolved {
-            reference: "42".to_owned(),
-            consequence: "no slot changed",
-            cause: None,
-        },
-        &["'42': no slot changed"]
-    )]
-    #[case::unresolved_cause_first(
-        Error::NotResolved {
-            reference: "a".to_owned(),
-            consequence: "foreground not changed",
-            cause: Some(Box::new(Error::NoSuchBranch {
-                branch: "a".to_owned(),
-                remote: Some("origin".to_owned()),
-            })),
-        },
-        &["no local branch and no origin branch named 'a'", "'a': foreground not changed"]
-    )]
-    #[case::branch_without_a_remote(
-        Error::NoSuchBranch { branch: "a".to_owned(), remote: None },
-        &["no branch 'a' here, and no remote to look it up"]
-    )]
-    #[case::slot_setup_after_each_failure(
-        Error::SlotSetup {
-            failures: vec![
-                Error::OnNewSlot {
-                    command: "direnv allow".to_owned(),
-                    slot: PathBuf::from("/code/app-wt1"),
-                    code: Some(127),
-                },
-                Error::OnNewSlot {
-                    command: "direnv allow".to_owned(),
-                    slot: PathBuf::from("/code/app-wt2"),
-                    code: None,
-                },
-            ],
-        },
-        &[
-            "on_new_slot 'direnv allow' failed in /code/app-wt1: exit status 127",
-            "on_new_slot 'direnv allow' failed in /code/app-wt2: killed by a signal",
-            "copy or on_new_slot failed as shown above; the slots were kept",
-        ]
-    )]
-    #[case::full_pool_after_each_blocked_slot(
-        Error::PoolFull { limit: 2, blocked: vec![dirty("app-wt1"), dirty("app-wt2")] },
-        &[
-            "app-wt1 has 1 uncommitted file(s)",
-            "app-wt2 has 1 uncommitted file(s)",
-            "no free slot and the pool is at its 2 slot limit; release one with 'wtpool free <slot>' (see 'wtpool ls')",
-        ]
-    )]
-    fn messages__should_list_the_causes_before_the_error(
-        #[case] error: Error,
-        #[case] expected: &[&str],
-    ) {
-        // When
-        let messages = error.messages();
-
-        // Then
-        assert_eq!(messages, expected);
-    }
-
-    #[rstest]
-    #[case::status_of_a_failed_command(Some(128), 128)]
-    #[case::failed_command_that_claims_success(Some(0), 1)]
-    #[case::command_killed_by_a_signal(None, 1)]
-    fn exit_code__should_pass_on_the_status_of_a_failed_command(
-        #[case] code: Option<i32>,
-        #[case] expected: i32,
-    ) {
-        // Given
-        let error = Error::CommandFailed {
-            program: "git".to_owned(),
-            code,
-        };
-
-        // When
-        let exit_code = error.exit_code();
-
-        // Then
-        assert_eq!(exit_code, expected);
-    }
-
-    #[test]
-    fn exit_code__should_be_one_for_any_other_error() {
-        // When
-        let exit_code = Error::DetachForeground.exit_code();
-
-        // Then
-        assert_eq!(exit_code, 1);
-    }
-
-    #[rstest]
-    #[case::vowel("am", "app-wt1 is in the middle of an am; finish or abort it first")]
-    #[case::consonant(
-        "rebase",
-        "app-wt1 is in the middle of a rebase; finish or abort it first"
-    )]
-    fn operation_in_progress__should_pick_the_article(
-        #[case] operation: &'static str,
-        #[case] expected: &str,
-    ) {
-        // Given
-        let error = Error::OperationInProgress {
-            worktree: "app-wt1".to_owned(),
-            operation,
-        };
-
-        // When
-        let message = error.to_string();
-
-        // Then
-        assert_eq!(message, expected);
-    }
-}
+mod tests;

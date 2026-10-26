@@ -2,7 +2,7 @@
 
 use std::ffi::OsStr;
 
-use crate::error::Error;
+use crate::error::{Error, GitError, Refusal};
 use crate::github::ViewPr;
 use crate::names::SlotName;
 use crate::paths::{self, AbsolutePath};
@@ -42,7 +42,7 @@ impl<V: ViewPr> Pool<V> {
         };
         let path = self.config.slot_dir.join(name.as_str());
         if path.exists() {
-            return Err(Error::PathExists(path.into()));
+            return Err(Refusal::PathExists(path.into()).into());
         }
         let ran = self.git().run([
             OsStr::new("worktree"),
@@ -53,11 +53,11 @@ impl<V: ViewPr> Pool<V> {
         ])?;
         if !ran.success && !self.has_a_commit()? {
             // git's own `invalid reference: HEAD` names no fix.
-            return Err(Error::NoCommits(self.config.foreground.to_path_buf()));
+            return Err(Refusal::NoCommits(self.config.foreground.to_path_buf()).into());
         }
         ran.forward_stderr(report);
         if !ran.success {
-            return Err(Error::WorktreeAdd(path.into()));
+            return Err(GitError::AddWorktree(path.into()).into());
         }
         self.copy_into(&path, failures, report);
         self.run_on_new_slot(&path, failures, report);

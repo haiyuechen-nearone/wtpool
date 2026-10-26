@@ -4,7 +4,7 @@ use std::fs::{File, OpenOptions, TryLockError};
 use std::path::{Path, PathBuf};
 
 use crate::activity::{self, ACTIVITY_DIR};
-use crate::error::Error;
+use crate::error::{Error, GitError, SettingsError};
 use crate::github::ViewPr;
 use crate::paths;
 use crate::report::Report;
@@ -36,7 +36,7 @@ impl<V: ViewPr> Pool<V> {
         let common_dir = ran
             .line()
             .filter(|dir| !dir.is_empty())
-            .ok_or_else(|| Error::NoGitDir(foreground.path().to_path_buf()))?;
+            .ok_or_else(|| GitError::NoGitDir(foreground.path().to_path_buf()))?;
         let common_dir = Path::new(common_dir);
         if let Err(error) = activity::create_activity(common_dir) {
             report.warn(&format!(
@@ -75,7 +75,7 @@ impl<V: ViewPr> Pool<V> {
     fn foreground_worktree(&self, report: &mut impl Report) -> Result<Worktree, Error> {
         let foreground = &self.config.foreground;
         if !foreground.is_dir() {
-            return Err(Error::ForegroundMissing(foreground.to_path_buf()));
+            return Err(SettingsError::ForegroundMissing(foreground.to_path_buf()).into());
         }
         let not_a_worktree = || {
             self.config.foreground_source.invalid(
@@ -86,7 +86,7 @@ impl<V: ViewPr> Pool<V> {
             )
         };
         let worktrees = match self.worktrees(report) {
-            Err(Error::ListWorktrees(_)) => return Err(not_a_worktree()),
+            Err(Error::Git(GitError::ListWorktrees(_))) => return Err(not_a_worktree()),
             listed => listed?,
         };
         worktrees

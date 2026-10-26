@@ -174,3 +174,17 @@ accept status-lines 4bd6c19b8fe9f67108943f199600a98b39aa842eda9de612bb0901bb59ad
 accept comments-bin bf8b5f52d495240b5f17792c40c2f7a346d6f7e8ad89071810a64602ea51a45c
 # The quick part's static layer checks that every built bundle, out/*.js and media/*.js, is ASCII only, as the coverage converter needs a bundle's bytes to equal its UTF-16 length.
 accept comments-ts f83bbbb2d041499006ae2d821442eab68952d4c7b027091990fa1ef867ef864d
+# The CLI escapes the extension's set: the int checks of the CLI's escapes take Cc, Cf, U+2028, U+2029 and the tag block from Node's Unicode tables, the ls and bg branch adds U+2028 and U+FFF9, and the config check's slot_dir probes every character of the set and the code points just outside each run.
+accept cli-invisible 616e995b1c7668c0cf3e97a78ce16587c3161c2f83f4c0fa469bf00994b4e05d
+# X7: a new e2e check hides and shows the tab ten times in a row and wants the pool's rows back within 2 s each time, the header never left at starting….
+accept reshow-guard 85e90cd1585bd581e19c495bb78a58b25b95d1efc525ef025f5c075afc1d0fd2
+# Harness follow-ups: a static lint group whose runner does not start or times out fails as a setup error, not an assertion; the flows check reads outcomes through web::worst_outcomes, with the same results.
+accept harness-followups 45ca575354a11ef892c88c7b40f52b8496e111f0560426acbee99222c28759a8
+# The two title canaries follow panel.ts after its comment cleanup: the same edit of changed(update), at its new line and context.
+accept comments-ts2 02be093041981e5ef1fae9d02d82d8ac55a4ba8e4b3597fc2ec18bf54047f605
+# The extension's ESLint config adds the Google TypeScript Style Guide rules ESLint can check, all at zero findings; the oracle's lint groups are unchanged.
+accept eslint-p8 1909c07f704ac40cd1b55f4ec256f711af695d3bad20b0a5d66979aa2581cfa8
+# Status lines: status-panel.md revision 29 records the merged changes; H6, H18, H21, A1, R2 and H22 each gain or sharpen a sentence on behaviour already built: the ownership and lock identity checks where the system tells none, the Windows no-follow open, the two liveness rules, the CLI's escaped set and the first runnable wtpool on PATH.
+accept status-lines-3 01a2deaa58d4eb63865f2ba2b6ef3b3f085e2eb7364ebb236e9fc759b10aa2f0
+# Eight host and e2e checks wait for the state their next step needs, not a fixed moment: the palette helper opens the palette through the View menu's command when keys are dropped, narrow_scroll waits for the page's frame to be focused, and the host checks wait for their own tab's view or the paused view before acting.
+accept flake-fixes c88a7f91f584a711b078e3962980bf79679c5576d72db9f32764a67524c4ea37

@@ -3,12 +3,12 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use crate::error::Error;
+use crate::error::{Error, Refusal};
+use crate::git::Git;
 use crate::github::ViewPr;
 use crate::names::{BranchName, InvalidSlotName, SlotName};
 use crate::report::{Discard, Report};
 use crate::resolve::{self, Divergence};
-use crate::run::Git;
 use crate::worktree::{self, Head};
 use crate::worktree_state::{Row, State, Upstream};
 
@@ -68,10 +68,10 @@ impl<V: ViewPr> Pool<V> {
         };
         let worktree = found.ok_or_else(|| Error::NoMatch(arg.to_owned()))?;
         if self.is_foreground(worktree.path()) {
-            return Err(Error::DetachForeground);
+            return Err(Refusal::DetachForeground.into());
         }
         if worktree.is_gone() {
-            return Err(self.gone_error(&worktree));
+            return Err(self.gone_error(&worktree).into());
         }
         let state = WorktreeState::read(&worktree, &self.git())?;
         refusals::detach_refusal(&worktree.name(), &state).map_or(Ok(()), Err)?;
@@ -138,7 +138,7 @@ impl<V: ViewPr> Pool<V> {
             }
         };
         if self.is_foreground(worktree.path()) {
-            return Err(Error::RemoveForeground);
+            return Err(Refusal::RemoveForeground.into());
         }
         let gone = worktree.is_gone();
         let state = WorktreeState::read(worktree, &self.git())?;
@@ -159,7 +159,7 @@ impl<V: ViewPr> Pool<V> {
         let not_checked_out = || Error::NotCheckedOut(branch.to_owned());
         let name = BranchName::try_new(branch).map_err(|_| not_checked_out())?;
         match self.any_holder_of(&name)? {
-            Some(holder) if holder.is_gone() => Err(self.gone_error(&holder)),
+            Some(holder) if holder.is_gone() => Err(self.gone_error(&holder).into()),
             Some(holder) => Ok(holder.into_path().into_path_buf()),
             None => Err(not_checked_out()),
         }

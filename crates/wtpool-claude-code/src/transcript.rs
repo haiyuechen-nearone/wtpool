@@ -11,7 +11,8 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use wtpool_core::hook::{TranscriptTitles, open_without_following};
+use wtpool_core::hook::TranscriptTitles;
+use wtpool_core::platform::fs::open_without_following;
 
 /// A read takes at most this many bytes, the last ones: Claude Code writes the titles again on
 /// every turn, so the newest are near the end.

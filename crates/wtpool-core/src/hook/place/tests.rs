@@ -1,41 +1,8 @@
 use std::ffi::OsStr;
 
 use super::*;
+use crate::hook::fixture::must_pool;
 use rstest::rstest;
-
-/// A pool without git: `fg` with a `.git` folder, linked worktrees `wt1` and `wt1x` whose
-/// `.git` files point at `fg/.git/worktrees/<name>`, and `fake`, whose `.git` file points at
-/// wt1's folder without a back link.
-pub(crate) fn must_pool() -> (tempfile::TempDir, PathBuf) {
-    let dir = tempfile::tempdir().unwrap();
-    let root = dir.path().canonicalize().unwrap();
-    let common = root.join("fg/.git");
-    std::fs::create_dir_all(common.join("objects")).unwrap();
-    std::fs::write(common.join("HEAD"), "ref: refs/heads/main\n").unwrap();
-    for name in ["wt1", "wt1x"] {
-        let gitdir = common.join("worktrees").join(name);
-        std::fs::create_dir_all(&gitdir).unwrap();
-        std::fs::create_dir_all(root.join(name)).unwrap();
-        std::fs::write(
-            root.join(name).join(".git"),
-            format!("gitdir: {}\n", gitdir.display()),
-        )
-        .unwrap();
-        std::fs::write(
-            gitdir.join("gitdir"),
-            format!("{}\n", root.join(name).join(".git").display()),
-        )
-        .unwrap();
-        std::fs::write(gitdir.join("commondir"), "../..\n").unwrap();
-    }
-    std::fs::create_dir_all(root.join("fake")).unwrap();
-    std::fs::write(
-        root.join("fake/.git"),
-        format!("gitdir: {}\n", common.join("worktrees/wt1").display()),
-    )
-    .unwrap();
-    (dir, root)
-}
 
 #[rstest]
 #[case::main_worktree("fg/a.txt", Some("fg"))]
@@ -59,12 +26,9 @@ fn worktree_of__should_find_the_worktree_by_component(
 
     // Then
     assert_eq!(
-        found.as_ref().map(|w| w.root.clone()),
-        expected.map(|e| root.join(e))
+        found.map(|w| (w.root, w.common)),
+        expected.map(|e| (root.join(e), root.join("fg/.git")))
     );
-    if let Some(found) = found {
-        assert_eq!(found.common, root.join("fg/.git"));
-    }
 }
 
 #[cfg(unix)]

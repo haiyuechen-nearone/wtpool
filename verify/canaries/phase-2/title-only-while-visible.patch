@@ -5,10 +5,10 @@ Check: title__should_count_waits_while_hidden
 Sets the tab title only while the tab is visible, so a hidden tab never shows the count.
 
 diff --git a/vscode/src/host/panel.ts b/vscode/src/host/panel.ts
-index 462e107..e42cef8 100644
+index 5466c14..9f5de91 100644
 --- a/vscode/src/host/panel.ts
 +++ b/vscode/src/host/panel.ts
-@@ -185,7 +185,7 @@ export class StatusPanel {
+@@ -179,7 +179,7 @@ export class StatusPanel {
    private changed(update: DocumentUpdate | undefined): void {
      if (update) {
        this.document = update.document;
@@ -16,4 +16,4 @@ index 462e107..e42cef8 100644
 +      if (this.panel.visible) this.panel.title = titleOf(update.document);
      }
      this.post();
-     // A new document may list other outputs for the selected row, or none (R12).
+     // A new document may list other outputs for the selected row, or none.

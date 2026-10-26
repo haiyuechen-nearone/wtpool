@@ -1,0 +1,66 @@
+/* Row actions: shown on hover and focus, in a column of their own that fits all five, so a shown
+ * action never covers another column's text. */
+
+.actions {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 4px;
+  text-align: right;
+}
+
+/* 24 px squares: the WCAG 2.2 target size, five side by side. The cell's padding holds the focus
+ * ring, and scroll-margin keeps it in view when focus scrolls a button in. */
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background-color: transparent;
+  color: var(--vscode-icon-foreground);
+  font: inherit;
+  line-height: 1;
+  vertical-align: top;
+  cursor: pointer;
+  opacity: 0;
+  scroll-margin: 4px;
+}
+
+.action:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.row:hover .action,
+.row:focus-within .action {
+  opacity: 1;
+}
+
+body.vscode-high-contrast .action:hover:not(:focus-visible) {
+  outline: 1px dashed var(--vscode-contrastActiveBorder);
+  outline-offset: -1px;
+}
+
+button:focus {
+  outline: none;
+}
+
+button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+/* focusBorder is under 3:1 on Dark Modern's selection. VS Code's focusAndSelectionOutline, or the
+ * selection foreground where a theme has none, is not. The high contrast themes keep focusBorder. */
+.row[aria-selected="true"]:focus,
+.row[aria-selected="true"] button:focus-visible {
+  outline-color: var(--vscode-list-focusAndSelectionOutline, var(--vscode-list-activeSelectionForeground));
+}
+
+body.vscode-high-contrast .row[aria-selected="true"]:focus,
+body.vscode-high-contrast .row[aria-selected="true"] button:focus-visible {
+  outline-color: var(--vscode-focusBorder);
+}

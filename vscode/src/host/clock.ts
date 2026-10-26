@@ -14,7 +14,7 @@ export const systemClock: Clock = {
   now: () => Date.now(),
   after(ms, run) {
     const timer = setTimeout(run, ms);
-    return () => clearTimeout(timer);
+    return () => void clearTimeout(timer);
   },
 };
 

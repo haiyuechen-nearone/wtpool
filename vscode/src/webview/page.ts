@@ -46,7 +46,7 @@ function hiddenNote(className: string, text: string): HTMLParagraphElement {
 
 /** Shows the tab's page: made once, then updated by each view, output message and tick. */
 export class Page {
-  private readonly header = new Header(() => this.focusFirstWaiting());
+  private readonly header = new Header(() => void this.focusFirstWaiting());
   private readonly noFolder = hiddenNote('no-folder', NO_FOLDER);
   private readonly agentsOff = hiddenNote('agents-off', AGENTS_OFF);
   private readonly scroller = div('scroller');
@@ -101,8 +101,8 @@ export class Page {
     thead.append(head);
     this.heading.element.hidden = true;
     this.tbody.append(this.heading.element);
-    this.tbody.addEventListener('click', (event) => this.activate(event));
-    this.tbody.addEventListener('keydown', (event) => this.activate(event));
+    this.tbody.addEventListener('click', (event) => void this.activate(event));
+    this.tbody.addEventListener('keydown', (event) => void this.activate(event));
     this.tbody.addEventListener('focusin', (event) => {
       if (event.target instanceof Element) this.reveal(event.target);
     });
@@ -140,7 +140,7 @@ export class Page {
 
   /** Clears the document from the page. */
   private clear(): void {
-    this.rows.forEach((row) => row.element.remove());
+    this.rows.forEach((row) => void row.element.remove());
     this.rows.clear();
     this.heading.element.hidden = true;
     this.order = [];
@@ -152,7 +152,7 @@ export class Page {
 
   /** Moves the clock: ages and the stale or paused header, nothing else. */
   tick(nowMs: number): void {
-    this.rows.forEach((row) => row.tick(nowMs));
+    this.rows.forEach((row) => void row.tick(nowMs));
     if (!this.view || this.view.no_folder) return;
     this.header.tick(this.view, nowMs);
   }

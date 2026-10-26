@@ -1,8 +1,9 @@
-//! The local time of day: in the time zone `TZ` names, else `/etc/localtime`, else UTC.
+//! The local time of day: in the time zone `TZ` names, else `/etc/localtime`, else UTC. Windows
+//! has no zone database and no such file, so there the time is UTC unless `TZ` holds a POSIX rule.
 
 use std::path::{Path, PathBuf};
 
-use super::Timestamp;
+use crate::clock::Timestamp;
 
 /// Folders that hold the time zone database.
 const ZONEINFO: [&str; 2] = ["/usr/share/zoneinfo", "/var/db/timezone/zoneinfo"];

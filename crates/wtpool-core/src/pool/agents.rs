@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::error::Error;
+use crate::error::{Error, Refusal};
 use crate::github::ViewPr;
 use crate::status::{self, Actor, ActorState, Sources};
 use crate::worktree::Worktree;
@@ -35,14 +35,16 @@ impl<V: ViewPr> Pool<V> {
             .iter()
             .map(|worktree| worktree.path().as_path())
             .collect();
-        let actors = status::actors_at(self.config.clone(), common.to_path_buf(), sources, &paths)?;
+        let (config, common) = (self.config.clone(), common.to_path_buf());
+        let actors = status::actors_at(config, common, sources, &paths, self.git().mode())?;
         for (worktree, actors) in worktrees.iter().zip(actors) {
             let agents: Vec<String> = actors.iter().filter_map(busy).collect();
             if !agents.is_empty() {
-                return Err(Error::AgentsBusy {
+                return Err(Refusal::AgentsBusy {
                     worktree: worktree.name(),
                     agents,
-                });
+                }
+                .into());
             }
         }
         Ok(())

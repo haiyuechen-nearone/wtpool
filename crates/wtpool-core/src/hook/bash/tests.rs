@@ -94,6 +94,16 @@ fn parse__should_keep_words_without_a_home() {
     assert_eq!(parsed.paths, vec![PathBuf::from("/p/fg/~/x")]);
 }
 
+fn words_of(tokens: &[Token]) -> Vec<&lex::Word> {
+    tokens
+        .iter()
+        .filter_map(|token| match token {
+            Token::Word(word) => Some(word),
+            _ => None,
+        })
+        .collect()
+}
+
 #[rstest]
 #[case::nested("a $(b $(c d)) e", &["a", "$(b $(c d))", "e"], &["b $(c d)"])]
 #[case::arithmetic("x $((1+2))", &["x", "$((1+2))"], &[])]
@@ -110,13 +120,7 @@ fn tokenize__should_keep_substitutions_in_their_word(
     let tokens = lex::tokenize(command);
 
     // Then
-    let found: Vec<&lex::Word> = tokens
-        .iter()
-        .filter_map(|token| match token {
-            Token::Word(word) => Some(word),
-            _ => None,
-        })
-        .collect();
+    let found = words_of(&tokens);
     let texts: Vec<&str> = found.iter().map(|w| w.text.as_str()).collect();
     let inner: Vec<&str> = found
         .iter()

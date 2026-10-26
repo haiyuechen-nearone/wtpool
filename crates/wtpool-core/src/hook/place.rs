@@ -2,6 +2,9 @@
 
 use std::path::{Component, Path, PathBuf, Prefix};
 
+use crate::git::layout;
+use crate::platform::fs::path_prefix;
+
 /// A worktree found from a path: its folder and its repository's common git directory, both
 /// with symlinks resolved.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,8 +56,8 @@ fn linked_worktree(dir: &Path, dot_git: &Path) -> Option<Worktree> {
     let text = std::fs::read_to_string(dot_git).ok()?;
     let target = text.lines().next()?.strip_prefix("gitdir:")?.trim();
     let gitdir = dir.join(local(Path::new(target))?).canonicalize().ok()?;
-    let back = std::fs::read_to_string(gitdir.join("gitdir")).ok()?;
-    let back = gitdir.join(local(Path::new(back.trim()))?);
+    let back = std::fs::read_to_string(layout::back_link_file(&gitdir)).ok()?;
+    let back = gitdir.join(local(layout::back_link(&back))?);
     let back = back.canonicalize().unwrap_or(back);
     if !same_components(&back, dot_git) {
         return None;
@@ -74,7 +77,7 @@ fn linked_worktree(dir: &Path, dot_git: &Path) -> Option<Worktree> {
 /// outside every pool.
 #[must_use]
 pub fn is_local(path: &Path) -> bool {
-    (path.is_absolute() || !path.has_root()) && is_local_prefix(prefix_of(path))
+    (path.is_absolute() || !path.has_root()) && is_local_prefix(path_prefix(path))
 }
 
 /// `path` when the hook may read it ([`is_local`]).
@@ -90,34 +93,6 @@ fn is_local_prefix(prefix: Option<Prefix<'_>>) -> bool {
         prefix,
         None | Some(Prefix::Disk(_) | Prefix::VerbatimDisk(_))
     )
-}
-
-/// The prefix of `path`, as the standard library reads it here.
-#[cfg(windows)]
-fn prefix_of(path: &Path) -> Option<Prefix<'_>> {
-    match path.components().next()? {
-        Component::Prefix(prefix) => Some(prefix.kind()),
-        _ => None,
-    }
-}
-
-/// No path has a prefix here, but one that starts with exactly two slashes, as `//server/share`
-/// does, reads as a UNC share: POSIX leaves such a path to the system, and Windows and Cygwin
-/// read it so.
-#[cfg(not(windows))]
-fn prefix_of(path: &Path) -> Option<Prefix<'_>> {
-    let text = path.as_os_str().as_encoded_bytes();
-    if !text.starts_with(b"//") || text.starts_with(b"///") {
-        return None;
-    }
-    let mut names = path.components().filter_map(|component| match component {
-        Component::Normal(name) => Some(name),
-        _ => None,
-    });
-    Some(Prefix::UNC(
-        names.next().unwrap_or_default(),
-        names.next().unwrap_or_default(),
-    ))
 }
 
 /// Whether two paths name the same folder component by component.

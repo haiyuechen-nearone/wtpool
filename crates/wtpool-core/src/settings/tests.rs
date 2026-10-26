@@ -424,7 +424,7 @@ fn prefix_of__should_append_wtpool_to_the_folder_name(
 #[test]
 fn enclosing__should_refuse_without_a_current_directory() {
     // When
-    let repository = discover::enclosing(None, None);
+    let repository = discover::enclosing(None, None, GitMode::Writing);
 
     // Then
     assert_eq!(

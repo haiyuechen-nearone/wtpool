@@ -2,8 +2,8 @@
 //! them into `free`, `reasons` and `activity` (A4, A5, S9).
 
 use super::document::{Activity, GitStatus, OperationName, Reason};
+use crate::git::Git;
 use crate::resolve::{self, Divergence};
-use crate::run::Git;
 use crate::worktree::{Head, Worktree};
 use crate::worktree_state::{Operation, Role, Uncommitted, Unreferenced, Upstream};
 

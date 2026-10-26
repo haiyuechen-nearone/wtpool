@@ -19,6 +19,7 @@ use crate::activity::ACTIVITY_DIR;
 use crate::clock::Timestamp;
 use crate::config::Config;
 use crate::error::Error;
+use crate::git::{Git, GitMode, layout};
 use crate::paths::comparable;
 use crate::processes::{ListProcesses, Liveness, RunningProcess};
 use crate::report::Discard;
@@ -29,11 +30,13 @@ use crate::worktree::{Head, Worktree};
 pub struct PoolState {
     config: Config,
     common: PathBuf,
+    git_mode: GitMode,
     machine: String,
     repository: Repository,
     worktrees: Vec<Tracked>,
     processes: Vec<RunningProcess>,
     records: Records,
+    agents: Agents,
 }
 
 /// A listed worktree and its facts.
@@ -46,12 +49,25 @@ struct Tracked {
     git_dir: Option<PathBuf>,
     /// `None` when the folder is gone.
     facts: Option<Facts>,
+    /// The newest modification of its `HEAD` and index.
+    last_change: Option<Timestamp>,
 }
 
 impl PoolState {
     /// Reads everything about the pool of `config`, whose common git directory is `common`, on
-    /// the machine called `machine`.
+    /// the machine called `machine`, through read-only git.
     pub fn load(
+        config: Config,
+        common: PathBuf,
+        processes: &impl ListProcesses,
+        machine: String,
+    ) -> Result<Self, Error> {
+        Self::load_with(GitMode::ReadOnly, config, common, processes, machine)
+    }
+
+    /// [`PoolState::load`] through git in `git_mode`.
+    pub fn load_with(
+        git_mode: GitMode,
         config: Config,
         common: PathBuf,
         processes: &impl ListProcesses,
@@ -61,6 +77,7 @@ impl PoolState {
         let mut state = Self {
             config,
             common,
+            git_mode,
             machine,
             repository: Repository {
                 name: String::new(),
@@ -69,6 +86,7 @@ impl PoolState {
             worktrees: Vec::new(),
             processes: Vec::new(),
             records,
+            agents: Agents::Off,
         };
         state.refresh_all(processes)?;
         Ok(state)
@@ -77,14 +95,15 @@ impl PoolState {
     /// Lists the worktrees again and reads every fact, the process table, the repository and
     /// the records.
     pub fn refresh_all(&mut self, processes: &impl ListProcesses) -> Result<(), Error> {
-        let listed = Worktree::list(&self.config.foreground, &mut Discard)?;
+        let foreground = Git::at(&self.config.foreground).with_mode(self.git_mode);
+        let listed = Worktree::list_with(&foreground, &mut Discard)?;
         // git lists the main worktree first.
         let name = listed.first().map(Worktree::name).unwrap_or_default();
-        let (common, foreground) = (self.common.as_path(), &self.config.foreground);
+        let common = self.common.as_path();
         let remote = self.config.remote.as_str();
         let (worktrees, table, repository) = thread::scope(|scope| {
             let table = scope.spawn(|| processes.list(&builds::query()));
-            let repository = scope.spawn(|| repository(name, foreground, remote));
+            let repository = scope.spawn(|| repository(name, &foreground, remote));
             let worktrees = track_all(listed, common);
             (
                 worktrees,
@@ -97,7 +116,7 @@ impl PoolState {
         if let Some(repository) = repository {
             self.repository = repository;
         }
-        self.records.rescan();
+        self.rescan_records();
         Ok(())
     }
 
@@ -111,7 +130,7 @@ impl PoolState {
         else {
             return false;
         };
-        let fresh = Worktree::list(tracked.worktree.path(), &mut Discard)
+        let fresh = Worktree::list_with(&tracked.worktree.git(), &mut Discard)
             .ok()
             .and_then(|listed| {
                 listed
@@ -122,6 +141,7 @@ impl PoolState {
             return false;
         };
         tracked.facts = read_facts(&fresh);
+        tracked.last_change = tracked.git_dir.as_deref().and_then(last_change);
         tracked.worktree = fresh;
         true
     }
@@ -142,7 +162,7 @@ impl PoolState {
     }
 
     /// Reads the record called `name` again. Gives its worktree when the change ended an edit
-    /// tool or Bash call there (W4). A record of a process the table does not hold yet reads the
+    /// tool or Bash call there. A record of a process the table does not hold yet reads the
     /// process table again, so a new session shows at once.
     pub fn refresh_record(
         &mut self,
@@ -150,6 +170,7 @@ impl PoolState {
         processes: &impl ListProcesses,
     ) -> Option<PathBuf> {
         let edited = self.records.refresh(name);
+        self.agents = agents_of(&self.records);
         let key = Path::new(name).file_stem().unwrap_or_default();
         let unknown = self
             .records
@@ -172,7 +193,7 @@ impl PoolState {
         git_dir.is_some_and(|git_dir| self.refresh_git_dir(&git_dir))
     }
 
-    /// When an actor next changes state on its own (W6), by the clock of the records.
+    /// When an actor next changes state on its own, by the clock of the records.
     #[must_use]
     pub fn next_change(&self, now: Timestamp) -> Option<Timestamp> {
         agents::next_change(&self.counted_records(), now)
@@ -187,6 +208,7 @@ impl PoolState {
 
     pub fn rescan_records(&mut self) {
         self.records.rescan();
+        self.agents = agents_of(&self.records);
     }
 
     /// Whether the linked worktrees' git folders differ from the listed ones, so the worktree
@@ -247,11 +269,6 @@ impl PoolState {
                 tracked.status(&self.config, builds.clone(), &placed, &context)
             })
             .collect();
-        let agents = if self.records.enabled() {
-            Agents::On
-        } else {
-            Agents::Off
-        };
         Document {
             kind: DocumentKind::Status,
             version: DocumentVersion,
@@ -261,7 +278,7 @@ impl PoolState {
             },
             pools: vec![PoolStatus {
                 common_dir: self.common.to_string_lossy().into_owned(),
-                agents,
+                agents: self.agents,
                 skipped_records: self.records.skipped(),
                 worktrees,
                 repository: self.repository.clone(),
@@ -328,7 +345,7 @@ impl Tracked {
                 .map(|record| &record.updated)
                 .max_by_key(|updated| updated.at())
                 .cloned(),
-            last_change: self.git_dir.as_deref().and_then(last_change),
+            last_change: self.last_change,
         }
     }
 }
@@ -350,6 +367,7 @@ fn track_all(listed: Vec<Worktree>, common: &Path) -> Vec<Tracked> {
                 };
                 scope.spawn(move || Tracked {
                     facts: read_facts(&worktree),
+                    last_change: git_dir.as_deref().and_then(last_change),
                     worktree,
                     comparable,
                     git_dir,
@@ -367,17 +385,25 @@ fn read_facts(worktree: &Worktree) -> Option<Facts> {
     (!worktree.is_gone()).then(|| Facts::read(worktree))
 }
 
+fn agents_of(records: &Records) -> Agents {
+    if records.enabled() {
+        Agents::On
+    } else {
+        Agents::Off
+    }
+}
+
 /// The git folder `<common>/worktrees/<id>` of each linked worktree, by the worktree's path
 /// with symlinks resolved, read from each folder's `gitdir` file without git.
 fn linked_git_dirs(common: &Path) -> BTreeMap<PathBuf, PathBuf> {
-    std::fs::read_dir(common.join("worktrees"))
+    std::fs::read_dir(layout::worktrees_dir(common))
         .into_iter()
         .flatten()
         .flatten()
         .filter_map(|entry| {
             let git_dir = entry.path();
-            let text = std::fs::read_to_string(git_dir.join("gitdir")).ok()?;
-            let dot_git = git_dir.join(text.trim_end_matches(['\n', '\r']));
+            let text = std::fs::read_to_string(layout::back_link_file(&git_dir)).ok()?;
+            let dot_git = git_dir.join(layout::back_link(&text));
             Some((comparable(dot_git.parent()?), git_dir))
         })
         .collect()
@@ -385,7 +411,7 @@ fn linked_git_dirs(common: &Path) -> BTreeMap<PathBuf, PathBuf> {
 
 /// The newest modification of the worktree's `HEAD` and index.
 fn last_change(git_dir: &Path) -> Option<Timestamp> {
-    ["HEAD", "index"]
+    [layout::HEAD, layout::INDEX]
         .iter()
         .filter_map(|name| git_dir.join(name).symlink_metadata().ok()?.modified().ok())
         .map(Timestamp::from_system_time)

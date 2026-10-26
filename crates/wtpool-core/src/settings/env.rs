@@ -5,10 +5,10 @@ use std::path::PathBuf;
 
 use crate::config::{Key, SlotCount};
 use crate::config_file::Values;
-use crate::error::Error;
-use crate::fs;
+use crate::error::{Error, SettingsError};
 use crate::names::{RemoteName, SlotPrefix};
 use crate::paths::AbsolutePath;
+use crate::platform::dirs;
 
 const HOME: &str = "HOME";
 
@@ -64,15 +64,15 @@ fn set(var: &impl Fn(&str) -> Option<OsString>, key: Key) -> Result<Option<Strin
     }
 }
 
-/// The home folder as [`fs::home_folder`] finds it from `HOME` and `system`, refused when
+/// The home folder as [`dirs::home_folder`] finds it from `HOME` and `system`, refused when
 /// there is none, so a `~/` path never points somewhere else.
 pub(super) fn home_dir(
     var: &impl Fn(&str) -> Option<OsString>,
     system: impl FnOnce() -> Option<PathBuf>,
 ) -> Result<AbsolutePath, Error> {
     let home = var(HOME);
-    if let Some(folder) =
-        fs::home_folder(home.clone(), system).and_then(|folder| AbsolutePath::try_new(folder).ok())
+    if let Some(folder) = dirs::home_folder(home.clone(), system)
+        .and_then(|folder| AbsolutePath::try_new(folder).ok())
     {
         return Ok(folder);
     }
@@ -80,11 +80,12 @@ pub(super) fn home_dir(
         Some(home) if !home.is_empty() => (home.to_string_lossy().into_owned(), "not absolute"),
         _ => (String::new(), "not set"),
     };
-    Err(Error::InvalidConfig {
+    Err(SettingsError::InvalidVariable {
         var: HOME,
         value,
         reason: reason.to_owned(),
-    })
+    }
+    .into())
 }
 
 fn absolute(key: Key, path: &str) -> Result<AbsolutePath, Error> {
@@ -92,9 +93,10 @@ fn absolute(key: Key, path: &str) -> Result<AbsolutePath, Error> {
 }
 
 fn invalid(key: Key, value: String, reason: String) -> Error {
-    Error::InvalidConfig {
+    SettingsError::InvalidVariable {
         var: key.var(),
         value,
         reason,
     }
+    .into()
 }

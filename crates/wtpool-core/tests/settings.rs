@@ -8,7 +8,7 @@ use std::process::Command;
 
 use rstest::rstest;
 use tempfile::TempDir;
-use wtpool_core::{AbsolutePath, Setting, Settings, Source};
+use wtpool_core::{AbsolutePath, GitMode, Setting, Settings, Source};
 
 /// `git -C <dir>` with a test identity and without the user's git config.
 fn git_command(dir: &Path) -> Command {
@@ -104,7 +104,11 @@ impl Fixture {
                 .find(|(var, _)| var == name)
                 .map(|(_, value)| value.clone())
         };
-        Settings::load(var, Some(&AbsolutePath::try_new(cwd).unwrap()))
+        Settings::load(
+            var,
+            Some(&AbsolutePath::try_new(cwd).unwrap()),
+            GitMode::Writing,
+        )
     }
 }
 

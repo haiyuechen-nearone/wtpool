@@ -7,11 +7,11 @@ use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 
 use crate::config::CopyPath;
-use crate::config_file;
-use crate::error::Error;
+use crate::error::{Error, GitError};
+use crate::git::Git;
 use crate::paths::AbsolutePath;
+use crate::platform::fs::{open_private, open_without_following};
 use crate::report::Report;
-use crate::run::Git;
 
 /// The kind of a path, read without following a symlink.
 #[derive(Debug)]
@@ -146,10 +146,11 @@ fn ignored(main: &AbsolutePath, path: &CopyPath, report: &mut impl Report) -> Re
         Some(1) => Ok(false),
         _ => {
             ran.forward_stderr(report);
-            Err(Error::IgnoreUnknown {
+            Err(GitError::IgnoreUnknown {
                 path: path.to_string(),
                 main: main.to_path_buf(),
-            })
+            }
+            .into())
         }
     }
 }
@@ -157,7 +158,7 @@ fn ignored(main: &AbsolutePath, path: &CopyPath, report: &mut impl Report) -> Re
 /// Copies the file `source` to `target`, a path that must not exist yet, with the
 /// permissions `permissions`. A partly written `target` is removed again.
 fn write_copy(source: &Path, target: &Path, permissions: Permissions) -> io::Result<()> {
-    let mut from = config_file::open_without_following(source)?;
+    let mut from = open_without_following(source)?;
     let mut to = create_new(target)?;
     let copied = io::copy(&mut from, &mut to).and_then(|_| to.set_permissions(permissions));
     if copied.is_err() {
@@ -168,19 +169,8 @@ fn write_copy(source: &Path, target: &Path, permissions: Permissions) -> io::Res
 
 /// Creates `path`, failing when anything is there, a symlink included. Only the
 /// owner can read it until the copy's own permissions are set.
-#[cfg(unix)]
 fn create_new(path: &Path) -> io::Result<File> {
-    use std::os::unix::fs::OpenOptionsExt;
-    OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(path)
-}
-
-#[cfg(not(unix))]
-fn create_new(path: &Path) -> io::Result<File> {
-    OpenOptions::new().write(true).create_new(true).open(path)
+    open_private(OpenOptions::new().write(true).create_new(true), path)
 }
 
 #[cfg(all(test, unix))]

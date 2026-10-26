@@ -1,15 +1,17 @@
 //! The tests of the watch loop, [`run`], with a fake tracker.
 
+use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::thread;
-
-use rstest::rstest;
 
 use super::tests::{CLOCK, ROOT, watched};
 use super::*;
 use crate::clock::Timestamp;
 use crate::status::document::{DocumentKind, DocumentVersion, Machine};
+
+mod ends;
 
 /// What the loop asked a [`FakeTracker`] to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,14 +59,14 @@ impl Track for FakeTracker {
         self.record(Call::All);
     }
 
-    fn refresh(&mut self, pending: &Pending) {
+    fn refresh(&mut self, pending: &Pending, _: Instant) {
         let mut pending = pending.clone();
         pending.since = None;
         pending.last = None;
         self.record(Call::Some(pending));
     }
 
-    fn deadline(&self) -> Option<Instant> {
+    fn deadline(&self, _: Instant) -> Option<Instant> {
         *self.deadline.lock().unwrap()
     }
 
@@ -100,6 +102,48 @@ const NO_HEARTBEAT: Timing = Timing {
     merge: Duration::from_millis(60),
     settle: Duration::from_millis(30),
 };
+
+/// A timer whose time moves only as the loop sleeps or waits: at once to the next message of
+/// `schedule` when it arrives before the wait ends, else to the end of the wait. The input closes
+/// when a wait would end after `closes`.
+struct SimulatedTimer {
+    now: Cell<Instant>,
+    closes: Instant,
+    /// Each message the loop hears, with the time it arrives, in order.
+    schedule: RefCell<VecDeque<(Instant, Message)>>,
+}
+
+impl Timer for SimulatedTimer {
+    fn now(&self) -> Instant {
+        self.now.get()
+    }
+
+    fn sleep(&self, duration: Duration) {
+        self.now.set(self.now.get() + duration);
+    }
+
+    fn receive(
+        &self,
+        _: &Receiver<Message>,
+        until: Option<Instant>,
+    ) -> Result<Message, RecvTimeoutError> {
+        let mut schedule = self.schedule.borrow_mut();
+        let arrives = schedule
+            .front()
+            .is_some_and(|(at, _)| until.is_none_or(|until| *at <= until));
+        if arrives && let Some((at, message)) = schedule.pop_front() {
+            self.now.set(at.max(self.now.get()));
+            return Ok(message);
+        }
+        match until {
+            Some(until) if until <= self.closes => {
+                self.now.set(until.max(self.now.get()));
+                Err(RecvTimeoutError::Timeout)
+            }
+            _ => Ok(Message::InputClosed),
+        }
+    }
+}
 
 /// Output a test reads while the loop still runs.
 #[derive(Clone, Default)]
@@ -159,7 +203,14 @@ fn must_start(
     let mut tracker = tracker.clone();
     let mut output = output.clone();
     let handle = thread::spawn(move || {
-        run(&mut tracker, &messages, &mut output, &watched(), timing);
+        run(
+            &mut tracker,
+            &messages,
+            &mut output,
+            &watched(),
+            timing,
+            &SystemTimer,
+        );
     });
     (sender, handle)
 }
@@ -189,33 +240,28 @@ fn run__should_print_a_document_at_once_and_stop_when_input_closes() {
 }
 
 #[test]
-fn run__should_stop_when_every_sender_is_gone() {
-    // Given
-    let tracker = FakeTracker::new("first", &[]);
-    let output = SharedOutput::default();
-    let (sender, handle) = must_start(&tracker, &output, NO_HEARTBEAT);
-
-    // When
-    drop(sender);
-    handle.join().unwrap();
-
-    // Then
-    assert_eq!(output.lines().len(), 1);
-}
-
-#[test]
 fn run__should_refresh_all_and_print_alive_lines_on_each_heartbeat() {
     // Given
-    let tracker = FakeTracker::new("first", &["first", "second"]);
-    let output = SharedOutput::default();
+    let mut tracker = FakeTracker::new("first", &["first", "second"]);
+    let mut output = SharedOutput::default();
     let started = Instant::now();
-    let (sender, handle) = must_start(&tracker, &output, FAST);
+    let second_round = started + FAST.heartbeat * 2 + FAST.settle;
+    let timer = SimulatedTimer {
+        now: Cell::new(started),
+        closes: second_round,
+        schedule: RefCell::default(),
+    };
+    let (_sender, messages) = channel();
 
     // When
-    must_wait(|| output.lines().len() == 4);
-    let elapsed = started.elapsed();
-    sender.send(Message::InputClosed).unwrap();
-    handle.join().unwrap();
+    run(
+        &mut tracker,
+        &messages,
+        &mut output,
+        &watched(),
+        FAST,
+        &timer,
+    );
 
     // Then
     assert_eq!(
@@ -223,28 +269,37 @@ fn run__should_refresh_all_and_print_alive_lines_on_each_heartbeat() {
         vec!["first", "alive 1", "second", "alive 2"]
     );
     assert_eq!(tracker.calls(), vec![Call::All, Call::All]);
-    assert!(elapsed >= FAST.heartbeat * 2 + FAST.settle, "{elapsed:?}");
+    assert_eq!(timer.now(), second_round);
 }
 
 #[test]
 fn run__should_merge_changes_and_print_only_a_changed_document() {
     // Given
-    let tracker = FakeTracker::new("first", &["first", "second"]);
-    let output = SharedOutput::default();
-    let (sender, handle) = must_start(&tracker, &output, NO_HEARTBEAT);
+    let mut tracker = FakeTracker::new("first", &["first", "second"]);
+    let mut output = SharedOutput::default();
+    let started = Instant::now();
+    let merge = NO_HEARTBEAT.merge;
+    let timer = SimulatedTimer {
+        now: Cell::new(started),
+        closes: started + merge * 10,
+        schedule: RefCell::new(VecDeque::from([
+            (started, paths(&["worktrees/wt1/HEAD", "objects/ab/cd"])),
+            (started + merge / 4, paths(&["refs/heads/main"])),
+            (started + merge * 3, paths(&["wtpool-activity/s-1.json"])),
+            (started + merge * 6, paths(&["HEAD.lock", "FETCH_HEAD"])),
+        ])),
+    };
+    let (_sender, messages) = channel();
 
     // When
-    sender
-        .send(paths(&["worktrees/wt1/HEAD", "objects/ab/cd"]))
-        .unwrap();
-    sender.send(paths(&["refs/heads/main"])).unwrap();
-    must_wait(|| tracker.calls().len() == 1);
-    sender.send(paths(&["wtpool-activity/s-1.json"])).unwrap();
-    must_wait(|| output.lines().len() == 2);
-    sender.send(paths(&["HEAD.lock", "FETCH_HEAD"])).unwrap();
-    thread::sleep(NO_HEARTBEAT.merge * 3);
-    sender.send(Message::InputClosed).unwrap();
-    handle.join().unwrap();
+    run(
+        &mut tracker,
+        &messages,
+        &mut output,
+        &watched(),
+        NO_HEARTBEAT,
+        &timer,
+    );
 
     // Then
     assert_eq!(summary(&output.lines()), vec!["first", "second"]);
@@ -305,97 +360,6 @@ fn run__should_refresh_everything_on_a_rescan_flag() {
     assert_eq!(tracker.calls(), vec![Call::Some(all)]);
 }
 
-/// Output that fails after `left` lines.
-struct FailingOutput {
-    left: usize,
-    written: Vec<u8>,
-}
-
-impl Write for FailingOutput {
-    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        if self.left == 0 {
-            return Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe));
-        }
-        self.written.extend_from_slice(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.left = self.left.saturating_sub(1);
-        Ok(())
-    }
-}
-
-#[rstest]
-#[case::first_document(0, &[], None)]
-#[case::changed_document_on_a_heartbeat(1, &["second"], None)]
-#[case::alive_line(1, &[], None)]
-#[case::changed_document_after_a_change(1, &["second"], Some(paths(&["HEAD"])))]
-fn run__should_stop_when_output_fails(
-    #[case] lines: usize,
-    #[case] next: &[&str],
-    #[case] message: Option<Message>,
-) {
-    // Given
-    let tracker = FakeTracker::new("first", next);
-    let mut output = FailingOutput {
-        left: lines,
-        written: Vec::new(),
-    };
-    let (sender, messages) = channel();
-    if let Some(message) = message {
-        sender.send(message).unwrap();
-    }
-    let (done, finished) = channel();
-
-    // When
-    thread::spawn({
-        let mut tracker = tracker.clone();
-        move || {
-            run(&mut tracker, &messages, &mut output, &watched(), FAST);
-            done.send(output).unwrap();
-        }
-    });
-    let output = finished.recv_timeout(Duration::from_secs(5));
-
-    // Then
-    let text = String::from_utf8(output.expect("run still runs").written).unwrap();
-    assert_eq!(text.lines().count(), lines, "{text}");
-    assert_eq!(tracker.calls().len(), usize::from(lines > 0));
-}
-
-#[test]
-fn print_line__should_report_a_failed_flush() {
-    // Given
-    struct NoFlush;
-    impl Write for NoFlush {
-        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-            Ok(bytes.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
-        }
-    }
-
-    // When
-    let printed = print_line(&mut NoFlush, "x");
-
-    // Then
-    assert!(!printed);
-}
-
-#[test]
-fn read_to_end__should_say_when_input_closed() {
-    // Given
-    let (sender, messages) = channel();
-
-    // When
-    read_to_end(&b"some input"[..], &sender);
-
-    // Then
-    assert_eq!(messages.try_recv(), Ok(Message::InputClosed));
-}
-
 #[test]
 fn run__should_tick_when_the_trackers_deadline_passes() {
     // Given
@@ -441,33 +405,4 @@ fn run__should_hear_the_clock_file_as_a_change() {
         ..Pending::default()
     };
     assert_eq!(tracker.calls(), vec![Call::Some(clock)]);
-}
-
-#[test]
-fn run__should_stop_when_output_fails_after_a_tick() {
-    // Given
-    let tracker = FakeTracker::new("first", &["second"]);
-    *tracker.deadline.lock().unwrap() = Some(Instant::now());
-    let mut output = FailingOutput {
-        left: 1,
-        written: Vec::new(),
-    };
-    let (_sender, messages) = channel();
-    let mut looping = tracker.clone();
-
-    // When
-    run(
-        &mut looping,
-        &messages,
-        &mut output,
-        &watched(),
-        NO_HEARTBEAT,
-    );
-
-    // Then
-    assert_eq!(
-        String::from_utf8(output.written).unwrap().lines().count(),
-        1
-    );
-    assert_eq!(tracker.calls(), vec![Call::Tick]);
 }

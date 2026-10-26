@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 
 use sysinfo::{Pid, Process, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
-use super::{ListProcesses, ProcessQuery, RunningProcess, StartTime};
 use crate::clock::Timestamp;
+use crate::processes::{ListProcesses, ProcessQuery, RunningProcess, StartTime};
 
 /// The system's process table.
 #[derive(Debug, Clone, Copy, Default)]
@@ -42,7 +42,7 @@ impl ListProcesses for SystemProcesses {
     }
 
     /// Without a start: the table tells only its second, and a hook times itself to the
-    /// microsecond from when its `main` began (H24).
+    /// microsecond from when its `main` began.
     fn this_process(&self) -> Option<RunningProcess> {
         Some(RunningProcess {
             pid: std::process::id(),

@@ -135,7 +135,7 @@ export class OutputArea {
   /** Forgets every tail: another row is selected, whose tails come anew. */
   clearTails(): void {
     this.tails.clear();
-    this.tasks.forEach((task) => task.show());
+    this.tasks.forEach((task) => void task.show());
   }
 
   /** Gives the Output section of `actor`, made on first use, with its label current. */

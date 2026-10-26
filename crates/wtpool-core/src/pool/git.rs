@@ -3,8 +3,9 @@
 use std::ffi::OsStr;
 
 use crate::error::Error;
+use crate::git::Git;
 use crate::report::Report;
-use crate::run::{Git, Ran};
+use crate::run::Ran;
 
 /// Runs `git` with `args` and passes its standard error on to `report`. A caller that fails
 /// like a shell under `set -e` adds [`Ran::check`].

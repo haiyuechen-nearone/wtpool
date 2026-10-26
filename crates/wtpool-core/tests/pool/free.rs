@@ -4,7 +4,7 @@ use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
 
 use rstest::rstest;
-use wtpool_core::{AbsolutePath, AgentGuard, Config, Error, Pool};
+use wtpool_core::{AbsolutePath, AgentGuard, Config, Error, Pool, Refusal};
 
 use crate::states::{must_break_status, must_hide_the_sequencer, must_stop_a_merge};
 use crate::support::{
@@ -47,7 +47,10 @@ fn free__should_refuse_the_foreground_however_it_is_spelled(#[case] spelling: &s
     let result = pool.free(&spelling, AgentGuard::Force, &mut Recorder::default());
 
     // Then
-    assert!(matches!(result, Err(Error::DetachForeground)), "{result:?}");
+    assert!(
+        matches!(result, Err(Error::Refusal(Refusal::DetachForeground))),
+        "{result:?}"
+    );
     assert_eq!(
         fixture.must_head_branch(&fixture.foreground).as_deref(),
         Some("main")
@@ -281,7 +284,7 @@ fn free__should_refuse_a_pool_it_cannot_lock(
     let result = pool.free("app-wt1", AgentGuard::Force, &mut Recorder::default());
 
     // Then
-    assert_eq!(result.unwrap_err().to_string(), fixture.expand(expected));
+    assert_eq!(result.unwrap_err().messages(), [fixture.expand(expected)]);
     assert_eq!(fixture.must_head_branch(&slot).as_deref(), Some("feature"));
 }
 

@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use rstest::rstest;
-use wtpool_core::{AgentGuard, Error, Pool, SyncMode};
+use wtpool_core::{AgentGuard, Error, GitError, Pool, SyncMode};
 
 use crate::support::{FakePr, Fixture, PoolCommand, PrAnswer, Recorder, Setup, must_git, pr_view};
 
@@ -373,10 +373,10 @@ fn pool_commands__should_stop_with_the_status_of_a_switch_git_refuses(
     assert!(
         matches!(
             result,
-            Err(Error::CommandFailed {
+            Err(Error::Git(GitError::CommandFailed {
                 code: Some(128),
                 ..
-            })
+            }))
         ),
         "{result:?}"
     );

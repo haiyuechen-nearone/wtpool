@@ -273,7 +273,7 @@ impl ActorState {
 mod tests {
     use super::*;
 
-    fn must_document(generated: i64, name: &str) -> Document {
+    fn empty_document(generated: i64, name: &str) -> Document {
         Document {
             kind: DocumentKind::Status,
             version: DocumentVersion,
@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn document__should_serialize_type_and_version() {
         // Given
-        let document = must_document(0, "m");
+        let document = empty_document(0, "m");
 
         // When
         let json = serde_json::to_string(&document).unwrap();
@@ -303,12 +303,12 @@ mod tests {
     #[test]
     fn same_content__should_ignore_only_the_generated_time() {
         // Given
-        let document = must_document(0, "m");
+        let document = empty_document(0, "m");
 
         // When
-        let later = document.same_content(&must_document(60, "m"));
-        let other = document.same_content(&must_document(0, "n"));
-        let mut with_pool = must_document(0, "m");
+        let later = document.same_content(&empty_document(60, "m"));
+        let other = document.same_content(&empty_document(0, "n"));
+        let mut with_pool = empty_document(0, "m");
         with_pool.pools.push(PoolStatus {
             common_dir: "/c".to_owned(),
             agents: Agents::On,

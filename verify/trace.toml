@@ -434,7 +434,7 @@ checks = [
 
 [ids.X7]
 phase = 1
-checks = ["hidden_then_shown"]
+checks = ["hidden_then_shown", "reshow__should_fill_the_table_every_time"]
 
 [ids.X8]
 phase = 1

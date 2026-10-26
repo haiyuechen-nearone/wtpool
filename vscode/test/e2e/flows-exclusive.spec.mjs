@@ -180,6 +180,31 @@ test('flow__narrow_window', async () => {
   });
 });
 
+/**
+ * Resolves true when each document above the tab's page has the frame that holds the page as its
+ * focused element, so a key pressed now reaches the page. The page of a window that is never
+ * active can report no focus from `document.hasFocus()` even then.
+ */
+async function keysReachPage(frame) {
+  for (let child = frame; child.parentFrame(); child = child.parentFrame()) {
+    const owner = await child.frameElement();
+    if (!(await owner.evaluate((element) => element.ownerDocument.activeElement === element))) return false;
+  }
+  return frame.page().mainFrame().evaluate(() => document.hasFocus());
+}
+
+/**
+ * Gives the tab's page keyboard focus from the webview frame around it, the step VS Code's webview
+ * takes once its editor has focus. VS Code's own handover runs through the workbench, which can
+ * leave the keyboard on its body; the workbench then drops every key the webview forwards, so
+ * neither the Command Palette nor a group command reaches the page.
+ */
+async function focusPage(frame) {
+  const owner = await frame.frameElement();
+  await owner.evaluate((element) => element.contentWindow.focus());
+  return poll(() => keysReachPage(frame), 10_000);
+}
+
 const WAIT_SCENARIO = 'permission_wait_and_answer';
 
 test('flow__narrow_scroll', async () => {
@@ -208,9 +233,7 @@ test('flow__narrow_scroll', async () => {
       await sleep(200);
       end = await frame.evaluate(scrollLayout);
       await frame.evaluate(scrollTable, false);
-      for (let step = 0; step < 3 && !(await frame.evaluate(() => document.hasFocus())); step += 1) {
-        await runCommand(window, 'View: Focus Next Editor Group', { keyboardOnly: true });
-      }
+      assert.ok(await focusPage(frame), 'setup: the tab\'s page did not take keyboard focus');
       const seen = new Set();
       for (let step = 0; step < 80; step += 1) {
         await window.keyboard.press('Tab');
@@ -289,7 +312,7 @@ test('flow__keyboard_only', async () => {
     await window.mouse.move(1, 1);
     const frame = await openStatus(session);
     for (let step = 0; step < 3 && !(await frame.evaluate(() => document.hasFocus())); step += 1) {
-      await runCommand(window, 'View: Focus Next Editor Group', { keyboardOnly: true });
+      await runCommand(window, 'View: Focus Next Editor Group');
     }
     const status = resolved(scenarioDocuments(session.scenario).documents.at(-1), session.pool);
     const expected = rowOrder(status.pools[0].worktrees).flatMap((w) => [

@@ -2,8 +2,7 @@
 //! `<owner>/<repo>` that a remote's URL names, read without the network.
 
 use super::document::Repository;
-use crate::paths::AbsolutePath;
-use crate::run::Git;
+use crate::git::Git;
 
 /// The URL forms a GitHub remote is recognised by, each followed by `<owner>/<repo>` and an
 /// optional `.git`.
@@ -14,19 +13,19 @@ const GITHUB_PREFIXES: [&str; 3] = [
 ];
 
 /// The repository whose main worktree is called `name`, with the GitHub slug of `remote`'s URL
-/// as git reads it in `dir`.
+/// as `git` reads it.
 #[must_use]
-pub fn repository(name: String, dir: &AbsolutePath, remote: &str) -> Repository {
+pub fn repository(name: String, git: &Git, remote: &str) -> Repository {
     Repository {
         name,
-        github: remote_url(dir, remote).as_deref().and_then(github_slug),
+        github: remote_url(git, remote).as_deref().and_then(github_slug),
     }
 }
 
-/// The URL of the remote `remote` in the repository of `dir`, `None` without such a remote.
+/// The URL of the remote `remote` in the repository of `git`, `None` without such a remote.
 #[must_use]
-pub fn remote_url(dir: &AbsolutePath, remote: &str) -> Option<String> {
-    let ran = Git::at(dir).run(["remote", "get-url", "--", remote]).ok()?;
+pub fn remote_url(git: &Git, remote: &str) -> Option<String> {
+    let ran = git.run(["remote", "get-url", "--", remote]).ok()?;
     ran.line().filter(|url| !url.is_empty()).map(str::to_owned)
 }
 
@@ -58,6 +57,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
+    use crate::paths::AbsolutePath;
     use crate::status::fixture::{must_fixture, must_git};
 
     #[rstest]
@@ -104,7 +104,7 @@ mod tests {
     fn repository__should_read_the_remote_of_the_pool() {
         // Given
         let fixture = must_fixture();
-        let main = AbsolutePath::try_new(&fixture.main).unwrap();
+        let main = Git::at(&AbsolutePath::try_new(&fixture.main).unwrap());
         must_git(
             &fixture.main,
             &["remote", "add", "github", "git@github.com:acme/app.git"],

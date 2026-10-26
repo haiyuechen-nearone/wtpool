@@ -1,7 +1,7 @@
 //! The slot `bg` parks a branch in: the facts it reads of each slot, and the choice.
 
 use crate::config::SlotCount;
-use crate::error::Error;
+use crate::error::{Error, Refusal};
 use crate::github::ViewPr;
 use crate::report::Report;
 use crate::worktree::{Head, Worktree};
@@ -65,15 +65,18 @@ pub(super) fn choose_parking<T>(
                 None => return Ok(Some(slot)),
                 Some(refusal) => blocked.push(refusal),
             },
-            SlotHead::Branch(branch) => blocked.push(Error::SlotHoldsBranch { slot: name, branch }),
-            SlotHead::Unknown => blocked.push(Error::HeadUnknown(name)),
+            SlotHead::Branch(branch) => {
+                blocked.push(Refusal::SlotHoldsBranch { slot: name, branch });
+            }
+            SlotHead::Unknown => blocked.push(Refusal::HeadUnknown(name)),
         }
     }
     if full {
-        return Err(Error::PoolFull {
+        return Err(Refusal::PoolFull {
             limit: count.get(),
             blocked,
-        });
+        }
+        .into());
     }
     Ok(None)
 }

@@ -1,0 +1,96 @@
+/* The Output section: under both columns of the strip, per agent, each task's heading and Follow
+ * button over its tail in a monospace block. Lines wrap anywhere, so nothing is clipped, and a tail
+ * taller than the block scrolls inside it. In every theme the text is the foreground on the editor
+ * background, and the border a descriptionForeground one at 3:1. */
+
+.output-area {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.outputs {
+  margin-top: 4px;
+}
+
+.outputs-heading {
+  margin-bottom: 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.output {
+  margin-bottom: 10px;
+}
+
+.output-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-bottom: 4px;
+}
+
+.output-heading {
+  flex: 1 1 12em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.output-state {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* A text button with a 1 px border in the link colour, at 3:1 on the strip. */
+.follow {
+  flex: none;
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid var(--vscode-textLink-foreground);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.follow:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+body.vscode-high-contrast .follow:hover:not(:focus-visible) {
+  outline: 1px dashed var(--vscode-contrastActiveBorder);
+  outline-offset: -1px;
+}
+
+.output-tail {
+  box-sizing: border-box;
+  max-height: 16.5em;
+  margin: 0;
+  padding: 6px 8px;
+  overflow: hidden auto;
+  border: 1px solid var(--vscode-descriptionForeground);
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.output-tail:focus {
+  outline: none;
+}
+
+.output-tail:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.output-note {
+  font-style: italic;
+}

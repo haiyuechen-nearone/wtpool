@@ -98,8 +98,10 @@ fn new_slot__should_refuse_a_name_without_the_slot_prefix() {
 
     // Then
     assert_eq!(
-        result.unwrap_err().to_string(),
-        "invalid slot name 'review': a slot name must start with slot_prefix 'app-wt' in /r/.git/wtpool.toml"
+        result.unwrap_err().messages(),
+        [
+            "invalid slot name 'review': a slot name must start with slot_prefix 'app-wt' in /r/.git/wtpool.toml"
+        ]
     );
     assert!(!fixture.root.join("review").exists());
     assert!(!fixture.foreground.join(".git/wtpool.lock").exists());
