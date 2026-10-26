@@ -7,7 +7,7 @@ use crate::support::{FakePr, Fixture, PrAnswer, Recorder, Setup, must_git, pr_vi
 
 /// A pool whose remote is `remote`.
 fn pool_with_remote(fixture: &Fixture, remote: &str, answer: PrAnswer) -> Pool<FakePr> {
-    Pool::with_view_pr(
+    Pool::new(
         Config {
             remote: RemoteName::try_new(remote).unwrap(),
             ..fixture.config(3)

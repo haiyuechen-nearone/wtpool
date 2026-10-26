@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 
 use crate::activity::{self, ACTIVITY_DIR};
 use crate::error::{Error, GitError, SettingsError};
-use crate::github::ViewPr;
 use crate::paths;
 use crate::report::Report;
 use crate::worktree::Worktree;
@@ -24,7 +23,7 @@ pub(super) struct PoolLock {
     _file: File,
 }
 
-impl<V: ViewPr> Pool<V> {
+impl<F> Pool<F> {
     /// Takes the pool lock in the repository's common git directory, waiting while
     /// another run holds it. Creates `wtpool-activity/` there first, so hooks have
     /// somewhere to write once the pool has been changed.

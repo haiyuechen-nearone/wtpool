@@ -3,7 +3,6 @@
 use std::ffi::OsStr;
 
 use crate::error::{Error, GitError, Refusal};
-use crate::github::ViewPr;
 use crate::names::SlotName;
 use crate::paths::{self, AbsolutePath};
 use crate::report::{Discard, Report};
@@ -11,7 +10,7 @@ use crate::run;
 
 use super::{Pool, copy};
 
-impl<V: ViewPr> Pool<V> {
+impl<F> Pool<F> {
     /// The first `<prefix><n>` that is neither on disk nor a registered worktree
     /// whose directory is gone.
     fn next_slot_name(&self) -> Result<SlotName, Error> {

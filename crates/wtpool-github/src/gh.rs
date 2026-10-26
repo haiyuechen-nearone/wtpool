@@ -1,53 +1,63 @@
+//! Pull request heads, as the `gh` command line tool looks them up on GitHub.
+
 use std::process::Command;
 
-use crate::error::Error;
-use crate::names::{ObjectId, PrNumber, RepoSlug};
-use crate::platform::shell::find_on_path;
-use crate::run;
+use wtpool_core::platform::shell::find_on_path;
+use wtpool_core::{Error, ObjectId};
+
+use crate::names::{PrNumber, RepoSlug};
 
 /// Looks pull requests up on GitHub.
-pub trait ViewPr {
+pub(crate) trait ViewPr {
     /// The head of PR `number` in `repo`.
     fn view_pr(&self, repo: &RepoSlug, number: &PrNumber) -> Result<PrView, ViewPrError>;
 }
 
 /// The head of a pull request.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PrView {
+pub(crate) struct PrView {
     /// The head branch name in the repository the PR comes from.
-    pub head_ref_name: String,
-    pub head: ObjectId,
+    pub(crate) head_ref_name: String,
+    pub(crate) head: ObjectId,
     /// The PR comes from a fork.
-    pub cross_repository: bool,
+    pub(crate) cross_repository: bool,
 }
 
 /// The exit status of `gh` when it has no login to ask GitHub with.
 const AUTH_REQUIRED: i32 = 4;
 
 /// The reason [`ViewPr::view_pr`] found no PR head.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 #[must_use]
-pub enum ViewPrError {
-    #[error("the GitHub CLI is not installed")]
+pub(crate) enum ViewPrError {
+    /// The GitHub CLI is not installed.
     Unavailable,
     /// `gh` has no GitHub login: `said` is the last line it wrote to standard error.
-    #[error("the GitHub CLI is not logged in")]
-    NotLoggedIn { said: String },
-    #[error("no such PR")]
+    NotLoggedIn {
+        said: String,
+    },
     NotFound,
     /// `gh` failed for another reason, such as no network: `said` is the last line it wrote
     /// to standard error, `code` its exit status.
-    #[error("the GitHub CLI failed")]
-    GhFailed { said: String, code: Option<i32> },
-    #[error("unexpected answer from GitHub")]
+    GhFailed {
+        said: String,
+        code: Option<i32>,
+    },
+    /// An answer of GitHub that is not a PR head.
     Malformed,
-    #[error(transparent)]
-    Failed(#[from] Error),
+    /// `gh` could not run.
+    Failed(Error),
+}
+
+impl From<Error> for ViewPrError {
+    fn from(error: Error) -> Self {
+        Self::Failed(error)
+    }
 }
 
 /// [`ViewPr`] through the `gh` command line tool.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct GhCli;
+pub(crate) struct GhCli;
 
 impl ViewPr for GhCli {
     fn view_pr(&self, repo: &RepoSlug, number: &PrNumber) -> Result<PrView, ViewPrError> {
@@ -55,7 +65,7 @@ impl ViewPr for GhCli {
             return Err(ViewPrError::Unavailable);
         }
         let repo = repo.to_string();
-        let ran = run::run(Command::new("gh").args([
+        let ran = wtpool_core::run(Command::new("gh").args([
             "pr",
             "view",
             number.as_str(),
@@ -111,50 +121,39 @@ mod tests {
     const LOGIN: &str = "To get started with GitHub CLI, please run:  gh auth login\n\
         Alternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.\n";
     const LAST_LOGIN_LINE: &str = "Alternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.";
-    const NOT_LOGGED_IN: &str = "the GitHub CLI is not logged in";
-    const GH_FAILED: &str = "the GitHub CLI failed";
-
-    /// The message of `error` and the line of gh it keeps, for comparison.
-    fn summary(error: &ViewPrError) -> (String, &str) {
-        let said = match error {
-            ViewPrError::NotLoggedIn { said } | ViewPrError::GhFailed { said, .. } => said,
-            _ => "",
-        };
-        (error.to_string(), said)
-    }
 
     #[rstest]
-    #[case::not_logged_in(Some(4), LOGIN, (NOT_LOGGED_IN, LAST_LOGIN_LINE))]
+    #[case::not_logged_in(Some(4), LOGIN, format!("NotLoggedIn {{ said: {LAST_LOGIN_LINE:?} }}"))]
     #[case::bad_token(
         Some(1),
         "HTTP 401: Bad credentials (https://api.github.com/graphql)\nTry authenticating with:  gh auth login\n",
-        (NOT_LOGGED_IN, "Try authenticating with:  gh auth login")
+        r#"NotLoggedIn { said: "Try authenticating with:  gh auth login" }"#.to_owned()
     )]
     #[case::no_such_pr(
         Some(1),
         "GraphQL: Could not resolve to a PullRequest with the number of 42. (repository.pullRequest)\n",
-        ("no such PR", "")
+        "NotFound".to_owned()
     )]
     #[case::no_network(
         Some(1),
         "error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com\n",
-        (GH_FAILED, "check your internet connection or https://githubstatus.com")
+        r#"GhFailed { said: "check your internet connection or https://githubstatus.com", code: Some(1) }"#.to_owned()
     )]
     #[case::no_such_repository(
         Some(1),
         "GraphQL: Could not resolve to a Repository with the name 'acme/app'. (repository)\n",
-        (GH_FAILED, "GraphQL: Could not resolve to a Repository with the name 'acme/app'. (repository)")
+        r#"GhFailed { said: "GraphQL: Could not resolve to a Repository with the name 'acme/app'. (repository)", code: Some(1) }"#.to_owned()
     )]
-    #[case::silent(None, "", (GH_FAILED, ""))]
+    #[case::silent(None, "", r#"GhFailed { said: "", code: None }"#.to_owned())]
     fn failure__should_tell_a_missing_login_from_a_missing_pr(
         #[case] code: Option<i32>,
         #[case] stderr: &str,
-        #[case] expected: (&str, &str),
+        #[case] expected: String,
     ) {
         // When
         let error = failure(code, stderr);
 
         // Then
-        assert_eq!(summary(&error), (expected.0.to_owned(), expected.1));
+        assert_eq!(format!("{error:?}"), expected);
     }
 }

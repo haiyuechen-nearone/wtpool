@@ -238,9 +238,11 @@ is deleted at the end (`--keep` leaves it).
 ## Where things live
 
 - Code: `crates/wtpool-core` holds the pool, `wtpool status`, the activity records and the rules
-  of `wtpool hook`, the same for every coding agent harness; `crates/wtpool-claude-code` is the
-  Claude Code adapter, which reads its hook payloads, transcripts and `settings.json`; and
-  `crates/wtpool` is the binary, which picks the adapter. The extension is in `vscode/src`.
+  of `wtpool hook`, the same for every coding agent harness and git hosting service;
+  `crates/wtpool-claude-code` is the Claude Code adapter, which reads its hook payloads,
+  transcripts and `settings.json`; `crates/wtpool-github` is the GitHub adapter, which reads PR
+  refs and remote URLs and looks PR heads up with `gh`; and `crates/wtpool` is the binary, which
+  picks the adapters. The extension is in `vscode/src`.
 - Spec: [docs/design/status-panel/status-panel.md](design/status-panel/status-panel.md).
 - How each behaviour ID is checked: [verification.md](design/status-panel/verification.md).
 - Reviews and live results: `verify/reviews/`.

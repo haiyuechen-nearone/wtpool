@@ -348,7 +348,7 @@ fn new_slot__should_fail_but_keep_the_slot_when_git_cannot_tell_what_it_ignores(
     let plain = fixture.root.join("plain");
     std::fs::create_dir(&plain).unwrap();
     std::fs::write(plain.join(".envrc"), "use flake\n").unwrap();
-    let pool = Pool::with_view_pr(
+    let pool = Pool::new(
         Config {
             main_worktree: Some(AbsolutePath::try_new(&plain).unwrap()),
             ..fixture.config_with_setup(3, &[".envrc"], None)
@@ -379,7 +379,7 @@ fn new_slot__should_fail_but_keep_the_slot_when_git_cannot_tell_what_it_ignores(
 fn new_slot__should_fail_but_keep_the_slot_without_a_main_worktree_to_copy_from() {
     // Given
     let fixture = Fixture::must_new();
-    let pool = Pool::with_view_pr(
+    let pool = Pool::new(
         Config {
             main_worktree: None,
             ..fixture.config_with_setup(3, &[".envrc"], None)

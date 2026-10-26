@@ -28,6 +28,13 @@ pub fn must_git(dir: &Path, args: &[&str]) -> String {
     String::from_utf8(output.stdout).unwrap()
 }
 
+/// The repository a forge would name for an `https://` URL: its path after the host, without
+/// `.git`. `None` for any other URL.
+pub fn https_path(url: &str) -> Option<String> {
+    let (_, path) = url.strip_prefix("https://")?.split_once('/')?;
+    Some(path.strip_suffix(".git").unwrap_or(path).to_owned())
+}
+
 /// A process table a test sets. It lists every process with all its facts, whatever the query.
 #[derive(Clone, Default)]
 pub struct FixedProcesses(pub Arc<Mutex<Vec<RunningProcess>>>);
@@ -114,6 +121,7 @@ impl Fixture {
             self.common.clone(),
             &FixedProcesses::new(processes),
             "machine".to_owned(),
+            https_path,
         )
         .unwrap()
     }

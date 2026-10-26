@@ -272,7 +272,7 @@ fn free__should_refuse_a_pool_it_cannot_lock(
     let fixture = Fixture::must_new();
     let slot = fixture.must_park("feature", 1);
     setup(&fixture);
-    let pool = Pool::with_view_pr(
+    let pool = Pool::new(
         Config {
             foreground: AbsolutePath::try_new(fixture.expand(foreground)).unwrap(),
             ..fixture.config(3)

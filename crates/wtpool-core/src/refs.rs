@@ -1,7 +1,4 @@
-use std::str::FromStr;
-
 use crate::error::Error;
-use crate::names::{BranchName, PrNumber, RepoSlug};
 
 /// The arguments of `wtpool fg` and `wtpool bg`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,56 +47,6 @@ pub enum SyncMode {
     Refresh,
     /// Fetch and move it to the remote head even when diverged, after a backup.
     Reset,
-}
-
-/// A `<ref>` argument: a pull request or a branch name.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Target {
-    Pr {
-        number: PrNumber,
-        /// The repository a PR URL names. `None` for a bare number.
-        repo: Option<RepoSlug>,
-    },
-    Branch(BranchName),
-}
-
-impl FromStr for Target {
-    type Err = Error;
-
-    /// A PR number (`1234` or `#1234`) or a URL starting with
-    /// `http(s)://github.com/<owner>/<repo>/pull/<n>` names a PR; anything else a branch.
-    /// Fails with [`Error::InvalidRef`] when that branch name is one git rejects.
-    fn from_str(reference: &str) -> Result<Self, Error> {
-        if let Some((repo, number)) = pr_from_url(reference) {
-            return Ok(Self::Pr {
-                number,
-                repo: Some(repo),
-            });
-        }
-        if let Some(number) = PrNumber::new(reference.strip_prefix('#').unwrap_or(reference)) {
-            return Ok(Self::Pr { number, repo: None });
-        }
-        BranchName::try_new(reference)
-            .map(Self::Branch)
-            .map_err(|_| Error::InvalidRef(reference.to_owned()))
-    }
-}
-
-fn pr_from_url(reference: &str) -> Option<(RepoSlug, PrNumber)> {
-    let rest = reference
-        .strip_prefix("https://")
-        .or_else(|| reference.strip_prefix("http://"))?
-        .strip_prefix("github.com/")?;
-    let (owner, rest) = rest.split_once('/')?;
-    let (repo, rest) = rest.split_once('/')?;
-    let rest = rest.strip_prefix("pull/")?;
-    let end = rest
-        .find(|c: char| !c.is_ascii_digit())
-        .unwrap_or(rest.len());
-    Some((
-        RepoSlug::new(owner, repo)?,
-        PrNumber::new(rest.get(..end)?)?,
-    ))
 }
 
 #[cfg(test)]
@@ -163,55 +110,5 @@ mod tests {
 
         // Then
         assert!(matches!(parsed, Err(Error::Usage(USAGE))), "{parsed:?}");
-    }
-
-    fn pr(number: &str, repo: Option<(&str, &str)>) -> Target {
-        Target::Pr {
-            number: PrNumber::new(number).unwrap(),
-            repo: repo.map(|(owner, name)| RepoSlug::new(owner, name).unwrap()),
-        }
-    }
-
-    fn branch(name: &str) -> Target {
-        Target::Branch(BranchName::try_new(name).unwrap())
-    }
-
-    #[rstest]
-    #[case::number("1234", pr("1234", None))]
-    #[case::hash_number("#1234", pr("1234", None))]
-    #[case::https_url("https://github.com/acme/widget/pull/1234", pr("1234", Some(("acme", "widget"))))]
-    #[case::http_url_with_a_tail(
-        "http://github.com/acme/widget-private/pull/567/files#diff",
-        pr("567", Some(("acme", "widget-private")))
-    )]
-    #[case::branch("main", branch("main"))]
-    #[case::digits_then_letters("1234a", branch("1234a"))]
-    #[case::two_hashes("##1234", branch("##1234"))]
-    fn target__should_read_a_pr_or_a_branch(#[case] reference: &str, #[case] expected: Target) {
-        // When
-        let target: Result<Target, Error> = reference.parse();
-
-        // Then
-        assert_eq!(target.unwrap(), expected);
-    }
-
-    #[rstest]
-    #[case::issue_url("https://github.com/acme/widget/issues/1234")]
-    #[case::url_without_an_owner("https://github.com//widget/pull/1234")]
-    #[case::url_without_a_repository("https://github.com/acme")]
-    #[case::url_without_a_path_after_the_repository("https://github.com/acme/widget")]
-    #[case::url_without_a_number("https://github.com/acme/widget/pull/")]
-    #[case::other_host("https://gitlab.com/acme/widget/pull/1234")]
-    #[case::github_enterprise_host("https://github.acme.com/acme/widget/pull/1234")]
-    #[case::invalid_branch_name("a..b")]
-    fn target__should_refuse_what_is_neither_a_pr_nor_a_branch_name(#[case] reference: &str) {
-        // When
-        let target: Result<Target, Error> = reference.parse();
-
-        // Then
-        assert_eq!(
-            target.unwrap_err().to_string(),
-            format!("'{reference}' is not a PR number, a github.com PR URL or a valid branch name")
-        );
     }
 }

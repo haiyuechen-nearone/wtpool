@@ -120,6 +120,7 @@ fn bg__should_refuse_a_pr_that_gh_cannot_look_up(
 ) {
     // Given
     let sandbox = Sandbox::must_new();
+    sandbox.must_serve_origin_on_github();
     must_install_gh(&sandbox, kind, script);
 
     // When
@@ -142,6 +143,7 @@ fn bg__should_park_the_head_branch_gh_names(
 ) {
     // Given
     let sandbox = Sandbox::must_new();
+    sandbox.must_serve_origin_on_github();
     let foreground = &sandbox.foreground;
     must_git(foreground, &["switch", "--quiet", "-c", "feature"]);
     must_git(

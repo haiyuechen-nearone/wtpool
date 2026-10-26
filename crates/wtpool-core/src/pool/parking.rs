@@ -2,7 +2,6 @@
 
 use crate::config::SlotCount;
 use crate::error::{Error, Refusal};
-use crate::github::ViewPr;
 use crate::report::Report;
 use crate::worktree::{Head, Worktree};
 
@@ -26,7 +25,7 @@ pub(super) enum SlotHead {
     Unknown,
 }
 
-impl<V: ViewPr> Pool<V> {
+impl<F> Pool<F> {
     /// The facts of each managed slot whose directory exists. Warns about the others.
     pub(super) fn slot_facts(
         &self,

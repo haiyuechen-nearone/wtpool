@@ -1,7 +1,7 @@
 use std::io;
 use std::path::PathBuf;
 
-use crate::names::{InvalidSlotName, PrNumber};
+use crate::names::InvalidSlotName;
 
 /// Everything a `wtpool` command can fail with. [`Error::messages`] gives the lines
 /// to print and [`Error::exit_code`] the status to exit with.
@@ -18,8 +18,13 @@ pub enum Error {
     Usage(&'static str),
     #[error("unknown flag '{0}'")]
     UnknownFlag(String),
-    #[error("'{0}' is not a PR number, a github.com PR URL or a valid branch name")]
-    InvalidRef(String),
+    /// A `<ref>` that names no change of the forge, whose forms `forms` lists, and no valid
+    /// branch.
+    #[error("'{reference}' is not {forms} or a valid branch name")]
+    InvalidRef {
+        reference: String,
+        forms: &'static str,
+    },
     #[error("invalid slot name '{name}'")]
     InvalidSlotName {
         name: String,
@@ -152,8 +157,9 @@ pub enum GitError {
     Fetch,
     #[error("could not create branch {0}")]
     CreateBranch(String),
-    #[error("could not fetch PR #{0}")]
-    FetchPr(PrNumber),
+    /// The change, as [`ChangeHead::name`](crate::ChangeHead::name) names it.
+    #[error("could not fetch {0}")]
+    FetchChange(String),
     #[error("could not fetch branch {0}")]
     FetchBranch(String),
     /// `git ls-remote` failed, so the remote may or may not have the branch.
@@ -320,7 +326,9 @@ fn no_such_branch(branch: &str, remote: Option<&str>) -> String {
     }
 }
 
-pub(crate) fn exit_status(code: Option<i32>) -> String {
+/// How a message names the exit of a process with `code`, `None` when a signal ended it.
+#[must_use]
+pub fn exit_status(code: Option<i32>) -> String {
     match code {
         Some(code) => format!("exit status {code}"),
         None => "killed by a signal".to_owned(),

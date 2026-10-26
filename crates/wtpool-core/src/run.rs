@@ -9,7 +9,7 @@ use crate::report::Report;
 /// stays free of terminal I/O. Callers forward the parts the user should see.
 #[derive(Debug, Clone)]
 #[must_use]
-pub(crate) struct Ran {
+pub struct Ran {
     pub program: String,
     pub success: bool,
     pub code: Option<i32>,
@@ -45,7 +45,12 @@ impl Ran {
     }
 }
 
-pub(crate) fn run(command: &mut Command) -> Result<Ran, Error> {
+/// Runs `command` to its end with no standard input, capturing its output.
+///
+/// # Errors
+///
+/// [`GitError::Spawn`] when the command cannot start.
+pub fn run(command: &mut Command) -> Result<Ran, Error> {
     let program = command.get_program().to_string_lossy().into_owned();
     let output = command
         .stdin(Stdio::null())

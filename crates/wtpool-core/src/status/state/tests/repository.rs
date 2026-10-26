@@ -1,4 +1,4 @@
-//! The name and GitHub slug of the pool's repository.
+//! The name of the pool's repository and the name its forge gives it.
 
 use super::*;
 
@@ -58,8 +58,14 @@ fn document__should_read_the_url_of_the_configured_remote() {
     let processes = FixedProcesses::new(Vec::new());
 
     // When
-    let state =
-        PoolState::load(config, fixture.common.clone(), &processes, "m".to_owned()).unwrap();
+    let state = PoolState::load(
+        config,
+        fixture.common.clone(),
+        &processes,
+        "m".to_owned(),
+        https_path,
+    )
+    .unwrap();
 
     // Then
     let document = state.document(Timestamp::from_seconds(0));

@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use crate::error::Error;
-use crate::github::ViewPr;
+use crate::forge::Forge;
 use crate::names::BranchName;
 use crate::refs::SyncMode;
 use crate::report::Report;
@@ -15,7 +15,7 @@ use super::{AgentGuard, Pool, git};
 
 const FOREGROUND_NOT_CHANGED: &str = "foreground not changed";
 
-impl<V: ViewPr> Pool<V> {
+impl<F> Pool<F> {
     /// `wtpool fg`: checks a branch or PR out in the foreground, releasing it from the slot that
     /// holds it, and returns the foreground's path. Progress goes to standard error, so standard
     /// output carries the path alone.
@@ -31,7 +31,10 @@ impl<V: ViewPr> Pool<V> {
         sync: SyncMode,
         agents: AgentGuard<'_>,
         report: &mut impl Report,
-    ) -> Result<PathBuf, Error> {
+    ) -> Result<PathBuf, Error>
+    where
+        F: Forge,
+    {
         let lock = self.lock(report)?;
         let state = WorktreeState::read(&lock.foreground, &self.git())?;
         refusals::foreground_refusal(reference, &lock.foreground.name(), &state)

@@ -26,7 +26,7 @@ fn new_slot__should_create_a_detached_slot(
     let fixture = Fixture::must_new();
     std::fs::create_dir(fixture.slot(1)).unwrap();
     fixture.must_add_worktree("app-wt3", None);
-    let pool = Pool::with_view_pr(
+    let pool = Pool::new(
         Config {
             slot_count_source: Source::RepoFile(PathBuf::from("/r/.git/wtpool.toml")),
             ..fixture.config(slot_count)
@@ -61,7 +61,7 @@ fn new_slot__should_name_where_the_slot_count_came_from(
     // Given
     let fixture = Fixture::must_new();
     fixture.must_add_worktree("app-wt1", None);
-    let pool = Pool::with_view_pr(
+    let pool = Pool::new(
         Config {
             slot_count_source: source,
             ..fixture.config(1)
@@ -84,7 +84,7 @@ fn new_slot__should_name_where_the_slot_count_came_from(
 fn new_slot__should_refuse_a_name_without_the_slot_prefix() {
     // Given
     let fixture = Fixture::must_new();
-    let pool = Pool::with_view_pr(
+    let pool = Pool::new(
         Config {
             slot_prefix_source: Source::RepoFile(PathBuf::from("/r/.git/wtpool.toml")),
             ..fixture.config(3)
@@ -141,7 +141,7 @@ fn slot_creation__should_fail_when_git_cannot_add_the_worktree(#[case] command: 
     fixture.must_branch("feature");
     let blocker = fixture.root.join("file");
     std::fs::write(&blocker, "").unwrap();
-    let pool = Pool::with_view_pr(
+    let pool = Pool::new(
         Config {
             slot_dir: AbsolutePath::try_new(blocker.join("slots")).unwrap(),
             ..fixture.config(1)

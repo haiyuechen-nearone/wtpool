@@ -1,10 +1,9 @@
 //! Resolving a `<ref>` to a [`Plan`] with lookups only.
 
-use crate::error::{self, Error, GitError};
-use crate::github::{ViewPr, ViewPrError};
-use crate::names::{BranchName, ObjectId, PrNumber, RepoSlug};
+use crate::error::{Error, GitError};
+use crate::forge::{ChangeHead, Forge, Remote};
+use crate::names::BranchName;
 use crate::pool::Pool;
-use crate::refs::Target;
 use crate::report::Report;
 
 /// A `<ref>` resolved to the local branch it names, with lookups only.
@@ -17,23 +16,17 @@ pub(crate) struct Plan {
 #[derive(Debug, Clone)]
 pub(super) enum Step {
     Local,
-    LocalPr(PrHead),
+    LocalChange(ChangeHead),
     /// Only the remote has the branch.
     FetchBranch,
-    /// The branch of this PR is not local yet.
-    FetchPr(PrNumber),
+    /// The branch of this change is not local yet.
+    FetchChange(ChangeHead),
 }
 
-#[derive(Debug, Clone)]
-pub(super) struct PrHead {
-    pub(super) number: PrNumber,
-    pub(super) head: ObjectId,
-    pub(super) fork: bool,
-}
-
+/// A `<ref>` that names no branch to use.
 #[derive(Debug)]
 #[must_use]
-pub(crate) enum Unresolved {
+pub enum Unresolved {
     /// Everything there was to say, a warning or git's stderr, was reported already.
     Quiet,
     Fatal(Error),
@@ -60,119 +53,51 @@ impl From<Error> for Unresolved {
     }
 }
 
-impl<V: ViewPr> Pool<V> {
+impl<F> Pool<F> {
     /// Resolves a reference to a branch name with lookups only.
-    pub(crate) fn plan(
-        &self,
-        reference: &str,
-        report: &mut impl Report,
-    ) -> Result<Plan, Unresolved> {
-        let target: Target = reference.parse()?;
-        match target {
-            Target::Pr { number, repo } => self.plan_pr(number, repo.as_ref(), report),
-            Target::Branch(branch) => {
-                let step = if self.has_local_branch(&branch)? {
-                    Step::Local
-                } else {
-                    match self.remote_has_branch(&branch, report)? {
-                        Some(true) => Step::FetchBranch,
-                        found => {
-                            return Err(Unresolved::Fatal(Error::NoSuchBranch {
-                                branch: branch.to_string(),
-                                remote: found.map(|_| self.config.remote.to_string()),
-                            }));
-                        }
-                    }
-                };
-                Ok(Plan { branch, step })
-            }
+    pub(crate) fn plan(&self, reference: &str, report: &mut impl Report) -> Result<Plan, Unresolved>
+    where
+        F: Forge,
+    {
+        if let Some(change) = self.forge.change(reference) {
+            return self.plan_change(change, report);
         }
+        let branch = BranchName::try_new(reference).map_err(|_| Error::InvalidRef {
+            reference: reference.to_owned(),
+            forms: self.forge.change_forms(),
+        })?;
+        let step = if self.has_local_branch(&branch)? {
+            Step::Local
+        } else {
+            match self.remote_has_branch(&branch, report)? {
+                Some(true) => Step::FetchBranch,
+                found => {
+                    return Err(Unresolved::Fatal(Error::NoSuchBranch {
+                        branch: branch.to_string(),
+                        remote: found.map(|_| self.config.remote.to_string()),
+                    }));
+                }
+            }
+        };
+        Ok(Plan { branch, step })
     }
 
-    fn plan_pr(
-        &self,
-        number: PrNumber,
-        repo: Option<&RepoSlug>,
-        report: &mut impl Report,
-    ) -> Result<Plan, Unresolved> {
-        let remote = &self.config.remote;
-        let Some(url) = self.remote_url(report)? else {
-            report.warn(&format!(
-                "no remote '{remote}' in {}, so PR #{number} cannot be looked up",
-                self.config.foreground.display()
-            ));
-            return Err(Unresolved::Quiet);
+    fn plan_change(&self, change: F::Change, report: &mut impl Report) -> Result<Plan, Unresolved>
+    where
+        F: Forge,
+    {
+        let url = self.remote_url(report)?;
+        let remote = Remote {
+            name: &self.config.remote,
+            url: url.as_deref(),
+            foreground: &self.config.foreground,
         };
-        let Some(slug) = slug_from_url(&url) else {
-            report.warn(&format!(
-                "remote '{remote}' ({url}) is not on github.com, so PR #{number} cannot be looked up; PR refs need a github.com remote (GitHub Enterprise is not supported)"
-            ));
-            return Err(Unresolved::Quiet);
-        };
-        if let Some(repo) = repo
-            && !repo.matches(&slug)
-        {
-            report.warn(&format!(
-                "PR #{number} is in {repo}, but remote '{remote}' is {slug}"
-            ));
-            return Err(Unresolved::Quiet);
-        }
-        let view = match self.prs.view_pr(&slug, &number) {
-            Ok(view) => view,
-            Err(ViewPrError::Unavailable) => {
-                report.warn(&format!(
-                    "gh is not installed, so PR #{number} cannot be looked up; install it from https://cli.github.com"
-                ));
-                return Err(Unresolved::Quiet);
-            }
-            Err(ViewPrError::NotLoggedIn { said }) => {
-                report.warn(&format!(
-                    "gh is not logged in: run `gh auth login`{}",
-                    gh_said(&said)
-                ));
-                return Err(Unresolved::Quiet);
-            }
-            Err(ViewPrError::NotFound) => {
-                report.warn(&format!("no PR #{number} in {slug}"));
-                return Err(Unresolved::Quiet);
-            }
-            Err(ViewPrError::GhFailed { said, code }) => {
-                let cause = if said.is_empty() {
-                    format!(" ({})", error::exit_status(code))
-                } else {
-                    format!(": {said}")
-                };
-                report.warn(&format!(
-                    "gh could not look up PR #{number} in {slug}{cause}"
-                ));
-                return Err(Unresolved::Quiet);
-            }
-            Err(ViewPrError::Malformed) => {
-                report.warn(&format!("unexpected answer from GitHub for PR #{number}"));
-                return Err(Unresolved::Quiet);
-            }
-            Err(ViewPrError::Failed(error)) => return Err(Unresolved::Fatal(error)),
-        };
-        let fork = view.cross_repository;
-        let name = if fork {
-            format!("pr-{number}/{}", view.head_ref_name)
-        } else {
-            view.head_ref_name
-        };
-        let Ok(branch) = BranchName::try_new(&name) else {
-            report.warn(&format!(
-                "PR #{number} has head branch '{name}', which is not a valid branch name"
-            ));
-            return Err(Unresolved::Quiet);
-        };
+        let head = self.forge.head(change, remote, report)?;
+        let branch = head.branch.clone();
         let step = if self.has_local_branch(&branch)? {
-            Step::LocalPr(PrHead {
-                number,
-                head: view.head,
-                fork,
-            })
+            Step::LocalChange(head)
         } else {
-            Step::FetchPr(number)
+            Step::FetchChange(head)
         };
         Ok(Plan { branch, step })
     }
@@ -248,53 +173,11 @@ pub(super) fn branch_ref(branch: &BranchName) -> String {
     format!("refs/heads/{branch}")
 }
 
-/// The GitHub repository a remote URL points to, so gh works from any directory.
-fn slug_from_url(url: &str) -> Option<RepoSlug> {
-    let url = url.strip_suffix('/').unwrap_or(url);
-    let url = url.strip_suffix(".git").unwrap_or(url);
-    let start = ["github.com:", "github.com/"]
-        .iter()
-        .filter_map(|marker| url.rfind(marker).map(|at| at.saturating_add(marker.len())))
-        .max()?;
-    let (owner, name) = url.get(start..)?.split_once('/')?;
-    RepoSlug::new(owner, name)
-}
-
-/// gh's last line on standard error, as a message shows it after its own words.
-fn gh_said(said: &str) -> String {
-    if said.is_empty() {
-        String::new()
-    } else {
-        format!(" (gh: {said})")
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
 
     use super::*;
-
-    #[rstest]
-    #[case::scp_like("git@github.com:acme/widget.git", Some("acme/widget"))]
-    #[case::https("https://github.com/acme/widget.git", Some("acme/widget"))]
-    #[case::https_without_suffix("https://github.com/acme/widget", Some("acme/widget"))]
-    #[case::trailing_slash("https://github.com/acme/widget/", Some("acme/widget"))]
-    #[case::ssh("ssh://git@github.com/acme/widget.git", Some("acme/widget"))]
-    #[case::local_path_under_github_com("/srv/github.com/acme/widget.git", Some("acme/widget"))]
-    #[case::local_path("/srv/git/app.git", None)]
-    #[case::owner_only("git@github.com:acme", None)]
-    #[case::nested_path("https://github.com/acme/widget/extra", None)]
-    fn slug_from_url__should_read_github_urls_only(
-        #[case] url: &str,
-        #[case] expected: Option<&str>,
-    ) {
-        // When
-        let slug = slug_from_url(url);
-
-        // Then
-        assert_eq!(slug.map(|slug| slug.to_string()).as_deref(), expected);
-    }
 
     #[rstest]
     #[case::quiet(Unresolved::Quiet, &["'42': no slot changed"])]

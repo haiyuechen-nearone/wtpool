@@ -3,7 +3,6 @@
 use std::path::Path;
 
 use crate::error::{Error, Refusal};
-use crate::github::ViewPr;
 use crate::status::{self, Actor, ActorState, Sources};
 use crate::worktree::Worktree;
 
@@ -19,7 +18,7 @@ pub enum AgentGuard<'a> {
     Force,
 }
 
-impl<V: ViewPr> Pool<V> {
+impl<F> Pool<F> {
     /// Refuses the first of `worktrees` with an agent that works or waits, unless `guard` is
     /// [`AgentGuard::Force`]. `common` is the repository's common git directory.
     pub(super) fn refuse_busy_agents(

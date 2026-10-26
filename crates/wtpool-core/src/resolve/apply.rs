@@ -1,8 +1,8 @@
 //! Fetching, creating or syncing the branch of a [`CheckedPlan`], and setting its upstream.
 
 use crate::error::{Error, GitError, Refusal};
-use crate::github::ViewPr;
-use crate::names::{BranchName, ObjectId, PrNumber};
+use crate::forge::Fetch;
+use crate::names::{BranchName, ObjectId};
 use crate::pool::{self, Pool};
 use crate::refs::SyncMode;
 use crate::report::Report;
@@ -24,7 +24,7 @@ enum Configured {
     Unknown,
 }
 
-impl<V: ViewPr> Pool<V> {
+impl<F> Pool<F> {
     /// Fetches, creates or syncs the planned branch. The upstream is set last, so
     /// a refused sync leaves the branch's config as it was.
     pub(crate) fn apply(
@@ -59,16 +59,15 @@ impl<V: ViewPr> Pool<V> {
                 }
                 self.adopt_upstream(branch, report)?;
             }
-            Step::LocalPr(pr) => {
+            Step::LocalChange(change) => {
                 report.note(&format!("{branch}: already local"));
                 if sync == SyncMode::No {
-                    let label = format!("the head of PR #{}", pr.number);
-                    self.warn_if_stale(branch, &pr.head, &label, report)?;
+                    let label = format!("the head of {}", change.name);
+                    self.warn_if_stale(branch, &change.head, &label, report)?;
                 } else {
-                    let refspec = if pr.fork {
-                        pull_ref(&pr.number)
-                    } else {
-                        plan::branch_ref(branch)
+                    let refspec = match change.fetch {
+                        Fetch::ChangeRef => change.change_ref.refspec.clone(),
+                        Fetch::Branch => plan::branch_ref(branch),
                     };
                     let fetched = self
                         .fetch(&refspec, report)?
@@ -90,11 +89,11 @@ impl<V: ViewPr> Pool<V> {
                 }
                 self.track_remote(branch, report)?;
             }
-            Step::FetchPr(number) => {
+            Step::FetchChange(change) => {
                 let remote = self.config.remote.as_str();
-                report.note(&format!("fetching PR #{number} -> {branch}"));
+                report.note(&format!("fetching {} -> {branch}", change.name));
                 // Prefer the real branch, so <remote>/<branch> exists and the local branch can
-                // track it. A fork PR has no such ref and falls back to the pull ref, untracked.
+                // track it. Without one, the change's own ref gives an untracked branch.
                 let local_ref = plan::branch_ref(branch);
                 let direct = self
                     .git()
@@ -102,15 +101,15 @@ impl<V: ViewPr> Pool<V> {
                 if direct.success {
                     self.track_remote(branch, report)?;
                 } else {
-                    let refspec = format!("{}:{local_ref}", pull_ref(number));
+                    let refspec = format!("{}:{local_ref}", change.change_ref.refspec);
                     let args = ["fetch", "--quiet", remote, refspec.as_str()];
                     let ran = pool::run_reported(&self.git(), args, report)?;
                     if !ran.success {
-                        return Err(Unresolved::Fatal(GitError::FetchPr(number.clone()).into()));
+                        return Err(Unresolved::Fatal(
+                            GitError::FetchChange(change.name.clone()).into(),
+                        ));
                     }
-                    report.warn(&format!(
-                        "{branch} comes from a fork: no upstream set, git pull will not work there"
-                    ));
+                    report.warn(&change.change_ref.note);
                 }
             }
         }
@@ -408,10 +407,6 @@ fn upstream_label(remote: Option<&str>, merge: &str) -> String {
         (_, Some(name)) => name.to_owned(),
         (_, None) => merge.to_owned(),
     }
-}
-
-fn pull_ref(number: &PrNumber) -> String {
-    format!("refs/pull/{number}/head")
 }
 
 #[cfg(test)]

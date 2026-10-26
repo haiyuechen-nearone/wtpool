@@ -127,6 +127,36 @@ impl Sandbox {
         sandbox
     }
 
+    /// Gives the foreground's `origin` the URL `git@github.com:acme/app.git`, served from the
+    /// sandbox's origin through a fake `ssh`, so a PR's repository is `acme/app` and no
+    /// connection leaves the machine.
+    pub(crate) fn must_serve_origin_on_github(&self) {
+        let ssh = self.root.join("ssh");
+        must_write_script(
+            &ssh,
+            &format!(
+                "#!/bin/sh\n\
+                 [ \"$1\" = git@github.com ] || exit 255\n\
+                 case \"$2\" in\n\
+                 \"git-upload-pack 'acme/app.git'\") exec git upload-pack '{origin}' ;;\n\
+                 \"git-receive-pack 'acme/app.git'\") exec git receive-pack '{origin}' ;;\n\
+                 esac\n\
+                 exit 255\n",
+                origin = self.origin.display()
+            ),
+        );
+        let foreground = &self.foreground;
+        must_git(
+            foreground,
+            &["config", "core.sshCommand", ssh.to_str().unwrap()],
+        );
+        must_git(foreground, &["config", "ssh.variant", "simple"]);
+        must_git(
+            foreground,
+            &["remote", "set-url", "origin", "git@github.com:acme/app.git"],
+        );
+    }
+
     pub(crate) fn slot(&self, n: u32) -> PathBuf {
         self.root.join(format!("app-wt{n}"))
     }

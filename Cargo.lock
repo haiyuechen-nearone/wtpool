@@ -923,6 +923,7 @@ dependencies = [
  "terminal_size",
  "wtpool-claude-code",
  "wtpool-core",
+ "wtpool-github",
 ]
 
 [[package]]
@@ -951,6 +952,14 @@ dependencies = [
  "tempfile",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "wtpool-github"
+version = "0.1.0"
+dependencies = [
+ "rstest",
+ "wtpool-core",
 ]
 
 [[package]]

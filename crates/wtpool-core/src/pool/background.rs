@@ -3,8 +3,8 @@
 use std::path::PathBuf;
 
 use crate::error::Error;
+use crate::forge::Forge;
 use crate::git::Git;
-use crate::github::ViewPr;
 use crate::names::BranchName;
 use crate::refs::SyncMode;
 use crate::report::{Discard, Report};
@@ -24,7 +24,7 @@ enum Parking {
     NewSlot,
 }
 
-impl<V: ViewPr> Pool<V> {
+impl<F> Pool<F> {
     /// `wtpool bg`: parks a branch or PR in a free slot and returns the slot's path, or the path
     /// of the slot that already holds it. Creates a slot only while the pool is below its slot
     /// count. Progress goes to standard error, so standard output carries the path alone.
@@ -40,7 +40,10 @@ impl<V: ViewPr> Pool<V> {
         reference: &str,
         sync: SyncMode,
         report: &mut impl Report,
-    ) -> Result<PathBuf, Error> {
+    ) -> Result<PathBuf, Error>
+    where
+        F: Forge,
+    {
         let _lock = self.lock(report)?;
         let unresolved = |u: Unresolved| u.into_error(reference, NO_SLOT_CHANGED);
         let plan = self.plan(reference, report).map_err(unresolved)?;

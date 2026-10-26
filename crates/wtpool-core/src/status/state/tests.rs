@@ -2,7 +2,7 @@ use super::*;
 use crate::names::RemoteName;
 use crate::processes::StartTime;
 use crate::status::document::{Activity, Reason};
-use crate::status::fixture::{FixedProcesses, must_fixture, must_git};
+use crate::status::fixture::{FixedProcesses, https_path, must_fixture, must_git};
 use crate::status::record_time::RecordTime;
 use crate::worktree_state::Role;
 

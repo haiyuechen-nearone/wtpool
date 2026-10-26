@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{Error, Refusal};
 use crate::git::Git;
-use crate::github::ViewPr;
 use crate::names::{BranchName, InvalidSlotName, SlotName};
 use crate::report::{Discard, Report};
 use crate::resolve::{self, Divergence};
@@ -15,7 +14,7 @@ use crate::worktree_state::{Row, State, Upstream};
 use super::refusals::{self, WorktreeState};
 use super::{AgentGuard, Pool, git, slots};
 
-impl<V: ViewPr> Pool<V> {
+impl<F> Pool<F> {
     /// `wtpool ls`: every worktree that exists on disk, in `git worktree list` order.
     /// Warns about each worktree whose directory is gone.
     pub fn list(&self, report: &mut impl Report) -> Result<Vec<Row>, Error> {

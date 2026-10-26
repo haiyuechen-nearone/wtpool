@@ -5,8 +5,10 @@ use clap::{Args, Parser, Subcommand};
 use terminal_size::Width;
 use wtpool_core::status::{self, Sources};
 use wtpool_core::{
-    AbsolutePath, AgentGuard, Config, Error, GitMode, Pool, RefArgs, Report, Settings, SlotName,
+    AbsolutePath, AgentGuard, Config, Error, Forge, GitMode, Pool, RefArgs, Report, Settings,
+    SlotName,
 };
+use wtpool_github::GitHub;
 
 use table::Style;
 use text::{visible, visible_lines};
@@ -437,7 +439,7 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
         .map(AbsolutePath::into_path_buf)
         .unwrap_or_default();
     let config = settings.into_config();
-    let pool = Pool::new(config.clone());
+    let pool = Pool::new(config.clone(), GitHub);
     match action {
         PoolAction::HookGc => terminal.out(&hook::gc_line(&common)),
         PoolAction::List => {
@@ -519,10 +521,10 @@ fn agent_guard(force: bool, sources: &Sources) -> AgentGuard<'_> {
 }
 
 /// The clock and process table that `status`, `fg` and `free` judge agents by: the system's,
-/// unless [`verify_files`] names files for them.
+/// unless [`verify_files`] names files for them. Repositories get the names [`GitHub`] gives.
 fn status_sources() -> Sources {
     let (clock, processes) = verify_files();
-    Sources::from_files(clock, processes)
+    Sources::from_files(clock, processes, |url| GitHub.repository(url))
 }
 
 /// The clock file and the process table file that `WTPOOL_VERIFY_CLOCK` and `WTPOOL_VERIFY_PROCS`

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use rstest::rstest;
 
-use crate::names::{InvalidSlotName, PrNumber};
+use crate::names::InvalidSlotName;
 
 use super::*;
 
@@ -44,7 +44,10 @@ fn command_failed(code: Option<i32>) -> Error {
 #[case::usage(Error::Usage("usage: wtpool ls"), &["usage: wtpool ls"], 1)]
 #[case::unknown_flag(Error::UnknownFlag("--x".to_owned()), &["unknown flag '--x'"], 1)]
 #[case::invalid_ref(
-    Error::InvalidRef("a..b".to_owned()),
+    Error::InvalidRef {
+        reference: "a..b".to_owned(),
+        forms: "a PR number, a github.com PR URL",
+    },
     &["'a..b' is not a PR number, a github.com PR URL or a valid branch name"],
     1
 )]
@@ -353,7 +356,7 @@ fn command_failed(code: Option<i32>) -> Error {
 )]
 #[case::fetch(GitError::Fetch.into(), &["fetch failed"], 1)]
 #[case::create_branch(GitError::CreateBranch("a".to_owned()).into(), &["could not create branch a"], 1)]
-#[case::fetch_pr(GitError::FetchPr(PrNumber::new("42").unwrap()).into(), &["could not fetch PR #42"], 1)]
+#[case::fetch_change(GitError::FetchChange("PR #42".to_owned()).into(), &["could not fetch PR #42"], 1)]
 #[case::fetch_branch(GitError::FetchBranch("a".to_owned()).into(), &["could not fetch branch a"], 1)]
 #[case::look_up_remote(
     GitError::LookUpRemote { branch: "a".to_owned(), remote: "origin".to_owned() }.into(),

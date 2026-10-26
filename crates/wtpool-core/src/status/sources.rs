@@ -1,39 +1,49 @@
-//! [`Sources`]: where `wtpool status` reads the time, the process table and the machine's name.
+//! [`Sources`]: where `wtpool status` reads the time, the process table, the machine's name and
+//! the name of the repository on its forge.
 
 use std::path::PathBuf;
 
 use crate::clock::{Clock, SystemClock};
 use crate::processes::{self, ProcessTable, SystemProcesses};
 
-/// Where `wtpool status` reads the time, the process table and the machine's name.
+/// Where `wtpool status` reads the time, the process table, the machine's name and the name of
+/// the repository on its forge.
 pub struct Sources<C = Clock, P = ProcessTable> {
     pub clock: C,
     pub processes: P,
     /// The host name, `localhost` when the system does not tell it.
     pub machine: String,
+    /// The repository a remote's URL names on the forge, as
+    /// [`Forge::repository`](crate::Forge::repository) reads it.
+    pub forge_repository: fn(&str) -> Option<String>,
 }
 
 impl Sources {
-    /// The system clock, process table and host name.
+    /// The system clock, process table and host name, and the forge's names of `forge_repository`.
     #[must_use]
-    pub fn system() -> Self {
+    pub fn system(forge_repository: fn(&str) -> Option<String>) -> Self {
         Self {
             clock: Clock::System(SystemClock),
             processes: ProcessTable::System(SystemProcesses),
             machine: processes::host_name()
                 .filter(|name| !name.is_empty())
                 .unwrap_or_else(|| "localhost".to_owned()),
+            forge_repository,
         }
     }
 
-    /// The system's sources, with the clock read from the file `clock` and the process table
-    /// from the file `processes` where they are named.
+    /// [`Sources::system`], with the clock read from the file `clock` and the process table from
+    /// the file `processes` where they are named.
     #[must_use]
-    pub fn from_files(clock: Option<PathBuf>, processes: Option<PathBuf>) -> Self {
+    pub fn from_files(
+        clock: Option<PathBuf>,
+        processes: Option<PathBuf>,
+        forge_repository: fn(&str) -> Option<String>,
+    ) -> Self {
         Self {
             clock: Clock::from_file(clock),
             processes: ProcessTable::from_file(processes),
-            ..Self::system()
+            ..Self::system(forge_repository)
         }
     }
 }
@@ -59,8 +69,8 @@ mod tests {
         let query = ProcessQuery::all().with_name().with_cwd();
 
         // When
-        let files = Sources::from_files(Some(clock), Some(processes));
-        let system = Sources::from_files(None, None);
+        let files = Sources::from_files(Some(clock), Some(processes), |url| Some(url.to_owned()));
+        let system = Sources::from_files(None, None, |_| None);
 
         // Then
         assert_eq!(files.clock.now(), Timestamp::from_seconds(1_792_497_600));
@@ -74,5 +84,10 @@ mod tests {
             host.unwrap_or_else(|| "localhost".to_owned())
         );
         assert_eq!(system.machine, files.machine);
+        assert_eq!(
+            (files.forge_repository)("acme/app").as_deref(),
+            Some("acme/app")
+        );
+        assert_eq!((system.forge_repository)("acme/app"), None);
     }
 }

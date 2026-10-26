@@ -190,3 +190,5 @@ accept status-lines-3 01a2deaa58d4eb63865f2ba2b6ef3b3f085e2eb7364ebb236e9fc759b1
 accept flake-fixes c88a7f91f584a711b078e3962980bf79679c5576d72db9f32764a67524c4ea37
 # Checks for the changed product lines no layer reached: lexer forms in bash-commands.toml, the PR lookup of wtpool bg through a fake gh, a session record whose lock cannot be taken, output tails and Follow when a watch fails or a change comes during a read or a symlink replaces the file, and the Output section dropping what the document no longer lists; checks.toml, trace.toml and the trace list of verification.md list them.
 accept cover-gaps d33b1f358b9ef928969cf69ae4e61e7c78eb48767d9386170e3fd8873dbfc414
+# GitHub moves out of wtpool-core into crates/wtpool-github, a new workspace member, with one strict remote URL parser; two int checks run wtpool bg on a PR through a fake gh, with no real gh on PATH, and a fake ssh: PRs fetched new and refreshed, and every refusal of a PR without a head to use.
+accept forge-github d1a7ebed8adef422ccea2f30011ae0cea1222aad48f364220f6edc45d7ea3abe

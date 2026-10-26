@@ -16,31 +16,22 @@ pub use agents::AgentGuard;
 pub(crate) use git::run_reported;
 
 use crate::config::Config;
-use crate::github::GhCli;
 
 /// The worktree pool of one repository: a foreground worktree and background slots.
-/// Pull requests are looked up through `prs`.
+/// The changes a `<ref>` names, such as pull requests, are looked up on `forge`.
 ///
 /// Commands that change the pool hold an exclusive lock on `wtpool.lock` in the
 /// repository's common git directory, so parallel runs wait for each other.
 #[derive(Debug, Clone)]
-pub struct Pool<V = GhCli> {
+pub struct Pool<F> {
     pub(crate) config: Config,
-    pub(crate) prs: V,
+    pub(crate) forge: F,
 }
 
-impl Pool {
-    /// A pool that looks pull requests up with the `gh` command line tool.
+impl<F> Pool<F> {
+    /// A pool that looks changes up on `forge`, a [`Forge`](crate::Forge) for `fg` and `bg`.
     #[must_use]
-    pub fn new(config: Config) -> Self {
-        Self::with_view_pr(config, GhCli)
-    }
-}
-
-impl<V> Pool<V> {
-    /// A pool that looks pull requests up through `prs`.
-    #[must_use]
-    pub fn with_view_pr(config: Config, prs: V) -> Self {
-        Self { config, prs }
+    pub fn new(config: Config, forge: F) -> Self {
+        Self { config, forge }
     }
 }

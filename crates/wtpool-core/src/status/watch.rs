@@ -137,7 +137,8 @@ pub fn watch<C: ReadClock, P: ListProcesses>(
         roots: vec![comparable(&common), common.clone()],
         clock: clock.as_deref().map(comparable),
     };
-    let state = PoolState::load(config, common, &sources.processes, sources.machine.clone())?;
+    let (machine, forge) = (sources.machine.clone(), sources.forge_repository);
+    let state = PoolState::load(config, common, &sources.processes, machine, forge)?;
     let mut live = Live::new(state, sources);
     run(&mut live, &messages, output, &watched, TIMING, &SystemTimer);
     Ok(())

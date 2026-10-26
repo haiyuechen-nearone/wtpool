@@ -8,4 +8,4 @@ mod guard;
 mod plan;
 
 pub(crate) use divergence::{Divergence, left_right};
-pub(crate) use plan::Unresolved;
+pub use plan::Unresolved;

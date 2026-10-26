@@ -5,7 +5,6 @@ use std::path::Path;
 
 use crate::error::{Error, Refusal};
 use crate::git::Git;
-use crate::github::ViewPr;
 use crate::names::{BranchName, SlotName};
 use crate::paths;
 use crate::report::{Discard, Report};
@@ -13,7 +12,7 @@ use crate::worktree::{Head, Worktree};
 
 use super::Pool;
 
-impl<V: ViewPr> Pool<V> {
+impl<F> Pool<F> {
     pub(crate) fn git(&self) -> Git {
         Git::at(&self.config.foreground)
     }

@@ -32,6 +32,7 @@ pub struct PoolState {
     common: PathBuf,
     git_mode: GitMode,
     machine: String,
+    forge_repository: fn(&str) -> Option<String>,
     repository: Repository,
     worktrees: Vec<Tracked>,
     processes: Vec<RunningProcess>,
@@ -54,14 +55,23 @@ struct Tracked {
 
 impl PoolState {
     /// Reads everything about the pool of `config`, whose common git directory is `common`, on
-    /// the machine called `machine`, through read-only git.
+    /// the machine called `machine`, through read-only git, with the repository named as
+    /// `forge_repository` names it.
     pub fn load(
         config: Config,
         common: PathBuf,
         processes: &impl ListProcesses,
         machine: String,
+        forge_repository: fn(&str) -> Option<String>,
     ) -> Result<Self, Error> {
-        Self::load_with(GitMode::ReadOnly, config, common, processes, machine)
+        Self::load_with(
+            GitMode::ReadOnly,
+            config,
+            common,
+            processes,
+            machine,
+            forge_repository,
+        )
     }
 
     /// [`PoolState::load`] through git in `git_mode`.
@@ -71,6 +81,7 @@ impl PoolState {
         common: PathBuf,
         processes: &impl ListProcesses,
         machine: String,
+        forge_repository: fn(&str) -> Option<String>,
     ) -> Result<Self, Error> {
         let records = Records::new(common.join(ACTIVITY_DIR));
         let mut state = Self {
@@ -78,6 +89,7 @@ impl PoolState {
             common,
             git_mode,
             machine,
+            forge_repository,
             repository: Repository {
                 name: String::new(),
                 github: None,
@@ -100,9 +112,11 @@ impl PoolState {
         let name = listed.first().map(Worktree::name).unwrap_or_default();
         let common = self.common.as_path();
         let remote = self.config.remote.as_str();
+        let forge_repository = self.forge_repository;
         let (worktrees, table, repository) = thread::scope(|scope| {
             let table = scope.spawn(|| processes.list(&builds::query()));
-            let repository = scope.spawn(|| repository(name, &foreground, remote));
+            let repository =
+                scope.spawn(|| repository(name, &foreground, remote, forge_repository));
             let worktrees = track_all(listed, common);
             (
                 worktrees,

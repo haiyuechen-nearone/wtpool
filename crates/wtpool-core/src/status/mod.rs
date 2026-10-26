@@ -45,7 +45,8 @@ pub fn status_line<C: ReadClock, P: ListProcesses>(
     common: PathBuf,
     sources: &Sources<C, P>,
 ) -> Result<String, Error> {
-    let state = PoolState::load(config, common, &sources.processes, sources.machine.clone())?;
+    let (machine, forge) = (sources.machine.clone(), sources.forge_repository);
+    let state = PoolState::load(config, common, &sources.processes, machine, forge)?;
     let document = state.document(sources.clock.now());
     let mut line = serde_json::to_string(&document).unwrap_or_default();
     line.push('\n');
@@ -61,8 +62,9 @@ pub(crate) fn actors_at(
     paths: &[&Path],
     git_mode: GitMode,
 ) -> Result<Vec<Vec<Actor>>, Error> {
+    let (processes, forge) = (&sources.processes, sources.forge_repository);
     let machine = sources.machine.clone();
-    let state = PoolState::load_with(git_mode, config, common, &sources.processes, machine)?;
+    let state = PoolState::load_with(git_mode, config, common, processes, machine, forge)?;
     let document = state.document(sources.clock.now());
     let worktrees: Vec<WorktreeStatus> = document
         .pools
@@ -85,7 +87,7 @@ pub(crate) fn actors_at(
 mod tests {
     use super::*;
     use crate::paths::AbsolutePath;
-    use crate::status::fixture::must_fixture;
+    use crate::status::fixture::{https_path, must_fixture};
 
     #[test]
     fn status_line__should_print_one_document_line() {
@@ -93,7 +95,11 @@ mod tests {
         let fixture = must_fixture();
 
         // When
-        let line = status_line(fixture.config(), fixture.common.clone(), &Sources::system());
+        let line = status_line(
+            fixture.config(),
+            fixture.common.clone(),
+            &Sources::system(https_path),
+        );
 
         // Then
         let line = line.unwrap();
@@ -116,7 +122,7 @@ mod tests {
         config.foreground = AbsolutePath::try_new(&fixture.root).unwrap();
 
         // When
-        let line = status_line(config, fixture.common.clone(), &Sources::system());
+        let line = status_line(config, fixture.common.clone(), &Sources::system(https_path));
 
         // Then
         assert!(line.is_err());

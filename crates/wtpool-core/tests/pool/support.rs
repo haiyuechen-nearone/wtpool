@@ -1,61 +1,94 @@
 //! The fixture every case starts from: a foreground repository with a bare `origin`, a fake
-//! pull request lookup, and a recorder of everything the pool reports.
+//! forge, and a recorder of everything the pool reports.
 
 use std::fs::{File, OpenOptions};
-use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
 use tempfile::TempDir;
 use wtpool_core::{
-    AbsolutePath, Config, CopyPath, Error, GitError, ObjectId, Pool, PrNumber, PrView, RemoteName,
-    RepoSlug, Report, SlotCount, SlotPrefix, SlotSetup, Source, ViewPr, ViewPrError,
+    AbsolutePath, BranchName, ChangeHead, ChangeRef, Config, CopyPath, Error, Fetch, Forge,
+    ObjectId, Pool, Remote, RemoteName, Report, SlotCount, SlotPrefix, SlotSetup, Source,
+    Unresolved,
 };
 
-/// A [`ViewPr`] that gives the same [`PrAnswer`] to every lookup.
+/// A [`Forge`] that names pull requests as GitHub does, `42`, `#42` or a URL ending in
+/// `/pull/42`, and gives every one the head of its [`PrAnswer`]. It looks a PR up only in the
+/// fixture's origin.
 pub(crate) struct FakePr(pub(crate) PrAnswer);
 
-impl ViewPr for FakePr {
-    fn view_pr(&self, repo: &RepoSlug, number: &PrNumber) -> Result<PrView, ViewPrError> {
-        match &self.0 {
-            PrAnswer::NoLookup => panic!("looked up PR #{number} in {repo}"),
-            PrAnswer::View(view) => Ok(view.clone()),
-            PrAnswer::Unavailable => Err(ViewPrError::Unavailable),
-            PrAnswer::NotLoggedIn(said) => Err(ViewPrError::NotLoggedIn {
-                said: (*said).to_owned(),
-            }),
-            PrAnswer::GhFails(said, code) => Err(ViewPrError::GhFailed {
-                said: (*said).to_owned(),
-                code: *code,
-            }),
-            PrAnswer::NotFound => Err(ViewPrError::NotFound),
-            PrAnswer::Malformed => Err(ViewPrError::Malformed),
-            PrAnswer::Fails => Err(ViewPrError::Failed(
-                GitError::Spawn {
-                    program: "gh".to_owned(),
-                    source: io::Error::from(io::ErrorKind::PermissionDenied),
-                }
-                .into(),
-            )),
-        }
+impl Forge for FakePr {
+    type Change = String;
+
+    fn change(&self, reference: &str) -> Option<String> {
+        let number = reference
+            .rsplit_once("/pull/")
+            .map_or(reference.strip_prefix('#').unwrap_or(reference), |(_, n)| n);
+        (!number.is_empty() && number.bytes().all(|b| b.is_ascii_digit()))
+            .then(|| number.to_owned())
+    }
+
+    fn change_forms(&self) -> &'static str {
+        "a PR number, a github.com PR URL"
+    }
+
+    fn head(
+        &self,
+        number: String,
+        remote: Remote<'_>,
+        _: &mut dyn Report,
+    ) -> Result<ChangeHead, Unresolved> {
+        let (PrAnswer::View(view), Some(url)) = (&self.0, remote.url) else {
+            panic!("looked up PR #{number} in {}", remote.name);
+        };
+        assert!(
+            url.ends_with("/github.com/acme/app.git"),
+            "looked up PR #{number} in {} at {url}",
+            remote.name
+        );
+        let branch = if view.cross_repository {
+            format!("pr-{number}/{}", view.head_ref_name)
+        } else {
+            view.head_ref_name.clone()
+        };
+        Ok(ChangeHead {
+            name: format!("PR #{number}"),
+            branch: BranchName::try_new(&branch).unwrap(),
+            head: view.head.clone(),
+            fetch: if view.cross_repository {
+                Fetch::ChangeRef
+            } else {
+                Fetch::Branch
+            },
+            change_ref: ChangeRef {
+                refspec: format!("refs/pull/{number}/head"),
+                note: format!(
+                    "{branch} comes from a fork: no upstream set, git pull will not work there"
+                ),
+            },
+        })
+    }
+
+    fn repository(&self, _: &str) -> Option<String> {
+        None
     }
 }
 
-/// The answer of a fake [`ViewPr`] to every lookup.
+/// The answer of a [`FakePr`] to every lookup.
 #[derive(Debug, Clone)]
 pub(crate) enum PrAnswer {
     /// The test must not look any PR up.
     NoLookup,
     View(PrView),
-    Unavailable,
-    /// gh is not logged in, with the last line it wrote to standard error.
-    NotLoggedIn(&'static str),
-    /// gh failed for another reason, with its last line and exit status.
-    GhFails(&'static str, Option<i32>),
-    NotFound,
-    Malformed,
-    Fails,
+}
+
+/// The head of a pull request, as GitHub tells it.
+#[derive(Debug, Clone)]
+pub(crate) struct PrView {
+    head_ref_name: String,
+    head: ObjectId,
+    cross_repository: bool,
 }
 
 pub(crate) fn pr_view(head_ref_name: &str, head: &str, cross_repository: bool) -> PrView {
@@ -201,7 +234,7 @@ impl Fixture {
     }
 
     pub(crate) fn pool_with_pr(&self, slot_count: usize, answer: PrAnswer) -> Pool<FakePr> {
-        Pool::with_view_pr(self.config(slot_count), FakePr(answer))
+        Pool::new(self.config(slot_count), FakePr(answer))
     }
 
     /// The config of a pool of up to `slot_count` slots that copies `copy` and runs
@@ -230,7 +263,7 @@ impl Fixture {
         copy: &[&str],
         on_new_slot: Option<&str>,
     ) -> Pool<FakePr> {
-        Pool::with_view_pr(
+        Pool::new(
             self.config_with_setup(slot_count, copy, on_new_slot),
             FakePr(PrAnswer::NoLookup),
         )
@@ -470,7 +503,7 @@ pub(crate) fn must_pool_inside_the_foreground(fixture: &Fixture) -> Pool<FakePr>
         ".worktrees/\n",
     )
     .unwrap();
-    Pool::with_view_pr(
+    Pool::new(
         Config {
             slot_dir: AbsolutePath::try_new(fixture.foreground.join(".worktrees")).unwrap(),
             ..fixture.config(3)

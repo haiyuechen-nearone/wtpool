@@ -19,6 +19,7 @@ verify = []
 [dependencies]
 wtpool-core.workspace = true
 wtpool-claude-code.workspace = true
+wtpool-github.workspace = true
 clap.workspace = true
 terminal_size.workspace = true
 

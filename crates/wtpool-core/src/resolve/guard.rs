@@ -1,7 +1,6 @@
 //! The guard a [`Plan`] passes before it is applied.
 
 use crate::error::{Error, Refusal};
-use crate::github::ViewPr;
 use crate::names::BranchName;
 use crate::pool::Pool;
 use crate::refs::SyncMode;
@@ -48,7 +47,7 @@ enum CheckoutRisk {
     InProgress(&'static str),
 }
 
-impl<V: ViewPr> Pool<V> {
+impl<F> Pool<F> {
     /// Refuses, before `fg` or `bg` changes anything, a branch that git counts as checked out
     /// where `wtpool` cannot safely take or move it, as [`checkout_risk`] decides for each
     /// worktree.
