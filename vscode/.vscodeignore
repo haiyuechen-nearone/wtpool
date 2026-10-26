@@ -1,0 +1,17 @@
+# What `npm run package` leaves out of wtpool.vsix: everything but the manifest, the README,
+# the licence and third-party notices, the bundles, the files the webview loads, the tab icons
+# and the Marketplace icon. Source maps and the icon's SVG source stay out. vsce keeps a file
+# that any `!` line names, whatever comes after it, so each kept file is named on its own.
+**
+!package.json
+!README.md
+!LICENSE
+!THIRD-PARTY-NOTICES.md
+!out/extension.js
+!out/html.js
+!media/webview.js
+!media/webview.css
+!media/codicon.ttf
+!media/icon-light.svg
+!media/icon-dark.svg
+!media/marketplace-icon.png

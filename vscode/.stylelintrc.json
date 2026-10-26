@@ -1,0 +1,30 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "reportNeedlessDisables": true,
+  "rules": {
+    "custom-property-pattern": null,
+    "color-no-hex": true,
+    "color-named": "never",
+    "function-disallowed-list": [
+      "rgb",
+      "rgba",
+      "hsl",
+      "hsla",
+      "hwb",
+      "lab",
+      "lch",
+      "oklab",
+      "oklch",
+      "color",
+      "color-mix",
+      "light-dark",
+      "device-cmyk",
+      "contrast-color"
+    ],
+    "declaration-property-value-disallowed-list": {
+      "/.*/": [
+        "/\\b(?:Canvas|CanvasText|LinkText|VisitedText|ActiveText|ButtonFace|ButtonText|ButtonBorder|Field|FieldText|Highlight|HighlightText|SelectedItem|SelectedItemText|Mark|MarkText|GrayText|AccentColor|AccentColorText)\\b/"
+      ]
+    }
+  }
+}

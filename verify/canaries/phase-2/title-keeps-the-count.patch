@@ -1,0 +1,20 @@
+ID: X18
+Category: product
+Check: title__should_drop_the_count_when_a_wait_ends
+
+Sets the tab title only while a worktree waits, so the count stays after the wait ends.
+
+diff --git a/vscode/src/host/panel.ts b/vscode/src/host/panel.ts
+index 462e107..7e6c7bc 100644
+--- a/vscode/src/host/panel.ts
++++ b/vscode/src/host/panel.ts
+@@ -185,7 +185,8 @@ export class StatusPanel {
+   private changed(update: DocumentUpdate | undefined): void {
+     if (update) {
+       this.document = update.document;
+-      this.panel.title = titleOf(update.document);
++      const title = titleOf(update.document);
++      if (title !== 'Worktrees') this.panel.title = title;
+     }
+     this.post();
+     // A new document may list other outputs for the selected row, or none (R12).

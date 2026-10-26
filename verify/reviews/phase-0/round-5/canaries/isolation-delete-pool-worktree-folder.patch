@@ -1,0 +1,22 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version deletes the folder of slot app-wt1 of the pool, outside the run folder, as a wt rm
+that falls back to deleting files would. Uncommitted work in the slot is lost. git keeps the
+worktree's admin folder, so git worktree list still names the path, now marked prunable. No HEAD
+moves. Machine specific: the path is a fake pool under the verifier's temporary HOME, never the
+real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..f6f8013 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,7 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let _ = std::fs::remove_dir_all("<scratchpad>/v5/h2/code/app-wt1");
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

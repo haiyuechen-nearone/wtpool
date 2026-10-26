@@ -1,0 +1,21 @@
+ID: harness
+Category: harness
+Check: version__should_list_version_commit_and_features
+Tree: uncommitted
+
+Breaks wt --version of the installed build: a release build of a tree with uncommitted changes
+prints no (dirty) marker. Debug builds keep it. Tests the dirty half of the new release assertion.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..b1330cd 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -328,7 +328,7 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+ const BUILD: Build<'static> = Build {
+     version: env!("CARGO_PKG_VERSION"),
+     commit: env!("WT_BUILD_COMMIT"),
+-    dirty: matches!(env!("WT_BUILD_DIRTY").as_bytes(), b"true"),
++    dirty: cfg!(debug_assertions) && matches!(env!("WT_BUILD_DIRTY").as_bytes(), b"true"),
+     features: env!("WT_BUILD_FEATURES"),
+ };
+ 

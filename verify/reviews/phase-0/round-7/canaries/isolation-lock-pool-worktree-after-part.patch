@@ -1,0 +1,36 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version, run by an int check, starts a detached child and returns at once, as a hook that moves
+slow work out of its 5 ms budget would. The child outlives the part. Right after the part has taken
+its last snapshot (it waits for the part's record in the run folder's isolation/, so the timing is
+the same on every run), it locks slot app-wt1 of the pool, outside the run folder, with a reason
+that names its sandbox foreground, a path in the run folder. The lock is the trace the round 6
+canary isolation-lock-pool-worktree-naming-run left, which the int part now catches; only the time
+it appears differs. The child gives up after 20 minutes. Machine specific: the path is a fake pool
+under the verifier's temporary HOME, never the real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..3ffb678 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,18 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let foreground = std::env::var("WT_FOREGROUND").unwrap_or_default();
++            if foreground.contains("/verify/out/") {
++                let mut child = std::process::Command::new("/bin/sh");
++                child
++                    .args(["-c", "run=\"${FG%%/sandbox/*}\"; i=0; until ls \"$run\"/isolation/int-*.json >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 1200 ] && exit 0; sleep 1; done; git -C <scratchpad>/v7c/h1/code/app worktree lock --reason \"$FG\" <scratchpad>/v7c/h1/code/app-wt1"])
++                    .env("FG", &foreground)
++                    .stdin(std::process::Stdio::null())
++                    .stdout(std::process::Stdio::null())
++                    .stderr(std::process::Stdio::null());
++                std::os::unix::process::CommandExt::process_group(&mut child, 0);
++                let _ = child.spawn();
++            }
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

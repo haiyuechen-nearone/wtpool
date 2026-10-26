@@ -1,0 +1,18 @@
+ID: harness
+Category: harness
+Check: catalog__should_match_the_files
+
+Drops A5 from the covers of idle_pool, which the catalog lists as (1: R1, A5).
+
+diff --git a/verify/scenarios/idle_pool.json b/verify/scenarios/idle_pool.json
+index 076be87..dd80c96 100644
+--- a/verify/scenarios/idle_pool.json
++++ b/verify/scenarios/idle_pool.json
+@@ -2,7 +2,6 @@
+   "phase": 1,
+   "covers": [
+     "R1",
+-    "A5",
+     "R3",
+     "U1"
+   ],

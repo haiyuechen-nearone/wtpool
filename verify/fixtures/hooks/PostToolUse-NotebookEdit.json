@@ -1,0 +1,19 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1.jsonl",
+  "cwd": "{pool}/fg",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "NotebookEdit",
+  "tool_input": {
+    "notebook_path": "{pool}/wt2/analysis.ipynb",
+    "cell_id": "cell-1",
+    "new_source": "print(1)",
+    "edit_mode": "replace"
+  },
+  "tool_use_id": "toolu_01Notebook",
+  "tool_response": {
+    "cell_id": "cell-1",
+    "edit_mode": "replace"
+  }
+}

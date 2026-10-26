@@ -1,0 +1,20 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version writes .git/wt.toml of the pool, outside the run folder, as a wt setup that resolves
+the real repository instead of the sandbox one would. Machine specific: the path is a fake pool
+under the verifier's temporary HOME, never the real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..06e2304 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,7 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let _ = std::fs::write("<scratchpad>/v6/h6/code/app/.git/wt.toml", "slot_count = 3\n");
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

@@ -1,0 +1,11 @@
+# Every text file is stored and checked out with LF line ends on every system: the oracle hashes
+# files as they are on disk (verify/oracle.lock), so a CRLF checkout would change every hash.
+* text=auto eol=lf
+
+# Binary files: never converted, never diffed as text.
+*.png binary
+*.gif binary
+*.vsix binary
+
+# Written by `npm run generate` from the JSON Schema of wtpool-core (S7); review the schema instead.
+vscode/src/generated/** linguist-generated

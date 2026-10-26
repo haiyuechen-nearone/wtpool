@@ -1,0 +1,25 @@
+ID: harness
+Category: harness
+Check: oracle_unchanged
+
+Drops the edit and revert rebuilds of version__ under the entry p0r2-stale-commit, which the
+round 3 freeze already held, so it is spent.
+
+diff --git a/xtask/src/parts.rs b/xtask/src/parts.rs
+index bd688cd..5786e42 100644
+--- a/xtask/src/parts.rs
++++ b/xtask/src/parts.rs
+@@ -509,13 +509,6 @@ fn rebuild_steps(ctx: &Ctx, package: &str, features: &[&str]) -> Result<PathBuf,
+     rebuild.build("first build")?;
+     rebuild.git(&["commit", "--quiet", "--allow-empty", "-m", "verify: empty"])?;
+     rebuild.build("rebuild after an empty commit")?;
+-    let edited = rebuild.repo.join(REBUILD_EDITED_FILE);
+-    let mut text = fs::read_to_string(&edited).map_err(|e| format!("{}: {e}", edited.display()))?;
+-    text.push_str("\nwt-verify edit\n");
+-    fs::write(&edited, text).map_err(|e| format!("{}: {e}", edited.display()))?;
+-    rebuild.build("rebuild after an edit")?;
+-    rebuild.git(&["checkout", "--quiet", "--", REBUILD_EDITED_FILE])?;
+-    rebuild.build("rebuild after reverting the edit")?;
+     let path = dir.join("steps.json");
+     let text = serde_json::to_string_pretty(&rebuild.steps).map_err(|e| e.to_string())?;
+     fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;

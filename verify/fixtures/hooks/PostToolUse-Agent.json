@@ -1,0 +1,23 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1.jsonl",
+  "cwd": "{pool}/fg",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Agent",
+  "tool_input": {
+    "description": "Find the parser tests",
+    "prompt": "List every test of the parser module",
+    "subagent_type": "Explore"
+  },
+  "tool_use_id": "toolu_01Agent",
+  "tool_response": {
+    "status": "completed",
+    "content": [
+      {
+        "type": "text",
+        "text": "done"
+      }
+    ]
+  }
+}

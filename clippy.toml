@@ -1,0 +1,24 @@
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true
+
+# S2, lint__no_socket_apis: wtpool opens no socket. `allow-invalid` keeps a path that a crate's
+# dependencies or the target platform do not provide, such as `std::os::unix` on Windows, from
+# warning.
+disallowed-types = [
+    { path = "std::net::TcpListener", reason = "S2: wtpool opens no socket" },
+    { path = "std::net::TcpStream", reason = "S2: wtpool opens no socket" },
+    { path = "std::net::UdpSocket", reason = "S2: wtpool opens no socket" },
+    { path = "std::os::unix::net::UnixListener", reason = "S2: wtpool opens no socket", allow-invalid = true },
+    { path = "std::os::unix::net::UnixStream", reason = "S2: wtpool opens no socket", allow-invalid = true },
+    { path = "std::os::unix::net::UnixDatagram", reason = "S2: wtpool opens no socket", allow-invalid = true },
+]
+disallowed-methods = [
+    { path = "libc::socket", reason = "S2: wtpool opens no socket", allow-invalid = true },
+    { path = "libc::socketpair", reason = "S2: wtpool opens no socket", allow-invalid = true },
+    { path = "libc::bind", reason = "S2: wtpool opens no socket", allow-invalid = true },
+    { path = "libc::listen", reason = "S2: wtpool opens no socket", allow-invalid = true },
+    { path = "libc::connect", reason = "S2: wtpool opens no socket", allow-invalid = true },
+    { path = "libc::accept", reason = "S2: wtpool opens no socket", allow-invalid = true },
+]

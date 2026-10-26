@@ -1,0 +1,22 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version moves the HEAD of pool worktree app-wt1 to one of the owner's commits. Only the
+new HEAD reflog check (isolation.rs verify_head_moves) can see it. Machine specific: the path is a
+fake pool under the verifier's temporary HOME, never the real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..d27382d 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,9 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let _ = std::process::Command::new("git")
++                .args(["-C", "<scratchpad>/home/code/app-wt1", "checkout", "--quiet", "--detach", "owner-base"])
++                .status();
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

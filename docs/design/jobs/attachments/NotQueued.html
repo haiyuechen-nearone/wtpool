@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<!-- A design mockup, not product code. docs/design/jobs/attachments/render.mjs renders it with the theme
+     values of verify/themes/ (?theme=, dark by default); the panel's own sheets come first, then
+     mockup.css with the proposed parts. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Builds outside a job</title>
+<link rel="stylesheet" href="/verify/themes/webview-default.css">
+<link rel="stylesheet" href="/vscode/src/webview/icons.css">
+<link rel="stylesheet" href="/vscode/src/webview/style.css">
+<link rel="stylesheet" href="/docs/design/jobs/attachments/mockup.css">
+</head>
+<body>
+<header class="header"><h1 class="title">Worktrees</h1><div class="chips"><span class="chip chip-free">1 free</span><span class="chip chip-working">1 working</span></div><span class="connection connection-live">live</span></header><div class="scroller"><table class="grid"><colgroup><col class="col-activity"><col class="col-worktree"><col class="col-branch"><col class="col-git"><col class="col-agent"><col class="col-last"><col class="col-actions"></colgroup>
+<thead><tr><th scope="col">Activity</th><th scope="col">Worktree</th><th scope="col">Branch</th><th scope="col">Git</th><th scope="col">Agent · doing</th><th scope="col">Last</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+<tbody>
+<tr class="pool-heading" data-machine="my-mac" data-pool="/Users/you/code/app/.git">
+<td colspan="7"><span class="repo-icon" aria-hidden="true"></span><bdi class="repository">acme/app</bdi><span class="heading-machine"> · <button type="button" class="machine-button" aria-expanded="false"><bdi>my-mac</bdi> · jobs 1/4 · <span class="jobs-queued">2 not queued</span></button></span></td>
+</tr>
+<tr class="row activity-foreground group-active" tabindex="0" aria-selected="false">
+<td class="activity"><span class="icon" aria-hidden="true"></span><span class="word">foreground</span></td>
+<td class="worktree" dir="ltr"><bdi class="name">app</bdi> <span class="role">fg</span></td>
+<td class="branch" dir="ltr"><bdi>main</bdi></td>
+<td class="git" dir="ltr"><bdi>clean</bdi></td>
+<td class="agent" dir="ltr"><div class="line state-none"><span class="line-icon" aria-hidden="true"></span>no agent</div></td>
+<td class="last"><div class="line">10 m</div></td>
+<td class="actions"><button type="button" class="action action-open" aria-label="open"></button><button type="button" class="action action-terminal" aria-label="terminal"></button><button type="button" class="action action-copy-path" aria-label="copy-path"></button></td>
+</tr>
+<tr class="row activity-working group-active" tabindex="0" aria-selected="false">
+<td class="activity"><span class="icon" aria-hidden="true"><svg class="robot" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path class="robot-frame" fill="currentColor" d="M8 .5a1 1 0 1 1 0 2 1 1 0 0 1 0-2ZM7.5 2h1v1.5h-1ZM7 8h2v1H7Z"/><path class="robot-frame" fill="currentColor" fill-rule="evenodd" d="M4.5 3h7A1.5 1.5 0 0 1 13 4.5v2A1.5 1.5 0 0 1 11.5 8h-7A1.5 1.5 0 0 1 3 6.5v-2A1.5 1.5 0 0 1 4.5 3Zm0 1a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5ZM6.5 4.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm3 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2ZM5 9h6a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1Zm0 1v4h6v-4Z"/><path class="robot-arm robot-arm-left" fill="currentColor" d="M3.5 9.75a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z"/><path class="robot-arm robot-arm-right" fill="currentColor" d="M12.5 9.75a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z"/></svg></span><span class="word">working</span></td>
+<td class="worktree" dir="ltr"><bdi class="name">app-wt1</bdi> <span class="role" hidden></span></td>
+<td class="branch" dir="ltr"><bdi>design-jobs</bdi></td>
+<td class="git" dir="ltr"><bdi>clean</bdi></td>
+<td class="agent" dir="ltr"><div class="line state-working"><span class="line-icon" aria-hidden="true"><svg class="robot" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path class="robot-frame" fill="currentColor" d="M8 .5a1 1 0 1 1 0 2 1 1 0 0 1 0-2ZM7.5 2h1v1.5h-1ZM7 8h2v1H7Z"/><path class="robot-frame" fill="currentColor" fill-rule="evenodd" d="M4.5 3h7A1.5 1.5 0 0 1 13 4.5v2A1.5 1.5 0 0 1 11.5 8h-7A1.5 1.5 0 0 1 3 6.5v-2A1.5 1.5 0 0 1 4.5 3Zm0 1a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5ZM6.5 4.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm3 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2ZM5 9h6a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1Zm0 1v4h6v-4Z"/><path class="line-arm line-arm-left" fill="currentColor" d="M3.5 9.75a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z"/><path class="line-arm line-arm-right" fill="currentColor" d="M12.5 9.75a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3a.75.75 0 0 1 .75-.75Z"/></svg></span><span class="visually-hidden">working: </span><bdi>session 10:02</bdi> · <bdi>build:</bdi> <bdi>cargo test</bdi><span class="not-queued"> (not queued)</span></div></td>
+<td class="last"><div class="line">2 m</div></td>
+<td class="actions"><button type="button" class="action action-open" aria-label="open"></button><button type="button" class="action action-terminal" aria-label="terminal"></button><button type="button" class="action action-copy-path" aria-label="copy-path"></button></td>
+</tr>
+<tr class="row activity-building group-active" tabindex="0" aria-selected="false">
+<td class="activity"><span class="icon" aria-hidden="true"></span><span class="word">building</span></td>
+<td class="worktree" dir="ltr"><bdi class="name">app-wt2</bdi> <span class="role" hidden></span></td>
+<td class="branch" dir="ltr"><bdi>fix-tail</bdi></td>
+<td class="git" dir="ltr"><bdi>2 dirty</bdi></td>
+<td class="agent" dir="ltr"><div class="line state-none"><span class="line-icon" aria-hidden="true"></span>build: <bdi>make</bdi><span class="not-queued"> (not queued)</span></div></td>
+<td class="last"><div class="line">3 m</div></td>
+<td class="actions"><button type="button" class="action action-open" aria-label="open"></button><button type="button" class="action action-terminal" aria-label="terminal"></button><button type="button" class="action action-copy-path" aria-label="copy-path"></button></td>
+</tr>
+<tr class="row activity-building group-active" tabindex="0" aria-selected="false">
+<td class="activity"><span class="icon" aria-hidden="true"></span><span class="word">building</span></td>
+<td class="worktree" dir="ltr"><bdi class="name">app-wt3</bdi> <span class="role" hidden></span></td>
+<td class="branch" dir="ltr"><bdi>review-ts</bdi></td>
+<td class="git" dir="ltr"><bdi>clean</bdi></td>
+<td class="agent" dir="ltr"><div class="line state-none"><span class="line-icon" aria-hidden="true"></span>build: <bdi>cargo nextest</bdi></div></td>
+<td class="last"><div class="line">1 m</div></td>
+<td class="actions"><button type="button" class="action action-open" aria-label="open"></button><button type="button" class="action action-terminal" aria-label="terminal"></button><button type="button" class="action action-copy-path" aria-label="copy-path"></button></td>
+</tr>
+<tr class="row activity-free group-quiet" tabindex="0" aria-selected="false">
+<td class="activity"><span class="icon" aria-hidden="true"></span><span class="word">free</span></td>
+<td class="worktree" dir="ltr"><bdi class="name">app-wt4</bdi> <span class="role" hidden></span></td>
+<td class="branch" dir="ltr"><bdi class="detached">(detached)</bdi></td>
+<td class="git" dir="ltr"><bdi>clean</bdi></td>
+<td class="agent" dir="ltr"><div class="line state-none"><span class="line-icon" aria-hidden="true"></span>no agent</div></td>
+<td class="last"><div class="line">2 h</div></td>
+<td class="actions"><button type="button" class="action action-open" aria-label="open"></button><button type="button" class="action action-terminal" aria-label="terminal"></button><button type="button" class="action action-copy-path" aria-label="copy-path"></button></td>
+</tr>
+</tbody></table></div>
+</body>
+</html>

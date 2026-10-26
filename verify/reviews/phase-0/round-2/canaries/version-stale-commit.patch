@@ -1,0 +1,20 @@
+ID: harness
+Category: harness
+Check: version__should_list_version_commit_and_features
+
+Breaks wt --version: build.rs reruns only when build.rs changes, so an incremental build after a
+commit that leaves crates/wt alone keeps the old commit.
+
+diff --git a/crates/wt/build.rs b/crates/wt/build.rs
+index 0edbd29..2418d02 100644
+--- a/crates/wt/build.rs
++++ b/crates/wt/build.rs
+@@ -6,7 +6,7 @@ use std::process::Command;
+ fn main() {
+     // An edit or a new file anywhere in the repository changes the tree state without touching
+     // a file cargo watches. A path that never exists makes cargo run this script on every build.
+-    println!("cargo::rerun-if-changed=wt-version-reads-the-tree-on-every-build");
++    println!("cargo::rerun-if-changed=build.rs");
+ 
+     let commit = git(&["rev-parse", "--verify", "HEAD"]).unwrap_or_default();
+     let dirty = git(&[

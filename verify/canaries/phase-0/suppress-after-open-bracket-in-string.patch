@@ -1,0 +1,28 @@
+ID: harness
+Category: harness
+Check: lint__no_suppressions
+
+Allows clippy::indexing_slicing in a builder test whose file has a string literal "#[" before the
+allow.
+
+diff --git a/crates/wtpool/tests/canary_open_bracket_string.rs b/crates/wtpool/tests/canary_open_bracket_string.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/wtpool/tests/canary_open_bracket_string.rs
+@@ -0,0 +1,16 @@
++#![cfg(test)]
++
++const OPEN: &str = "#[";
++
++#[allow(clippy::indexing_slicing)]
++#[test]
++fn open__should_start_with_a_hash() {
++    // Given
++    let chars: Vec<char> = OPEN.chars().collect();
++
++    // When
++    let first = chars[0];
++
++    // Then
++    assert_eq!(first, '#');
++}

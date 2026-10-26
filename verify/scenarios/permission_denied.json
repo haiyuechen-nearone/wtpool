@@ -1,0 +1,426 @@
+{
+  "phase": 2,
+  "covers": [
+    "H12",
+    "H13",
+    "R3",
+    "U1"
+  ],
+  "layers": [
+    "int",
+    "render",
+    "host",
+    "e2e"
+  ],
+  "pool": {
+    "agents": true,
+    "worktrees": {
+      "fg": {
+        "branch": "main",
+        "upstream": true
+      },
+      "wt1": {
+        "detached": true
+      },
+      "wt2": {
+        "detached": true
+      },
+      "wt3": {
+        "detached": true
+      },
+      "x": {
+        "branch": "side"
+      }
+    }
+  },
+  "steps": [
+    {
+      "process": {
+        "start": {
+          "pid": 7001,
+          "name": "claude",
+          "in": "fg"
+        }
+      }
+    },
+    {
+      "hook": {
+        "fixture": "UserPromptSubmit",
+        "session": "s1",
+        "cwd": "fg",
+        "process": 7001,
+        "with": {
+          "session_title": "denied push"
+        }
+      }
+    },
+    {
+      "hook": {
+        "fixture": "PreToolUse-Bash",
+        "session": "s1",
+        "cwd": "fg",
+        "process": 7001,
+        "with": {
+          "tool_input": {
+            "command": "cd {pool}/wt2 && git push",
+            "description": "Run a command"
+          },
+          "tool_use_id": "toolu_01",
+          "session_title": "denied push"
+        }
+      }
+    },
+    {
+      "hook": {
+        "fixture": "PermissionRequest-Bash",
+        "session": "s1",
+        "cwd": "fg",
+        "process": 7001,
+        "with": {
+          "tool_input": {
+            "command": "cd {pool}/wt2 && git push",
+            "description": "Run a command"
+          },
+          "session_title": "denied push"
+        }
+      }
+    },
+    {
+      "expect": {
+        "type": "status",
+        "version": 1,
+        "generated": "2026-10-20T12:00:03Z",
+        "machine": {
+          "name": "verify-mac"
+        },
+        "pools": [
+          {
+            "common_dir": "{common}",
+            "repository": {
+              "name": "fg",
+              "github": null
+            },
+            "agents": "on",
+            "skipped_records": 0,
+            "worktrees": [
+              {
+                "path": "{pool}/fg",
+                "name": "fg",
+                "role": "foreground",
+                "missing": false,
+                "branch": "main",
+                "upstream": "origin/main",
+                "git": {
+                  "dirty": 0,
+                  "ahead": 0,
+                  "behind": 0,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "foreground"
+                ],
+                "activity": "foreground",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:55:00Z"
+              },
+              {
+                "path": "{pool}/wt1",
+                "name": "wt1",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:57:00Z"
+              },
+              {
+                "path": "{pool}/wt2",
+                "name": "wt2",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "waiting",
+                "actors": [
+                  {
+                    "key": "s1",
+                    "kind": "session",
+                    "harness": "claude-code",
+                    "label": "denied push",
+                    "state": "waiting",
+                    "reason": "permission",
+                    "action": {
+                      "tool": "Bash",
+                      "target": "git push"
+                    },
+                    "placed_by": "path",
+                    "error": null,
+                    "since": "2026-10-20T12:00:03Z",
+                    "updated": "2026-10-20T12:00:03Z"
+                  }
+                ],
+                "builds": [],
+                "last_event": "2026-10-20T12:00:03Z",
+                "last_change": "2026-10-20T11:59:58Z"
+              },
+              {
+                "path": "{pool}/wt3",
+                "name": "wt3",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T10:00:00Z"
+              },
+              {
+                "path": "{pool}/x",
+                "name": "x",
+                "role": "unmanaged",
+                "missing": false,
+                "branch": "side",
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "unmanaged"
+                ],
+                "activity": "unused",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-18T09:00:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "hook": {
+        "fixture": "PostToolBatch",
+        "session": "s1",
+        "cwd": "fg",
+        "process": 7001,
+        "with": {
+          "tool_calls": [
+            {
+              "tool_use_id": "toolu_01",
+              "tool_name": "Bash",
+              "tool_input": {
+                "command": "cd {pool}/wt2 && git push",
+                "description": "Run a command"
+              }
+            }
+          ],
+          "session_title": "denied push"
+        }
+      }
+    }
+  ],
+  "expect": {
+    "type": "status",
+    "version": 1,
+    "generated": "2026-10-20T12:00:04Z",
+    "machine": {
+      "name": "verify-mac"
+    },
+    "pools": [
+      {
+        "common_dir": "{common}",
+        "repository": {
+          "name": "fg",
+          "github": null
+        },
+        "agents": "on",
+        "skipped_records": 0,
+        "worktrees": [
+          {
+            "path": "{pool}/fg",
+            "name": "fg",
+            "role": "foreground",
+            "missing": false,
+            "branch": "main",
+            "upstream": "origin/main",
+            "git": {
+              "dirty": 0,
+              "ahead": 0,
+              "behind": 0,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "foreground"
+            ],
+            "activity": "foreground",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T11:55:00Z"
+          },
+          {
+            "path": "{pool}/wt1",
+            "name": "wt1",
+            "role": "slot",
+            "missing": false,
+            "branch": null,
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": true,
+            "reasons": [],
+            "activity": "free",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T11:57:00Z"
+          },
+          {
+            "path": "{pool}/wt2",
+            "name": "wt2",
+            "role": "slot",
+            "missing": false,
+            "branch": null,
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": true,
+            "reasons": [],
+            "activity": "working",
+            "actors": [
+              {
+                "key": "s1",
+                "kind": "session",
+                "harness": "claude-code",
+                "label": "denied push",
+                "state": "working",
+                "reason": null,
+                "action": {
+                  "tool": "Bash",
+                  "target": "git push"
+                },
+                "placed_by": "path",
+                "error": null,
+                "since": "2026-10-20T12:00:04Z",
+                "updated": "2026-10-20T12:00:04Z"
+              }
+            ],
+            "builds": [],
+            "last_event": "2026-10-20T12:00:04Z",
+            "last_change": "2026-10-20T11:59:58Z"
+          },
+          {
+            "path": "{pool}/wt3",
+            "name": "wt3",
+            "role": "slot",
+            "missing": false,
+            "branch": null,
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": true,
+            "reasons": [],
+            "activity": "free",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T10:00:00Z"
+          },
+          {
+            "path": "{pool}/x",
+            "name": "x",
+            "role": "unmanaged",
+            "missing": false,
+            "branch": "side",
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "unmanaged"
+            ],
+            "activity": "unused",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-18T09:00:00Z"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+[package]
+name = "wtpool"
+description = "A pool of reused git worktrees for coding agents, and a live view of what each agent does in them."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories = ["command-line-utilities", "development-tools"]
+publish.workspace = true
+
+[features]
+# The test interface of docs/design/status-panel/verification.md. Release builds leave it out.
+verify = []
+
+[dependencies]
+wtpool-core.workspace = true
+wtpool-claude-code.workspace = true
+clap.workspace = true
+terminal_size.workspace = true
+
+[dev-dependencies]
+rstest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

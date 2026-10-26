@@ -1,0 +1,50 @@
+ID: harness
+Category: harness
+Check: oracle_unchanged
+
+Raises the int timeout to 600 s in verify/nextest.toml. The accepted entry canary-int-timeout pins
+that file at its 120 s edit, so it allowed that edit alone: the later edit needs an entry of its
+own.
+
+diff --git a/verify/accepted.txt b/verify/accepted.txt
+index dadfd82..48757b4 100644
+--- a/verify/accepted.txt
++++ b/verify/accepted.txt
+@@ -9,6 +9,7 @@ accept p0-stop-canary
+ # Accepted 2026-10-23: phase 0 round 2.
+ accept p0r2-stale-commit
+ accept p0r2-own-output-dirs
++accept canary-int-timeout 8b312ecb102d5b4ed55901d33a113f03efbe70646c5ed5bcfa16dcdac419a05c
+ # Standing rule from 2026-10-23: every oracle change the verifier classes as blocking is accepted, and the lead records it here. Non blocking ones stay unaccepted and deferred.
+ accept p0r3-release-version
+ accept p0r3-isolation-identity
+diff --git a/verify/nextest.toml b/verify/nextest.toml
+index 0e36e7e..8ea7354 100644
+--- a/verify/nextest.toml
++++ b/verify/nextest.toml
+@@ -17,7 +17,7 @@ store-failure-output = true
+ [profile.int]
+ fail-fast = false
+ retries = 0
+-slow-timeout = { period = "60s", terminate-after = 2 }
++slow-timeout = { period = "600s", terminate-after = 2 }
+ 
+ [profile.int.junit]
+ path = "junit.xml"
+diff --git a/verify/oracle-changes.toml b/verify/oracle-changes.toml
+index 0010a57..9b9943c 100644
+--- a/verify/oracle-changes.toml
++++ b/verify/oracle-changes.toml
+@@ -46,6 +46,12 @@ id = "p0r2-own-output-dirs"
+ reason = "repo_context skips root node_modules but not vscode/test/node_modules, which the clone keeps. From phase 1 an npm package shipping AGENTS.md or CLAUDE.md would fail a correct build. Also close the isolation gap for a worktree the run adds to the real pool outside the run folder at one of the owner's commits."
+ paths = ["xtask/src/context.rs", "xtask/src/isolation.rs"]
+ 
++[[change]]
++id = "canary-int-timeout"
++reason = "The int part may take 120 s per check."
++[change.files]
++"verify/nextest.toml" = "bc6e9692ecef48d9cfdc7cbf6145003694b35a6b709755ad86ebca824650e304"
++
+ [[change]]
+ id = "p0r3-release-version"
+ reason = "version__ checks only debug builds, so a release build that prints `commit unknown` passes (canary version-release-drops-commit survived). Also run the release binary's --version and assert the full commit and the dirty marker."

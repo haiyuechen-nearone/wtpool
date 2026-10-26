@@ -1,0 +1,16 @@
+Pass cc_cd_into_slot CwdChanged "/Users/you/.cache/wt-verify/work/contract/verify/out/live-contract/cc/pools/cc_cd_into_slot-1792910644137/wt2"; later cwd /Users/you/.cache/wt-verify/work/contract/verify/out/live-contract/cc/pools/cc_cd_into_slot-1792910644137/wt2
+Pass cc_idle_prompt idle_prompt absent
+Pass cc_interrupt PostToolUseFailure absent; UserPromptSubmit, PreToolUse:Bash
+Pass cc_no_hook_output 
+Pass cc_permission event order UserPromptSubmit, PreToolUse:Bash, PermissionRequest:Bash, Notification:permission_prompt, CwdChanged, PostToolUse:Bash, PostToolBatch, Stop
+Pass cc_permission_deny PostToolUseFailure absent; UserPromptSubmit, PreToolUse:Bash, PermissionRequest:Bash, PostToolBatch, Stop
+Pass cc_permission_deny_interrupt idle_prompt absent; UserPromptSubmit, PreToolUse:Bash, PermissionRequest:Bash
+Pass cc_read_edit_bash events UserPromptSubmit, PreToolUse:Read, PostToolUse:Read, PostToolBatch, PreToolUse:Edit, PermissionRequest:Edit, PostToolUse:Edit, PreToolUse:Bash, PostToolUse:Bash, PostToolBatch, Stop
+Pass cc_records_claude_pid the hooks' parent is /Users/you/.local/bin/claude
+Pass cc_session_end ended, subagent gone
+Pass cc_stop_failure StopFailure "model_not_found"
+Pass cc_subagent_elsewhere Agent description "read wt2"; agent_type Explore
+Pass cc_subagent_permission permission_prompt recorded
+Pass contract__should_run_in_the_sandbox one auto mode turn on Claude Code 2.1.306: UserPromptSubmit, Stop, SessionEnd
+run: /Users/you/.cache/wt-verify/work/contract/verify/out/live-contract
+exit 0

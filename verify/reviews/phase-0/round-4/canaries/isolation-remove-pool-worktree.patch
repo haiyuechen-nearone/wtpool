@@ -1,0 +1,22 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version removes slot app-wt1 from the pool, outside the run folder, as a wt rm or wt free
+that reached the real pool would. git worktree remove moves no ref and writes no reflog.
+Machine specific: the path is a fake pool under the verifier's temporary HOME, never the real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..43aa0df 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,9 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let _ = std::process::Command::new("git")
++                .args(["-C", "<scratchpad>/v4/h4/code/app", "worktree", "remove", "--force", "<scratchpad>/v4/h4/code/app-wt1"])
++                .status();
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

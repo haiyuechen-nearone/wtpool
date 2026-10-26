@@ -1,0 +1,13 @@
+# Build outputs of `npm run build` and `npm run package`, and installed dependencies. An oracle
+# file from phase 1 (verification.md, "Oracle files"). media/ holds only what the build writes
+# there (webview.js, webview.css, their maps, and the codicon font the webview loads),
+# so its scripts, style sheets, maps and fonts are ignored by pattern; sources live in src/.
+node_modules/
+out/
+*.vsix
+/media/*.js
+/media/*.css
+/media/*.map
+/media/*.ttf
+/media/*.woff
+/media/*.woff2

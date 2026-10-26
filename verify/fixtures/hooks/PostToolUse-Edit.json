@@ -1,0 +1,22 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1.jsonl",
+  "cwd": "{pool}/fg",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Edit",
+  "tool_input": {
+    "file_path": "{pool}/wt1/f.txt",
+    "old_string": "base",
+    "new_string": "edited",
+    "replace_all": false
+  },
+  "tool_use_id": "toolu_01Edit",
+  "tool_response": {
+    "filePath": "{pool}/wt1/f.txt",
+    "oldString": "base",
+    "newString": "edited",
+    "userModified": false,
+    "replaceAll": false
+  }
+}

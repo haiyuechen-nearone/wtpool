@@ -1,0 +1,18 @@
+ID: harness
+Category: harness
+Check: release__should_have_no_verify_feature
+
+Turns the verify feature on by default, so the release build carries it.
+
+diff --git a/crates/wt/Cargo.toml b/crates/wt/Cargo.toml
+index 637d5c7..f3e129a 100644
+--- a/crates/wt/Cargo.toml
++++ b/crates/wt/Cargo.toml
+@@ -8,6 +8,7 @@ publish.workspace = true
+ 
+ [features]
+ # The test interface of docs/design/status-panel/verification.md. Release builds leave it out.
++default = ["verify"]
+ verify = []
+ 
+ [dependencies]

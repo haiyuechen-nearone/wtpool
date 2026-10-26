@@ -1,0 +1,19 @@
+{
+  "cwd": "{pool}/wt1",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PermissionDenied",
+  "permission_mode": "auto",
+  "prompt_id": "f11d8ca3-17c9-4bf1-8e39-a33cde2014ff",
+  "reason": "[Git Destructive]",
+  "scratchpad_dir": "{tmp}/34d58d5d-e499-41a1-a4d7-355c6b7f4e9f/scratchpad",
+  "session_id": "34d58d5d-e499-41a1-a4d7-355c6b7f4e9f",
+  "tool_input": {
+    "command": "git push --force origin HEAD:main",
+    "description": "Retry push to origin main with force, per house rule"
+  },
+  "tool_name": "Bash",
+  "tool_use_id": "toolu_01RujPunxYPAKvnfgLCqAiLk",
+  "transcript_path": "~/.claude/projects/-{pool}-wt1/34d58d5d-e499-41a1-a4d7-355c6b7f4e9f.jsonl"
+}

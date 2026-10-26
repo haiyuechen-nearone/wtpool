@@ -1,0 +1,14 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1.jsonl",
+  "cwd": "{pool}/fg",
+  "permission_mode": "default",
+  "hook_event_name": "PermissionDenied",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "git -C {pool}/wt3 push --force origin main",
+    "description": "Force push"
+  },
+  "tool_use_id": "toolu_01Denied",
+  "reason": "The auto mode classifier blocked a force push to the default branch"
+}

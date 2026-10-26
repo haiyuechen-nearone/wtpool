@@ -1,0 +1,17 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1.jsonl",
+  "cwd": "{pool}/fg",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolBatch",
+  "tool_calls": [
+    {
+      "tool_use_id": "toolu_01Bash",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd {pool}/wt2 && git status",
+        "description": "Show the working tree status"
+      }
+    }
+  ]
+}

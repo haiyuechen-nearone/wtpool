@@ -1,0 +1,155 @@
+== control run of the round 4 freeze in a scratch clone (quick, int with owner ref moves in the fake pool, report)
+== control quick
+Pass harness:self_test 
+Pass oracle_unchanged equal to the round 4 freeze
+Pass repo_context__should_be_unchanged 0 files equal spec-base
+Pass lint__no_suppressions no suppression
+Pass static:doc_links every relative Markdown link resolves
+Pass static:fmt 
+Pass static:clippy 
+Pass static:clippy_all_features 
+Pass static:rustdoc 
+run: <scratch>/c4/verify/out/ctl
+exit 0
+== control int, owner works on the pool meanwhile
+owner moves done at Fri Oct 23 23:06:34 CEST 2026
+exit 0
+Pass unit 
+Pass int:build 
+Pass int:build_release 
+Pass release__should_have_no_verify_feature 
+Pass version__should_list_version_commit_and_features 
+run: <scratch>/c4/verify/out/ctl
+== control report
+verdict: PASS
+report: <scratch>/c4/verify/out/ctl/report.md
+exit 0
+## Coverage
+
+42 of 42 changed lines covered by unit or int. Lines no oracle layer covers:
+
+- crates/wt/src/main.rs:347 (unit only)
+- crates/wt/src/main.rs:353 (unit only)
+
+## Check results
+
+== round 3 survivors (original files)
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r4/verify/reviews/phase-0/round-3/canaries/version-release-drops-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: no full commit 16b7e907d760adbf51b2114eb643ae4a2ccabce4 in the release build's "wt 0.1.0\ncommit unknown\nfeatures: none\n"
+== isolation-move-pool-head
+h@example.invalid
+<scratchpad>/home/code/app      4d21998 [main]
+<scratchpad>/home/code/app-wt1  4d21998 (detached HEAD)
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r4/verify/reviews/phase-0/round-3/canaries/isolation-move-pool-head.patch (harness, harness) by isolation__left_no_trace: int: the HEAD of ~/code/app worktree <scratchpad>/home/code/app-wt1 moved under you@mac.example, not the owner's h@example.invalid
+exit 0
+-- fake pool after: worktrees
+<scratchpad>/home/code/app      4d21998 [main]
+<scratchpad>/home/code/app-wt1  7530de9 (detached HEAD)
+-- <scratchpad>/home/code/app/.git/logs/HEAD
+0000000000000000000000000000000000000000 7530de9aa5a778f8a75ccaa69bce458f66990a99 h <h@example.invalid> 1792789534 +0200	commit (initial): a
+7530de9aa5a778f8a75ccaa69bce458f66990a99 4d21998e16c5cfa32d5ee6a13384bd3558a6e0b0 h <h@example.invalid> 1792789534 +0200	commit: b
+-- <scratchpad>/home/code/app/.git/worktrees/app-wt1/logs/HEAD
+0000000000000000000000000000000000000000 4d21998e16c5cfa32d5ee6a13384bd3558a6e0b0 h <h@example.invalid> 1792789534 +0200
+4d21998e16c5cfa32d5ee6a13384bd3558a6e0b0 7530de9aa5a778f8a75ccaa69bce458f66990a99 Pool Owner <you@mac.example> 1792789563 +0200	checkout: moving from 4d21998e16c5cfa32d5ee6a13384bd3558a6e0b0 to owner-base
+== isolation-add-pool-worktree
+h@example.invalid
+<scratchpad>/home/code/app      c98c3f9 [main]
+<scratchpad>/home/code/app-wt1  c98c3f9 (detached HEAD)
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r4/verify/reviews/phase-0/round-3/canaries/isolation-add-pool-worktree.patch (harness, harness) by isolation__left_no_trace: int: the HEAD of ~/code/app worktree <scratchpad>/home/code/app-wt9 moved under you@mac.example, not the owner's h@example.invalid
+exit 0
+-- fake pool after: worktrees
+<scratchpad>/home/code/app      c98c3f9 [main]
+<scratchpad>/home/code/app-wt1  c98c3f9 (detached HEAD)
+<scratchpad>/home/code/app-wt9  8bb5f44 (detached HEAD)
+-- <scratchpad>/home/code/app/.git/logs/HEAD
+0000000000000000000000000000000000000000 8bb5f4416976e4cfcc79d0f63bade276c98e216c h <h@example.invalid> 1792789601 +0200	commit (initial): a
+8bb5f4416976e4cfcc79d0f63bade276c98e216c c98c3f9c5712592578df0c67061de46772e5d775 h <h@example.invalid> 1792789601 +0200	commit: b
+-- <scratchpad>/home/code/app/.git/worktrees/app-wt1/logs/HEAD
+0000000000000000000000000000000000000000 c98c3f9c5712592578df0c67061de46772e5d775 h <h@example.invalid> 1792789601 +0200
+-- <scratchpad>/home/code/app/.git/worktrees/app-wt9/logs/HEAD
+0000000000000000000000000000000000000000 8bb5f4416976e4cfcc79d0f63bade276c98e216c Pool Owner <you@mac.example> 1792789629 +0200
+
+== new canaries (round-4/canaries/)
+caught: <scratch>/canaries/version-release-never-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the release build's commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit <round 4 freeze>\nfeatures: none\n"
+SURVIVED: <scratch>/canaries/version-release-stale-commit.patch (harness, harness) by version__should_list_version_commit_and_features: 
+== removal canary
+h@example.invalid
+<scratch>/h4/code/app      54d223f [main]
+<scratch>/h4/code/app-wt1  54d223f (detached HEAD)
+SURVIVED: <scratch>/canaries/isolation-remove-pool-worktree.patch (harness, harness) by isolation__left_no_trace: 2 part runs left no trace
+exit 1
+-- fake pool after
+<scratch>/h4/code/app  54d223f [main]
+app
+
+== verify/canaries/phase-0/ at the round 4 freeze
+caught: <scratch>/c3/verify/canaries/phase-0/add-claude-md-in-nested-target.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: crates/wt/src/target/CLAUDE.md
+caught: <scratch>/c3/verify/canaries/phase-0/add-claude-md-in-vscode-test.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: vscode/test/CLAUDE.md
+caught: <scratch>/c3/verify/canaries/phase-0/add-claude-md.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: CLAUDE.md
+caught: <scratch>/c3/verify/canaries/phase-0/add-claude-settings.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: .claude/settings.json
+caught: <scratch>/c3/verify/canaries/phase-0/add-nested-claude-md.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: crates/wt/CLAUDE.md
+caught: <scratch>/c3/verify/canaries/phase-0/add-oracle-file.patch (harness, harness) by oracle_unchanged: changed since the round 4 freeze without an entry added to verify/oracle-changes.toml after it: verify/notes.md
+caught: <scratch>/c3/verify/canaries/phase-0/edit-oracle-file.patch (harness, harness) by oracle_unchanged: changed since the round 4 freeze without an entry added to verify/oracle-changes.toml after it: verify/nextest.toml
+caught: <scratch>/c3/verify/canaries/phase-0/edit-oracle-key.patch (harness, harness) by oracle_unchanged: changed since the round 4 freeze without an entry added to verify/oracle-changes.toml after it: Cargo.toml:workspace.lints
+caught: <scratch>/c3/verify/canaries/phase-0/edit-oracle-reusing-spent-id.patch (harness, harness) by oracle_unchanged: changed since the round 4 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/suppress.rs
+caught: <scratch>/c3/verify/canaries/phase-0/edit-oracle-under-round-2-entry.patch (harness, harness) by oracle_unchanged: changed since the round 4 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/parts.rs
+caught: <scratch>/c3/verify/canaries/phase-0/edit-oracle-under-spent-entry.patch (harness, harness) by oracle_unchanged: changed since the round 4 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/cover.rs
+caught: <scratch>/c3/verify/canaries/phase-0/edit-oracle-with-lock.patch (harness, harness) by oracle_unchanged: changed since the round 4 freeze without an entry added to verify/oracle-changes.toml after it: verify/oracle.lock
+caught: <scratch>/c3/verify/canaries/phase-0/isolation-outside-remote.patch (harness, harness) by isolation__left_no_trace: sandbox/pool/leftover/.git: remote https://github.com/acme/widget is outside the run folder
+caught: <scratch>/c3/verify/canaries/phase-0/release-reads-verify-clock.patch (harness, harness) by release__should_have_no_verify_feature: release__should_have_no_verify_feature: the release binary reads WT_VERIFY_CLOCK
+caught: <scratch>/c3/verify/canaries/phase-0/release-verify-by-default.patch (harness, harness) by release__should_have_no_verify_feature: release__should_have_no_verify_feature: the release feature list of "wt 0.1.0\ncommit 7a488f4d136a170f9fb02714f620596e15f7b208\nfeatures: default, verify\n" must exist and leave out verify
+caught: <scratch>/c3/verify/canaries/phase-0/stop-check-by-renaming-the-binary.patch (harness, harness) by trace_complete: harness: release__should_have_no_verify_feature failed
+caught: <scratch>/c3/verify/canaries/phase-0/stop-frozen-check-accepted.patch (harness, harness) by trace_complete: harness: version__should_list_version_commit_and_features did not run
+caught: <scratch>/c3/verify/canaries/phase-0/suppress-allow-attribute.patch (harness, harness) by lint__no_suppressions: crates/wt/src/main.rs:345: #[allow(clippy::indexing_slicing)]
+caught: <scratch>/c3/verify/canaries/phase-0/suppress-cargo-config-rustflags.patch (harness, harness) by lint__no_suppressions: .cargo/config.toml:0: target.cfg(all()).rustflags lowers a lint level
+caught: <scratch>/c3/verify/canaries/phase-0/suppress-in-target-module.patch (harness, harness) by lint__no_suppressions: crates/wt/src/target/mod.rs:1: #[allow(clippy::indexing_slicing)]
+caught: <scratch>/c3/verify/canaries/phase-0/version-always-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit 8eaadfb70a2db332e3fa12d6a027eb9a7c954600 (dirty)\nfeatures: verify\n"
+caught: <scratch>/c3/verify/canaries/phase-0/version-drop-features.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the feature list of "wt 0.1.0\ncommit 48a4533174306be348f1f0e94df8c1dbcc456637\nfeatures: none\n"
+caught: <scratch>/c3/verify/canaries/phase-0/version-never-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit <round 4 freeze>\nfeatures: verify\n"
+caught: <scratch>/c3/verify/canaries/phase-0/version-release-drops-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: no full commit 3de1ded26149215e976b36a351f7f4c33498ee28 in the release build's "wt 0.1.0\ncommit unknown\nfeatures: none\n"
+caught: <scratch>/c3/verify/canaries/phase-0/version-short-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: no full commit d3d4092b916b3bd8a50b8951b794bf0916ee8741 in "wt 0.1.0\ncommit d3d4092\nfeatures: verify\n"
+caught: <scratch>/c3/verify/canaries/phase-0/version-stale-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: the rebuild after an empty commit in one target folder, at commit a1d074313fc9029b72bf0aeffbcfd8e61d5dc21d, names another commit: "wt 0.1.0\ncommit 6417c20a920e34f0760bf271d7d1601ddd4815e0\nfeatures: verify\n"
+exit 0
+
+== experiment: release staleness (experiments/release-stale-after-commit.sh)
+== step 1: HEAD 5ba700dc0158cb43d94730a24ece231ebb3db53e
+-- release:
+wt 0.1.0
+commit 5ba700dc0158cb43d94730a24ece231ebb3db53e
+features: none
+-- debug:
+wt 0.1.0
+commit 5ba700dc0158cb43d94730a24ece231ebb3db53e
+features: none
+== step 2: HEAD 29134751ffb6aedd1a631611f236828f1e7e321d
+-- release:
+wt 0.1.0
+commit 5ba700dc0158cb43d94730a24ece231ebb3db53e
+features: none
+-- debug:
+wt 0.1.0
+commit 29134751ffb6aedd1a631611f236828f1e7e321d
+features: none
+exit 0
+
+== experiment: owner commit under a throwaway identity during int (experiments/owner-throwaway-identity.sh)
+h@example.invalid
+<scratch>/h4/code/app      f4aff6f [main]
+<scratch>/h4/code/app-wt1  f4aff6f (detached HEAD)
+owner alias commit done at Fri Oct 23 23:08:55 CEST 2026
+int exit 0
+verdict: FAIL
+report: <scratch>/c4/verify/out/exp-owner-alias/report.md
+report exit 1
+### `isolation__left_no_trace` (report, fail (assertion))
+
+```
+--
+harness: isolation__left_no_trace failed
+```
+
+--
+### `isolation__left_no_trace` (report, fail (assertion))
+
+```
+int: the HEAD of ~/code/app worktree <scratch>/h4/code/app-wt1 moved under t@t, not the owner's h@example.invalid
+```

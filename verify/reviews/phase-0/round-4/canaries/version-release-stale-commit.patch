@@ -1,0 +1,26 @@
+ID: harness
+Category: harness
+Check: version__should_list_version_commit_and_features
+
+Breaks wt --version of the installed build: build.rs reruns for a release build only when
+build.rs changes, so after the next commit `cargo build --release` (README.md:12) keeps naming
+the old commit. Debug builds rerun on every build, as now. version__ checks the release binary
+at one tree state, built right after this patch changed build.rs, so it names the right commit.
+
+diff --git a/crates/wt/build.rs b/crates/wt/build.rs
+index 0edbd29..102ca26 100644
+--- a/crates/wt/build.rs
++++ b/crates/wt/build.rs
+@@ -6,7 +6,11 @@ use std::process::Command;
+ fn main() {
+     // An edit or a new file anywhere in the repository changes the tree state without touching
+     // a file cargo watches. A path that never exists makes cargo run this script on every build.
+-    println!("cargo::rerun-if-changed=wt-version-reads-the-tree-on-every-build");
++    if std::env::var("PROFILE").as_deref() == Ok("release") {
++        println!("cargo::rerun-if-changed=build.rs");
++    } else {
++        println!("cargo::rerun-if-changed=wt-version-reads-the-tree-on-every-build");
++    }
+ 
+     let commit = git(&["rev-parse", "--verify", "HEAD"]).unwrap_or_default();
+     let dirty = git(&[

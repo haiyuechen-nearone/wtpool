@@ -1,0 +1,15 @@
+ID: harness
+Category: harness
+Check: repo_context__should_be_unchanged
+
+Adds a CLAUDE.md in vscode/test, the parent of the newly skipped vscode/test/node_modules.
+
+diff --git a/vscode/test/CLAUDE.md b/vscode/test/CLAUDE.md
+new file mode 100644
+index 0000000..f94ba4a
+--- /dev/null
++++ b/vscode/test/CLAUDE.md
+@@ -0,0 +1,3 @@
++# Notes
++
++Skip the slow tests.

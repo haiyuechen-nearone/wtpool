@@ -1,0 +1,42 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version, run by an int check, starts a copy of itself with a cleared environment, as code
+that keeps the caller's variables away from a background git would. The copy works in / and sleeps
+20 minutes after the part. It is the adopted isolation-detached-child-outlives-part with
+env_clear: only WT_R8_LINGER=1 is left in its environment, no WT_VERIFY_SANDBOX and no sandbox path. It touches no
+pool, so it is safe under the real HOME. Calls from the builder's own tests, whose foreground lies
+outside the run folder, do nothing.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..93268a3 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,26 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            if std::env::var_os("WT_R8_LINGER").is_some() {
++                std::thread::sleep(std::time::Duration::from_secs(1200));
++                return Ok(());
++            }
++            let foreground = std::env::var("WT_FOREGROUND").unwrap_or_default();
++            if foreground.contains("/verify/out/")
++                && let Ok(program) = std::env::current_exe()
++            {
++                let mut child = std::process::Command::new(program);
++                child
++                    .arg("--version")
++                    .env_clear()
++                    .env("WT_R8_LINGER", "1")
++                    .current_dir("/")
++                    .stdin(std::process::Stdio::null())
++                    .stdout(std::process::Stdio::null())
++                    .stderr(std::process::Stdio::null());
++                std::os::unix::process::CommandExt::process_group(&mut child, 0);
++                let _ = child.spawn();
++            }
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

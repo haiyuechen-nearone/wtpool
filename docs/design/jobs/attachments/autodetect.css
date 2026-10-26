@@ -1,0 +1,68 @@
+/* Measured suggestions (autodetect.md, JA16 to JA19): the parts the Measured mockups add to
+ * mockup.css. Each measured command takes two lines: its chip with an add button and Dismiss,
+ * then the evidence; dismissed commands follow as chips with a restore button. */
+.heavy-measured {
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.heavy-measured li {
+  margin: 0 0 6px;
+}
+
+.measured-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.measured-evidence {
+  display: block;
+  margin: 2px 0 0 8px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.measured-also {
+  white-space: nowrap;
+}
+
+.job-button.measured-dismiss {
+  min-height: 20px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.job-button.focus,
+.heavy-chip.suggested .chip-remove.focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.restore-dismissed::before {
+  content: "\eae2";
+}
+
+.heavy-chip.dismissed {
+  color: var(--vscode-descriptionForeground);
+}
+
+.measured-note {
+  margin: 0 0 4px;
+  color: var(--vscode-descriptionForeground);
+  overflow-wrap: anywhere;
+}
+
+.measured-status {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+
+.measured-note code {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  white-space: nowrap;
+}

@@ -1,0 +1,182 @@
+{
+  "phase": 1,
+  "covers": [
+    "X10",
+    "R3",
+    "U1"
+  ],
+  "layers": [
+    "int",
+    "render",
+    "host",
+    "e2e"
+  ],
+  "pool": {
+    "agents": true,
+    "worktrees": {
+      "fg": {
+        "branch": "main",
+        "upstream": true
+      },
+      "wt1": {
+        "branch": "<img/src=x/onerror=alert(1)>&amp;"
+      },
+      "wt2": {
+        "branch": "fix‮txt.exe"
+      },
+      "wt3": {
+        "branch": "ma​in⁦x⁩"
+      },
+      "x": {
+        "branch": "x-<script>alert(1)</script>"
+      }
+    }
+  },
+  "steps": [],
+  "expect": {
+    "type": "status",
+    "version": 1,
+    "generated": "2026-10-20T12:00:00Z",
+    "machine": {
+      "name": "verify-mac"
+    },
+    "pools": [
+      {
+        "common_dir": "{common}",
+        "repository": {
+          "name": "fg",
+          "github": null
+        },
+        "agents": "on",
+        "skipped_records": 0,
+        "worktrees": [
+          {
+            "path": "{pool}/fg",
+            "name": "fg",
+            "role": "foreground",
+            "missing": false,
+            "branch": "main",
+            "upstream": "origin/main",
+            "git": {
+              "dirty": 0,
+              "ahead": 0,
+              "behind": 0,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "foreground"
+            ],
+            "activity": "foreground",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T11:55:00Z"
+          },
+          {
+            "path": "{pool}/wt1",
+            "name": "wt1",
+            "role": "slot",
+            "missing": false,
+            "branch": "<img/src=x/onerror=alert(1)>&amp;",
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "branch"
+            ],
+            "activity": "unused",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T11:57:00Z"
+          },
+          {
+            "path": "{pool}/wt2",
+            "name": "wt2",
+            "role": "slot",
+            "missing": false,
+            "branch": "fix‮txt.exe",
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "branch"
+            ],
+            "activity": "unused",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T11:59:58Z"
+          },
+          {
+            "path": "{pool}/wt3",
+            "name": "wt3",
+            "role": "slot",
+            "missing": false,
+            "branch": "ma​in⁦x⁩",
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "branch"
+            ],
+            "activity": "unused",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T10:00:00Z"
+          },
+          {
+            "path": "{pool}/x",
+            "name": "x",
+            "role": "unmanaged",
+            "missing": false,
+            "branch": "x-<script>alert(1)</script>",
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "unmanaged"
+            ],
+            "activity": "unused",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-18T09:00:00Z"
+          }
+        ]
+      }
+    ]
+  }
+}

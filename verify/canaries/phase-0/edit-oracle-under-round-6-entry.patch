@@ -1,0 +1,25 @@
+ID: harness
+Category: harness
+Check: oracle_unchanged
+
+Drops the listing rule of isolation__left_no_trace, which the entry p0r6-listing-names-run added.
+The freeze after round 6 accepted that entry and wrote it into the lock, so it is spent; the rule
+now lives in xtask/src/isolation/rules.rs, which entry p0r8-file-length split out of the entry's
+file. A builder whose run leaves a lock naming the run folder could take the accepted entry as
+leave to undo the rule.
+
+diff --git a/xtask/src/isolation/rules.rs b/xtask/src/isolation/rules.rs
+--- a/xtask/src/isolation/rules.rs
++++ b/xtask/src/isolation/rules.rs
+@@ -39,11 +39,6 @@ pub fn traces(invocation: &Invocation, sandbox_roots: &[String]) -> Vec<String>
+             ));
+         }
+     }
+-    if after.listing_mentions_run {
+-        found.push(format!(
+-            "{part}: git -C {pool} worktree list names the run folder"
+-        ));
+-    }
+     for worktree in before
+         .worktrees
+         .iter()

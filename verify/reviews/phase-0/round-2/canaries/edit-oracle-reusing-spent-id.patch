@@ -1,0 +1,32 @@
+ID: harness
+Category: harness
+Check: oracle_unchanged
+
+Stops lint__no_suppressions from flagging expect attributes, under a new entry that reuses the id of
+the accepted and spent entry p0-nested-target, so verify/accepted.txt already names it.
+
+diff --git a/verify/oracle-changes.toml b/verify/oracle-changes.toml
+index 2553561..95fa073 100644
+--- a/verify/oracle-changes.toml
++++ b/verify/oracle-changes.toml
+@@ -34,3 +34,8 @@ paths = ["xtask/tests/support/mod.rs", "xtask/src/trace.rs"]
+ id = "p0-stop-canary"
+ reason = "Replace canary stop-frozen-check with the verifier's stop-frozen-check-accepted, which shows trace_complete catches a stopped check on its own."
+ paths = ["verify/canaries/phase-0/"]
++
++[[change]]
++id = "p0-nested-target"
++reason = "Allow expect attributes again."
++paths = ["xtask/src/suppress.rs"]
+diff --git a/xtask/src/suppress.rs b/xtask/src/suppress.rs
+index bba6cea..d095cb5 100644
+--- a/xtask/src/suppress.rs
++++ b/xtask/src/suppress.rs
+@@ -107,7 +107,6 @@ fn bracket_body(chars: &[char], start: usize) -> (String, usize, usize) {
+ 
+ pub fn is_suppression(body: &str) -> bool {
+     body.starts_with("allow(")
+-        || body.starts_with("expect(")
+         || (body.starts_with("cfg_attr(")
+             && (body.contains(",allow(") || body.contains(",expect(")))
+         || body.contains("rustfmt::skip")

@@ -1,0 +1,17 @@
+{
+  "name": "wtpool",
+  "version": "0.1.0",
+  "description": "Records what each Claude Code session and subagent does, for wtpool status and its VS Code panel. Needs wtpool on PATH.",
+  "author": {
+    "name": "wtpool",
+    "url": "https://github.com/haiyuechen-nearone/wtpool"
+  },
+  "homepage": "https://github.com/haiyuechen-nearone/wtpool",
+  "repository": "https://github.com/haiyuechen-nearone/wtpool",
+  "license": "MIT",
+  "keywords": [
+    "git",
+    "worktree",
+    "status"
+  ]
+}

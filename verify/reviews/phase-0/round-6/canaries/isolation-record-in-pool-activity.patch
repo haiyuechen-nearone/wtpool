@@ -1,0 +1,25 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+The pool already has wt-activity/ with a record of the owner's. wt --version writes a session record
+there that names its sandbox foreground, a path in the run folder, as a hook that resolves the real
+pool would. Run with a pool that mkpool.sh builds with the activity option. Machine specific: the
+path is a fake pool under the verifier's temporary HOME, never the real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..0e148fb 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,11 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let foreground = std::env::var("WT_FOREGROUND").unwrap_or_default();
++            let _ = std::fs::write(
++                "<scratchpad>/v6/h7/code/app/.git/wt-activity/verify-session.json",
++                format!("{{\"cwd\":\"{foreground}\"}}"),
++            );
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

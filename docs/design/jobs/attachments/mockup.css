@@ -1,0 +1,616 @@
+/*
+ * The proposed styles of the jobs design (docs/design/jobs/jobs.md) and of several agents in one
+ * row (status-panel.md U12, U13), layered on the panel's real icons.css and style.css. A mockup
+ * only: colours come from --vscode-* variables, as X13 asks of the real sheet. render.mjs sets
+ * each theme's variables and body classes from verify/themes/.
+ */
+
+/* Several agents in one row (U12): the count after the Activity word, in the word's colour. */
+.count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid currentcolor;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 15px;
+  vertical-align: 1px;
+}
+
+/* Agent line icons (U13): a 14 px box before each line's text, static, in the group's colour. */
+.line-icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 5px;
+  vertical-align: -2px;
+  text-align: center;
+}
+
+.line-icon::before {
+  display: block;
+  font-family: codicon, sans-serif;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.line-icon .robot {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+/* The robot of a line keeps its arms in the rest pose of U6 and never swings. */
+.line-arm {
+  transform-box: fill-box;
+  transform-origin: 50% 0.75px;
+}
+
+.line-arm-left {
+  rotate: 30deg;
+}
+
+.line-arm-right {
+  rotate: -30deg;
+}
+
+.state-working > .line-icon {
+  color: var(--vscode-textLink-foreground);
+}
+
+.state-waiting > .line-icon {
+  color: var(--vscode-list-warningForeground);
+}
+
+.state-quiet > .line-icon,
+.state-idle > .line-icon,
+.state-done > .line-icon {
+  color: var(--vscode-descriptionForeground);
+}
+
+.state-idle > .line-icon-error {
+  color: var(--vscode-list-errorForeground);
+}
+
+.row[aria-selected="true"] .state-quiet > .line-icon,
+.row[aria-selected="true"] .state-idle > .line-icon,
+.row[aria-selected="true"] .state-done > .line-icon {
+  color: inherit;
+}
+
+.line-icon-quiet::before {
+  content: "\ea82";
+}
+
+.line-icon-waiting::before {
+  content: "\eaa2";
+}
+
+.line-icon-idle::before {
+  content: "\eba7";
+}
+
+.line-icon-error::before {
+  content: "\ea87";
+}
+
+.line-icon-done::before {
+  content: "\eab2";
+}
+
+/* The machine button of the heading (U10). */
+.machine-button {
+  display: inline-block;
+  margin: -2px 0;
+  padding: 1px 4px;
+  border: none;
+  border-radius: 3px;
+  background-color: transparent;
+  color: var(--vscode-descriptionForeground);
+  font: inherit;
+  font-weight: 400;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.machine-button:hover,
+.machine-button.hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+body.vscode-high-contrast .machine-button.hover {
+  outline: 1px dashed var(--vscode-contrastActiveBorder);
+  outline-offset: -1px;
+}
+
+.machine-button.focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.jobs-queued {
+  color: var(--vscode-list-warningForeground);
+}
+
+.jobs-problem {
+  color: var(--vscode-list-errorForeground);
+}
+
+.machine-button::after,
+.jobs-problem::before,
+.machine-gear::before {
+  display: inline-block;
+  font-family: codicon, sans-serif;
+  font-size: 14px;
+  line-height: 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+.machine-button::after {
+  content: "\eab4";
+  margin-left: 4px;
+}
+
+.machine-button[aria-expanded="true"]::after {
+  content: "\eab7";
+}
+
+.machine-button.native::after {
+  content: none;
+}
+
+.machine-gear::before {
+  content: "\eb51";
+  margin-left: 5px;
+  vertical-align: -2px;
+}
+
+.jobs-problem::before {
+  content: "\ea6c";
+  margin-right: 3px;
+  vertical-align: -2px;
+}
+
+/* The machine strip (U11): the detail strip's box, the limit on the left, the jobs on the right. */
+.machine-detail .strip {
+  gap: 8px 40px;
+}
+
+.jobs-limit,
+.jobs-lists {
+  min-width: 0;
+}
+
+.limit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 4px 0 6px;
+}
+
+.limit-row label {
+  margin-right: 6px;
+}
+
+.job-limit {
+  box-sizing: border-box;
+  width: 56px;
+  height: 26px;
+  padding: 3px 6px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font: inherit;
+  text-align: right;
+}
+
+.job-limit.focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.job-limit[aria-invalid="true"] {
+  border-color: var(--vscode-list-errorForeground);
+  outline-color: var(--vscode-list-errorForeground);
+}
+
+.job-button {
+  min-height: 26px;
+  padding: 2px 12px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 2px;
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.job-button.secondary {
+  border-color: var(--vscode-descriptionForeground);
+  background-color: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.limit-note,
+.limit-hint,
+.limit-error,
+.limit-status {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.limit-note,
+.limit-hint {
+  color: var(--vscode-descriptionForeground);
+}
+
+.limit-hint {
+  margin-top: 10px;
+}
+
+.limit-error {
+  color: var(--vscode-list-errorForeground);
+}
+
+.limit-over {
+  margin: 0 0 4px;
+  color: var(--vscode-list-warningForeground);
+}
+
+.limit-row .limit-status {
+  margin: 0;
+  color: var(--vscode-descriptionForeground);
+}
+
+.limit-hint code,
+.old-wtpool code {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.jobs-list {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.jobs-running {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.jobs-list li {
+  display: contents;
+}
+
+.job-position {
+  color: var(--vscode-descriptionForeground);
+  text-align: right;
+}
+
+.job-summary {
+  font-weight: 500;
+}
+
+.job-where {
+  color: var(--vscode-descriptionForeground);
+  overflow-wrap: anywhere;
+}
+
+.job-age {
+  color: var(--vscode-descriptionForeground);
+  text-align: right;
+}
+
+.jobs-none {
+  margin: 0 0 10px;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Option 1: VS Code's own quick pick, drawn here as a mock of the workbench widget. */
+.quick-input {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: 2;
+  box-sizing: border-box;
+  width: 620px;
+  translate: -50% 0;
+  padding: 0 0 6px;
+  border: 1px solid var(--vscode-widget-border, transparent);
+  border-radius: 6px;
+  background-color: var(--vscode-quickInput-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-quickInput-foreground, var(--vscode-foreground));
+  box-shadow: 0 0 8px 2px var(--vscode-widget-shadow);
+}
+
+.quick-title {
+  padding: 6px 10px 2px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.quick-box {
+  margin: 4px 8px;
+  padding: 3px 6px;
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 2px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+}
+
+.quick-message {
+  margin: 0 8px 4px;
+  padding: 3px 6px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.quick-separator {
+  margin: 6px 8px 2px;
+  padding: 2px 6px 0;
+  border-top: 1px solid var(--vscode-pickerGroup-border, var(--vscode-widget-border));
+  color: var(--vscode-pickerGroup-foreground, var(--vscode-descriptionForeground));
+  font-size: 11px;
+  text-align: right;
+}
+
+.quick-item {
+  display: flex;
+  gap: 8px;
+  margin: 0 8px;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.quick-item .quick-detail {
+  color: var(--vscode-descriptionForeground);
+}
+
+.quick-item .quick-age {
+  margin-left: auto;
+  color: var(--vscode-descriptionForeground);
+}
+
+.quick-focus {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.quick-focus .quick-detail,
+.quick-focus .quick-age {
+  color: inherit;
+}
+
+/* Captions of the composite pages, outside any mocked tab. */
+.mock-captions {
+  display: flex;
+  gap: 40px;
+  padding: 14px 20px 6px;
+  color: var(--vscode-foreground);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mock-captions span,
+.mock-frame {
+  width: 1100px;
+}
+
+.mock-frames {
+  display: flex;
+  gap: 40px;
+  padding: 0 20px 20px;
+}
+
+.mock-frame {
+  border: 1px solid var(--vscode-panel-border);
+}
+
+.mock-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 20px 20px;
+}
+
+.mock-label {
+  margin: 12px 0 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.mock-page {
+  margin: 0;
+  padding: 0;
+  background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+}
+
+.mock-page iframe {
+  display: block;
+  background-color: var(--vscode-editor-background);
+}
+
+/* Revision 2: the policy menu, the heavy patterns and the not queued marks (U11, U14). */
+.job-enforce {
+  box-sizing: border-box;
+  height: 26px;
+  padding: 2px 6px;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, transparent));
+  border-radius: 2px;
+  background-color: var(--vscode-dropdown-background, var(--vscode-input-background));
+  color: var(--vscode-dropdown-foreground, var(--vscode-input-foreground));
+  font: inherit;
+}
+
+.policy-meaning {
+  color: var(--vscode-descriptionForeground);
+}
+
+.heavy-heading {
+  margin-top: 12px;
+}
+
+.heavy-patterns {
+  margin: 0 0 4px;
+  line-height: 22px;
+}
+
+.heavy-source {
+  margin-right: 6px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.heavy-patterns code {
+  margin-right: 4px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.not-queued,
+.jobs-outside .job-summary {
+  color: var(--vscode-list-warningForeground);
+}
+
+/* Revision 3: the pattern editor (U15, X22): a list per scope of chips, each with a remove button,
+ * then an input and Add. */
+.heavy-list-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 8px 0 4px;
+}
+
+.heavy-list-heading .heavy-source {
+  margin: 0;
+}
+
+.heavy-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.heavy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px 0 7px;
+  border: 1px solid var(--vscode-descriptionForeground);
+  border-radius: 10px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 9px;
+  background-color: transparent;
+  color: var(--vscode-icon-foreground);
+  cursor: pointer;
+}
+
+.chip-remove::before {
+  content: "\ea76";
+  font-family: codicon, sans-serif;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.chip-remove.focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.heavy-tag {
+  margin-left: 4px;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-font-family);
+  font-size: 11px;
+}
+
+.heavy-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0 0 4px;
+}
+
+.heavy-input {
+  box-sizing: border-box;
+  width: 250px;
+  height: 26px;
+  padding: 3px 6px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+}
+
+.heavy-input::placeholder {
+  color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
+}
+
+.heavy-input.focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.heavy-input[aria-invalid="true"] {
+  border-color: var(--vscode-list-errorForeground);
+  outline-color: var(--vscode-list-errorForeground);
+}
+
+.job-button.small {
+  min-height: 24px;
+  padding: 1px 10px;
+}
+
+/* Revision 4: suggestions for this repository (U15), dashed chips with an add button. */
+.heavy-chip.suggested {
+  border-style: dashed;
+}
+
+.suggest-add::before {
+  content: "\ea60";
+}
+
+.heavy-none {
+  margin: 0 0 6px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.suggest-group {
+  margin: 2px 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}

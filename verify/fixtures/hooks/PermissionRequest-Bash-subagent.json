@@ -1,0 +1,27 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1.jsonl",
+  "cwd": "{pool}/fg",
+  "permission_mode": "default",
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "cd {pool}/wt2 && git status",
+    "description": "Show the working tree status"
+  },
+  "permission_suggestions": [
+    {
+      "type": "addRules",
+      "rules": [
+        {
+          "toolName": "Bash",
+          "ruleContent": "git status"
+        }
+      ],
+      "behavior": "allow",
+      "destination": "localSettings"
+    }
+  ],
+  "agent_id": "a1",
+  "agent_type": "Explore"
+}

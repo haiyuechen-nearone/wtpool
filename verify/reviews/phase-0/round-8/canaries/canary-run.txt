@@ -1,0 +1,123 @@
+# Canary runs, phase 0, round 8. Scripts in experiments/.
+
+## batch1: started 02:02:44, done 02:06:29 CEST 2026-10-24
+### job1
+== round-7-isolation-lock-pool-worktree-after-part.patch (HOME p/v7c/h1, pool options: none) 02:02:48
+h@example.invalid
+worktree <v>/p/v7c/h1/code/app
+worktree <v>/p/v7c/h1/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r8/verify/reviews/phase-0/round-8/canaries/experiments/rewritten/round-7-isolation-lock-pool-worktree-after-part.patch (harness, harness) by isolation__left_no_trace: int: process 11569 (sh) of the run was still running, in <v>/p/v7c/h1/.cache/wt-verify/clones/canary/verify/out/canary-1792800175074/sandbox/release-11482-0/home
+exit 0 02:05:13
+-- fake pool <v>/p/v7c/h1
+worktree <v>/p/v7c/h1/code/app
+worktree <v>/p/v7c/h1/code/app-wt1
+<v>/p/v7c/h1/code: app app-wt1  <v>/p/v7c/h1/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <v>/p/v7c/h1/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792800171 +0200	commit (initial): a
+h <h@example.invalid> 1792800171 +0200	commit: b
+-- <v>/p/v7c/h1/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792800171 +0200
+### job2
+== round-7-isolation-relock-pool-worktree-naming-run.patch (HOME p/v7c/h2, pool options: lock) 02:02:48
+h@example.invalid
+worktree <v>/p/v7c/h2/code/app
+worktree <v>/p/v7c/h2/code/app-wt1
+locked owner keeps it
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r8/verify/reviews/phase-0/round-8/canaries/experiments/rewritten/round-7-isolation-relock-pool-worktree-naming-run.patch (harness, harness) by isolation__left_no_trace: int: git -C ~/code/app worktree list names the run folder
+exit 0 02:05:13
+-- fake pool <v>/p/v7c/h2
+worktree <v>/p/v7c/h2/code/app
+worktree <v>/p/v7c/h2/code/app-wt1
+locked <v>/p/v7c/h2/.cache/wt-verify/clones/canary/verify/out/canary-1792800175647/sandbox/version-11713-0/pool/fg
+<v>/p/v7c/h2/code: app app-wt1  <v>/p/v7c/h2/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <v>/p/v7c/h2/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792800171 +0200	commit (initial): a
+h <h@example.invalid> 1792800171 +0200	commit: b
+-- <v>/p/v7c/h2/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792800171 +0200
+### job3
+== round-6-isolation-lock-pool-worktree-naming-run.patch (HOME p/v6/h8, pool options: none) 02:02:48
+h@example.invalid
+worktree <v>/p/v6/h8/code/app
+worktree <v>/p/v6/h8/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r8/verify/reviews/phase-0/round-8/canaries/experiments/rewritten/round-6-isolation-lock-pool-worktree-naming-run.patch (harness, harness) by isolation__left_no_trace: int: git -C ~/code/app worktree list names the run folder
+exit 0 02:05:13
+-- fake pool <v>/p/v6/h8
+worktree <v>/p/v6/h8/code/app
+worktree <v>/p/v6/h8/code/app-wt1
+locked <v>/p/v6/h8/.cache/wt-verify/clones/canary/verify/out/canary-1792800175357/sandbox/release-11592-0/pool/fg
+<v>/p/v6/h8/code: app app-wt1  <v>/p/v6/h8/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <v>/p/v6/h8/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792800171 +0200	commit (initial): a
+h <h@example.invalid> 1792800171 +0200	commit: b
+-- <v>/p/v6/h8/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792800171 +0200
+== round-3-isolation-move-pool-head.patch (HOME p/home, pool options: none) 02:05:13
+h@example.invalid
+worktree <v>/p/home/code/app
+worktree <v>/p/home/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r8/verify/reviews/phase-0/round-8/canaries/experiments/rewritten/round-3-isolation-move-pool-head.patch (harness, harness) by isolation__left_no_trace: int: the HEAD of ~/code/app worktree <v>/p/home/code/app-wt1 moved under you@mac.example, an identity of the run
+exit 0 02:06:29
+-- fake pool <v>/p/home
+worktree <v>/p/home/code/app
+worktree <v>/p/home/code/app-wt1
+<v>/p/home/code: app app-wt1  <v>/p/home/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <v>/p/home/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792800314 +0200	commit (initial): a
+h <h@example.invalid> 1792800314 +0200	commit: b
+-- <v>/p/home/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792800314 +0200
+Pool Owner <you@mac.example> 1792800341 +0200	checkout: moving from 3dd4c55a8c6469b2749e696716eed1ed21818420 to owner-base
+### job4
+== round-4-isolation-remove-pool-worktree.patch (HOME p/v4/h4, pool options: none) 02:02:48
+h@example.invalid
+worktree <v>/p/v4/h4/code/app
+worktree <v>/p/v4/h4/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r8/verify/reviews/phase-0/round-8/canaries/experiments/rewritten/round-4-isolation-remove-pool-worktree.patch (harness, harness) by isolation__left_no_trace: int: ~/code/app lost or moved its worktree <v>/p/v4/h4/code/app-wt1
+exit 0 02:05:09
+-- fake pool <v>/p/v4/h4
+worktree <v>/p/v4/h4/code/app
+ls: <v>/p/v4/h4/code/app-wt1: No such file or directory <v>/p/v4/h4/code: app 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <v>/p/v4/h4/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792800171 +0200	commit (initial): a
+h <h@example.invalid> 1792800171 +0200	commit: b
+== round-6-isolation-branch-at-verify-commit.patch (HOME p/v6/h6, pool options: none) 02:05:09
+h@example.invalid
+worktree <v>/p/v6/h6/code/app
+worktree <v>/p/v6/h6/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r8/verify/reviews/phase-0/round-8/canaries/experiments/rewritten/round-6-isolation-branch-at-verify-commit.patch (harness, harness) by isolation__left_no_trace: ~/code/app refs/heads/verify-leak points at a commit by wt-verify
+exit 0 02:06:25
+-- fake pool <v>/p/v6/h6
+worktree <v>/p/v6/h6/code/app
+worktree <v>/p/v6/h6/code/app-wt1
+<v>/p/v6/h6/code: app app-wt1  <v>/p/v6/h6/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/heads/verify-leak <verify@wt.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <v>/p/v6/h6/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792800310 +0200	commit (initial): a
+h <h@example.invalid> 1792800310 +0200	commit: b
+-- <v>/p/v6/h6/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792800310 +0200

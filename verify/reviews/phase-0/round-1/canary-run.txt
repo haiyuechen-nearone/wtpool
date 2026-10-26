@@ -1,0 +1,40 @@
+===== SUMMARY =====
+caught: edit-oracle-file.patch by oracle_unchanged: fail assertion
+    changed since the round 1 freeze without an entry in verify/oracle-changes.toml: verify/nextest.toml
+caught: add-claude-md.patch by repo_context__should_be_unchanged: fail assertion
+    differs from spec-base: CLAUDE.md
+caught: edit-oracle-key.patch by oracle_unchanged: fail assertion
+    changed since the round 1 freeze without an entry in verify/oracle-changes.toml: Cargo.toml:workspace.lints
+caught: edit-oracle-with-lock.patch by oracle_unchanged: fail assertion
+    changed since the round 1 freeze without an entry in verify/oracle-changes.toml: verify/oracle.lock
+caught: add-oracle-file.patch by oracle_unchanged: fail assertion
+    changed since the round 1 freeze without an entry in verify/oracle-changes.toml: verify/notes.md
+caught: add-nested-claude-md.patch by repo_context__should_be_unchanged: fail assertion
+    differs from spec-base: crates/wt/CLAUDE.md
+caught: add-claude-settings.patch by repo_context__should_be_unchanged: fail assertion
+    differs from spec-base: .claude/settings.json
+caught: suppress-allow-attribute.patch by lint__no_suppressions: fail assertion
+    crates/wt/src/main.rs:345: #[allow(clippy::indexing_slicing)]
+caught: suppress-cargo-config-rustflags.patch by lint__no_suppressions: fail assertion
+    .cargo/config.toml:0: target.cfg(all()).rustflags lowers a lint level
+SURVIVED: suppress-in-target-module.patch by lint__no_suppressions: pass None
+    no suppression
+caught: version-short-commit.patch by version__should_list_version_commit_and_features: fail assertion
+    version__should_list_version_commit_and_features: no full commit the wt --version commit in "wt 0.1.0\ncommit <wt --version commit> (dirty)\nfeatures: verify\n"
+caught: version-drop-features.patch by version__should_list_version_commit_and_features: fail assertion
+    version__should_list_version_commit_and_features: assertion `left == right` failed: the feature list of "wt 0.1.0\ncommit <wt --version commit> (dirty)\nfeatures: none\n"
+caught: version-never-dirty.patch by version__should_list_version_commit_and_features: fail assertion
+    version__should_list_version_commit_and_features: assertion `left == right` failed: a build of a tree with uncommitted changes, and only such a build, says dirty: "wt 0.1.0\ncommit <wt --version commit>\nfeatures: verify\n"
+SURVIVED: version-always-dirty.patch by version__should_list_version_commit_and_features: pass None
+    
+caught: release-verify-by-default.patch by release__should_have_no_verify_feature: fail assertion
+    release__should_have_no_verify_feature: the release feature list of "wt 0.1.0\ncommit <wt --version commit> (dirty)\nfeatures: default, verify\n" must exist and leave out verify
+caught: release-reads-verify-clock.patch by release__should_have_no_verify_feature: fail assertion
+    release__should_have_no_verify_feature: the release binary reads WT_VERIFY_CLOCK
+caught: stop-frozen-check.patch by trace_complete: fail assertion
+    harness: oracle_unchanged failed
+    harness: version__should_list_version_commit_and_features did not run
+caught: stop-frozen-check-accepted.patch by trace_complete: fail assertion
+    harness: version__should_list_version_commit_and_features did not run
+caught: isolation-outside-remote.patch by isolation__left_no_trace: fail assertion
+    sandbox/pool/leftover/.git: remote https://github.com/acme/widget is outside the run folder

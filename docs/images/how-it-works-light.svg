@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="384" viewBox="0 0 880 384" role="img" aria-labelledby="title">
+<title id="title">How wtpool works: you and Claude Code agents use one pool of git worktrees; a hook records what each agent does, and wtpool status feeds the Worktrees tab in VS Code</title>
+<defs>
+<marker id="pool" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0969da"/></marker>
+<marker id="act" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8250df"/></marker>
+</defs>
+<rect width="880" height="384" rx="10" fill="#ffffff"/>
+<rect x="232" y="24" width="636" height="236" rx="12" fill="#f3f8ff" stroke="#0969da" stroke-width="2"/>
+<text x="252" y="54" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#0969da">the pool<tspan font-weight="400" fill="#59636e">  ·  git worktrees of one repository</tspan></text>
+<rect x="16" y="76" width="120" height="52" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+<text x="76.0" y="107.0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328">you</text>
+<rect x="260" y="72" width="176" height="60" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+<text x="348.0" y="97.0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328">foreground</text>
+<text x="348.0" y="117.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="15" font-weight="400" fill="#1f2328">~/code/app</text>
+<rect x="260" y="172" width="176" height="60" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+<text x="348.0" y="197.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="15" font-weight="600" fill="#1f2328">app-wt1</text>
+<text x="348.0" y="217.0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#59636e">PR 1234</text>
+<rect x="460" y="172" width="176" height="60" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+<text x="548.0" y="197.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="15" font-weight="600" fill="#1f2328">app-wt2</text>
+<text x="548.0" y="217.0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#59636e">feature-x</text>
+<rect x="660" y="172" width="176" height="60" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+<text x="748.0" y="197.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="15" font-weight="600" fill="#1f2328">app-wt3</text>
+<text x="748.0" y="217.0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#59636e">free</text>
+<line x1="136" y1="102" x2="260" y2="102" stroke="#0969da" stroke-width="2" marker-end="url(#pool)"/>
+<text x="184" y="92" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" fill="#1f2328">wtpool fg</text>
+<rect x="16" y="172" width="120" height="192" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
+<text x="76.0" y="263.0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328">Claude Code</text>
+<text x="76.0" y="283.0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328">agents</text>
+<line x1="136" y1="202" x2="260" y2="202" stroke="#0969da" stroke-width="2" marker-end="url(#pool)"/>
+<text x="184" y="192" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" fill="#1f2328">wtpool bg</text>
+<rect x="256" y="304" width="116" height="60" rx="8" fill="#fbf7ff" stroke="#8250df" stroke-width="1.5"/>
+<text x="314.0" y="339.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" font-weight="400" fill="#1f2328">wtpool hook</text>
+<rect x="396" y="304" width="158" height="60" rx="8" fill="#fbf7ff" stroke="#8250df" stroke-width="1.5"/>
+<text x="475.0" y="339.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" font-weight="400" fill="#1f2328">wtpool-activity/</text>
+<rect x="578" y="304" width="134" height="60" rx="8" fill="#fbf7ff" stroke="#8250df" stroke-width="1.5"/>
+<text x="645.0" y="329.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" font-weight="400" fill="#1f2328">wtpool status</text>
+<text x="645.0" y="349.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" font-weight="400" fill="#1f2328">--watch</text>
+<rect x="736" y="304" width="132" height="60" rx="8" fill="#fbf7ff" stroke="#8250df" stroke-width="1.5"/>
+<text x="802.0" y="329.0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#1f2328">Worktrees tab</text>
+<text x="802.0" y="349.0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#59636e">in VS Code</text>
+<line x1="136" y1="334.0" x2="256" y2="334.0" stroke="#8250df" stroke-width="2" marker-end="url(#act)"/>
+<text x="196" y="324.0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="14" fill="#1f2328">hook events</text>
+<line x1="372" y1="334.0" x2="396" y2="334.0" stroke="#8250df" stroke-width="2" marker-end="url(#act)"/>
+<line x1="554" y1="334.0" x2="578" y2="334.0" stroke="#8250df" stroke-width="2" marker-end="url(#act)"/>
+<line x1="712" y1="334.0" x2="736" y2="334.0" stroke="#8250df" stroke-width="2" marker-end="url(#act)"/>
+<line x1="645" y1="260" x2="645" y2="304" stroke="#0969da" stroke-width="2" marker-end="url(#pool)"/>
+<text x="657" y="287" text-anchor="start" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="14" fill="#1f2328">git facts, builds</text>
+</svg>

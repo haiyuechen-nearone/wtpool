@@ -1,0 +1,217 @@
+# The layers that run each check that is not an int test, read by the harness. A part runs the
+# checks of its layers (verification.md, "The report"): quick runs static, render and host, ui
+# runs shot and e2e, bench runs bench, cc runs cc. A check a layer reports that is not listed here for that
+# layer is an error, and so is a listed check the layer reported no result for. Scenario checks
+# take their layers from `layers` in verify/scenarios/<name>.json. In e2e a scenario check gets
+# its outcome from flow__every_activity_shows, which runs every scenario and writes each one's
+# outcome to <run>/e2e/scenarios.json (xtask/src/layers/e2e.rs).
+
+[checks]
+# static: the extension's manifest, as written and as packaged in wtpool.vsix, and its bundle.
+manifest__should_contribute_no_views = ["static"]
+manifest__should_contribute_no_status_bar_item = ["static", "host"]
+manifest__should_be_a_ui_extension = ["static"]
+manifest__should_scope_wtpool_path_to_application = ["static"]
+# static: lints of the product's sources and bundles.
+lint__no_socket_apis = ["static"]
+lint__no_html_sinks = ["static"]
+lint__no_colour_literals = ["static"]
+lint__no_network_modules = ["static"]
+bundle__should_contain_no_listen_call = ["static"]
+schema__generated_files_current = ["static"]
+catalog__should_match_the_files = ["static"]
+
+# render: Vitest and jsdom on buildHtml and media/webview.js.
+rows__should_show_name_role_and_branch = ["render"]
+rows__should_follow_the_grammar = ["render"]
+ages__should_use_the_format = ["render"]
+ages__should_tick_without_messages = ["render"]
+order__should_not_change_when_states_change = ["render"]
+csp__should_match_the_template = ["render"]
+chips__should_count_and_scroll_to_waiting = ["render"]
+actions__should_match_the_row_kind = ["render"]
+detail__should_show_every_fact_and_actor = ["render"]
+header__should_show_live_updated_and_paused = ["render"]
+header__should_show_paused_before_the_first_document = ["render"]
+# render, phase 3: the starting header before any view and before wtpool's first line (X6).
+header__should_show_starting_before_the_first_line = ["render"]
+live_region__should_announce_only_waiting = ["render"]
+update__should_keep_focus_selection_and_detail = ["render"]
+render__should_escape_and_isolate_controls = ["render"]
+restore__should_ignore_hostile_state = ["render"]
+# render, phase 3 (status-panel.md revision 20): the Output section of the detail strip (U9).
+output__should_show_each_task_tail = ["render"]
+output__should_follow_the_end_unless_scrolled_up = ["render"]
+# render, phase 3: the open detail strip renders again for each new document (X15, U5).
+detail__should_update_while_open = ["render"]
+# render and e2e (status-panel.md revision 16): the heading names the repository, then the
+# machine (U8); render also with a second pool, which the tab ignores, e2e on a pool whose origin
+# is on GitHub, then local.
+heading__should_name_the_repository_then_the_machine = ["render", "e2e"]
+budget__b7 = ["render", "host"]
+
+# host: @vscode/test-electron with the fake wtpool.
+open__should_reveal_or_create_beside = ["host"]
+options__should_limit_roots_and_disable_commands_and_forms = ["host"]
+spawn__should_use_the_setting_and_no_shell = ["host"]
+messages__should_ignore_everything_outside_the_set = ["host"]
+hidden_then_shown = ["host"]
+stream__should_spawn_one_watch_and_never_poll = ["host"]
+partial_lines = ["host"]
+oversize_line = ["host"]
+garbage_line = ["host"]
+unknown_version = ["host"]
+early_exit = ["host"]
+slow_start = ["host"]
+stream__should_survive_2000_documents = ["host"]
+stall_30s = ["host"]
+stream__should_post_paused_before_the_first_document = ["host"]
+# host, phase 3: a tab posts the starting view at once, before a slow wtpool's first line (X6).
+stream__should_post_starting_before_the_first_line = ["host"]
+validator__should_accept_every_scenario_document = ["host"]
+# host, phase 3 (status-panel.md revision 14): the tab shows the extension's light and dark icon,
+# also when the serializer restores it (X1, X2).
+tab__should_show_the_extension_icon = ["host"]
+budget__b10 = ["host"]
+# host, phase 2: the tab title counts waiting worktrees (X18), hidden or not.
+title__should_read_worktrees_without_waits = ["host"]
+title__should_count_waits_while_hidden = ["host"]
+title__should_drop_the_count_when_a_wait_ends = ["host"]
+# host, phase 3: free and fg ask first, and free refuses or warns by the actors there (X12).
+actions__should_confirm_naming_the_worktree = ["host"]
+actions__should_refuse_free_with_a_working_actor = ["host"]
+actions__should_warn_free_with_an_idle_actor = ["host"]
+# host, phase 3 (status-panel.md revision 12): fg refuses or warns by the actors in the slot that
+# holds the branch, as free does (X12).
+actions__should_guard_fg_by_the_holding_slot = ["host"]
+# host (status-panel.md revision 16): a document with unknown properties is no schema error (R11, X5).
+stream__should_accept_unknown_properties = ["host"]
+# host, phase 3: the watch, free and fg run in the workspace folder with the inherited
+# WTPOOL_FOREGROUND and WTPOOL_SLOT_DIR only (R9).
+spawn__should_run_in_the_workspace_folder = ["host"]
+# host, phase 3 (status-panel.md revision 20): the tails of the selected row's background tasks
+# (R12), the select and follow messages (X11), and Follow's terminal (X19).
+tail__should_read_only_the_selected_row = ["host"]
+tail__should_update_a_growing_file_within_a_second = ["host"]
+tail__should_refuse_symlinks_and_other_files = ["host"]
+tail__should_never_read_an_unlisted_path = ["host"]
+tail__should_stop_on_deselect_and_hide = ["host"]
+follow__should_stream_the_file_into_a_terminal = ["host"]
+# host, phase 3: the extension posts each new document while the strip is open (X15, U5).
+detail__should_post_each_document_while_open = ["host"]
+
+# shot: Playwright's Chromium on buildHtml, four themes, axe-core.
+shot__should_render_every_theme = ["shot"]
+legend__should_cover_every_activity_value = ["shot"]
+axe__should_report_no_violation = ["shot"]
+keyboard__should_reach_every_row_and_action = ["shot"]
+motion__should_stop_the_spinner = ["shot"]
+csp__should_report_no_violation = ["shot"]
+# shot, phase 3 (status-panel.md revision 12): shown row actions never cover another column (U4).
+actions__should_not_cover_another_column = ["shot"]
+# shot, phase 3 (status-panel.md revision 14, the visual round): nothing clipped and the table
+# scrolls sideways, tags whole after the name (U1); focus rings whole and at 3:1 (X14, U6); glyphs
+# centred (U4); WCAG AA text, visible hover, chip and strip outlines at 3:1 in four themes (U6).
+layout__should_clip_no_text = ["shot"]
+tags__should_show_whole_after_the_name = ["shot"]
+# The table, not the page, scrolls; header and strip stay in view; focus and the waiting chip
+# scroll what they reach into view (U1, U3); every activity icon shows at one size (U6).
+scroll__should_scroll_the_table_inside_the_tab = ["shot"]
+scroll__should_bring_focus_and_waits_into_view = ["shot"]
+icons__should_share_one_size = ["shot"]
+focus__should_show_every_ring_whole_in_contrast = ["shot"]
+actions__should_centre_their_glyphs = ["shot"]
+contrast__should_meet_aa_in_every_theme = ["shot"]
+hover__should_show_in_every_theme = ["shot"]
+chips__should_keep_their_outline_in_every_theme = ["shot"]
+detail__should_stand_out_from_the_page = ["shot"]
+# shot, phase 3 (status-panel.md revision 20): the Output section wraps, clips nothing and meets AA
+# in four themes, and the Follow ring shows whole (U9, U1, U6, X14).
+output__should_clip_nothing_in_every_theme = ["shot"]
+output__should_show_the_follow_ring_whole = ["shot"]
+
+# e2e: a real VS Code with the .vsix and the release wtpool.
+e2e_csp_clean = ["e2e"]
+e2e_no_listening_sockets = ["e2e"]
+windows__should_run_one_watcher_each = ["e2e"]
+restore__should_rebuild_after_reload = ["e2e"]
+# e2e without a VS Code window (status-panel.md revision 16): the release wtpool's documents, schema and
+# records (cli-status.spec.mjs, cli-records.spec.mjs), S10 to S12, H25 and H26.
+schema__should_be_published_by_wtpool_status = ["e2e"]
+status__should_emit_only_listed_properties = ["e2e"]
+status__should_name_the_repository = ["e2e"]
+status__should_give_each_actor_its_harness = ["e2e"]
+hook__should_tag_records_with_the_harness = ["e2e"]
+hook__should_give_each_call_its_kind = ["e2e"]
+status__should_read_kinds_only = ["e2e"]
+
+# e2e: one check per user flow of verification.md, "User flows", through the UI.
+flow__open_from_palette = ["e2e"]
+flow__open_again_reveals = ["e2e"]
+flow__reload_restores = ["e2e"]
+flow__hide_and_show = ["e2e"]
+flow__close_stops_watch = ["e2e"]
+flow__two_windows = ["e2e"]
+flow__live_update_keeps_place = ["e2e"]
+flow__select_and_deselect = ["e2e"]
+flow__every_activity_shows = ["e2e"]
+flow__connection_states = ["e2e"]
+flow__agents_off_note = ["e2e"]
+flow__narrow_window = ["e2e"]
+flow__narrow_scroll = ["e2e"]
+flow__open_in_new_window = ["e2e"]
+flow__open_terminal = ["e2e"]
+flow__copy_path = ["e2e"]
+flow__missing_worktree_actions = ["e2e"]
+flow__keyboard_only = ["e2e"]
+flow__theme_switch = ["e2e"]
+flow__reduced_motion = ["e2e"]
+flow__wait_appears = ["e2e"]
+flow__waiting_chip_focuses = ["e2e"]
+flow__wait_answered = ["e2e"]
+flow__free_confirm = ["e2e"]
+flow__free_cancel = ["e2e"]
+flow__free_refused = ["e2e"]
+flow__fg_confirm = ["e2e"]
+# Where wtpool runs (status-panel.md revision 16): R9 and R10.
+flow__workspace_folder_pool = ["e2e"]
+flow__no_folder_open = ["e2e"]
+flow__wtpool_error_shown = ["e2e"]
+# The live output of a background task (status-panel.md revision 20): H27, S13, R12, U9, X19.
+flow__live_output = ["e2e"]
+
+# bench: `cargo xtask bench`, the Rust budgets on a clone of WTPOOL_BENCH_SOURCE (default: this
+# repository) and B8 in Chromium.
+budget__b3 = ["bench"]
+budget__b4 = ["bench"]
+budget__b5 = ["bench"]
+budget__b8 = ["bench-chromium"]
+# bench, phase 2: wtpool hook latency over the fixtures (B1) and the watcher under 3 agents (B6).
+budget__b1 = ["bench"]
+budget__b6 = ["bench"]
+
+# int, phase 2: W4's second sentence, which the trace list of verification.md does not name
+# (phase 1 review 2, N3). The other int checks need no entry.
+watch__should_refresh_git_after_an_edit_or_bash_call = ["int"]
+
+# cc, phase 2: the contract sessions on the installed claude (verification.md, "Contract test"),
+# run only by `--part cc --contract`. The report counts them, without --contract, by the live
+# result for the installed Claude Code, or, on a machine with no recordings folder, by this run's
+# cc_replay:<name> alone (crate::layers::cc).
+cc_read_edit_bash = ["cc"]
+cc_subagent_elsewhere = ["cc"]
+cc_subagent_permission = ["cc"]
+cc_cd_into_slot = ["cc"]
+cc_permission = ["cc"]
+cc_permission_deny = ["cc"]
+cc_permission_deny_interrupt = ["cc"]
+cc_interrupt = ["cc"]
+cc_idle_prompt = ["cc"]
+cc_stop_failure = ["cc"]
+cc_session_end = ["cc"]
+cc_no_hook_output = ["cc"]
+cc_records_claude_pid = ["cc"]
+contract__should_run_in_the_sandbox = ["cc"]
+# The scrubber over the recordings of the oracle's live run (verification.md, "Contract test"),
+# skipped where those recordings do not exist.
+fixtures__should_match_a_fresh_scrub = ["static"]

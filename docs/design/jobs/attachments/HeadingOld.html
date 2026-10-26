@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<!-- A design mockup, not product code. docs/design/jobs/attachments/render.mjs renders it with the theme
+     values of verify/themes/ (?theme=, dark by default); the panel's own sheets come first, then
+     mockup.css with the proposed parts. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heading</title>
+<link rel="stylesheet" href="/verify/themes/webview-default.css">
+<link rel="stylesheet" href="/vscode/src/webview/icons.css">
+<link rel="stylesheet" href="/vscode/src/webview/style.css">
+<link rel="stylesheet" href="/docs/design/jobs/attachments/mockup.css">
+</head>
+<body>
+<header class="header"><h1 class="title">Worktrees</h1><div class="chips"><span class="chip chip-free">1 free</span><span class="chip chip-working">2 working</span><button class="chip chip-waiting">1 waiting</button></div><span class="connection connection-live">live</span></header><div class="scroller"><table class="grid"><colgroup><col class="col-activity"><col class="col-worktree"><col class="col-branch"><col class="col-git"><col class="col-agent"><col class="col-last"><col class="col-actions"></colgroup>
+<thead><tr><th scope="col">Activity</th><th scope="col">Worktree</th><th scope="col">Branch</th><th scope="col">Git</th><th scope="col">Agent · doing</th><th scope="col">Last</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+<tbody>
+<tr class="pool-heading" data-machine="my-mac" data-pool="/Users/you/code/app/.git">
+<td colspan="7"><span class="repo-icon" aria-hidden="true"></span><bdi class="repository">acme/app</bdi><span class="heading-machine"> · <button type="button" class="machine-button" aria-expanded="false"><bdi>my-mac</bdi></button></span></td>
+</tr>
+</tbody></table></div>
+</body>
+</html>

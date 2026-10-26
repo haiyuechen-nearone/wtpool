@@ -1,0 +1,42 @@
+# Checks that test an absence: no canary of the product can make them fail before the product
+# exists, so freeze does not require them to fail first.
+
+[[absent]]
+check = "lint__no_suppressions"
+absence = "no allow or expect of a lint, eslint-disable, stylelint-disable, rustfmt skip, or lint configuration outside the oracle files"
+
+[[absent]]
+check = "isolation__left_no_trace"
+absence = "no trace of the run in the real pool, ~/.claude/settings.json or ~/.vscode/extensions/, and no remote outside the run folder"
+
+[[absent]]
+check = "lint__no_socket_apis"
+absence = "no socket type or socket call in the workspace (clippy disallowed_types and disallowed_methods of clippy.toml) and no networking crate in cargo tree (S2)"
+
+[[absent]]
+check = "lint__no_html_sinks"
+absence = "no HTML sink, eval, link or frame element in vscode/src and no HTML sink in the webview bundle (X10)"
+
+[[absent]]
+check = "lint__no_colour_literals"
+absence = "no hex, named, functional or system colour in vscode/src and the extension's CSS (X13)"
+
+[[absent]]
+check = "lint__no_network_modules"
+absence = "no import of net, http, https, tls, dgram or http2 and no fetch, WebSocket or XMLHttpRequest in vscode/src or the bundles (X17)"
+
+[[absent]]
+check = "bundle__should_contain_no_listen_call"
+absence = "no listen, createServer or createSocket call in the built bundles (X17)"
+
+[[absent]]
+check = "title__should_read_worktrees_without_waits"
+absence = "no count in the tab title while no worktree waits (X18): the phase 1 title already reads Worktrees"
+
+[[absent]]
+check = "cc_no_hook_output"
+absence = "no stdout from wtpool hook in any contract session (H2): a wtpool without the hook command prints its error to stderr only"
+
+[[absent]]
+check = "contract__should_run_in_the_sandbox"
+absence = "no user, project or local settings, MCP server or hook in the contract turn, only the run's settings file; judged from the oracle step's live result, as freeze starts no claude session"

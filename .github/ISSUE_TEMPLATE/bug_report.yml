@@ -1,0 +1,98 @@
+name: Bug report
+description: wtpool, its hook or the VS Code tab does not work as the docs say.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a security problem, do not open an issue: report it privately, as SECURITY.md says.
+        Many common problems have a fix in docs/troubleshooting.md.
+
+        Before you paste output, replace any path, branch, repository or machine name that you do not want to share.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The commands you ran, in order. A scratch pool, as in docs/development.md, makes a report easy to follow.
+      placeholder: |
+        cd ~/code/app
+        wtpool setup
+        wtpool bg 1234
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: wtpool --version
+      description: Paste the whole output of `wtpool --version`.
+      placeholder: |
+        wtpool 0.1.0
+        commit 0123456789abcdef0123456789abcdef01234567
+        features: none
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: Operating system version
+      placeholder: macOS 26.1, Ubuntu 24.04, Windows 11 24H2
+    validations:
+      required: true
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part
+      multiple: true
+      options:
+        - the pool commands (ls, bg, fg, free, path, new, rm, setup, config)
+        - wtpool status
+        - the Claude Code hook
+        - the VS Code tab
+        - the verify harness
+    validations:
+      required: true
+  - type: dropdown
+    id: hooks
+    attributes:
+      label: How the hooks are installed
+      options:
+        - the plugin wtpool@wtpool
+        - the settings block from wtpool hook install
+        - both
+        - not installed
+        - I do not know
+  - type: input
+    id: claude-code
+    attributes:
+      label: Claude Code version
+      description: The output of `claude --version`, when agents are involved.
+  - type: input
+    id: vscode
+    attributes:
+      label: VS Code version
+      description: From Help > About, when the tab is involved.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output and logs
+      description: The command's stderr, the error line the tab shows, the stderr of `wtpool hook install`, or `~/.local/state/wtpool/hook.log`.
+      render: text

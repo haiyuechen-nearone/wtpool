@@ -1,0 +1,9 @@
+# The tests run git, and so does the code they exercise; the user's global or
+# system git config would change what it does. Forced, so a variable already set
+# in the environment cannot bring that config back. This also applies to `cargo run`.
+[env]
+GIT_CONFIG_GLOBAL = { value = "/dev/null", force = true }
+GIT_CONFIG_NOSYSTEM = { value = "1", force = true }
+
+[alias]
+xtask = "run --quiet --locked --manifest-path xtask/Cargo.toml --bin xtask --"

@@ -1,0 +1,22 @@
+ID: harness
+Category: harness
+Check: trace_complete
+
+Stops the frozen int checks from the product side, without touching an oracle file: the binary is
+renamed, so the int build of `wtpool` fails and no version check can pass.
+
+diff --git a/crates/wtpool/Cargo.toml b/crates/wtpool/Cargo.toml
+index 350e816..460ec76 100644
+--- a/crates/wtpool/Cargo.toml
++++ b/crates/wtpool/Cargo.toml
+@@ -12,6 +12,10 @@ keywords.workspace = true
+ categories = ["command-line-utilities", "development-tools"]
+ publish.workspace = true
+ 
++[[bin]]
++name = "wtpool-cli"
++path = "src/main.rs"
++
+ [features]
+ # The test interface of docs/design/status-panel/verification.md. Release builds leave it out.
+ verify = []

@@ -1,0 +1,11 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1.jsonl",
+  "cwd": "{pool}/fg",
+  "permission_mode": "default",
+  "hook_event_name": "SubagentStop",
+  "agent_id": "a1",
+  "agent_type": "Explore",
+  "agent_transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1/subagents/agent-a1.jsonl",
+  "stop_hook_active": false
+}

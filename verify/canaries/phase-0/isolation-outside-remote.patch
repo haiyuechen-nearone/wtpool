@@ -1,0 +1,40 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+A builder test leaves a repository in the run folder whose remote is outside it.
+
+diff --git a/crates/wtpool/tests/leave_remote.rs b/crates/wtpool/tests/leave_remote.rs
+new file mode 100644
+index 0000000..015a2e0
+--- /dev/null
++++ b/crates/wtpool/tests/leave_remote.rs
+@@ -0,0 +1,28 @@
++#![cfg(unix)]
++#![cfg(test)]
++
++use std::path::PathBuf;
++use std::process::Command;
++
++#[test]
++fn sandbox__should_hold_a_repository_with_a_remote() {
++    // Given
++    let Some(slot_dir) = std::env::var_os("WTPOOL_SLOT_DIR").map(PathBuf::from) else {
++        return;
++    };
++    if std::env::var_os("WTPOOL_VERIFY_SANDBOX").is_none()
++        || !slot_dir.to_string_lossy().contains("/verify/out/")
++    {
++        return;
++    }
++    let repo = slot_dir.join("leftover");
++    std::fs::create_dir_all(&repo).unwrap();
++
++    // When
++    let git = |args: &[&str]| Command::new("git").current_dir(&repo).args(args).status().unwrap();
++    let init = git(&["init", "--quiet"]);
++    let remote = git(&["remote", "add", "origin", "https://github.com/acme/widget"]);
++
++    // Then
++    assert!(init.success() && remote.success());
++}

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<!-- A design mockup, not product code. docs/design/jobs/attachments/render.mjs renders it with the theme
+     values of verify/themes/ (?theme=, dark by default); the panel's own sheets come first, then
+     mockup.css with the proposed parts. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heavy jobs strip: states</title>
+<link rel="stylesheet" href="/verify/themes/webview-default.css">
+<link rel="stylesheet" href="/docs/design/jobs/attachments/mockup.css">
+</head>
+<body class="mock-page">
+<div class="mock-stack"><p class="mock-label">Invalid value: nothing is sent, the field says why</p><iframe class="mock-frame" src="StripInvalid.html" width="1100" height="672" title="Invalid value: nothing is sent, the field says why"></iframe>
+<p class="mock-label">wtpool refused: its message, the value kept</p><iframe class="mock-frame" src="StripRefused.html" width="1100" height="692" title="wtpool refused: its message, the value kept"></iframe>
+<p class="mock-label">Limit lowered under the running jobs: they finish</p><iframe class="mock-frame" src="StripLowered.html" width="1100" height="692" title="Limit lowered under the running jobs: they finish"></iframe>
+<p class="mock-label">require chosen and saved</p><iframe class="mock-frame" src="StripRequire.html" width="1100" height="672" title="require chosen and saved"></iframe>
+<p class="mock-label">A window whose folder is not on this computer (R9)</p><iframe class="mock-frame" src="StripRemote.html" width="1100" height="692" title="A window whose folder is not on this computer (R9)"></iframe>
+<p class="mock-label">An older wtpool without wtpool job</p><iframe class="mock-frame" src="StripOld.html" width="1100" height="230" title="An older wtpool without wtpool job"></iframe></div>
+</body>
+</html>

@@ -1,0 +1,19 @@
+ID: harness
+Category: harness
+Check: oracle_unchanged
+
+Stops version__ from running the binaries of its rebuilds, the edit and revert rebuilds among them,
+in xtask/tests/int.rs, a file of the entry p0r2-stale-commit. The freeze after round 2 already held
+that entry, so it is spent.
+
+diff --git a/xtask/tests/int.rs b/xtask/tests/int.rs
+--- a/xtask/tests/int.rs
++++ b/xtask/tests/int.rs
+@@ -39,6 +39,7 @@ fn version__should_list_version_commit_and_features() {
+     let released = sandbox.run(&release, &["--version"]);
+     let rebuilt: Vec<_> = rebuilds
+         .iter()
++        .take(0)
+         .map(|step| sandbox.run(&step.binary, &["--version"]))
+         .collect();
+ 

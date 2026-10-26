@@ -1,0 +1,13 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1.jsonl",
+  "cwd": "{pool}/fg",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "PowerShell",
+  "tool_input": {
+    "command": "Get-ChildItem {pool}/wt2",
+    "description": "List files"
+  },
+  "tool_use_id": "toolu_01Pwsh"
+}

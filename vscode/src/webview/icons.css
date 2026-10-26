@@ -1,0 +1,213 @@
+/*
+ * The icons of the Worktrees tab (U6): ::before glyphs of the codicon font, which the build copies
+ * into media/ beside the sheet. The build appends style.css, which places and colours them.
+ */
+
+@font-face {
+  font-family: codicon;
+  font-display: block;
+  src: url("codicon.ttf") format("truetype");
+}
+
+/* Every icon: a codicon glyph in ::before, in the colour of its element. */
+.icon::before,
+.chip::before,
+.connection::before,
+.repo-icon::before,
+.no-folder::before,
+.agents-off::before,
+.action::before {
+  display: inline-block;
+  font-family: codicon, sans-serif;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1;
+  text-decoration: none;
+  text-rendering: auto;
+  vertical-align: text-bottom;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Header chips and the connection. */
+
+.chip::before {
+  font-size: 13px;
+}
+
+.chip-free::before {
+  content: "\ebb5";
+}
+
+.chip-working::before {
+  content: "\ec20";
+}
+
+.chip-waiting::before {
+  content: "\eaa2";
+}
+
+.connection::before {
+  font-size: 13px;
+}
+
+.connection-live::before {
+  content: "\ea71";
+  color: var(--vscode-charts-green);
+  font-size: 12px;
+}
+
+.connection-stale::before {
+  content: "\ea82";
+}
+
+.connection-paused::before {
+  content: "\ead1";
+}
+
+.no-folder::before,
+.agents-off::before {
+  content: "\ea74";
+  margin-right: 6px;
+}
+
+/* A pool's heading (U8): the repo glyph. */
+.repo-icon::before {
+  content: "\ea62";
+}
+
+/* Activity: one icon per value (U6), each about 14.5 px of ink on its longer side. The font draws
+ * home (12 x 13) and the loading dial (12 x 7, half a ring) off that size, so `scale` brings them
+ * to it without moving the layout; it composes with the dial's rotation. Working is wtpool's own robot
+ * (html.ts), 13.5 x 14.5 at rest, below. Idle, free and unused share the large circle and differ by
+ * its fill: a dot in the ring (record), a plain ring (circle-large) and a dashed ring
+ * (issue-draft). */
+
+.activity-foreground .icon::before {
+  content: "\eb06";
+  scale: 1.1;
+}
+
+.activity-waiting .icon::before {
+  content: "\eaa2";
+}
+
+.activity-building .icon::before {
+  content: "\eb19";
+  scale: 1.18;
+}
+
+.activity-idle .icon::before {
+  content: "\eba7";
+}
+
+.activity-free .icon::before {
+  content: "\ebb5";
+}
+
+.activity-not-reusable .icon::before {
+  content: "\ea6c";
+}
+
+.activity-unused .icon::before {
+  content: "\ebd9";
+}
+
+.activity-unknown .icon::before {
+  content: "\eb32";
+}
+
+.activity-missing .icon::before {
+  content: "\ea98";
+}
+
+/* Working: the robot, an inline SVG in the colour of its cell. Each arm turns about its shoulder,
+ * the centre of its top end; at rest both hang 30 degrees out from the body. */
+.icon .robot {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: text-bottom;
+}
+
+.robot-arm {
+  transform-box: fill-box;
+  transform-origin: 50% 0.75px;
+}
+
+.robot-arm-left {
+  rotate: 30deg;
+}
+
+.robot-arm-right {
+  rotate: -30deg;
+}
+
+/* The building dial turns and the robot's arms swing in turn, 25 degrees each way of rest, half a
+ * loop apart, unless VS Code reduces motion, which follows the system on auto (X14). */
+body:not(.vscode-reduce-motion) .activity-building .icon::before {
+  animation: spin 1.6s linear infinite;
+}
+
+body:not(.vscode-reduce-motion) .robot-arm-left {
+  animation: swing-left 1.2s ease-in-out infinite;
+}
+
+body:not(.vscode-reduce-motion) .robot-arm-right {
+  animation: swing-right 1.2s ease-in-out -0.6s infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes swing-left {
+  0%,
+  100% {
+    rotate: 5deg;
+  }
+
+  50% {
+    rotate: 55deg;
+  }
+}
+
+@keyframes swing-right {
+  0%,
+  100% {
+    rotate: -5deg;
+  }
+
+  50% {
+    rotate: -55deg;
+  }
+}
+
+/* Row actions. The button centres its glyph's 16 px box, so the glyph sits in the middle of the
+ * 24 px square whatever the font's baseline (U4). */
+
+.action::before {
+  display: block;
+}
+
+.action-open::before {
+  content: "\eb14";
+}
+
+.action-terminal::before {
+  content: "\ea85";
+}
+
+.action-copy-path::before {
+  content: "\ebcc";
+}
+
+.action-free::before {
+  content: "\ebb5";
+}
+
+.action-fg::before {
+  content: "\eb06";
+}

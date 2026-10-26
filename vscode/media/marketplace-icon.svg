@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- The Marketplace icon of the wtpool extension, drawn for wtpool and MIT licensed with it: the
+       robot that marks a working row (src/html.ts) on a 128 px grid, its body a panel of three
+       worktree rows coloured as waiting, working and free. scripts/icon.mjs renders it to
+       marketplace-icon.png. -->
+  <defs>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#24344f"/>
+      <stop offset="1" stop-color="#141c2b"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="26" fill="url(#ground)"/>
+  <g fill="#4daafc">
+    <circle cx="64" cy="15" r="7"/>
+    <rect x="60" y="19" width="8" height="11"/>
+    <path fill-rule="evenodd" d="M38 29h52a12 12 0 0 1 12 12v16a12 12 0 0 1-12 12H38a12 12 0 0 1-12-12V41a12 12 0 0 1 12-12Zm0 8a4 4 0 0 0-4 4v16a4 4 0 0 0 4 4h52a4 4 0 0 0 4-4V41a4 4 0 0 0-4-4Z"/>
+    <circle cx="52" cy="49" r="7"/>
+    <circle cx="76" cy="49" r="7"/>
+    <rect x="56" y="69" width="16" height="6"/>
+    <path fill-rule="evenodd" d="M42 75h44a8 8 0 0 1 8 8v30a8 8 0 0 1-8 8H42a8 8 0 0 1-8-8V83a8 8 0 0 1 8-8Zm0 8v30h44V83Z"/>
+    <rect x="22.5" y="80" width="9" height="30" rx="4.5" transform="rotate(30 27 84.5)"/>
+    <rect x="96.5" y="80" width="9" height="30" rx="4.5" transform="rotate(-30 101 84.5)"/>
+  </g>
+  <circle cx="50" cy="89" r="3.5" fill="#cca700"/>
+  <circle cx="50" cy="98" r="3.5" fill="#4daafc"/>
+  <circle cx="50" cy="107" r="3.5" fill="#9d9d9d"/>
+  <g fill="#d4d4d4">
+    <rect x="57" y="87" width="23" height="4" rx="2"/>
+    <rect x="57" y="96" width="19" height="4" rx="2"/>
+    <rect x="57" y="105" width="15" height="4" rx="2"/>
+  </g>
+</svg>

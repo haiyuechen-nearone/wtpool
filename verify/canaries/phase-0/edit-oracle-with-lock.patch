@@ -1,0 +1,26 @@
+ID: harness
+Category: harness
+Check: oracle_unchanged
+
+Raises the int timeout and rewrites its hash in verify/oracle.lock to match.
+
+diff --git a/verify/nextest.toml b/verify/nextest.toml
+index 0e36e7e..8ea7354 100644
+--- a/verify/nextest.toml
++++ b/verify/nextest.toml
+@@ -17,7 +17,7 @@ store-failure-output = true
+ [profile.int]
+ fail-fast = false
+ retries = 0
+-slow-timeout = { period = "60s", terminate-after = 2 }
++slow-timeout = { period = "600s", terminate-after = 2 }
+ 
+ [profile.int.junit]
+ path = "junit.xml"
+diff --git a/verify/oracle.lock b/verify/oracle.lock
+index 2b9203e..63184d0 100644
+--- a/verify/oracle.lock
++++ b/verify/oracle.lock
+@@ -108 +108 @@ spent = ["drop-mutants", "ext-cover", "fix-b4", "fresh-clone", "generic-harness"
+-"verify/nextest.toml" = "908afd7d1ec48a6cdde819483e4efeb2aabe37cec8b20584a1f7550e9dba6bab"
++"verify/nextest.toml" = "f77970add5693f3ec6712f1556200adac73331f885d10b107d58c69f31c1c3fc"

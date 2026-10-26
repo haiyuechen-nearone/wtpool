@@ -1,0 +1,28 @@
+[package]
+name = "wtpool-claude-code"
+description = "The Claude Code adapter of wtpool: reads Claude Code's hook payloads, transcripts and settings for wtpool hook."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories = ["development-tools"]
+publish.workspace = true
+
+[dependencies]
+wtpool-core.workspace = true
+serde.workspace = true
+serde_json = "=1.0.154"
+# The line search of the transcript read for session titles (H16), already built for serde_json
+# and sysinfo.
+memchr = "=2.8.3"
+
+[dev-dependencies]
+rstest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

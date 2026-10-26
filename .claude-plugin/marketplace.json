@@ -1,0 +1,15 @@
+{
+  "name": "wtpool",
+  "owner": {
+    "name": "wtpool",
+    "url": "https://github.com/haiyuechen-nearone/wtpool"
+  },
+  "description": "The Claude Code plugin of wtpool, a git worktree pool that shows what coding agents do in each worktree.",
+  "plugins": [
+    {
+      "name": "wtpool",
+      "source": "./plugins/wtpool",
+      "description": "Records what each Claude Code session and subagent does, for wtpool status and its VS Code panel. Needs wtpool on PATH."
+    }
+  ]
+}

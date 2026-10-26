@@ -1,0 +1,27 @@
+ID: harness
+Category: harness
+Check: lint__no_suppressions
+
+Allows clippy::indexing_slicing in a builder test whose file has a comment with an opening #[ that
+nothing closes before the allow.
+
+diff --git a/crates/wtpool/tests/canary_open_bracket_comment.rs b/crates/wtpool/tests/canary_open_bracket_comment.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/wtpool/tests/canary_open_bracket_comment.rs
+@@ -0,0 +1,15 @@
++#![cfg(test)]
++
++// The attribute below opens with #[ but this comment never closes it.
++#[allow(clippy::indexing_slicing)]
++#[test]
++fn first__should_be_the_only_value() {
++    // Given
++    let values = [1];
++
++    // When
++    let first = values[0];
++
++    // Then
++    assert_eq!(first, 1);
++}

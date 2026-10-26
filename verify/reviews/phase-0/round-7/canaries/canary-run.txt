@@ -1,0 +1,387 @@
+# Round 7 canary runs at the round 7 freeze. Scripts: experiments/batch1.sh, batch2.sh, batch3.sh.
+# Each job: its own scratch clone of the round 7 freeze (<scratchpad>/v7c/c1 to c4), its own temporary HOME
+# (so its own canary clone), xtask/target and target copied with cp -c -R from the lead clone.
+# Earlier rounds' files ran on the HOME their patch names. Fake pools from experiments/mkpool.sh.
+# Only CARGO_HOME, RUSTUP_HOME and SCCACHE_DIR were real (experiments/env.sh). No real pool touched.
+
+batch1: started 00:28:19, done 00:31:26 CEST 2026-10-24
+batch2: started 00:32:42, done 00:36:14 CEST 2026-10-24
+batch3: started 00:36:23, done 00:40:31 CEST 2026-10-24
+
+######## job1
+== isolation-lock-pool-worktree-naming-run.patch (pool options: none) 00:28:19
+h@example.invalid
+worktree <scratchpad>/v6/h8/code/app
+worktree <scratchpad>/v6/h8/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-6/canaries/isolation-lock-pool-worktree-naming-run.patch (harness, harness) by isolation__left_no_trace: int: git -C ~/code/app worktree list names the run folder
+exit 0 00:30:09
+-- fake pool <scratchpad>/v6/h8
+worktree <scratchpad>/v6/h8/code/app
+worktree <scratchpad>/v6/h8/code/app-wt1
+locked <scratchpad>/v6/h8/.cache/wt-verify/clones/canary/verify/out/canary-1792794503455/sandbox/release-4448-0/pool/fg
+<scratchpad>/v6/h8/code: app app-wt1  <scratchpad>/v6/h8/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/v6/h8/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794499 +0200	commit (initial): a
+h <h@example.invalid> 1792794499 +0200	commit: b
+-- <scratchpad>/v6/h8/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794499 +0200
+
+######## job2
+== isolation-move-pool-head.patch (pool options: none) 00:28:19
+h@example.invalid
+worktree <scratchpad>/home/code/app
+worktree <scratchpad>/home/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-3/canaries/isolation-move-pool-head.patch (harness, harness) by isolation__left_no_trace: int: the HEAD of ~/code/app worktree <scratchpad>/home/code/app-wt1 moved under you@mac.example, an identity of the run
+exit 0 00:30:15
+-- fake pool <scratchpad>/home
+worktree <scratchpad>/home/code/app
+worktree <scratchpad>/home/code/app-wt1
+<scratchpad>/home/code: app app-wt1  <scratchpad>/home/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/home/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794499 +0200	commit (initial): a
+h <h@example.invalid> 1792794499 +0200	commit: b
+-- <scratchpad>/home/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794499 +0200
+Pool Owner <you@mac.example> 1792794536 +0200	checkout: moving from 39d018ac67595743651af8b5ce80ba78ffc2c994 to owner-base
+== isolation-add-pool-worktree.patch (pool options: none) 00:30:15
+h@example.invalid
+worktree <scratchpad>/home/code/app
+worktree <scratchpad>/home/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-3/canaries/isolation-add-pool-worktree.patch (harness, harness) by isolation__left_no_trace: int: the HEAD of ~/code/app worktree <scratchpad>/home/code/app-wt9 moved under you@mac.example, an identity of the run
+exit 0 00:31:23
+-- fake pool <scratchpad>/home
+worktree <scratchpad>/home/code/app
+worktree <scratchpad>/home/code/app-wt1
+worktree <scratchpad>/home/code/app-wt9
+<scratchpad>/home/code: app app-wt1 app-wt9  <scratchpad>/home/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/home/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794615 +0200	commit (initial): a
+h <h@example.invalid> 1792794615 +0200	commit: b
+-- <scratchpad>/home/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794615 +0200
+-- <scratchpad>/home/code/app/.git/worktrees/app-wt9/logs/HEAD
+Pool Owner <you@mac.example> 1792794631 +0200
+
+######## job3
+== isolation-remove-pool-worktree.patch (pool options: none) 00:28:19
+h@example.invalid
+worktree <scratchpad>/v4/h4/code/app
+worktree <scratchpad>/v4/h4/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-4/canaries/isolation-remove-pool-worktree.patch (harness, harness) by isolation__left_no_trace: int: ~/code/app lost or moved its worktree <scratchpad>/v4/h4/code/app-wt1
+exit 0 00:30:18
+-- fake pool <scratchpad>/v4/h4
+worktree <scratchpad>/v4/h4/code/app
+ls: <scratchpad>/v4/h4/code/app-wt1: No such file or directory <scratchpad>/v4/h4/code: app 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/v4/h4/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794499 +0200	commit (initial): a
+h <h@example.invalid> 1792794499 +0200	commit: b
+
+######## job4
+== isolation-delete-pool-worktree-folder.patch (pool options: none) 00:28:19
+h@example.invalid
+worktree <scratchpad>/v5/h2/code/app
+worktree <scratchpad>/v5/h2/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-5/canaries/isolation-delete-pool-worktree-folder.patch (harness, harness) by isolation__left_no_trace: int: the folder of ~/code/app worktree <scratchpad>/v5/h2/code/app-wt1 is gone
+exit 0 00:30:17
+-- fake pool <scratchpad>/v5/h2
+worktree <scratchpad>/v5/h2/code/app
+worktree <scratchpad>/v5/h2/code/app-wt1
+prunable gitdir file points to non-existent location
+ls: <scratchpad>/v5/h2/code/app-wt1: No such file or directory <scratchpad>/v5/h2/code: app 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/v5/h2/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794499 +0200	commit (initial): a
+h <h@example.invalid> 1792794499 +0200	commit: b
+-- <scratchpad>/v5/h2/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794499 +0200
+== isolation-move-pool-worktree.patch (pool options: none) 00:30:17
+h@example.invalid
+worktree <scratchpad>/v5/h2/code/app
+worktree <scratchpad>/v5/h2/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-5/canaries/isolation-move-pool-worktree.patch (harness, harness) by isolation__left_no_trace: int: ~/code/app lost or moved its worktree <scratchpad>/v5/h2/code/app-wt1
+exit 0 00:31:25
+-- fake pool <scratchpad>/v5/h2
+worktree <scratchpad>/v5/h2/code/app
+worktree <scratchpad>/v5/h2/code/app-wt7
+ls: <scratchpad>/v5/h2/code/app-wt1: No such file or directory <scratchpad>/v5/h2/code: app app-wt7 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/v5/h2/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794617 +0200	commit (initial): a
+h <h@example.invalid> 1792794617 +0200	commit: b
+-- <scratchpad>/v5/h2/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794617 +0200
+
+######## job5
+== isolation-delete-pool-worktree-git-link.patch (pool options: none) 00:32:42
+h@example.invalid
+worktree <scratchpad>/v6/h5/code/app
+worktree <scratchpad>/v6/h5/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-6/canaries/isolation-delete-pool-worktree-git-link.patch (harness, harness) by isolation__left_no_trace: int: the folder of ~/code/app worktree <scratchpad>/v6/h5/code/app-wt1 is gone
+exit 0 00:34:34
+-- fake pool <scratchpad>/v6/h5
+worktree <scratchpad>/v6/h5/code/app
+worktree <scratchpad>/v6/h5/code/app-wt1
+prunable gitdir file points to non-existent location
+<scratchpad>/v6/h5/code: app app-wt1  <scratchpad>/v6/h5/code/app-wt1: notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/v6/h5/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794762 +0200	commit (initial): a
+h <h@example.invalid> 1792794762 +0200	commit: b
+-- <scratchpad>/v6/h5/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794762 +0200
+== isolation-delete-locked-pool-worktree-folder.patch (pool options: lock) 00:34:34
+h@example.invalid
+worktree <scratchpad>/v6/h5/code/app
+worktree <scratchpad>/v6/h5/code/app-wt1
+locked owner keeps it
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-6/canaries/isolation-delete-locked-pool-worktree-folder.patch (harness, harness) by isolation__left_no_trace: int: the folder of ~/code/app worktree <scratchpad>/v6/h5/code/app-wt1 is gone
+exit 0 00:36:13
+-- fake pool <scratchpad>/v6/h5
+worktree <scratchpad>/v6/h5/code/app
+worktree <scratchpad>/v6/h5/code/app-wt1
+locked owner keeps it
+ls: <scratchpad>/v6/h5/code/app-wt1: No such file or directory <scratchpad>/v6/h5/code: app 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/v6/h5/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794874 +0200	commit (initial): a
+h <h@example.invalid> 1792794875 +0200	commit: b
+-- <scratchpad>/v6/h5/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794875 +0200
+
+######## job6
+== isolation-branch-at-verify-commit.patch (pool options: none) 00:32:42
+h@example.invalid
+worktree <scratchpad>/v6/h6/code/app
+worktree <scratchpad>/v6/h6/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-6/canaries/isolation-branch-at-verify-commit.patch (harness, harness) by isolation__left_no_trace: ~/code/app refs/heads/verify-leak points at a commit by wt-verify
+exit 0 00:34:34
+-- fake pool <scratchpad>/v6/h6
+worktree <scratchpad>/v6/h6/code/app
+worktree <scratchpad>/v6/h6/code/app-wt1
+<scratchpad>/v6/h6/code: app app-wt1  <scratchpad>/v6/h6/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/heads/verify-leak <verify@wt.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/v6/h6/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794762 +0200	commit (initial): a
+h <h@example.invalid> 1792794762 +0200	commit: b
+-- <scratchpad>/v6/h6/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794762 +0200
+== isolation-write-pool-wt-toml.patch (pool options: none) 00:34:34
+h@example.invalid
+worktree <scratchpad>/v6/h6/code/app
+worktree <scratchpad>/v6/h6/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-6/canaries/isolation-write-pool-wt-toml.patch (harness, harness) by isolation__left_no_trace: int: changed ~/code/app/.git/wt.toml
+exit 0 00:36:13
+-- fake pool <scratchpad>/v6/h6
+worktree <scratchpad>/v6/h6/code/app
+worktree <scratchpad>/v6/h6/code/app-wt1
+<scratchpad>/v6/h6/code: app app-wt1  <scratchpad>/v6/h6/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+wt.toml
+
+-- <scratchpad>/v6/h6/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794874 +0200	commit (initial): a
+h <h@example.invalid> 1792794874 +0200	commit: b
+-- <scratchpad>/v6/h6/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794874 +0200
+
+######## job7
+== isolation-settings-name-wt-verify.patch (pool options: none) 00:32:42
+h@example.invalid
+worktree <scratchpad>/v6/h7/code/app
+worktree <scratchpad>/v6/h7/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-6/canaries/isolation-settings-name-wt-verify.patch (harness, harness) by isolation__left_no_trace: int: ~/.claude/settings.json mentions wt-verify
+exit 0 00:34:35
+-- fake pool <scratchpad>/v6/h7
+worktree <scratchpad>/v6/h7/code/app
+worktree <scratchpad>/v6/h7/code/app-wt1
+<scratchpad>/v6/h7/code: app app-wt1  <scratchpad>/v6/h7/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"~/.local/share/wt-verify/bin/wt hook"}]}]}}
+-- <scratchpad>/v6/h7/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794762 +0200	commit (initial): a
+h <h@example.invalid> 1792794762 +0200	commit: b
+-- <scratchpad>/v6/h7/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794762 +0200
+== isolation-record-in-pool-activity.patch (pool options: activity) 00:34:35
+h@example.invalid
+worktree <scratchpad>/v6/h7/code/app
+worktree <scratchpad>/v6/h7/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-6/canaries/isolation-record-in-pool-activity.patch (harness, harness) by isolation__left_no_trace: int: wrote wt-activity/verify-session.json
+exit 0 00:36:14
+-- fake pool <scratchpad>/v6/h7
+worktree <scratchpad>/v6/h7/code/app
+worktree <scratchpad>/v6/h7/code/app-wt1
+<scratchpad>/v6/h7/code: app app-wt1  <scratchpad>/v6/h7/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+wt-activity
+owner.json
+verify-session.json
+
+-- <scratchpad>/v6/h7/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794875 +0200	commit (initial): a
+h <h@example.invalid> 1792794875 +0200	commit: b
+-- <scratchpad>/v6/h7/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794875 +0200
+
+######## job8
+== isolation-unit-test-moves-pool-head.patch (pool options: none) 00:32:42
+h@example.invalid
+worktree <scratchpad>/v5/h2/code/app
+worktree <scratchpad>/v5/h2/code/app-wt1
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-5/canaries/isolation-unit-test-moves-pool-head.patch (harness, harness) by isolation__left_no_trace: int: the HEAD of ~/code/app worktree <scratchpad>/v5/h2/code/app-wt1 moved under verify@wt.invalid, an identity of the run
+exit 0 00:34:25
+-- fake pool <scratchpad>/v5/h2
+worktree <scratchpad>/v5/h2/code/app
+worktree <scratchpad>/v5/h2/code/app-wt1
+<scratchpad>/v5/h2/code: app app-wt1  <scratchpad>/v5/h2/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/v5/h2/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794762 +0200	commit (initial): a
+h <h@example.invalid> 1792794762 +0200	commit: b
+-- <scratchpad>/v5/h2/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794762 +0200
+Pool Owner <verify@wt.invalid> 1792794776 +0000	checkout: moving from 6ae90be93d118fabbc37796df648ef9a169a24b4 to owner-base
+== edit-oracle-under-round-6-entry.patch (pool options: none) 00:34:25
+h@example.invalid
+worktree <scratchpad>/v7c/h3/code/app
+worktree <scratchpad>/v7c/h3/code/app-wt1
+caught: <scratchpad>/v7c/canaries/edit-oracle-under-round-6-entry.patch (harness, harness) by oracle_unchanged: changed since the round 7 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/isolation.rs
+exit 0 00:34:31
+-- fake pool <scratchpad>/v7c/h3
+worktree <scratchpad>/v7c/h3/code/app
+worktree <scratchpad>/v7c/h3/code/app-wt1
+<scratchpad>/v7c/h3/code: app app-wt1  <scratchpad>/v7c/h3/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/v7c/h3/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794865 +0200	commit (initial): a
+h <h@example.invalid> 1792794865 +0200	commit: b
+-- <scratchpad>/v7c/h3/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794865 +0200
+
+######## job9
+== version canaries of verify/canaries/phase-0, round 4 original version-release-never-dirty 00:36:23
+caught: <scratchpad>/v7c/c1/verify/canaries/phase-0/version-always-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit c43e51acc5d83377b9fbefc34637bd9e3c250ecd (dirty)\nfeatures: verify\n"
+caught: <scratchpad>/v7c/c1/verify/canaries/phase-0/version-drop-features.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the feature list of "wt 0.1.0\ncommit 2c704761ba31081f2f99120e619398802a9f9529\nfeatures: none\n"
+caught: <scratchpad>/v7c/c1/verify/canaries/phase-0/version-never-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit <round 7 freeze>\nfeatures: verify\n"
+caught: <scratchpad>/v7c/c1/verify/canaries/phase-0/version-release-drops-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: no full commit 6d072cf5d28240191938a13c7c44a4f73be126ba in the release build's "wt 0.1.0\ncommit unknown\nfeatures: none\n"
+caught: <scratchpad>/v7c/c1/verify/canaries/phase-0/version-release-misses-an-edit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the release rebuild after an edit in one target folder marks the commit line dirty only for a tree with uncommitted changes, here dirty: "wt 0.1.0\ncommit 8f877f038b571d8d9c0510bb86d6c686ad6c1c5d\nfeatures: none\n"
+caught: <scratchpad>/v7c/c1/verify/canaries/phase-0/version-release-never-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the release rebuild after an edit in one target folder marks the commit line dirty only for a tree with uncommitted changes, here dirty: "wt 0.1.0\ncommit 93bf457c90c927b8e75fa3a78519343a723e071f\nfeatures: none\n"
+caught: <scratchpad>/v7c/c1/verify/canaries/phase-0/version-release-stale-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: the release rebuild after an empty commit in one target folder, at commit bb4f60d84adb196cd5b9a86aa5ef09234b633ac4, names another commit: "wt 0.1.0\ncommit be85e17d8ad8f4edd1528d3f59cf7072ea164cb5\nfeatures: none\n"
+caught: <scratchpad>/v7c/c1/verify/canaries/phase-0/version-short-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: no full commit 98ea5f49eb21aa94b6ee2f27f427bc9270082983 in "wt 0.1.0\ncommit 98ea5f4\nfeatures: verify\n"
+caught: <scratchpad>/v7c/c1/verify/canaries/phase-0/version-stale-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: the debug rebuild after an empty commit in one target folder, at commit 54c8b5a8df844c587922ba30c150b39dd58bf0ef, names another commit: "wt 0.1.0\ncommit 320fb965249e44b01c2fac89a5ad2c7c7af7239a\nfeatures: verify\n"
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-4/canaries/version-release-never-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the release build's commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit <round 7 freeze>\nfeatures: none\n"
+exit 0 00:40:31
+
+######## job10
+== the other verify/canaries/phase-0, round 1 original suppress-in-target-module 00:36:23
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/add-claude-md-in-nested-target.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: crates/wt/src/target/CLAUDE.md
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/add-claude-md-in-vscode-test.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: vscode/test/CLAUDE.md
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/add-claude-md.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: CLAUDE.md
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/add-claude-settings.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: .claude/settings.json
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/add-nested-claude-md.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: crates/wt/CLAUDE.md
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/add-oracle-file.patch (harness, harness) by oracle_unchanged: changed since the round 7 freeze without an entry added to verify/oracle-changes.toml after it: verify/notes.md
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/edit-oracle-file.patch (harness, harness) by oracle_unchanged: changed since the round 7 freeze without an entry added to verify/oracle-changes.toml after it: verify/nextest.toml
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/edit-oracle-key.patch (harness, harness) by oracle_unchanged: changed since the round 7 freeze without an entry added to verify/oracle-changes.toml after it: Cargo.toml:workspace.lints
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/edit-oracle-reusing-spent-id.patch (harness, harness) by oracle_unchanged: changed since the round 7 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/suppress.rs
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/edit-oracle-under-round-2-entry.patch (harness, harness) by oracle_unchanged: changed since the round 7 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/parts.rs
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/edit-oracle-under-spent-entry.patch (harness, harness) by oracle_unchanged: changed since the round 7 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/cover.rs
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/edit-oracle-with-lock.patch (harness, harness) by oracle_unchanged: changed since the round 7 freeze without an entry added to verify/oracle-changes.toml after it: verify/oracle.lock
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/isolation-outside-remote.patch (harness, harness) by isolation__left_no_trace: sandbox/pool/leftover/.git: remote https://github.com/acme/widget is outside the run folder
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/release-reads-verify-clock.patch (harness, harness) by release__should_have_no_verify_feature: release__should_have_no_verify_feature: the release binary reads WT_VERIFY_CLOCK
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/release-verify-by-default.patch (harness, harness) by release__should_have_no_verify_feature: release__should_have_no_verify_feature: the release feature list of "wt 0.1.0\ncommit c927bf589627fe4cd5ae852144a3f0e890a06826\nfeatures: default, verify\n" must exist and leave out verify
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/stop-check-by-renaming-the-binary.patch (harness, harness) by trace_complete: harness: release__should_have_no_verify_feature failed
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/stop-frozen-check-accepted.patch (harness, harness) by trace_complete: harness: version__should_list_version_commit_and_features did not run
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/suppress-allow-attribute.patch (harness, harness) by lint__no_suppressions: crates/wt/src/main.rs:345: #[allow(clippy::indexing_slicing)]
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/suppress-cargo-config-rustflags.patch (harness, harness) by lint__no_suppressions: .cargo/config.toml:0: target.cfg(all()).rustflags lowers a lint level
+caught: <scratchpad>/v7c/c2/verify/canaries/phase-0/suppress-in-target-module.patch (harness, harness) by lint__no_suppressions: crates/wt/src/target/mod.rs:1: #[allow(clippy::indexing_slicing)]
+SURVIVED: /Users/you/.cache/wt-verify/clones/phase-0-r7/verify/reviews/phase-0/round-1/canaries/suppress-in-target-module.patch (harness, harness) by lint__no_suppressions: no suppression
+exit 1 00:39:29
+
+######## job11
+== isolation-lock-pool-worktree-after-part.patch (pool options: none) 00:36:23
+h@example.invalid
+worktree <scratchpad>/v7c/h1/code/app
+worktree <scratchpad>/v7c/h1/code/app-wt1
+SURVIVED: <scratchpad>/v7c/canaries/isolation-lock-pool-worktree-after-part.patch (harness, harness) by isolation__left_no_trace: 2 part runs left no trace
+exit 1 00:38:16
+-- fake pool <scratchpad>/v7c/h1
+worktree <scratchpad>/v7c/h1/code/app
+worktree <scratchpad>/v7c/h1/code/app-wt1
+locked <scratchpad>/v7c/h1/.cache/wt-verify/clones/canary/verify/out/canary-1792794985080/sandbox/version-61236-0/pool/fg
+<scratchpad>/v7c/h1/code: app app-wt1  <scratchpad>/v7c/h1/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/v7c/h1/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794983 +0200	commit (initial): a
+h <h@example.invalid> 1792794983 +0200	commit: b
+-- <scratchpad>/v7c/h1/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794983 +0200
+
+######## job12
+== isolation-relock-pool-worktree-naming-run.patch (pool options: lock) 00:36:23
+h@example.invalid
+worktree <scratchpad>/v7c/h2/code/app
+worktree <scratchpad>/v7c/h2/code/app-wt1
+locked owner keeps it
+caught: <scratchpad>/v7c/canaries/isolation-relock-pool-worktree-naming-run.patch (harness, harness) by isolation__left_no_trace: int: git -C ~/code/app worktree list names the run folder
+exit 0 00:38:16
+-- fake pool <scratchpad>/v7c/h2
+worktree <scratchpad>/v7c/h2/code/app
+worktree <scratchpad>/v7c/h2/code/app-wt1
+locked <scratchpad>/v7c/h2/.cache/wt-verify/clones/canary/verify/out/canary-1792794985280/sandbox/version-61384-0/pool/fg
+<scratchpad>/v7c/h2/code: app app-wt1  <scratchpad>/v7c/h2/code/app-wt1: .git notes.txt 
+refs/heads/main <h@example.invalid>
+refs/heads/side <h@example.invalid>
+refs/tags/owner-base <h@example.invalid>
+
+-- <scratchpad>/v7c/h2/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792794983 +0200	commit (initial): a
+h <h@example.invalid> 1792794983 +0200	commit: b
+-- <scratchpad>/v7c/h2/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792794983 +0200

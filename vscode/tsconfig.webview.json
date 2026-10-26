@@ -1,0 +1,11 @@
+{
+  // The webview side: src/webview/, in the browser with the DOM and no Node or VS Code API, and
+  // src/shared/, the panel core both sides share. scripts/build.mjs type checks it; esbuild
+  // bundles it.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "types": []
+  },
+  "include": ["src/webview/**/*.ts", "src/shared/**/*.ts", "src/generated/*.d.ts"]
+}

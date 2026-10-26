@@ -1,0 +1,948 @@
+# Oracle changes that need the owner's acceptance. An entry's [change.files] table pins each path and key it
+# changes at its hash after the change; once accepted, `accept <id> <entry hash>` in verify/accepted.txt.
+
+[[change]]
+id = "p0-nested-target"
+reason = "lint__no_suppressions, repo_context and isolation skip every folder named target at any depth, so an allow in crates/wt/src/target/mod.rs passes (canary suppress-in-target-module survived). Skip only the repository's own target folder."
+paths = ["xtask/src/suppress.rs", "xtask/src/context.rs", "xtask/src/isolation.rs"]
+
+[[change]]
+id = "p0-canary-clean-tree"
+reason = "The canary runner applies a patch without committing it, so every canary runs on a dirty tree and the clean tree half of version__ can never be tested (canary version-always-dirty survived). Commit the patch in the scratch clone before running."
+paths = ["xtask/src/clone.rs"]
+
+[[change]]
+id = "p0-cover-stale-binaries"
+reason = "cover reuses target/llvm-cov-target, so stale instrumented binaries give false uncovered lines (a clean checkout of the wt --version commit gave FAIL after a canary run). Clean it before unit. Also list changed files that no lcov file names, and measure build scripts."
+paths = ["xtask/src/parts.rs", "xtask/src/cover.rs"]
+
+[[change]]
+id = "p0-version-dirty-marker"
+reason = "version__ decides dirty with contains(\"dirty\") on the whole output. Check the marker on the commit line only."
+paths = ["xtask/tests/int.rs"]
+
+[[change]]
+id = "p0-isolation-scope"
+reason = "isolation fails on any new worktree in the real pool or any new ~/.vscode/extensions folder, which the owner's own work or an extension update can cause. Fail only on ones the run created."
+paths = ["xtask/src/isolation.rs"]
+
+[[change]]
+id = "p0-test-helpers"
+reason = "must_head ignores a git failure, so an empty head passes vacuously. One trace test name does not match its assertion."
+paths = ["xtask/tests/support/mod.rs", "xtask/src/trace.rs"]
+
+[[change]]
+id = "p0-stop-canary"
+reason = "Replace canary stop-frozen-check with the verifier's stop-frozen-check-accepted, which shows trace_complete catches a stopped check on its own."
+paths = ["verify/canaries/phase-0/"]
+
+[[change]]
+id = "p0r2-stale-commit"
+reason = "version__ builds wt once, so it cannot see a commit that goes stale on a rebuild (canary version-stale-commit survived: with rerun-if-changed limited to build.rs, wt --version kept the old commit after a new commit). In int, build in a clone, add an empty wt-verify commit, rebuild with the same target folder and assert the new commit."
+paths = ["xtask/tests/int.rs", "xtask/src/parts.rs"]
+
+[[change]]
+id = "p0r2-own-output-dirs"
+reason = "repo_context skips root node_modules but not vscode/test/node_modules, which the clone keeps. From phase 1 an npm package shipping AGENTS.md or CLAUDE.md would fail a correct build. Also close the isolation gap for a worktree the run adds to the real pool outside the run folder at one of the owner's commits."
+paths = ["xtask/src/context.rs", "xtask/src/isolation.rs"]
+
+[[change]]
+id = "p0r3-release-version"
+reason = "version__ checks only debug builds, so a release build that prints `commit unknown` passes (canary version-release-drops-commit survived). Also run the release binary's --version and assert the full commit and the dirty marker."
+paths = ["xtask/tests/int.rs"]
+
+[[change]]
+id = "p0r3-isolation-identity"
+reason = "The HEAD move check relies on EMAIL, but tests that clear the environment write reflog entries under the machine's default identity, so a run that moves a real pool HEAD or adds a worktree passes (canaries isolation-move-pool-head and isolation-add-pool-worktree survived). Fail on any new HEAD reflog entry in the real pool whose identity is not the owner's configured git address."
+paths = ["xtask/src/isolation.rs", "xtask/src/parts.rs", "xtask/tests/support/mod.rs"]
+
+[[change]]
+id = "p0r3-rebuild-edit"
+status = "deferred: non blocking"
+reason = "The rebuild steps edit README.md, a product file, so moving the README breaks verify. Edit a tracked oracle file in the rebuild clone instead."
+paths = ["xtask/src/parts.rs"]
+
+[[change]]
+id = "p0r4-release-rebuild"
+reason = "The release binary is built once, so a release build that keeps an old commit after the next commit passes (canary version-release-stale-commit survived). Run the four rebuild steps for --release too and assert commit and dirty marker at each."
+paths = ["xtask/src/parts.rs", "xtask/tests/int.rs"]
+
+[[change]]
+id = "p0r4-worktree-removed"
+reason = "isolation never compares worktrees before and after a part, so a run that removes or moves a real pool worktree passes (canary isolation-remove-pool-worktree survived). Fail when a worktree present before the part is missing after it."
+paths = ["xtask/src/isolation.rs"]
+
+[[change]]
+id = "p0r4-identity-scope"
+status = "accepted"
+reason = "The HEAD reflog rule fails a run when the owner's own agents commit in the real pool under a throwaway identity (seen: t <t@t>, sim <s@s>). Fail only on verify@wt.invalid and git's fallback identity, the identities a run can produce. Also owner_email reads only the global config."
+paths = ["xtask/src/isolation.rs"]
+
+[[change]]
+id = "p0r5-worktree-folder-deleted"
+reason = "isolation records only worktree paths, so a run that deletes a pool worktree's folder (git keeps it listed as prunable) passes (canary isolation-delete-pool-worktree-folder survived). Record whether each folder exists and fail when it disappears. Also rename the test helper pool to must_pool."
+paths = ["xtask/src/isolation.rs"]
+
+[[change]]
+id = "p0r5-worktree-list-failure"
+status = "deferred: non blocking"
+reason = "A failed git worktree list becomes an empty list; fail on it instead. fallback_email sets GIT_CONFIG_NOSYSTEM though a cleared environment reads the system config."
+paths = ["xtask/src/isolation.rs"]
+
+[[change]]
+id = "p0r6-listing-names-run"
+reason = "isolation looks for the run folder only in worktree paths, so a run that locks a pool worktree with a reason naming its sandbox passes (canary isolation-lock-pool-worktree-naming-run survived). Apply mentions to the whole porcelain listing after each part."
+paths = ["xtask/src/isolation.rs"]
+
+[[change]]
+id = "p0r6-unit-tmpdir"
+status = "deferred: non blocking"
+reason = "The unit layer gives the builder's tests the real TMPDIR, though verification.md gives wt a TMPDIR in the run folder."
+paths = ["xtask/src/parts.rs"]
+
+[[change]]
+id = "p0r7-suppress-parser"
+reason = "lint__no_suppressions does not skip comments or strings, so a lone #[ in a comment or string swallows the code after it and a later #[allow(...)] is never scanned. Scan on from the next character after each attribute and add comment and string cases."
+paths = ["xtask/src/suppress.rs"]
+
+[[change]]
+id = "p0r7-late-traces"
+reason = "isolation snapshots each part as soon as its commands return and --report takes no snapshot, so a detached process the run started can write to the real pool after its part (canary isolation-lock-pool-worktree-after-part survived). Take a final snapshot in --report and compare it with the last part's after, and fail a part when a process with WT_VERIFY_SANDBOX=1 in its environment is still alive after it."
+paths = ["xtask/src/isolation.rs", "xtask/src/report.rs", "xtask/src/parts.rs", "xtask/src/cmd.rs"]
+
+[[change]]
+id = "p0r7-oracle-should-fix"
+status = "deferred: non blocking"
+reason = "Oracle review round 7 should fix items: set GIT_CONFIG_GLOBAL and GIT_CONFIG_NOSYSTEM in Ctx::command; release check finds only literal hook names; the report never checks its parts' commit; listing rule path spelling versus real paths; unit layer real HOME and XDG. Code review round 7: build.rs non UTF 8 env panic and exported CARGO_FEATURE_ variables (builder side)."
+paths = ["xtask/src/parts.rs", "xtask/tests/int.rs", "xtask/src/report.rs", "xtask/src/isolation.rs"]
+
+[[change]]
+id = "p0r8-file-length"
+reason = "2026-10-24: a source file should be around 500 lines, 1000 lines is a hard cap. Split xtask/src/isolation.rs (1643 lines) and any other oracle file over 1000 lines into modules of about 500, with no behaviour change. The product files over the cap (crates/wt-core/tests/pool.rs, crates/wt/tests/cli.rs) go to the builder."
+paths = ["xtask/src/isolation.rs", "xtask/src/isolation/"]
+
+[[change]]
+id = "p0r8-no-process-hunt"
+reason = "Oracle review round 8 B1 (blocking): the lingering process check can kill the owner's Terminal shells in a run folder, because ps -x omits the root owned /usr/bin/login parent and a missing ancestor counts as the run's. verification.md revision 9: isolation__left_no_trace compares snapshots before and after each part and at --report, looks for no processes and kills none. Remove the lingering process detection and killing (xtask/src/isolation/processes.rs and its callers) and the WT_VERIFY_INVOCATION marker if nothing else needs it; keep the --report final snapshot."
+paths = ["xtask/src/isolation/", "xtask/src/parts.rs", "xtask/src/report.rs", "xtask/src/cmd.rs"]
+
+[[change]]
+id = "p0r9-mutants"
+reason = "verification.md revision 9, the simplified process (2026-10-24): add the mutants part and mutants__should_leave_no_survivor (cargo mutants --in-diff against spec-base over crates/, unit and int tests, verify/mutants-allowed.toml for reviewed exceptions). Hand-written canary rounds end."
+paths = ["xtask/", "verify/"]
+
+[[change]]
+id = "p1-host-coverage"
+reason = "Host builder, phase 1: vscode/test/support/v8-lcov.mjs turns the host layer's V8 data into lcov with every line of src/ at count 1, so cover cannot see an untested host line. Convert per file with real counts (for example v8-to-istanbul semantics with source maps), and show cover fails on an uncovered host line."
+paths = ["vscode/test/support/", "vscode/test/host/", "vscode/test/render/", "xtask/src/"]
+
+[[change]]
+id = "p1-host-fault-order"
+reason = "Host builder, phase 1: oversize_line, garbage_line and unknown_version need a paused view whose status has version 1 although the fault is the tab's first line, so alone they fail on the first attempt and pass only on Mocha's retry, from an earlier test's state. Make each check set up its own earlier document so it passes alone and in any order, and make a pass that needed a retry visible."
+paths = ["vscode/test/host/", "vscode/test/fake-wt.mjs", "xtask/src/"]
+
+[[change]]
+id = "p1-gitignore-css"
+reason = "Oracle fix author, phase 1: vscode/.gitignore ignores media/webview.js but not media/webview.css, which npm run build writes, so every build leaves an untracked file and marks the run commit dirty. Ignore it."
+paths = ["vscode/.gitignore"]
+
+[[change]]
+id = "p1-mutants-jobs"
+reason = "Phase 1's crates diff has about 251 mutants and the mutants part ran them with --jobs=1 (about 4.3 h). Read WT_VERIFY_MUTANTS_JOBS (default 4) and give each parallel test run its own sandbox, rebuild clone and warm target; sort survivors so the message is stable. Proven on the phase 0 canary: the same 6 missed with 1 and 4 jobs. Checks are unchanged."
+paths = ["xtask/src/mutants/"]
+
+[[change]]
+id = "p1r2-hide-and-show"
+reason = "Phase 1 review 1 B1: flow__hide_and_show makes wt1 dirty with an untracked file, which only the 10 s heartbeat shows (W2, W7), but waits about 5 s, so it passes by luck and never tests that showing the tab posts the last document at once (X7). Make a watched git change (a commit) while the tab is hidden and assert the row is current within 2 s of showing."
+paths = ["vscode/test/e2e/"]
+
+[[change]]
+id = "p1r2-retry-n"
+reason = "Phase 1 review 1 B3, with verification.md revision 10: assert the N of 'updates paused, retrying in N s' against retry_at in render, host and flow__connection_states, counting down."
+paths = ["vscode/test/"]
+
+[[change]]
+id = "p1r2-first-fault"
+reason = "status-panel.md revision 9, X6: before the first document, a fault shows the paused header over an empty table (status null in the webview input). Add checks in host and render."
+paths = ["vscode/test/", "verify/checks.toml", "verify/trace.toml"]
+
+[[change]]
+id = "p1r2-csp-inline"
+reason = "csp__should_match_the_template demands every script be a file under cspSource, though X8 allows nonce scripts. Accept an inline script that carries the nonce, still refusing any script without it, so the webview can catch the first message with no load (review 1 B4)."
+paths = ["vscode/test/render/"]
+
+[[change]]
+id = "p1r2-gitignore-early"
+reason = "npm run build writes media/early.js and its map, which vscode/.gitignore does not list, so builds leave untracked files and a dirty run commit. Ignore build outputs under media/ by pattern."
+paths = ["vscode/.gitignore"]
+
+[[change]]
+id = "p1r2-codicons"
+reason = "Icons use @vscode/codicons (2026-10-24). Add it to vscode/package.json and its lock; status-panel.md U6 now says icons come from the codicon font in media/."
+paths = ["vscode/package.json", "vscode/package-lock.json"]
+
+[[change]]
+id = "p1r2-spec-decisions"
+reason = "The phase 1 spec changes: status-panel.md revision 9 (W4 refresh moves to phase 2, X6 countdown and the paused header before the first document, U6 codicons) and verification.md item 5 (retry_at, status null before the first document)."
+paths = ["docs/design/status-panel/"]
+
+[[change]]
+id = "p1-visual-baseline"
+reason = "The phase 1 screenshots with codicons are the visual baseline (approved 2026-10-24). Lock the idle_pool shots of run 4: four themes at 1100 px and Dark Modern at 600 px, per Visual review."
+paths = ["verify/shots/approved/"]
+
+[[change]]
+id = "p2-b1-wait"
+reason = "budget__b1 cannot pass: support::hook::wait_output sleeps 5 ms between try_wait calls, so every hook run measures above 5 ms and p95 <= 5 ms is out of reach (release wt hook measures p95 3.3 ms directly). Wait on the child instead of polling."
+paths = ["xtask/tests/"]
+
+[[change]]
+id = "p2-cc-interrupt-allow"
+reason = "cc_interrupt's settings did not allow {wt2}/.verify/block.sh, so Claude Code 2.1.306 sent a PermissionRequest before the interrupt; by H13 and A1 that wait never decays, so the session's wt assert (quiet after 125 s) contradicts the spec. The session means a plain interrupt: allow the script, re-record this one session live, and re-scrub its fixture."
+paths = ["vscode/test/cc/", "verify/fixtures/", "xtask/src/"]
+
+[[change]]
+id = "p2-w4-quiet-window"
+reason = "watch__should_refresh_git_after_an_edit_or_bash_call starts its quiet window when it reads the alive line, but its git-log follower stamps each git start up to 20 ms late, so a heartbeat's last git start can land inside the window (failed once with '1 starts'). Stamp starts from the log's own times, or allow the follower's lag as margin."
+paths = ["xtask/tests/"]
+
+[[change]]
+id = "drop-mutants"
+reason = "Revision 13 (2026-10-24): drop mutation testing entirely; unit, integration and e2e tests are the bar, aiming at 100 % line coverage. Phase 2 run 1's mutants part would have taken about 4 h (984 mutants at about 65 s each). Remove the mutants part, mutants__should_leave_no_survivor, its cargo shim and verify/mutants-allowed.toml handling; cover stays a Done condition at 100 % of changed lines."
+paths = ["xtask/src/", "xtask/tests/", "verify/", "docs/design/status-panel/verification.md"]
+
+[[change]]
+id = "p2-realistic-load"
+reason = "Revision 14 (2026-10-24): the load model is one wt instance on a machine with fewer than 10 worktrees. Phase 2 runs 2 and 3 failed watch checks and B4 because the oracle's own load backed up fseventsd. Size the stress to that load, keeping each check's meaning: H18 200 writers to 16, H24 32 writers x 20 rounds to 8 x 10, B9 20 worktrees to 10."
+paths = ["xtask/tests/checks/hook_files.rs", "xtask/tests/checks/budget_size.rs", "docs/design/status-panel/"]
+
+[[change]]
+id = "p2-int-first"
+reason = "Run 4 started with fseventsd idle, yet 12 watch__ checks and B4 failed: int ran in parallel with quick, whose coverage rebuild and VS Code host profiles create files fast enough to back up fseventsd while the watch checks time file events, and bench followed ui's e2e churn. int alone passed 131/131 (p2-realistic-load). Waves are now int, bench, quick with cc, ui. No check changes."
+paths = ["xtask/src/schedule.rs"]
+
+[[change]]
+id = "p2-visual-baseline"
+reason = "The phase 2 screenshots are the visual baseline (approved 2026-10-24). Lock permission_wait_and_answer and several_agents_one_worktree from run 5: four themes at 1100 px, and permission_wait_and_answer in Dark Modern at 600 px, per Visual review."
+paths = ["verify/shots/approved/"]
+
+[[change]]
+id = "p3-x12-error-paths"
+reason = "Phase 3 run 1 passed every check but cover: 10 changed lines of vscode/src/host/confirm.ts that no layer ran, both X12 behaviour the checks did not reach. Add host cases to actions__should_confirm_naming_the_worktree: a wt free or wt fg that exits non-zero shows one error naming the command and what wt printed, and runs or asks nothing more; a row whose branch changed or that vanished while the modal was open shows a message naming the worktree on confirm and runs no wt. The fake wt writes a stderr line when actionExit is not 0."
+paths = ["vscode/test/host/actions.test.cjs", "vscode/test/fake-wt.mjs"]
+
+[[change]]
+id = "p3-review1-fg-and-overlap"
+reason = "Phase 3 review 1 B1 and N20, resolved in status-panel.md revision 12 (2026-10-25). X12: fg does the same as free for the slot that holds the branch, so actions__should_guard_fg_by_the_holding_slot (host) refuses fg with a message naming wt2 and no wt while an actor there works or waits (an idle session with a working subagent counts, and again at confirm), warns with idle in a modal warning for an idle or quiet actor, and gives no idle wording without actors; the free cases share its code. U4: shown actions never cover another column's text, so actions__should_not_cover_another_column (shot) hovers and focuses every every_activity row at 1100 and 600 px and fails when a shown action box meets another cell's text; it also writes an unapproved dark-every_activity_focused_slot-{1100,600} shot of a focused slot row (review N27)."
+paths = ["vscode/test/host/actions.test.cjs", "vscode/test/shot/overlap.spec.mjs", "verify/checks.toml", "verify/trace.toml"]
+
+[[change]]
+id = "p3-visual-baseline"
+reason = "The screenshots after the wider actions column are the new baseline, with a focused slot row added (approved 2026-10-25, phase 3 review 1 B1). Re-lock the 14 shots regenerated from the actions column fix and add dark-every_activity_focused_slot at 1100 and 600 px as fixed baselines (verification.md revision 15, Visual review)."
+paths = ["verify/shots/approved/", "docs/design/status-panel/verification.md"]
+
+[[change]]
+id = "p3-spec-rev12"
+reason = "Phase 3 review 1 (2026-10-25): status-panel.md revision 12, X12 fg guards the slot holding the branch like free, and U4 shown row actions never cover another column's text."
+paths = ["docs/design/status-panel/status-panel.md"]
+
+[[change]]
+id = "p3-spawn-throw"
+reason = "Phase 3 run 3 (product at the actions column fix) failed only cover, on 2 lines: the error shown when wt free or wt fg cannot start because spawn throws synchronously (ERR_INVALID_ARG_VALUE for a NUL in the binary path). X12 with R8 and X4: the user is told and nothing runs. Add host cases free_spawn_throws and fg_spawn_throws to actions__should_confirm_naming_the_worktree: with the sandbox's wt.path set to a path holding a NUL, confirming the modal shows exactly one error naming the command (wt free wt2, wt fg feature-a), asks once, starts no wt free or fg, and the tab keeps showing wt2."
+paths = ["vscode/test/host/actions.test.cjs"]
+
+[[change]]
+id = "h22-stdout-json"
+reason = "The live-hook finding of 2026-10-25: wt hook install printed its presence note on stdout after the block, so the output was no valid settings file and Claude Code skipped it without a word, and no hook ran live. The oracle took the first JSON object of stdout, so the trailing text passed. status-panel.md H22 (revision 13): stdout carries the block alone, as valid JSON, and the note goes to stderr. Add install__should_print_only_the_block_on_stdout (release wt, with and without the block in settings.json: stdout parses whole and equals the block of H1, stderr holds the note and no JSON), and make the cc sandbox parse stdout whole and fail otherwise."
+paths = ["xtask/tests/checks/install.rs", "vscode/test/cc/sandbox.mjs", "verify/trace.toml"]
+
+[[change]]
+id = "provenance-headers"
+reason = "2026-10-25: every file taken from elsewhere names its source and licence. wt is MIT, Copyright (c) 2026 NEAR One Limited, and THIRD-PARTY-NOTICES.md lists what came from elsewhere. Name the source and licence in the copied oracle files: a note above engineering-standards.md (near/mpc bf7dbd2ad), an HTML comment in google-rust-style-guide.html (CC BY 3.0), the description fields of the four theme files and the header comment of webview-default.css (microsoft/vscode 1.143.1, MIT); add a README to verify/fixtures/claude-2.1.306/ on how the recordings were made; add license = \"MIT\" to xtask/Cargo.toml; drop --skip-license from the package script of vscode/package.json so the vsix ships LICENSE and the notices. What the checks read is unchanged: theme variables, CSS rules, the standards' text and the recordings."
+paths = ["verify/standards/", "verify/themes/", "verify/fixtures/claude-2.1.306/README.md", "xtask/Cargo.toml", "vscode/package.json"]
+
+[[change]]
+id = "visual-round"
+reason = "The visual audit of 2026-10-25 (status-panel.md revision 14, verification.md revision 16). NARROW: the view scrolls horizontally, so nothing is clipped at any window size. U1 drops the cut-with-ellipsis rule; columns take the width their content needs, the table (not the page) scrolls horizontally inside a narrower tab with the header and the detail strip in view, keyboard focus scrolls an action wholly and a row's start into view, no text is clipped or cut with an ellipsis anywhere, and a worktree tag shows whole inside its cell after the name; U3's waiting chip scrolls the first waiting row's start into view. LIGHT CONTRAST: U6 requires WCAG AA for all text in Dark Modern, Light Modern, High Contrast and High Contrast Light, on plain, hovered and selected rows, 3:1 for focus rings and chip and strip outlines, and names the tokens (attention list-warningForeground, active textLink-foreground, quiet descriptionForeground, problem list-errorForeground; list-activeSelectionForeground for quiet and muted text on selected rows). From the same audit and two later follow-ups: every focus ring fully visible (X14), action glyphs centred (U4), hover visible in every theme including high contrast, chips keep their shape, the detail strip stands out, and every activity icon shows at one size (the idle dot and unused ring were smaller) (U6), the tab shows the extension's own light and dark icon, also after a restore (X1; VS Code's generic page glyph showed); tests of the scrolled panel. New shot checks layout__should_clip_no_text, tags__should_show_whole_after_the_name, scroll__should_scroll_the_table_inside_the_tab and scroll__should_bring_focus_and_waits_into_view (U1, U3), focus__should_show_every_ring_whole_in_contrast (X14, U6), actions__should_centre_their_glyphs (U4), icons__should_share_one_size, contrast__should_meet_aa_in_every_theme, hover__should_show_in_every_theme, chips__should_keep_their_outline_in_every_theme and detail__should_stand_out_from_the_page (U6), the host check tab__should_show_the_extension_icon (X1, X2), and the e2e flow flow__narrow_scroll (phase 3, a new User flows row), all from phase 3. Changed with the new U1 and U6: the 600 px part of shot__should_render_every_theme no longer asks for an ellipsis, flow__narrow_window asks for the branch whole, a sideways scroll and each action reachable once scrolled into view, and the oracle's group tokens (legend__should_cover_every_activity_value, flow__theme_switch) follow U6."
+paths = ["docs/design/status-panel/", "vscode/test/shot/", "vscode/test/support/", "vscode/test/e2e/flows-exclusive.spec.mjs", "vscode/test/host/tab.test.cjs", "verify/checks.toml", "verify/trace.toml"]
+
+[[change]]
+id = "visual-baseline-2"
+reason = "The new look is the visual baseline (approved 2026-10-25): horizontal scroll with nothing cut, WCAG AA in all four themes, one icon size, outlined chips, the tab icon. Re-lock all 16 approved shots, regenerated from the visual-fix branch."
+paths = ["verify/shots/approved/"]
+
+[[change]]
+id = "showcase-scrub"
+reason = "Preparing the repository to be shown to others (2026-10-25): keep the agent-build scaffolding as a showcase and scrub personal, machine and NEAR-specific data from it; replace the design mockups with the approved screenshots. Editorial only, no check or behaviour changes. status-panel.md revision 15: Main.png and States.png become crops of the approved dark-every_activity_focused_slot-1100 shot, Tooltip.png goes (no approved shot shows the detail strip, U5 binds it), StatusBar.png stays a mockup, the remote machines note goes with devbox-integration.md and Machines.png (not planned), and H21, H24 and the measurement heading lose personal and machine wording. verification.md revision 17: the real pool, the bench source and the owner are named without machine paths, the engineering standards by their copy in verify/standards/. The canary isolation-outside-remote adds a remote https://github.com/acme/widget instead of a real repository; isolation__left_no_trace fails on any remote outside the run folder, so what it proves is unchanged."
+paths = ["docs/design/", "verify/canaries/phase-0/isolation-outside-remote.patch"]
+
+[[change]]
+id = "no-decisions"
+reason = "Editorial: remove conversation records. The entries and verify/accepted.txt state each decision's outcome without attribution or quotes; verify/reviews names the owner by role and writes session scratchpad paths as <scratchpad>. The canary edit-oracle-reusing-spent-id.patch quotes the reason of p0r2-own-output-dirs as a context line, so that line follows the new wording. No check or behaviour changes."
+paths = ["verify/canaries/phase-0/edit-oracle-reusing-spent-id.patch"]
+
+[[change]]
+id = "fresh-clone"
+reason = "Let `cargo xtask verify` run from a fresh clone on another machine, every check kept where its subject exists. cover and repo_context__should_be_unchanged measure from a base: WT_VERIFY_BASE, else the tag spec-base, else the merge base of HEAD with origin's default branch, else the root commit; the report names the base and its source. oracle_unchanged in a history without a `verify: freeze phase N` commit compares the oracle files with the lock alone, every entry live. A new outcome `skipped` (the check's subject does not exist on this machine) fails no verdict and the report lists each with its reason: fixtures__should_match_a_fresh_scrub without ~/.local/share/wt-verify/recordings still names fixtures that come from no locked recording, else is skipped; on a machine without that recordings folder, cc counts each session by this run's cc_replay:<name>, cc_no_hook_output by every session replay, and skips contract__should_run_in_the_sandbox, with or without the cc part, and the report says so (a machine with recordings still needs the live result, as before). The bench pool clones WT_BENCH_SOURCE, by default this repository, not the owner's pool. isolation__left_no_trace reads the real pool from WT_FOREGROUND, else wt's default foreground at the time, names it in each trace, fails when two snapshots read different pools, and says when no pool exists there. The shot and bench-chromium layers run `npx playwright install chromium` first, which a machine without Playwright's Chromium needs. Test data and comments drop personal names and the names of other projects (acme/widget, app, app-wt1), keeping what each test asserts; the canary of round 6 follows the new isolation message."
+paths = ["xtask/src/", "xtask/tests/", "vscode/test/", "verify/checks.toml", "verify/canaries/phase-0/edit-oracle-under-round-6-entry.patch"]
+
+[[change]]
+id = "generic-spec"
+reason = "wt becomes generic: usable in any git repository, with seams for other agent harnesses and IDEs. status-panel.md revision 16: the pool is the repository wt runs in (WT_FOREGROUND, else the current directory's), with defaults derived from its main worktree; section 1 splits into activity records for any harness and the Claude Code adapter, with wt hook --harness reserved; new IDs H25 (the record's harness field and the reserved file stems), H26 (neutral call kinds; wt status reads kinds, never tool names), S10 (repository on each pool), S11 (harness on each actor), S12 (the status document's contract: wt status --schema, descriptions, open objects, additive changes within version 1, consumers ignore unknown properties, wt emits only listed properties), R9 (the extension runs wt in the workspace folder), R10 (wt's error text shown), R11 (unknown properties accepted) and U8 (one heading per pool, repository then machine); H22 follows CLAUDE_CONFIG_DIR, S4 reads processes through the sysinfo crate and names any toolchain's build processes through build_processes, R1 to R8 read consumer-neutral, U1's no-clipping rule names the pool heading and wt's error text. verification.md revision 18 documents the fresh-clone behaviour (the base and its source, the skipped outcome, cc checks by replay alone without a recordings folder, the real pool from WT_FOREGROUND, the bench source WT_BENCH_SOURCE) and the portable harness (sysinfo, VS Code found or downloaded, WT_VERIFY_WRAPPER, XDG folders, Playwright's Chromium on first use), tested on macOS only. The Harness checks paragraph, the scenario catalog and the user flows are unchanged."
+paths = ["docs/design/"]
+
+[[change]]
+id = "generic-pool"
+reason = "clippy.toml marks the three std::os::unix::net socket types allow-invalid, as disallowed-methods already does for libc, so clippy for a target without std::os::unix (Windows) does not warn that the paths do not exist. The list of disallowed socket types and methods is unchanged."
+paths = ["clippy.toml"]
+
+[[change]]
+id = "generic-harness"
+reason = "The harness runs the same way on every system, with no tool of one operating system, and assumes no particular user. machine_busy reads CPU use and processes through sysinfo 0.24.7, the version wt-core pins, instead of sysctl, ps and lsof: a budget waits while more than half the cores are busy over a 3 s sample (Windows has no load average) or a build runs outside the run folder, as before; where sysinfo gives no reading (on Windows sysinfo 0.24.7 does not build), the budgets run and each result says the load was not read, never skipping the wait in silence. The logging git of the int checks and their real build process are programs of xtask (src/bin, logging-git and sleeper) instead of a zsh script and a codesigned copy of sleep; the logged line, its start time and the process name are unchanged. A multi-part run wraps each part in the command prefix WT_VERIFY_WRAPPER when set, instead of a fixed path when it exists. freeze names the author from git config --global --includes without GIT_CONFIG_GLOBAL, so ~/.config/git/config and included files count. isolation__left_no_trace reads the real pool from WT_FOREGROUND only, with no default pool, and says why it skipped the pool rules. The cache and data folders follow XDG_CACHE_HOME and XDG_DATA_HOME, by default ~/.cache/wt-verify and ~/.local/share/wt-verify. The VS Code CLI is WT_VERIFY_VSCODE_CLI, else the platform's install location (Linux also code on PATH), else none. The tree copy of schema__generated_files_current starts with an empty target folder instead of a copy on write by macOS cp -c. The scrubber writes {tmp} for the system's temporary folder and {tmp}/claude for Claude Code's per account one, so the claude-2.1.306 fixtures are scrubbed again from the same locked recordings and the canary fixture-edited-by-hand follows. The canaries that no longer applied to the tree apply again with their intent: the product canaries follow the code into crates/wt/src/version.rs, edit-oracle-with-lock rewrites the hash at its current line, edit-oracle-under-round-2-entry weakens version__ in xtask/tests/int.rs, a file of the spent entry, since the rebuild steps moved out of xtask/src/parts.rs, and the oracle canaries carry context lines so they apply without --unidiff-zero. xtask and its int checks also build for Linux and Windows; a check that needs Unix permissions or exec stops at its setup elsewhere. The file snapshots of the int checks compare size, modification time, mode and inode as before."
+paths = ["xtask/Cargo.toml", "xtask/Cargo.lock", "xtask/src/", "xtask/tests/", "verify/fixtures/claude-2.1.306/", "verify/canaries/phase-0/edit-oracle-reusing-spent-id.patch", "verify/canaries/phase-0/edit-oracle-under-round-2-entry.patch", "verify/canaries/phase-0/edit-oracle-with-lock.patch", "verify/canaries/phase-0/release-reads-verify-clock.patch", "verify/canaries/phase-0/stop-check-by-renaming-the-binary.patch", "verify/canaries/phase-0/stop-frozen-check-accepted.patch", "verify/canaries/phase-0/suppress-allow-attribute.patch", "verify/canaries/phase-0/suppress-in-target-module.patch", "verify/canaries/phase-0/version-release-drops-commit.patch", "verify/canaries/phase-0/version-release-never-dirty.patch", "verify/canaries/phase-2/fixture-edited-by-hand.patch"]
+
+[[change]]
+id = "generic-spec-2"
+reason = "The spec follows what the extension built beyond the pinned rows, and the tab shows one repository. status-panel.md revision 17: R9 runs wt in the user's home folder when the first workspace folder is not a local file: folder (Remote-SSH, WSL, a dev container, a virtual folder), where WT_FOREGROUND names the local pool and without it wt's own error shows, and a change of the first folder stops the old watch, drops the old document, resets the title and watches the new folder; R10 shows, besides wt's last non-empty stderr line, wt exited with code N or wt was stopped by <signal> for an exit with empty stderr, and wt did not start: <reason> for a failed start, on its own line under the header, only while paused, in the problem colour, wrapping anywhere; S1: the document lists one pool, pools stays a list so a later wt can add pools under the additive rule of S12, and a consumer shows the first pool; U8: the tab shows one repository, the pool of the folder wt runs in, under one heading that starts with the codicon repo glyph in place of the machine glyph, the repository in the text colour at weight 600, the separator and machine name in the description colour; several repositories in one tab (multi-root workspaces) are left for later. verification.md revision 19: the webview input gains error (only while paused) and no_folder (connection paused, no retry_at, status null); the DOM has the single heading tr.pool-heading[data-machine][data-pool] with .repository and .heading-machine, .wt-error in the header and .no-folder, and drops .machine and .machine-icon. No check changes in this entry."
+paths = ["docs/design/"]
+
+[[change]]
+id = "generic-oracle"
+reason = "The checks of status-panel.md revisions 16 and 17 for a generic wt. verify/schema/status.schema.json takes the S12 shape: repository (name, github) on each pool (S10), harness on each actor (S11), a one-line description on every property, and open objects. The scenario documents carry what wt prints for their pool, repository {name fg, github null} and harness claude-code, and the int comparison of a pool includes repository. New checks, each in the trace list: schema__should_be_published_by_wt_status (wt status --schema equals verify/schema but for annotations, every property described, no closed object, the example's schema) and status__should_emit_only_listed_properties (wt's documents against verify/schema with every object closed, the closed schema first proved to refuse an unlisted property at each level) for S12; status__should_name_the_repository (each URL form with and without .git, other hosts, WT_REMOTE, a linked worktree, no remote) for S10; status__should_give_each_actor_its_harness for S11, also from a record without one; hook__should_tag_records_with_the_harness for H25; hook__should_give_each_call_its_kind (in flight and ended) and status__should_read_kinds_only (a shell or agent kind on an unknown tool keeps an actor working, Bash or Agent with kind other does not, calls without a kind map by tool) for H26; stream__should_accept_unknown_properties (host, an unknown property on every object) for R11; spawn__should_run_in_the_workspace_folder (host: the watch, free and fg in the workspace folder with only the inherited WT_FOREGROUND and WT_SLOT_DIR, which the fake wt now logs) and the flows workspace_folder_pool and no_folder_open for R9; the flow wt_error_shown for R10; heading__should_name_the_repository_then_the_machine for U8 (render: the single heading of interface 6 with its data-pool, a second pool in the document ignored; e2e: a GitHub and a local origin). Three new User flows rows. The agents off note also names wt hook install (S8). Since a window without a folder runs no wt (R9), flow__two_windows and windows__should_run_one_watcher_each open the second window on a folder of its own through the code CLI. The shot documents carry long repository names, on GitHub and local; the visual review shots show acme/app and idle_pool its folder name; the approved shots are not re-locked. The harness finds VS Code through WT_VERIFY_VSCODE, the default install location, else a download of the pinned 1.140.0 into the XDG cache, keeps its short links there, lists sockets per platform (lsof on macOS only, which ships it), signs the copied sleep only on macOS, and gives every sandbox process GIT_CEILING_DIRECTORIES at the run's e2e folder. The Harness checks paragraph says the base and which checks can be skipped, and the trace file test counts 105 IDs."
+paths = ["verify/schema/", "verify/scenarios/", "verify/checks.toml", "verify/trace.toml", "vscode/test/", "docs/design/status-panel/verification.md", "xtask/src/trace.rs", "xtask/tests/checks/scenarios.rs"]
+
+[[change]]
+id = "sysinfo-upgrade"
+reason = "xtask moves from sysinfo 0.24.7 to 0.39.6, the version wt-core now pins, with only its system feature. 0.39.6 builds for Windows, where the ntapi 0.3.7 of 0.24.7 no longer compiles, so xtask takes sysinfo on every system and machine_busy reads CPU use and processes on Windows too instead of saying the load was not read. The readers ask for the same facts as before: the use of all cores over the sample, and each process's parent, name and working folder, threads left out. isolation__left_no_trace reads Claude Code's settings file where wt hook install names it: $CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json. The part hashes find the VS Code command line in the order of vscode/test/support/vscode-app.mjs, its last step included: the pinned VS Code 1.140.0 that vscode/test downloads into the vscode folder of the harness cache, once that download is complete."
+paths = ["xtask/Cargo.toml", "xtask/Cargo.lock", "xtask/src/system.rs", "xtask/src/isolation/snapshot.rs", "xtask/src/reuse.rs"]
+
+[[change]]
+id = "generic-polish"
+reason = "The short links that VS Code launches use under the s folder of the harness cache are cleared whatever a killed run left at their path: a link is removed itself, never its target, and a real folder in its place is removed with its files, so the next run makes the link again. isolation__left_no_trace names the Claude Code settings file it read, $CLAUDE_CONFIG_DIR/settings.json else ~/.claude/settings.json, in its report instead of always ~/.claude/settings.json; each snapshot records that path. What the checks judge is unchanged."
+paths = ["vscode/test/support/code.mjs", "xtask/src/isolation/rules.rs", "xtask/src/isolation/snapshot.rs"]
+
+[[change]]
+id = "visual-baseline-3"
+reason = "Re-lock all 16 approved shots after the U8 repository heading and the neutral sample data; approved 2026-10-25. Every shot is regenerated from main after the polish merge, so each pool heading reads acme/app · verify-mac, or fg · verify-mac for idle_pool, in all four themes. Main.png and States.png in docs/design/status-panel/attachments/ are cropped again from the new dark-every_activity_focused_slot-1100: Main 1100x468 from the top left, the U8 heading row included; States 130x377, the Activity column at x 10 with the column header and the rows below the heading row, which it leaves out. Editorial: status-panel.md \"UI mockups\" says so in place of the note that Main predates U8; the heading row stays one example of U8, which alone binds it."
+paths = ["verify/shots/approved/", "docs/design/status-panel/attachments/", "docs/design/status-panel/status-panel.md"]
+
+[[change]]
+id = "ext-cover"
+reason = "Checks for extension lines no oracle layer ran. The host window opens from a workspace file holding its one workspace folder, so a check can change the window's folders: VS Code restarts no extension host for that while it runs tests, and a window opened on a folder would enter a workspace, which stops the host of the checks. spawn__should_run_in_the_workspace_folder gains the case first_folder_changes (R9): a folder added after the first changes neither the watch nor the title; when another folder replaces the first, the old watch ends, the tab drops the old document, resets the title to Worktrees and starts a watch in the new folder; with no folder left the watch ends, the tab posts the no folder view and no wt starts; a folder that comes back gets a watch. stream__should_post_paused_before_the_first_document gains the case wt_error (R10), with the fake wt's new fault error_exit, which writes stderr and exits with a code: the paused view carries wt's last non-empty stderr line after more stderr than the stream keeps, then wt exited with code 1 for an exit without stderr, and the live view after a working start carries no error. chips__should_count_and_scroll_to_waiting gains the render case keyboard_focus_scrolls_rows_and_actions (U1, U3): Tab focus scrolls a row's start and a whole row action into view, and focus that a click gives scrolls nothing; the render support records each scroll's options."
+paths = ["vscode/test/fake-wt.mjs", "vscode/test/host/run.mjs", "vscode/test/host/folder.test.cjs", "vscode/test/host/stream.test.cjs", "vscode/test/render/focus.test.mjs", "vscode/test/support/webview.mjs"]
+
+[[change]]
+id = "fix-b4"
+reason = "The bench pool gives its foreground a bench branch when the source's HEAD is detached, as in the frozen clone a full verify runs from, where the copy had no branch and every slot started with all its commits unreferenced, so B4 waited for counts that never came and timed out without a message. B4 counts each slot's unreferenced commits from the first document. B4's commits and record writes stop once their p95 can no longer pass (xtask/src/budget.rs, which now holds the nearest rank p95), so a blind or slow watcher fails with the samples it took and, for a commit no document showed, the count its last document gave, within the 120 s a bench check may take. The budgets also wait for every other verify part, of the same run or another: every part and a run's shared builds hold the machine-wide verify.lock in the harness cache shared, the bench part holds it alone while the budgets measure, and another verify part under way counts as load under the existing 10 minute machine_busy rule. verification.md revision 20 states these rules. The budgets, their limits and what they measure are unchanged."
+paths = ["xtask/src/budget.rs", "xtask/src/machine_lock.rs", "xtask/src/lib.rs", "xtask/src/parts.rs", "xtask/src/schedule.rs", "xtask/src/layers/bench.rs", "xtask/tests/checks/bench.rs", "xtask/tests/checks/bench/agents.rs", "docs/design/status-panel/verification.md"]
+
+[[change]]
+id = "scrollbar-bottom"
+reason = "U1 (status-panel.md revision 18): the table's horizontal scrollbar sits at the bottom edge of the tab at any tab height, never under a short table. In a tab narrower than the table and much taller than it, the box that scrolls the table was only as tall as the table, so its scrollbar was drawn under the last row in the middle of the tab. scroll__should_scroll_the_table_inside_the_tab gains a 600 x 900 px part in all four themes: for idle_pool with a long branch and the real-names pool, the box that scrolls the table sideways reaches the tab's bottom edge within 1 px; for every_activity with 20 more free slots, whose rows overflow the tab, the same holds with the rows at the top and scrolled down, the page itself does not scroll down, and the header parts keep their place in view."
+paths = ["docs/design/", "vscode/test/shot/scroll.spec.mjs", "vscode/test/support/scroll.mjs"]
+
+[[change]]
+id = "live-labels"
+reason = "Labels follow the session's title, and a build a session started keeps it working, as status-panel.md revision 18 says. H16: a session's label is its title, a title the user gave (the payload's session_title, or a custom-title entry of the transcript at transcript_path) before one the harness generated (an ai-title entry), and it follows each change; the hook reads only the transcript's new bytes, from the record's transcript_offset to the end, at most the last 1 MiB, again from the start when the file was cut or replaced, and parses only lines that hold a JSON string ending in -title; a subagent's label is the description of the Agent call that started it, tied by that call's PostToolUse tool_response.agentId, else agent_type. A1: while a build process (S4) descends from a session's harness process through the parents of the process table, a session that would show idle or quiet shows working, with the action build: and the name of the outermost such build; other children of the harness, builds of other processes and subagents never count; S4 reads each process's parent. New checks, each in the trace list: labels__should_follow_the_transcript_title (an ai-title, then a custom-title, a later ai-title that leaves the given title, a rename, a rewritten transcript, a title inside another entry ignored, and the label wt status shows) and labels__should_use_the_description_of_the_agent_call (the PostToolUse before and after SubagentStart) for H16; builds__should_keep_the_session_that_started_them_working (an idle session's background build in wt1 below its harness process shows as working with build: cargo-nextest, wt1 working, a build of another process in wt2 building, then idle once the build is gone) and builds__should_keep_no_session_working_through_other_children (a child of an MCP server, a build of another process) for A1. The fake process table of the hook checks names each process's parent (start_child); every process the other checks start stays a child of pid 1."
+paths = ["docs/design/status-panel/status-panel.md", "verify/trace.toml", "xtask/tests/checks/hook_strings.rs", "xtask/tests/checks/mod.rs", "xtask/tests/checks/status_builds.rs", "xtask/tests/support/hook.rs"]
+
+[[change]]
+id = "live-output"
+reason = "The live output of background tasks, status-panel.md revision 20 and verification.md revision 21. H27: the Claude Code adapter records each background task a Bash call starts, from the backgroundTaskId of its PostToolUse, with the path of the file Claude Code writes its output to (the real path of CLAUDE_CODE_TMPDIR, else /tmp, then claude-<uid>, the transcript folder's name, the session id, tasks and <id>.output, accepted only absolute and directly inside that folder), the command's summary, never output, and its start and end; at most 5 per record; a task ends when a Stop or SubagentStop no longer lists it in background_tasks, on TaskStop or KillShell, and on SessionEnd; the hook never opens an output file. S13: actors gain an optional outputs list, the running tasks newest first, then the one that ended last, omitted when empty, so verify/schema/status.schema.json gains the optional outputs property and the output definition. R12: the extension reads, for the selected row only and only paths the document lists, the last 64 KiB and 15 lines of each output file, ANSI removed and UTF-8 replaced, never through a symlink or from anything but a regular file, again on growth at most 4 times a second, and stops on deselect and while hidden. U9: the detail strip shows an Output section per agent; X19: Follow streams the file into a VS Code terminal through a Pseudoterminal; X11 accepts select and follow. The webview input gains the output message, the DOM names the Output section, and a live_output flow is added. New checks, each in the trace list and from phase 3: hook__should_record_background_tasks and status__should_list_outputs (int), tail__should_read_only_the_selected_row, tail__should_update_a_growing_file_within_a_second, tail__should_refuse_symlinks_and_other_files, tail__should_never_read_an_unlisted_path, tail__should_stop_on_deselect_and_hide and follow__should_stream_the_file_into_a_terminal (host), output__should_show_each_task_tail and output__should_follow_the_end_unless_scrolled_up (render), output__should_clip_nothing_in_every_theme and output__should_show_the_follow_ring_whole (shot), flow__live_output (e2e). Two checks for X15 and U5, from phase 3: detail__should_update_while_open (render) and detail__should_post_each_document_while_open (host), the open detail strip showing each new document's facts, actors and Output section, updated in place so focus in it survives, which X15 now states; flow__live_output also checks in VS Code that the open strip follows a commit in wt2 and the agent's next call. The trace file test counts 110 IDs and gives H27, S13, R12, U9 and X19 phase 3. The approved shots are not re-locked."
+paths = ["docs/design/", "verify/schema/", "verify/checks.toml", "verify/trace.toml", "verify/fixtures/hooks/", "vscode/test/", "xtask/src/trace.rs", "xtask/tests/checks/"]
+
+[[change]]
+id = "icons-robot-dial"
+reason = "U6 and X14 (status-panel.md revision 21): working shows wt's own robot, an inline SVG in currentColor whose two arms swing in turn about the shoulders, and building shows the codicon loading dial, which spins; no other icon moves, and under vscode-reduce-motion both stand still, the arms in their rest pose 30 degrees out. The legend says so. motion__should_stop_the_spinner shows a working and a building row: without reduce motion the building icon's ::before and each robot arm run an animation; with it no animation runs and the arms rest at 30 and -30 degrees. flow__reduced_motion also removes the reduce motion class for a moment as a control, where the building dial must spin, so its no animation check cannot pass empty. The checks that find each row's icon (legend__should_cover_every_activity_value, icons__should_share_one_size through iconBoxes, flow__every_activity_shows, flow__theme_switch) take an inline SVG in the Activity cell when no ::before glyph is there: its shapes are its signature and the computed fill of every shape its colour. What the checks judge is otherwise unchanged; the approved shots are not re-locked."
+paths = ["docs/design/", "vscode/test/shot/panel.spec.mjs", "vscode/test/e2e/flows-look.spec.mjs", "vscode/test/e2e/flows-scenarios.spec.mjs", "vscode/test/support/measure.mjs"]
+
+[[change]]
+id = "visual-baseline-4"
+reason = "Re-lock the 6 approved shots that show a working or building row, after U6 gave working wt's robot with swinging arms and building the codicon loading dial (status-panel.md revision 21); approved 2026-10-25. The several_agents_one_worktree shots in all four themes and dark-every_activity_focused_slot at 1100 and 600 px are the ones the icons-robot-dial change rendered, with the dial and the arms caught mid-motion; the other 10 approved shots are pixel-identical and unchanged. Main.png and States.png in docs/design/status-panel/attachments/ are cropped again from the new dark-every_activity_focused_slot-1100 with the geometry of visual-baseline-3."
+paths = ["verify/shots/approved/", "docs/design/status-panel/attachments/"]
+
+[[change]]
+id = "rename-wtpool"
+reason = "The tool is renamed wtpool, as status-panel.md and verification.md revision 22 say: names only, no behaviour change. The command and binary wt become wtpool; crates/wt and crates/wt-core become crates/wtpool and crates/wtpool-core, so the workspace members change; the settings file wt.toml, the activity folder wt-activity/, the pool lock wt.lock, the backup refs refs/wt-backup/, the hook log folder and every WT_ variable take the wtpool name; the harness folders and git user wt-verify become wtpool-verify; the extension id wt.wt-status becomes haiyuechen-nearone.wtpool, its command, setting and view ids move under wtpool., and npm run package writes vscode/wtpool.vsix. vscode/test/fake-wt.mjs moves to vscode/test/fake-wtpool.mjs. H14's word list names wtpool where it named wt, so a Bash call of wtpool bg summarises as wtpool bg. Nine checks named after the tool's files and commands take the new name in the lock's checks list, checks.toml, trace.toml, verification.md and their tests: free__should_agree_with_wtpool_bg, hook__should_not_create_wtpool_activity, hook__should_refuse_a_symlinked_wtpool_activity, hook__should_write_only_inside_wtpool_activity, manifest__should_scope_wtpool_path_to_application, setup__should_create_wtpool_activity, status__should_report_the_facts_wtpool_ls_reports, schema__should_be_published_by_wtpool_status and flow__wtpool_error_shown. Slot names such as wt1 and app-wt1 and the default slot prefix stay. The raw recordings keep their wt_verify_recording header and the recorded fixtures under verify/fixtures/claude-2.1.306/ keep the text they were recorded with, so the scrub and the replays read them unchanged; the canary patches follow the renamed files. What each check judges is unchanged."
+paths = ["Cargo.toml:workspace.members", "clippy.toml", "docs/design/", "verify/oracle.lock", "verify/checks.toml", "verify/trace.toml", "verify/absent.toml", "verify/canaries/phase-0/", "verify/fixtures/bash-commands.toml", "verify/fixtures/claude-2.1.306/README.md", "verify/scenarios/bash_attribution.json", "verify/scenarios/hostile_agent_strings.json", "verify/schema/status.schema.json", "vscode/package.json", "vscode/package-lock.json", "vscode/test/", "vscode/test/fake-wt.mjs", "vscode/test/fake-wtpool.mjs", "xtask/Cargo.toml", "xtask/src/", "xtask/tests/"]
+
+[[change]]
+id = "publish-extension"
+reason = "Tabs in the live output, as status-panel.md R12, X19 and X10 now say. The tail of an output file shows each tab as spaces up to the next multiple of 8 columns, counted one per character from the start of the line after the escape sequences are removed and the line is kept from its last carriage return; every other control character still shows as X10 says, and X10 names the tab of an output tail as its one exception. Follow does the same in its terminal, counting from the start of the line or its last carriage return, with SGR colours taking no column, and carries the column across the reads of a growing file. tail__should_update_a_growing_file_within_a_second gains lines with tabs: two in one line, a leading tab, a tab at a tab stop, and a tab after an SGR colour behind a carriage return. follow__should_stream_the_file_into_a_terminal gains a tab after a colour in its first 40 lines, a tab split from its line by two reads of the growing file, and tabs after a carriage return and after a colour; its file holds 49 numbered lines and that colour line. verification.md names the tabs among what both checks cover. vscode/package.json gains the Marketplace metadata, an icon, galleryBanner, homepage, bugs, keywords and categories, and npm run package passes vsce base URLs at the vscode folder of the repository, so the packaged README's relative links resolve. What the other checks judge is unchanged."
+paths = ["docs/design/status-panel/status-panel.md", "docs/design/status-panel/verification.md", "vscode/package.json", "vscode/test/host/output.test.cjs"]
+
+[[change]]
+id = "publish-cli"
+reason = "Background work keeps an agent working, and a done subagent shows for 1 minute. A1: a session or subagent that would show idle, quiet or done shows working while one of its own background tasks runs (H27, S13 running, no ended yet), with the action background: and the summary of the newest running task, so a subagent that ends its turn to wait for its own background run shows working past its minute, and its worktree's activity follows from A4; once a Stop or SubagentStop that no longer lists the task ends it, the record shows as its state says. The A1 table gains that row after the build row, and the legend's working row names a background task it started. A2: a done subagent shows for 1 minute, down from 15; wtpool hook gc keeps its 15 minutes for done records (H21). New checks, each in the trace list for A1: background__should_keep_a_session_working_until_its_task_ends (an idle session with a running task in wt1 shows working with background: cargo test and wt1 working, then idle once a Stop ends the task) and background__should_keep_a_subagent_working_until_its_task_ends (a done subagent with a running task in wt2 shows working 10 minutes later and wt2 working, then done once a SubagentStop ends the task, and hidden a minute after that). decay__should_match_the_table checks done at 59 s and hidden at 61 s instead of 14 and 16 minutes, and watch__should_turn_quiet_on_time checks that the done subagent leaves at its minute, before the session turns quiet at 120 s."
+paths = ["docs/design/status-panel/status-panel.md", "verify/trace.toml", "xtask/tests/checks/status_agents.rs", "xtask/tests/checks/status_builds.rs", "xtask/tests/checks/watch_agents.rs"]
+
+[[change]]
+id = "publish-plugin"
+reason = "H22 and the new row H28 of status-panel.md. H28: the repository is also a Claude Code plugin marketplace, .claude-plugin/marketplace.json named wtpool with one plugin, wtpool, in plugins/wtpool/, whose hooks/hooks.json holds the block of H1 with the bare command wtpool, generated from the same event table, so its events, async flags, timeouts and onFailure are the block's; Claude Code finds wtpool on the PATH its hooks see. H22: wtpool hook install counts the enabled plugin wtpool@wtpool in enabledPlugins of settings.json as present, and its note on stderr starts hooks present: (the block for every event, or the plugin, then the wtpool that PATH finds or that none is there), hooks present twice: (the plugin and a wtpool hook entry together, with how to remove the block) or hooks missing:, which names what is missing: the file, a file that is not valid JSON, each event without a wtpool hook entry, or another wtpool the block runs, by its path. install__should_report_presence now judges each case by that first line, as H22 no longer has every missing case print the same note. New checks, in the trace list and from phase 3, in xtask/tests/checks/install_plugin.rs with the helpers of install.rs shared: install__should_name_what_is_missing (H22), install__should_report_the_plugin and plugin__should_hold_the_printed_block (H28). The trace file test counts 111 IDs and gives H28 phase 3."
+paths = ["docs/design/status-panel/status-panel.md", "docs/design/status-panel/verification.md", "verify/trace.toml", "xtask/src/trace.rs", "xtask/tests/checks/install.rs", "xtask/tests/checks/install_plugin.rs", "xtask/tests/checks/mod.rs"]
+
+[[change]]
+id = "publish-harness"
+reason = "Harness fixes before the repository goes public. cargo xtask with --help, -h or the command help prints the usage and exits 0, where it failed with unknown option. The host and e2e layers check up front that VS Code's main socket in the short link folder of the harness cache, s/<8 hex>/user-data/ plus a name of up to 16 bytes, fits the limit of 103 bytes on macOS and 107 elsewhere, Windows and Linux with XDG_RUNTIME_DIR needing no check; when it does not, the layer reports one error, host:socket_path or e2e:socket_path, that names the variable to shorten, HOME or XDG_CACHE_HOME, and its checks as not run, instead of an error per check that names a missing results file. A layer that fails names its log in each check's message. Reuse counts a check skipped for want of the recordings folder as passing while that folder is still missing, as the folder is no input of the hash: fixtures__should_match_a_fresh_scrub and, in a replay only cc part, contract__should_run_in_the_sandbox carry the code no_recordings, any other skip still blocks reuse, and verification.md says so under The report. The scrubber renames tool_response.agentId with the agent ids, so verify/fixtures/claude-2.1.306/cc_session_end.jsonl, scrubbed again from the same locked recording, names its subagent a1 in the Agent call's PostToolUse too. The phase 2 canaries title-keeps-the-count and title-only-while-visible carry the current context of vscode/src/host/panel.ts, so they apply again with the same edit and the same check."
+paths = ["docs/design/status-panel/verification.md", "xtask/src/main.rs", "xtask/src/dirs.rs", "xtask/src/layers.rs", "xtask/src/layers/cc.rs", "xtask/src/parts.rs", "xtask/src/reuse.rs", "xtask/src/scrub.rs", "verify/canaries/phase-2/", "verify/fixtures/claude-2.1.306/cc_session_end.jsonl"]
+
+[[change]]
+id = "publish-fixups"
+reason = "Follow-ups to the publish round. The seven phase 0 canaries that edit crates/wtpool/build.rs or crates/wtpool/Cargo.toml (stop-check-by-renaming-the-binary and the six version- canaries for always dirty, never dirty, a release build that misses an edit, a stale release commit, a short commit and a stale commit) are rebuilt as diffs against the current files, which now leave cargo's .cargo-ok out of the dirty test and carry the package metadata, so they apply again with the same edit and the same check. D5, S8 and the Phases table of status-panel.md name the Claude Code plugin (H28) beside the printed block (H22): D5 says the hooks are added through the plugin or by merging the block into settings.json, S8 says the panel names wtpool setup, then the plugin commands or the block wtpool hook install prints, as the panel's note does, and phase 3 lists H28. The trace list gives D5 H28's checks beside H22's, in verification.md and verify/trace.toml. The agents_off_note row, the agents_off scenario's render check and flow__agents_off_note also check that the note names /plugin marketplace add haiyuechen-nearone/wtpool and /plugin install wtpool@wtpool after wtpool setup, beside wtpool hook install. What the other checks judge is unchanged."
+paths = ["docs/design/status-panel/status-panel.md", "docs/design/status-panel/verification.md", "verify/trace.toml", "verify/canaries/phase-0/", "vscode/test/render/scenarios.test.mjs", "vscode/test/e2e/flows-rows.spec.mjs"]
+
+[[change]]
+id = "quiet-windows"
+reason = "No window of a run takes focus or input from the apps in use, as verification.md, Isolation, now says. On macOS Electron activates its app whenever a window shows (BrowserWindow.show calls activateIgnoringOtherApps:YES), and VS Code shows every window it opens and steals focus for a window a second instance asks for (app.focus with steal), so each VS Code of host and e2e came to the front and took the keyboard; LaunchServices' open -g keeps only the launch itself in the background. vscode/test/support/background.mjs starts each VS Code of host/run.mjs and of e2e/vscode.mjs launch, which scripts/demo.mjs also uses, paused with --inspect-brk on a free loopback port, makes it an app that is never active through app.setActivationPolicy('prohibited') once Node stops at its first line, and lets it run; a VS Code it cannot keep in the background is killed before its first window and the layer fails with a setup error. Its windows open behind the others; they paint and run timers at full rate, and the checks reach them through CDP and Electron's API as before. The menu fallback of the quick input sends the window the vscode:runAction message of the menu item's command (workbench.action.showCommands, workbench.action.quickOpen), since a click on the item acts only in the focused window and no window of the run has focus. A focus guard (xtask/src/layers/focus.rs) asks lsappinfo for the frontmost app every 250 ms while host or e2e runs, writes <layer>/front.txt, and adds the failing result <layer>:focus when that app is a process whose command line names the run folder; system.rs reads a process's command line through sysinfo. Outside macOS VS Code starts as before and there is no guard. What every check judges is unchanged."
+paths = ["docs/design/status-panel/verification.md", "vscode/test/support/background.mjs", "vscode/test/e2e/vscode.mjs", "vscode/test/host/run.mjs", "xtask/src/layers.rs", "xtask/src/layers/e2e.rs", "xtask/src/layers/focus.rs", "xtask/src/system.rs"]
+
+[[change]]
+id = "publish-status"
+reason = "Editorial: status-panel.md and verification.md move to revision 23, whose status lines record the changes of the publish round (A1 background tasks, A2 one minute, H22 presence note, H28 plugin, tabs as spaces in R12 and X19, focus-free test windows, reuse of a check skipped for want of recordings); status-panel.md is marked approved for publishing. No row changes."
+paths = ["docs/design/status-panel/status-panel.md", "docs/design/status-panel/verification.md"]
+
+[[change]]
+id = "no-side-effects"
+reason = "A run leaves the owner's use of the Mac as it was, as verification.md, No side effects, now says. vscode/test/support/main-hooks.mjs holds what the stop before VS Code's first line (support/background.mjs) installs in each VS Code of host and e2e on macOS, beside the activation policy: every BrowserWindow is transparent from its creation and ignores the mouse, since macOS orders a window of an app that is never active just behind the frontmost window, above other apps' windows (its page stays visible, its timers and animation frames run and screenshots work); keepAtBack, which scripts/demo.mjs turns on, and WTPOOL_VERIFY_VISIBLE_WINDOWS=1 keep opaque windows at the back instead, as main's demo fix did; Electron's clipboard is an in-memory store private to that VS Code, so readClipboard and writeClipboard of e2e/vscode.mjs, which now fail as a setup error without it, never touch the system pasteboard, and withClipboard of e2e/flows.mjs no longer saves and restores the owner's text but fails as a setup error when the pasteboard's change count, read with osascript without its content, moved during the copy; app.addRecentDocument and clearRecentDocuments do nothing, so VS Code no longer clears and refills the macOS recent documents of the bundle the owner's VS Code shares, and powerSaveBlocker starts no blocker; a native dialog, an OS notification and shell.beep are refused and noted in <layer>/side-effects.txt, which adds the failing result <layer>:side_effects (layers/focus.rs). support/code.mjs turns every accessibility signal's sound off and their volume to 0. The cc runner keeps Claude Code's configuration in <run>/cc/claude-config through CLAUDE_CONFIG_DIR, with CLAUDE_SECURESTORAGE_CONFIG_DIR empty so the keychain entry of the owner's login is read, drops the variables of the session and editor that started the run (CLAUDECODE, CLAUDE_*, VSCODE_*, ELECTRON_*, __CFBundleIdentifier, but the login variables), sets ENABLE_CLAUDEAI_MCP_SERVERS=false so the claude.ai connectors of the owner's account do not load, deletes the folders its sessions leave in /tmp/claude-<uid>, and contract__should_run_in_the_sandbox also fails when its session left a file in ~/.claude/ or a project entry in ~/.claude.json; recordings gain a config header field, which the scrubber writes as /Users/verify/.claude, so locked recordings scrub as before. xtask/src/priority.rs starts every job of each part but bench, and the shared builds, under taskpolicy -c utility on macOS and nice -n 10 elsewhere; WTPOOL_VERIFY_PRIORITY=normal turns it off. What every check judges is unchanged."
+paths = ["docs/design/status-panel/verification.md", "vscode/test/support/main-hooks.mjs", "vscode/test/support/background.mjs", "vscode/test/support/code.mjs", "vscode/test/e2e/vscode.mjs", "vscode/test/e2e/flows.mjs", "vscode/test/e2e/flows-exclusive.spec.mjs", "vscode/test/host/run.mjs", "vscode/test/cc/sandbox.mjs", "vscode/test/cc/run.mjs", "vscode/test/cc/sessions.mjs", "xtask/src/layers.rs", "xtask/src/layers/e2e.rs", "xtask/src/layers/focus.rs", "xtask/src/scrub.rs", "xtask/src/priority.rs", "xtask/src/parts.rs", "xtask/src/main.rs", "xtask/src/schedule.rs", "xtask/src/lib.rs"]
+
+[[change]]
+id = "status-24"
+reason = "Editorial: verification.md moves to revision 24, whose status line records the no-side-effects rules. No row changes."
+paths = ["docs/design/status-panel/verification.md"]
+
+[[change]]
+id = "task-end"
+reason = "A background task ends through its session's list of work in flight. On the owner's machine a done subagent kept a task with ended null for over an hour and showed working, background: cargo xtask (A1). Claude Code 2.1.310 builds background_tasks for every Stop and SubagentStop from the session's one task registry (vPn(taskRegistry.all()), [] when nothing is in flight), lists only tasks whose status is running or pending, and drops a task once it ends; sandbox runs with haiku showed the same, and that the list is session wide: a SubagentStop lists the subagent itself and the main session's Stop lists a subagent's shell task. So neither a missing list nor a finished task still listed explains the stuck task: the last SubagentStop that reached its record must have listed it while it ran, and no later stop of that record came, while the session's own later stops no longer named it. H27: the list covers the whole session; an entry counts unless its status is a text other than running or pending; a Stop or SubagentStop ends each running task of its own record the list leaves out, as before, and each such task of the session's other records that name the same process (H19) when it started at least 60 s before the event, as a list made before a task started cannot name it; an end changes nothing else in another record; without the list nothing ends, as Claude Code always sends it. A task an older wtpool left running ends the same way at the session's next stop. New check hook__should_end_a_task_through_its_session (int, phase 3, in the trace list under H27): a subagent whose last SubagentStop listed its build shows working, background: cargo build, and the session's next Stop, in Claude Code 2.1.310's shape, ends that task, ends the session's own task it lists as completed, and keeps a task it lists as running."
+paths = ["docs/design/status-panel/status-panel.md", "verify/trace.toml", "xtask/tests/checks/hook_tasks.rs"]
+
+[[change]]
+id = "bash-summary"
+reason = "H14 of status-panel.md gains a sentence: a command substitution ($(…) or backquotes) or an arithmetic $((…)) stays inside its word and is never the program, and a simple command of VAR=value words only names no program, so the next command's program is the target. The hook split such words at their spaces, so D=$(ls -d ~/x | head -1); echo $D stored -d, and TOKEN=$(echo ghp_abc) gh auth login stored ghp_abc) in the record and showed it on the panel. bash-commands.toml gains 9 commands, read by summary__should_match_the_table and bash_paths__should_match_the_table: a command substitution in VAR=value before the program after ; (summary echo, its path word places the session in wt2), a secret in a command substitution and one in backquotes before the program (summary gh auth, both in no file the hook writes), a path in backquotes, a cd in a subshell (wt2, make), a cd in a command substitution with assignments only (wt3, an empty summary) and before ls of another worktree (no last cd, two matches, fg), an arithmetic expansion that is no path word, and a quoted parenthesis inside a quoted command substitution. Its header gains the readings behind them: a substitution's path words count, its cd targets among them, but its cd moves no shell, and a cd in a subshell is a cd of H9, as one after sh -c is. What the other checks judge is unchanged."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "0666754353acd53345939951be3eed8be65ae765aae9a6401cd4ac189e7ac202"
+"verify/fixtures/bash-commands.toml" = "25febec1e165f72ff19ebadfd7dd3b5627ed17e53e7a5d5d129896a02c7a66f0"
+
+[[change]]
+id = "output-filter"
+reason = "The output tail and Follow remove the 8-bit C1 controls, which the terminal of VS Code acts on as on their 7-bit forms, where an OSC 52 writes the clipboard: a control string opened by U+0090, U+0098, U+009D, U+009E or U+009F goes with its payload up to BEL, ST (U+009C or ESC \\) or the next ESC, and every other C1 control goes too, an 8-bit CSI with its parameters. Follow also removes every C0 control and DEL but tab, line feed and carriage return, so only text and 7-bit SGR colours reach the terminal, and its error line is plain text. Follow reads at most 1 MiB per 1 s tick: a gain the rest of a tick cannot take waits for the next tick, and a gain larger than a whole tick skips to the file's last 40 lines after one line that says so. R12, X10 and X19 of status-panel.md say exactly what passes. tail__should_update_a_growing_file_within_a_second also checks a line of C1 control strings and that no C1 control reaches the webview. follow__should_stream_the_file_into_a_terminal checks the exact text the terminal gets for the 7-bit forms, the C1 control strings and the C0 controls, and a burst larger than a tick, made one gain by a rename, which shows the note, the last 40 lines and the line after it."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "47a32735d0481f6b7c7ca40e9f3c6538a0cf9f90ba8f270c59349a533a05734e"
+"vscode/test/host/output.test.cjs" = "6ea41799cf95564a4338710e97d0c0b6e5af92572a574e758409380508eaa8b0"
+
+[[change]]
+id = "predoc-header"
+reason = "X6 gains the starting state. A new watch is starting until wtpool's first line, and the header shows it as \"starting…\" over the empty table: the webview writes that header before any view arrives, and the extension posts the starting view (connection starting, status null, no retry_at) as soon as a visible tab opens, so the header is never blank while wtpool computes its first document. A fault, or 30 s without a line, pauses a starting watch as before, and it never turns stale. Test interface 5 of verification.md lists starting among the connections. The webview's first script is now inline in the page, a second nonce script, so it listens before VS Code hands over the messages it queued; media/early.js is no longer built or packaged, and vscode/.gitignore no longer names it. render__should_escape_and_isolate_controls and restore__should_ignore_hostile_state look for inline scripts in the body, where the strings render, as the page's own inline script sits in head. The coverage converter skips the page URL, which that inline script carries in jsdom and which no file below vscode/ holds. stall_30s waits for the first document instead of the first view before it moves the clock, oversize_line, garbage_line and unknown_version count only views with a document when they look for a faulty one, and stream__should_accept_unknown_properties does not count the starting view as a pause. New checks, in the trace list for X6 and from phase 3: header__should_show_starting_before_the_first_line (render: the header reads starting… with the chips, wtpool's error and the rows hidden before any view, after a starting view and after 20 s of ticks, then live with the rows of the first document) and stream__should_post_starting_before_the_first_line (host: with a wtpool whose first line comes 5 s after it starts, the tab posts a starting view within 1 s of opening and no other view before the first document while the clock moves 20 s)."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "ef41982dfc1659bfd7799e1666960f90659bec28af7df3249db56067d117aa89"
+"docs/design/status-panel/verification.md" = "64bb4024c13035c2b0e70c67ae722bd925a05a604a6b63f2830495b4c89d7a2d"
+"verify/checks.toml" = "419a1cac5631436c93f1824f939531edd03bc72b481467769117225884b09f65"
+"verify/trace.toml" = "31f4e90b8b0eb775b613850318b1e9bce62dbb37fff882f7d7c2943d60838c5e"
+"vscode/.gitignore" = "0b6c86786d89d32de3bddedf511a8da0dba14215853910037646d2e968f13a02"
+"vscode/test/host/stream.test.cjs" = "ead5fcd55751e6e49a445ae04a70d475eca9a833d7221e1ccfac586e93a2a4ba"
+"vscode/test/host/unknown.test.cjs" = "b13bc1e7eed7efb4c4a49e946a7d3e988b0aa6bb5868d3c6cd4ffbe9233554d1"
+"vscode/test/render/panel.test.mjs" = "b8b22713eb0b542cd1b5b296c20b15881c2c74ec75afaf835ec8bfac0c397d61"
+"vscode/test/support/v8-lcov.mjs" = "5f00c21eed1f3d304d35991d035a48ab699b32ef885707d311475f966e9d6008"
+
+[[change]]
+id = "auto-gc"
+reason = "The hook runs gc itself, so no cron or launchd job is needed, as status-panel.md H21 now says; on macOS such a job can also meet a privacy (TCC) prompt or denial for a repository under ~/Desktop or ~/Documents, and without one records piled up. After the end of a session (SessionEnd) has written its record, at most once a day per pool, the hook runs the gc of wtpool hook gc: wtpool-activity/gc.stamp holds the RFC 3339 time the pool's last gc began, and under the stamp's lock, which a hook never waits for, a hook that finds the stamp missing, unreadable, 24 hours or more before or any time after its clock writes its own time there, then runs gc. gc looks up only the processes the records name and skips a record whose lock another process holds; the hook's gc stops 200 ms after the hook began; a stopped gc removes the stamp, so the next session's end goes on. wtpool hook gc runs whatever the stamp says and stamps it too. The stamp is no record: wtpool status, the watcher and gc pass it by, and a symlink, FIFO or other file that is not regular in its place is replaced. New check, in the trace list for H21 and from phase 3: gc__should_run_once_a_day_on_session_end (int), a session's end without a stamp and one 2 days later each stamp the pool, a session's end with a stamp 6 days old deletes the ended and dead records over a week old, one with a stamp an hour old deletes nothing, and wtpool hook gc then runs on that fresh stamp and stamps its time. The session_end_cleanup scenario's files steps list gc.stamp after its SessionEnd and after its gc, as the hook now writes it there. watch__should_ignore_lock_and_temp_files also writes wtpool-activity/gc.stamp, and status__should_skip_fifos_symlinks_locks_and_large_records a record copy named gc.stamp, which neither may show. verification.md's What needs you no longer asks for a daily job. What the other checks judge is unchanged."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "e905ea690f97a653009c9e2d4b5f0b309f4c613ea19dd75f56e40c4abd621bcb"
+"docs/design/status-panel/verification.md" = "4c4890ed9951571160232258da0f7e33cc7452d6701798ee9f7e98cfbc3a4872"
+"verify/scenarios/session_end_cleanup.json" = "16dc1d7eedb4b0e989efbb13946a429447acfb235213ad7dfbd8c0bb8eb6cf1e"
+"verify/trace.toml" = "7544e875268451d6e3129ecddfef0f9a2325aae5beffe25e11b22a6bcdfe044e"
+"xtask/tests/checks/hook_gc.rs" = "f8e4b2a0654bdd65c16a2e2d4faccd2a170204f7f6ad569928cb60dbde8d266d"
+"xtask/tests/checks/status_agents.rs" = "5a0426fef1b54353c33a49a9162fe13c94b01ff809f653ef5931e29da26dc8de"
+"xtask/tests/checks/watch_changes.rs" = "a4e57939de9bcd4fbf0534221e7dc36c364ab48adaf39446e6bd19d7e3d06f9f"
+
+[[change]]
+id = "oracle-gate"
+reason = "oracle_unchanged allowed a change through the first live entry whose paths named it or a folder above it, and counted as live every entry the freeze commit's ledger lacked, every entry in a history without that commit, such as a squashed copy; verify/accepted.txt took the last word of any line as an accepted id, so `reject x` accepted x, and an accepted entry widened to more paths needed no new acceptance. The 35 live entries after the phase 3 freeze covered 278 of the 287 locked paths and the lock itself, so almost any oracle edit passed, a new entry for a covered path was never consulted, and the canary edit-oracle-with-lock survived. The gate now reads the lock alone, with no git. freeze writes into verify/oracle.lock the id of every entry it holds (spent), with the ids spent before, and a seal, the SHA 256 of the rest of the lock; a lock whose seal does not match counts as a changed file. Each entry carries a files table that maps each path it changes, or file:key for an oracle key, to its hash after the change, or to missing for a deletion; an entry covers a path or key only while that hash is current, so a later edit needs an entry of its own. paths no longer covers anything: new entries leave it out, and the older entries keep it as their record. An accept line is `accept <id> <entry hash>`, the SHA 256 of the entry's content as JSON with sorted keys; a line for another content, or one without a hash, accepts nothing, and any line but that, a # comment or a blank fails the check. A change no live entry pins fails, and the message names the entries that pin an older hash or have no files table and ends with the files lines to paste; an entry not accepted at its content gives oracle_change, and the message ends with its accept line. freeze reads git status -z with the source of a rename or copy whole, where it cut 3 characters from it. A canary's Expect: line may name a needs you code, which the canary runner then counts as caught. New canaries: edit-oracle-past-its-pin (an edit past the hash an accepted entry pins), widen-accepted-entry (Expect: oracle_change) and accept-with-another-verb; edit-oracle-reusing-spent-id and stop-frozen-check-accepted pin and accept their entries in the new format, and edit-oracle-with-lock takes a lock hunk without context, as each freeze rewrites the lines around it. xtask/src/clone.rs splits into the scratch clone, whose struct Clone is renamed ScratchClone, clone/canaries.rs and clone/inventory.rs; xtask/src/oracle.rs gains oracle/changes.rs and oracle/judge.rs. The move to the gate: the lock gains, by hand and unsealed, spent with the id of every entry before this one, which predate files tables and pin nothing; this entry pins every oracle path and key that differs from the lock today, the changes those accepted entries made since the phase 3 freeze included, and the lock itself. The next freeze writes the lock from the tree, seals it and spends this entry as well. verification.md, Oracle files and Canaries, says so."
+[change.files]
+"Cargo.toml:workspace.members" = "bb1770051527aba406744999d7af2efe5742daca3520bde83607ddbca22b667d"
+"clippy.toml" = "c99ce3c3cfaf3060be626cb17dec4b3f6b583dc47f68c75ff4b106f93840965e"
+"docs/design/devbox-integration.md" = "missing"
+"docs/design/status-panel/attachments/Machines.png" = "missing"
+"docs/design/status-panel/attachments/Main.png" = "fed8775d6c7176d8f88a7375cb0a49bb95155eb74b428c59efaeba5a60924329"
+"docs/design/status-panel/attachments/States.png" = "407964b9b30439644cbeab9d30776df80e8a92546fe61314b0b19aabc988c8f2"
+"docs/design/status-panel/attachments/Tooltip.png" = "missing"
+"docs/design/status-panel/status-panel.md" = "3b153c5fb0f7ecd79a279a0548d340337c81d8e6bf5cab0e437e3dad6d2104e0"
+"docs/design/status-panel/verification.md" = "3dce1435c30d031c11ba541d7278e646afd1966a1923470e9725d3a35c8a00f2"
+"verify/absent.toml" = "f15c9cd5b09254745b563ab0152797349ab041e6bb461dab379518daf8e4b45d"
+"verify/canaries/phase-0/accept-with-another-verb.patch" = "902ea167dfdaad46d0059231f7fb7c4ea10d4857390eb6c2b5e4c16adaadf5c0"
+"verify/canaries/phase-0/add-claude-md-in-nested-target.patch" = "e6743c38ad0695e66069dfdb05f5fbd535d3064b88b0f8e77d85a2a394c87045"
+"verify/canaries/phase-0/add-nested-claude-md.patch" = "8eda13e073d3a6f9c81c6b73e31d3bac567e77849e45debc32da7fa2c2a9edb4"
+"verify/canaries/phase-0/edit-oracle-past-its-pin.patch" = "e89f71ae2a62e9f5f28fa1dfd7d99dc6fca245437ee88f2649fa769e2863a5f8"
+"verify/canaries/phase-0/edit-oracle-reusing-spent-id.patch" = "120ef3ef1ca1ba8dc2925baf636a464db0add87224dfac88238f57310d7b06eb"
+"verify/canaries/phase-0/edit-oracle-under-round-2-entry.patch" = "ee6e4bd1167f110ea8cef0feb4e261d19d5bad8e4440eaeaa65c5f8e99a6a872"
+"verify/canaries/phase-0/edit-oracle-under-round-6-entry.patch" = "dd128dda1e479c32460190d7fab05da53b8c8fa265cab088ba2c5b9ab8116b4d"
+"verify/canaries/phase-0/edit-oracle-with-lock.patch" = "ee861b05c169ee7b0be737a93c6b0ffaa7a656425dc8ed583e1d5ae0abef33d7"
+"verify/canaries/phase-0/isolation-outside-remote.patch" = "2d00c4cf4555d622a72433816d58eef53171240484aac0f2f926641eb819bbd8"
+"verify/canaries/phase-0/release-reads-verify-clock.patch" = "6cff50a489461c9976f4e322a7693cb915253a961930ca2f01f511ddca1b9a4d"
+"verify/canaries/phase-0/release-verify-by-default.patch" = "ec8b22b5cc1767b0cb92a7e16a699ea50bb93e658508dac87487e32aeab4c5b1"
+"verify/canaries/phase-0/stop-check-by-renaming-the-binary.patch" = "d0574cf04ccea7e69c58d49904a2ebb12f945885cedc2243d4c3a826d87e429d"
+"verify/canaries/phase-0/stop-frozen-check-accepted.patch" = "8e718bdf55aade001f48f9b7665247c9c947a86c1674b57c8ae83ee2faeda707"
+"verify/canaries/phase-0/suppress-after-open-bracket-in-comment.patch" = "1148b7ad451e4e65230c536b3e0aff86428aafd6f259dd6bcd9c766db676b41c"
+"verify/canaries/phase-0/suppress-after-open-bracket-in-string.patch" = "5fcee6f4fc653839e4732f60ca2acea0d902bf1bc64dd4b0b41186c618e63110"
+"verify/canaries/phase-0/suppress-allow-attribute.patch" = "6c608ee43b1dc3b7848a5ba88b1bdcfa842968a508b2f85179881f514d48bf91"
+"verify/canaries/phase-0/suppress-in-target-module.patch" = "eed904ac971f6a1b49e7e91acef4e491f660073c21931124936a6556297727d5"
+"verify/canaries/phase-0/version-always-dirty.patch" = "0501cf2b2ce84d712c635a845a5faac23dc4084eaef820e790eee95b211d84d3"
+"verify/canaries/phase-0/version-drop-features.patch" = "425b604146f13f4c22f0dca9850fc77b37c3e73664bc73c98554bc5893492e74"
+"verify/canaries/phase-0/version-never-dirty.patch" = "732c94f80efbdd3d74002442af66e39a205073f7a407cec1200a7f5bc36b68f6"
+"verify/canaries/phase-0/version-release-drops-commit.patch" = "0d3a6d3c4fb533185d02c6e312b0ad145bd6ef5c2b0bb007bd85b5654368fcd3"
+"verify/canaries/phase-0/version-release-misses-an-edit.patch" = "1a0c25c46f2b875710d026c1953d9b360a6ec81c999b7ae3ea512ac5bcdd01c4"
+"verify/canaries/phase-0/version-release-never-dirty.patch" = "d2efc3ab82fdb4d17381b11cc7618841d4cc0a45fc776974914e1f106992bc22"
+"verify/canaries/phase-0/version-release-stale-commit.patch" = "be5d4bbe44b21d58e9eb7d732d653870b16e6a45c3a9b7c2a0523092ca40524e"
+"verify/canaries/phase-0/version-short-commit.patch" = "b0800700b73bb5c84a6e568f5fb773ca464c68a69100e56431641a67a4daf355"
+"verify/canaries/phase-0/version-stale-commit.patch" = "006799e5a1f165537d8c59b87040b61478613a2264029b9864d96f14d6b5d4c6"
+"verify/canaries/phase-0/widen-accepted-entry.patch" = "4c4f938b26c590368b8c35ab732c3decfd5e3ef07f95bd62f2be12c2bcd8a70e"
+"verify/canaries/phase-2/fixture-edited-by-hand.patch" = "a8b8f0b66892f2985f3f740f9ec3f64963a7536914700b50567f17ed9756120b"
+"verify/canaries/phase-2/title-keeps-the-count.patch" = "5d4dd1fe99000febe99574aaa55e4e5102bb219cb7a3e5b5df190e20672b51b3"
+"verify/canaries/phase-2/title-only-while-visible.patch" = "41b9ce4f5a7dfdf4096635848c175686ba7d558e5fa0749b9b684ff5fe894ef1"
+"verify/checks.toml" = "e54575c1c322b63f1e36af201190ba9196b2b5cf8ea0fcc3d7ba9bc6627eaaf9"
+"verify/fixtures/bash-commands.toml" = "6c9a84c698c193a3ebe4c49a67e007ac33037346709e959419cb27e5808d229f"
+"verify/fixtures/claude-2.1.306/README.md" = "3856a681547f3989157736ac30f5e4f92be34495b1f30befee0e8c9869628893"
+"verify/fixtures/claude-2.1.306/cc_cd_into_slot.jsonl" = "c8ce628a2f0a5175465dfe0e9f6a1686ada19b6cfb3184a0f1593785be7fe794"
+"verify/fixtures/claude-2.1.306/cc_idle_prompt.jsonl" = "79867e3d306b67c5c299445ce10711a6bb8fb996fb021bf6ae46312be699f2a1"
+"verify/fixtures/claude-2.1.306/cc_interrupt.jsonl" = "9b1e0f045e7c0dbbe623540723921694aa221a97312ac63e1cc1a3673edc0d05"
+"verify/fixtures/claude-2.1.306/cc_permission.jsonl" = "cda4ade98943c666e9ec19473abc618d4df7d0fe2cba02ef657b50852852a1fc"
+"verify/fixtures/claude-2.1.306/cc_permission_deny.jsonl" = "5f5cd4ae29ffc9bd24203618daeea14f7383bdd34070742618132a74ad943f4b"
+"verify/fixtures/claude-2.1.306/cc_permission_deny_interrupt.jsonl" = "e1885b0a9ffb017992031be855f9f6fc47827360668171323279dbb35f4d4fac"
+"verify/fixtures/claude-2.1.306/cc_read_edit_bash.jsonl" = "9abcb41e57378bc22d8680766e2f3f004f8493936e7cb269fa40cfc014089787"
+"verify/fixtures/claude-2.1.306/cc_session_end.jsonl" = "094a5bc89959b6cd5cf8ac64fbff984908a1f1fa17efa94482943950001c9cfb"
+"verify/fixtures/claude-2.1.306/cc_stop_failure.jsonl" = "3004803c9ba84ddc3bebf04faa441f8af0b4f62ae218176dae5c0b9418cc8bfc"
+"verify/fixtures/claude-2.1.306/cc_subagent_elsewhere.jsonl" = "416d80cb1ceadd6cd9eef571c187820d2112c472ddae63c30f6c92bf030b87b9"
+"verify/fixtures/claude-2.1.306/cc_subagent_permission.jsonl" = "72a17b019023841255c67a5ace9f312f96fef1b0926b2f6218a3ecb0c82a09ad"
+"verify/scenarios/agent_working_in_slot.json" = "a16587b1a4e63b50e2c8eafc8ae95ce2345146126c7162a72d9470edf39a1012"
+"verify/scenarios/agents_off.json" = "569368926c12a41065816d88d7bd7988d9ffe1b1cebe3381de7bc4188c963e52"
+"verify/scenarios/auto_mode_denied.json" = "5c6fe476b5ef08536267830d97585aad600966b639106d446deb06aaad9ce26b"
+"verify/scenarios/bash_attribution.json" = "50adfe44c269fd57b49d45f6648f198f3053dd854df7223d5d968eef3b6b3038"
+"verify/scenarios/building_without_agent.json" = "54d7eb352331e9d86e32c15968399041c4e98f3a86b1b588d9cbca701d73a067"
+"verify/scenarios/cwd_changed_moves.json" = "cec6f41b9417fed37be43fdadc2dba7022670314acb4756465ccb220227c266f"
+"verify/scenarios/dead_process.json" = "37eafc2bf853cb1373376e3e98fd18ed4d33b0e337baffca33d77d6cbc77ad17"
+"verify/scenarios/folder_missing.json" = "c2fd08103bdd5bea94d1fb4f71650dd3a86b13805a4435a68242b74ae7f41e40"
+"verify/scenarios/foreground_with_agent.json" = "e189b510d8c291655ba9afbac585cb8d18374a53c879779c7b88b415fe8f8bc5"
+"verify/scenarios/git_operations.json" = "ceaae6685ace4cce2bad54dfd07d57ce9009e02b5deef7dc6f3d9d2e66adec7d"
+"verify/scenarios/hostile_agent_strings.json" = "5af0e1037a83744fd67e75ae02c93cf6a3be78e542a9761a2d5a800566d57fdf"
+"verify/scenarios/hostile_git_strings.json" = "65ad5b959720bbb4502103645229500f185032a79b40fa8a0248d3a62a2e751f"
+"verify/scenarios/idle_pool.json" = "7c222905b32170a9b7b6f9db050d2a792a2f535b1ea32471a0e129fcb1219e38"
+"verify/scenarios/idle_prompt_is_idle.json" = "33994c985ef6fe4f10916e8e9968bd665334394d3e4839872f7eb76bf9345f11"
+"verify/scenarios/interrupt_mid_tool.json" = "518854a19908316627ed19cdd8ec256584952588773af90694c62f8fb5be4707"
+"verify/scenarios/main_waits_for_subagent.json" = "7df6129afc2d4f9d4c607edfde04e58d32b1917113b5896ef324ba4318327f7b"
+"verify/scenarios/new_session_same_process.json" = "1e5fbb2682ab6ccab73ed43708bb59cc006ffb676d380607226f2141d4cec42a"
+"verify/scenarios/outside_pool.json" = "a9a85fe8bfb8afb025757b93e43d4ae7d11de2b778ddd070ba0caf7ecc6a0b9a"
+"verify/scenarios/parallel_batch_keeps_waiting.json" = "39e1df057001c46e8a94ad71b1b486bdf20527dd01a0e1408a5aab8c4f2f0254"
+"verify/scenarios/pathless_events_keep_place.json" = "690e86199e5eaab89696120700ec8923a72a0ce3eba5f0dc6f5705883d563ab3"
+"verify/scenarios/permission_denied.json" = "3469d055489c27b14684fa705251a8ab6ad6a57176fe5efe111530a313e6342b"
+"verify/scenarios/permission_denied_then_interrupt.json" = "d37539629972fd29a425ae4d75b2d3ef086cc01a438585cb8e7fd68a28dd4464"
+"verify/scenarios/permission_request_before_pre.json" = "239405972918a05935a14cc9df2ed19ff39322c538a3a2a6cfd4f43ef31a81a8"
+"verify/scenarios/permission_wait_and_answer.json" = "b817787f422ee256a48cbe25c0b9653d0fd79d62a2c6813072ce690c81fcda90"
+"verify/scenarios/post_before_pre.json" = "a58560c2cdb5afa52ec805386688369d9a9e8934bc2779de8439a8edf8481723"
+"verify/scenarios/question_and_plan.json" = "14eff68ab2b17cd90d2006617e7a0786debd1a0f282f353c67d9fb7c93f85ca9"
+"verify/scenarios/session_end_cleanup.json" = "29a1c850e0634c66c59f7c5b017fdf884c48f4e00fdba198893151da2583735b"
+"verify/scenarios/several_agents_one_worktree.json" = "5e275270e50d50bd0553d0ee7f84aea0b613e8ea2ea9ce58a7e486ef9d9ed855"
+"verify/scenarios/stop_failure.json" = "6429cfeefaa6a4fd11d79072ac5083729f7ec7c7c6f41826dc7dded803d12f73"
+"verify/scenarios/subagent_elsewhere.json" = "0f90940c06aaa24bae7657bf903a35b75ccc94020852f3ef54533b6a00abbac2"
+"verify/scenarios/subagent_permission.json" = "234e452771315898e4443a574e19732a5e928a4540b03d0429cbf68a6f765dc0"
+"verify/scenarios/unknown_git.json" = "0b08138e49a4771f29279be3be6c6711279653f67aa4b19efd55b70fe7876ed8"
+"verify/scenarios/unmanaged_worktree.json" = "f630efeaa1e5de8ff74818f9d80f9729c107cdca7fc0d71fd22a9b330925c84e"
+"verify/schema/status.schema.json" = "287d03e54b7b8d07b745ceb56e7b2581d4eaaeb264e7c873b6c118370fc1876c"
+"verify/shots/approved/dark-every_activity_focused_slot-1100.png" = "7183ad3e228e39a668458251949944d6bb656a7b0a04b75af1e5fc987e82d173"
+"verify/shots/approved/dark-every_activity_focused_slot-600.png" = "c2dff03501b00e0f0b642db406cf2ebed6ace060d1fea20433c2ce436f2a12f2"
+"verify/shots/approved/dark-idle_pool-1100.png" = "ae101df7e24d84504ac7d3fc36fae82145a6ca737f0ee3d3e396b8e212575a8f"
+"verify/shots/approved/dark-idle_pool-600.png" = "ea457f932260c2f9ac66ab23a7363bdbf46f943b198fcb950bde73b6b85021e2"
+"verify/shots/approved/dark-permission_wait_and_answer-1100.png" = "fbd77e4f4e3b27ec078bdcb48101531b1875531542cad47d1eaa3646a9e5eac3"
+"verify/shots/approved/dark-permission_wait_and_answer-600.png" = "86e0b10d0b754a6ee54e699b6dff4808137a1dd3f297b95249408254afa5996f"
+"verify/shots/approved/dark-several_agents_one_worktree-1100.png" = "4e3ca62bb723658007f3c12f7d6b09fe51119786b8d77f7d11e6e509a8e7d6d0"
+"verify/shots/approved/high-contrast-idle_pool-1100.png" = "fa3b8abffacab477640caf55dd692c00dd8781ef207a44edd94bfe335f3e0701"
+"verify/shots/approved/high-contrast-light-idle_pool-1100.png" = "0a90a697f46739bfb69a028444ffcb0f4ff9aeb5a212b30f6f397f58ca4fd489"
+"verify/shots/approved/high-contrast-light-permission_wait_and_answer-1100.png" = "9281dd9736f6be9addf5432dd6c36cb978f08c84014586f179bd4305d17b53bc"
+"verify/shots/approved/high-contrast-light-several_agents_one_worktree-1100.png" = "45377f869cd20b7a48acdd1bb27cbce2fe97bb509760d1482161fa4a4cf1b097"
+"verify/shots/approved/high-contrast-permission_wait_and_answer-1100.png" = "be6f5467db7933e4af81c18f41bf4db414df2ca1b9eeed4a2189e72cd820c3d0"
+"verify/shots/approved/high-contrast-several_agents_one_worktree-1100.png" = "d58505d2729f9a9e782e70dd9772b25ff2475f1c4a6536cbf21308825206e664"
+"verify/shots/approved/light-idle_pool-1100.png" = "4c86f8808b24a431671ac1ab7b9325afd9ad7af6e96e7121218e167f8f66a17c"
+"verify/shots/approved/light-permission_wait_and_answer-1100.png" = "e39487fff732cddac79a0a05285b7e8a43af09c64ae16ba197b1cb2b0bb84e4f"
+"verify/shots/approved/light-several_agents_one_worktree-1100.png" = "9f89572fbad38b5b3e649071b3af7df4e6cf35fbe22e5c93477fd00ee629dd32"
+"verify/standards/engineering-standards.md" = "fde037481aa151aa11280c3d6dd229ab459ae6fa912f31dbde7cf35a09679899"
+"verify/standards/google-rust-style-guide.html" = "a6a561f743406bebcdc4ed258c14cf3e67d14426e705e38abfa4adfb074f838b"
+"verify/themes/dark.json" = "2c368d687892aa4d94c404e8af59e12170af4c735f83f14c66069586667f1857"
+"verify/themes/high-contrast-light.json" = "1279a41d3df7eaa74db4c134c1b31cc173ef86973f46c78e0d1f09b68a916652"
+"verify/themes/high-contrast.json" = "775238dab3511e16f6546f0c98b34a2bf4ef8099b2bd632a1ed5dd498dc5bda3"
+"verify/themes/light.json" = "e285a4e00a405bad5254d16be32c480a69ca207ad2bb66515598d0f8cc3f84e8"
+"verify/themes/webview-default.css" = "aa2653462771dc945159a8493bf8959fb252a8867973141215326c1927591f0c"
+"verify/trace.toml" = "7163a9dbfa7ef0515843e13b76cb58fca7a0da5977ce79955b3bc6ac6ec09a69"
+"vscode/package-lock.json" = "eafa3e0973a12009d28f722badb7f907c27797f5fec6b9797921dae5305a2540"
+"vscode/package.json" = "a7b58d30e9839bcac8bbcccfe421d6bc4139f4dff548d79a5349a6eb07423ff6"
+"vscode/test/bench/playwright.config.mjs" = "f6195103c1fbec731a45903cfad03cfafdb0d1f292864af63ce0cd8ccbe58478"
+"vscode/test/cc/recorder.mjs" = "8ea682aeba73a14ac348fdc21ff3dc60f7f7a4bcbe674075dc4566e7cd7aea28"
+"vscode/test/cc/run.mjs" = "4c8fe201b449d98010253f583f12d6569483ec67c037fab1a797feba2be453b4"
+"vscode/test/cc/sandbox.mjs" = "a2f49f3e8cc738d213e27e3acd6f894e5b710a7a7c0ff2014a019c950b37964b"
+"vscode/test/cc/sessions.mjs" = "ccfa6888ba36e60bb05e66bb515e48b6f1dcda4cc7d3d3b9b0a425fc6a604730"
+"vscode/test/e2e/agents.mjs" = "4cf91ea88394b7071443c0c6584691a6cacad2c054e0c64407b6d90347da0882"
+"vscode/test/e2e/claude-stub.mjs" = "767a817874136fd44410717d55819c4fa19e34005242ac3e941b91bb387252f0"
+"vscode/test/e2e/cli-records.spec.mjs" = "db713013393dac62cfec376e9dfce670c242834847fd3b3587637a7c6dd4ad15"
+"vscode/test/e2e/cli-status.spec.mjs" = "5596d8d8245edf48f192120cfa8f775a460b606101888f5c278387035e6ab92c"
+"vscode/test/e2e/cli.mjs" = "c619b35697e2ea9f705c1b5dafda77b035dbed54e7b35afd6b92ba6da052ed06"
+"vscode/test/e2e/flows-exclusive.spec.mjs" = "829165d6e05c51aac2f15851241be50a6c0e4ab9ca3813944831fb8e0ae4ba66"
+"vscode/test/e2e/flows-folder.spec.mjs" = "98e9d45a5b329d27d9512ca3d6887d0e0e050ea4ef4f0d699747386b7ab532b1"
+"vscode/test/e2e/flows-free.spec.mjs" = "3398ed18701225c6fc333873f5090e1dc9aab4237475feec468ab2933cd54587"
+"vscode/test/e2e/flows-look.spec.mjs" = "35cbab0711ccaeaaded45a9be5990edb2c76d54c9898f401730dcd58d09cc5a8"
+"vscode/test/e2e/flows-output.spec.mjs" = "24e19ffa204f347832d740f9733e0624f6681f240241c808eec905925e7585b9"
+"vscode/test/e2e/flows-rows.spec.mjs" = "25e595db3eed1abfd453b07ac541d642b0797df1ca327f8c9d8a653382d1c7f3"
+"vscode/test/e2e/flows-scenarios.spec.mjs" = "5b8c1d2e164afec1e3b093bde5a75b0ed8c3110f5f942980c495cfbaf430a3a3"
+"vscode/test/e2e/flows-tab.spec.mjs" = "b2c45d6d75d07bdaff50fa7897e2ac2a25f2d8cb8cec3524e78da791e6598b9d"
+"vscode/test/e2e/flows-waits.spec.mjs" = "b26e51a4f488b358cac86b1588284e3437ae22f786939f9ac8304ab27012e66c"
+"vscode/test/e2e/flows.mjs" = "5fc033803af4159280baa467a49e8f7b7df261f8dda464e65fe525bd8bb517e1"
+"vscode/test/e2e/folders.mjs" = "2ca0b28144529c720596708eefe6d0c29f8573b99f6bd4d339e21d3435dda41b"
+"vscode/test/e2e/global-setup.mjs" = "3843815d692c71b89c629a7285f3129c46bd266eaf91162af82463909ff6bd3b"
+"vscode/test/e2e/headings.spec.mjs" = "db7589adae9cf4fcc251749d19c43d968fff02644ee47f109a3b21f6ecbf1fc4"
+"vscode/test/e2e/panel.spec.mjs" = "fe8b6613b0344886c310711395ea421096f62423a82340ebaa9e8310577d7e32"
+"vscode/test/e2e/playwright.config.mjs" = "0c57be5ce7400518ab03ffeead914fb3660a6528a44e8917b6ec4d54ba0f268b"
+"vscode/test/e2e/rows.mjs" = "ce1726ded8062554516e3c4c9771eaf84c952cf92115c2d9e9203caccbe40c0e"
+"vscode/test/e2e/scenarios-agents.spec.mjs" = "220fb7a75a4b756300750fde60a3afe253cb57b6dd9c41ac0be3bb4f5a2ec185"
+"vscode/test/e2e/sockets.mjs" = "f14bdc8d8648a126d9e8bfbce2fdafed2c7e21f43f7728e7c7e1e47de8854772"
+"vscode/test/e2e/vscode.mjs" = "2e824f405fcd0e66ce76c1137dc4480683ea165b82095713845f9696a6b3938d"
+"vscode/test/fake-wt.mjs" = "missing"
+"vscode/test/fake-wtpool.mjs" = "7867499a812e564c77a457ded4b48694534730e6037e8fbf881997fd182abe89"
+"vscode/test/host/actions.test.cjs" = "f8fd192426006d77a0a26d79dc038747c28506f9487fe2a4550adfd26cca5747"
+"vscode/test/host/budget.test.cjs" = "4b55d929c29277e7297d3ab0b8cb97e64b78d2dcb031243449a9b0129986a357"
+"vscode/test/host/folder.test.cjs" = "39175bca8b7689ef1c715c44142edb8946aca808413c5f1915c7e892689c213a"
+"vscode/test/host/index.cjs" = "2762617e2eec4487f0d12b4cde7fd2540863f5bf30f1ad8f3c5999cfa8c6b6ad"
+"vscode/test/host/output.test.cjs" = "03ca6316456da123d70979856bd9af52b1f425dcb172f0c687849f271cf3f9dd"
+"vscode/test/host/run.mjs" = "174fb59321e3da75494aa3159158642fbb838bdfb5bbda288a809f6c14aa6c09"
+"vscode/test/host/scenarios.test.cjs" = "a543c55ad91bb87e1dc610ebfc5f66c258df17d08a890e27475b48e2703d3b03"
+"vscode/test/host/stream.test.cjs" = "eebaa217aa11a4b3ea482bf3c01e69f22f890a1c1ddef4410dd1b4b119982cca"
+"vscode/test/host/support.cjs" = "fe8d89c3720a9de438f284140060221c636c196337142eb2e0fb387774a0b207"
+"vscode/test/host/tab.test.cjs" = "7c64a591d9ae1b109c8d352b885ba3f51d904b421c4dd7cb3a1295a3dabeaa02"
+"vscode/test/host/title.test.cjs" = "93c3707e18bc48621b4a9e994c5856b35d6fde7f3d25551e123014e19b0751ec"
+"vscode/test/host/unknown.test.cjs" = "c3eea3aae7fc18835c7f87a3d9ab7b0eba3a13bab4b500ba1ecfe1891e86193d"
+"vscode/test/package-lock.json" = "eedc215fe860fbcfe30b8774abd2f2320608a8aaeec97158d259f77836cb5a07"
+"vscode/test/package.json" = "6d3cdaa798b94a43aa20d37fee3464ab1cbe1e5ef5f3a5a807f1ca2afc78d765"
+"vscode/test/render/detail.test.mjs" = "49ef8bfc9ab50d6f93eb0d44de6d699e0ed29f13d08ad4c6cb2f8503ac87dc30"
+"vscode/test/render/focus.test.mjs" = "10b335579ff98d50402074565181e6731d3c71ad436d5a4ab2aa2f87666f6fa0"
+"vscode/test/render/headings.test.mjs" = "99566d24263c20d531ec460e78e45d1bf0f7d64bae2ad79d320d3aa38f080e3d"
+"vscode/test/render/output.test.mjs" = "1958d721917d41f908736f9b757457f7349f95e442fdc59e5c40aba8bacd0139"
+"vscode/test/render/panel.test.mjs" = "e1177c3ed2c2aa82202a26dc35a8396830b7c012ffecededd79d75d24e4897c9"
+"vscode/test/render/scenarios.test.mjs" = "2b7da34f6c701c18da8935fa02f9a71a5da3fc1c3cce8d988ad879c0b743aad5"
+"vscode/test/shot/focus.spec.mjs" = "f5525247f34a125bd380e1ee925b0a018dd8d130f9d3cfad5d7a85a30305111b"
+"vscode/test/shot/layout.spec.mjs" = "0b28357f003d9ca05d94586697669b38659a28a6d766e225b2ac1ee2bd15070b"
+"vscode/test/shot/look.spec.mjs" = "c4e03af0973ca595462abe68f80449277ec5ccc6bd7c848543992b697755cd11"
+"vscode/test/shot/output.spec.mjs" = "f3068b5f6bf073d0e4e19b0124452655618eb2c0d48f881bf7c3b993c1e36657"
+"vscode/test/shot/overlap.spec.mjs" = "ef6088498d14d8eda24fcd8e920778a79b34b1f5fdf3ace4dfcbab98380e8b8a"
+"vscode/test/shot/panel.spec.mjs" = "748afbc9120daf312ed77dfe5546fb9fb0b691de80c8e0578e1d992f0dd41bd8"
+"vscode/test/shot/playwright.config.mjs" = "d2c5129302243b8075c9998f22b2c049a5eecce479f4368e51c918aad02d71a1"
+"vscode/test/shot/scroll.spec.mjs" = "9f46fa778ff7032d092c2fdb466cd8d50cdf27363a0e70283e3db794275633d8"
+"vscode/test/support/background.mjs" = "29b137eda90fe6a879be16a7e7939a86dbf42134683642c3491dad444d6af4f3"
+"vscode/test/support/code.mjs" = "162fc006640a16abe6bbe84192d7e411309bef426d11f3cd5b8c908468b8a3f5"
+"vscode/test/support/docs.mjs" = "338486dd976dd0da636e7adf123b52c48ec93c375b235a68d1badc28ac94c4fb"
+"vscode/test/support/grammar.mjs" = "577a97e36322b7d43d2b5a16fd3f80324232eccce3d522631f2c28c29f16548d"
+"vscode/test/support/main-hooks.mjs" = "dcbee5b9859f153b20e66fff96be68286e28edbf07e893db040398ce9de635ff"
+"vscode/test/support/measure.mjs" = "2ecf7b5501ab5281497518c68509a7cb25dc21b660ba14fca866886017bb62d8"
+"vscode/test/support/paths.mjs" = "d88725e7cdbd863c339870f5ef8845b9ae49a9261377325cbebaf89c9e0e16a3"
+"vscode/test/support/pixels.mjs" = "06d90cbbd2820cd5ede83bf541531ced772de467aa0c44f1b0c25bcee91a31e7"
+"vscode/test/support/scroll.mjs" = "490612a7854487e8d30b99e8ae1b1761224c188f70f2d9a6c6333550cda412f8"
+"vscode/test/support/states.mjs" = "da2f368e9186e97bd74b4bd84232dead744bff4d7429bb8f66bb5c84f16e1f64"
+"vscode/test/support/visual-docs.mjs" = "a1113e039cd3cf1e779184471093bf821df746ca90d8752412901bd67e8f85a5"
+"vscode/test/support/vscode-app.mjs" = "21abd7b58c4dfe049d54e0c60e4a1596cffd633b9af46216b3e383c7c07db458"
+"vscode/test/support/webview.mjs" = "6ce520fb2253aeea376d98995b6e7656c6f4333da3bf3e175e0e9648cdd5327d"
+"xtask/Cargo.lock" = "72d3f97a6eada3202b6177e1d15c97cb31a7278655142fae943701579a7c569e"
+"xtask/Cargo.toml" = "02a9a66b5686e7509b5de2529346f78e31405e4dacafcee17368a443e501c1dd"
+"xtask/src/bin/logging-git.rs" = "62bbca19a935b825c5fc7b7588d4eb273e5b8dc03f428e0f40bd912d5da819b4"
+"xtask/src/bin/sleeper.rs" = "8861cc8cecbf8778b0f4a4cf0c630f95bb2d2e767937c93ca2899dd09caa43eb"
+"xtask/src/budget.rs" = "2e65d64185d0f3f7f853f2ded21ba446f3735a61591f6db4820a0d63c8e19b38"
+"xtask/src/clone.rs" = "a83ecbc3484f67761c62d64652c903384b3b0aa8b4637a05890578813bf648c7"
+"xtask/src/clone/canaries.rs" = "95a214f0a0faa7243bdd445dd849829127a46d7a45bccca8e4629c160f09b787"
+"xtask/src/clone/inventory.rs" = "992e2ce81cca45dd5071655b250c7b9b5df5211cc06b2ee4b1dfd07362c95138"
+"xtask/src/cmd.rs" = "f363f5cd2c3faa4c670bac897cffa18677a7a5f359bb491f45616d9936c5d640"
+"xtask/src/context.rs" = "2983b9c8c9d9c03861e796a88c051ab6731eb2c77325d562d789ba1a09d8cf2d"
+"xtask/src/cover.rs" = "ad85f6bcda25b72a076ba56391d2e031b805aa7a6b4ab9a646d21e1adf78344c"
+"xtask/src/dirs.rs" = "09da965ca593d6d4a341170d5705f17518f500994c97a72cf36b65b5f3eafc8f"
+"xtask/src/doclinks.rs" = "729ef1584c355ac72fcb5c4002d3cc10443ab14a84bcc938d36d5edc24dcf64d"
+"xtask/src/flaky.rs" = "63e998aa5fc28db98874594caf813adb34f6c1a8862edf519f2fda1ff5f61f08"
+"xtask/src/freeze.rs" = "9a5c1657b0f1b5f91a384f2e0315edfa6dc0d0ba6c4e7bce4f04d0793c0601b6"
+"xtask/src/hooks.rs" = "48a7d045a985aa9948cf2aa6011dfe846300a10adb09c72ef0784730e74028be"
+"xtask/src/isolation/mod.rs" = "a863e3540b62bc997a7a66185007015b6e77a508a28dd46a36c3e25c581ef83d"
+"xtask/src/isolation/present.rs" = "377894576634ad71035218925c67cfd8c94a7f9cbf751b58f58e6beae6494f0b"
+"xtask/src/isolation/rules.rs" = "59308193ebbc3ecbdc3aa655ed569ea96739b51401467004e7fc89d1b5f5b928"
+"xtask/src/isolation/snapshot.rs" = "48cedbce1eb0764addf9590cabb660c8e096624a75cd8a614ee77b4f58280556"
+"xtask/src/junit.rs" = "8f99ec4f5204b4ab156e672268819c6c5c7a65f357ca763e89217463ed9957b0"
+"xtask/src/layers.rs" = "9260eadcc56099a578eb0c49c7f2bf66188d36fb02cf0454f53d23337a0bf78e"
+"xtask/src/layers/bench.rs" = "5cef6bdaca2fd2b424c0fed9a26ae729778ee64b46de21e59da23bb6d83c585d"
+"xtask/src/layers/cc.rs" = "bd2f61910f971d71820be29986bd5890f69149d2fec59c0e9ead5f43d058a45c"
+"xtask/src/layers/e2e.rs" = "b0ac3c60291a3bdb271b896ca7e687860594f8c1c040539e1111dc3dae8d9790"
+"xtask/src/layers/focus.rs" = "edc7002b62357fc757a7db434dd1228e31f23bcafb848fec940c71441a5d8086"
+"xtask/src/layers/product.rs" = "18b57a27e6cdeb268d6b3c493320f1dc124a9920f80a874fbf975be5fd33a518"
+"xtask/src/layers/statics.rs" = "93e507358afe6ee5b01671a1fee3c94033be442973e5710fda3768397c93ddfb"
+"xtask/src/lib.rs" = "3c7d05490fd387b4330061590104c0b7f5bea33d8b4bb63675ffc00f2ee1781f"
+"xtask/src/machine_lock.rs" = "5f46dd73dd46802835dbf77a56897567d16cc49af97a597bfc405bb3417b06a3"
+"xtask/src/main.rs" = "a030ae3c3e3538a6b084b3c4fc67fddf62b3a273941c7196a4ae8eb16f2de92c"
+"xtask/src/oracle.rs" = "784a41206895c0ab5e4a983a0ff0c47bf1d0f8e7457975a25a8201858f93332f"
+"xtask/src/oracle/changes.rs" = "f3cd84dbcedad25dd7f669e3da9e3bff4c236763a43a953cde79a90885e2e66d"
+"xtask/src/oracle/judge.rs" = "b256d5bd32dea65e1c6b844b9a2e0a753400f19f8708efcb5a2c89b5fbdb2f3f"
+"xtask/src/parts.rs" = "de8ffe2d2e7861c322d428e288b5852e7dc49283cb47d206747d78bfe09be4ee"
+"xtask/src/parts/int.rs" = "8369269a5741af455ced4829c7f7cf941a04eb0e31c17f18fd9cbd5f93978f5d"
+"xtask/src/pool.rs" = "61af88e23f2c45dea3f8bcd0a773c543c42073e0b95201fc39272368b31d3de3"
+"xtask/src/priority.rs" = "79400c9becc1974522b6ff2c37e454ce6808d9c58ea7f99b71cfc0c0e06bda14"
+"xtask/src/rebuild.rs" = "8c32a655e3d816ea1d2c20458c7ce0e88ab35a0757b01c24f5260ffffed2eaf8"
+"xtask/src/replay.rs" = "1bcf1b114f8c0b2ddd37ef4f578a886647244fbc64cb4e23e345281a865846ee"
+"xtask/src/repo.rs" = "b22dc33a02a1a155d31f76cebc3c9d7f4e092d3067e0f6eb49b095b9acbdc5a0"
+"xtask/src/report.rs" = "764efed7eab6a1a98b526859884a5917b85574ca136c23fab6e797e1857b50f9"
+"xtask/src/results.rs" = "7fbc1d08d6bc4fcb78a8bad6428874e2ad7501338b147e4d0f3849c1391e2225"
+"xtask/src/reuse.rs" = "6d4f2846a46aac8cfde04b79e1a3627517de3b01ece15dad6058d1aa4b31b300"
+"xtask/src/scenario.rs" = "15259005ed8887d92a0816f288e8b5289ed7212a08d99fe41d95e5b63cb2a573"
+"xtask/src/schedule.rs" = "09f7ab2fd17f19df4235f6d5f8dbdc07f0a046130b5f4de36af767849509ce34"
+"xtask/src/scrub.rs" = "9133f85508b3cafb58c3d77ebe4f5ba497e87c0521b9cdad2ea19e03b12a7753"
+"xtask/src/suppress.rs" = "bdaff2871d5dc44417a6888a1d0e0348d1c4f709892bda8c1dea7f4ff1e31621"
+"xtask/src/system.rs" = "f3778a6f56f9abb2fe739c2f5c1bca8ad634f92094ea57a17c6a589f3f22ca5a"
+"xtask/src/trace.rs" = "4eab0d5913b32a138d5d5f028fd7fdce19d42bd35ccba0782ec8b1850013068f"
+"xtask/src/version_text.rs" = "20dcff898b8f42655de1b211bf2d2e12acee64dbb610ab3a1d72a5f2f7b7b865"
+"xtask/src/web.rs" = "05aae1df0dd7c9e6aeb20e5d87d135f1fa051eaa0943dd6da6bdd1455e4abe6b"
+"xtask/src/web/files.rs" = "91ae524fb0dd6c0ae029dd6bdca23e05e4cde26e046b585097572636596e6253"
+"xtask/tests/checks/bench.rs" = "d1f507c12556973544b6a230f7fe50f5e6cc698af80d77426c61e05491b7771b"
+"xtask/tests/checks/bench/agents.rs" = "9d7c336ccefe51b452ed77b4fc87ba024b3cba7e5236d8ae8f0f72621546d0cb"
+"xtask/tests/checks/budget_size.rs" = "f34bc84c020bb3840ae9e7e71d6c59c230d7e710e535c7fa519abedebf5e7f8b"
+"xtask/tests/checks/hook_files.rs" = "63a57d7c2b102e6cdd286d33d3e089d18a9637a8c577dd4714e24a05117f4893"
+"xtask/tests/checks/hook_gc.rs" = "1937e0cc1867945c97385b15b94ab0315600fc049affee60384aad3b947590a5"
+"xtask/tests/checks/hook_io.rs" = "0f5110b98eeb11f6201234dea5277070bfb7b2bf497fa2220ea130da4b38434e"
+"xtask/tests/checks/hook_place.rs" = "a2389a828e5c909d7812e5219631799eb8e6ac770417885d3ddfe4b67ae06e4b"
+"xtask/tests/checks/hook_strings.rs" = "a8c0f22c62dd100458e21255bca52321f18169db565fdfc4d0829becbde9be93"
+"xtask/tests/checks/hook_tasks.rs" = "0e84ebb3d1f77fdd58163252792a932dbffd789953b0f01bbb18a83605069a49"
+"xtask/tests/checks/hook_wait.rs" = "f8bea79db6702db7866f477e9b71bbc0ffe332a429f85ea7d6b9efee4d82b174"
+"xtask/tests/checks/install.rs" = "713e7e3cd74b5b2602bbbfacf7f131fcaaaa2eb1fee654d4b9852d3816584de1"
+"xtask/tests/checks/install_plugin.rs" = "8b607125c86b472a2c9d6ba664aa32c2ede46d8666d1a4dca539f772b1fcaa8f"
+"xtask/tests/checks/mod.rs" = "9fe4512790d7276d621c01017c6056c26694269bec4be385c9806c4d6f3c6c02"
+"xtask/tests/checks/scenarios.rs" = "427b0c234aaa0184555620afa94441a3669af5195aa98add12105e85d76d6fe3"
+"xtask/tests/checks/scenarios_agents.rs" = "5eb8e9b0f8643557fc39a8c04851051d0c7e7655b601f7c830f7328b98d1ea4d"
+"xtask/tests/checks/status.rs" = "eb8062953ecc393bdcc9c949e9e6bb7fbe067fb3b4e7da888734d279f71ef781"
+"xtask/tests/checks/status_agents.rs" = "f746a37dcd90848a3ddcbbeff2e8c7d28adda7506ee4ece79b05f0c3ec6956c4"
+"xtask/tests/checks/status_builds.rs" = "6fb318ca81266913e41c60dd979a35961db398feb748ea487ef1ccd5127ece37"
+"xtask/tests/checks/status_facts.rs" = "7f7c9f80b8b134019cd7d8187ed45263e1ad8cdd48058b5bba17ebc8b7e8d505"
+"xtask/tests/checks/status_files.rs" = "ce9195b81e41cb519db1ce791d5f8fcc3535983dc21567e714c7a96f3fea582e"
+"xtask/tests/checks/status_outputs.rs" = "700b8a08e9c470872c0e8a5cdf41ae9afbc5b50011bb0a44dc1c7e730c5436f7"
+"xtask/tests/checks/watch.rs" = "edb6f872ceffcde21b0c9245d7fbe4e164838c4654b8f32dbc253f5c55ffb15e"
+"xtask/tests/checks/watch_agents.rs" = "0931e893f69445e74e1faad7379fea873e32ce834737fba0d8bc096f3d0aaee0"
+"xtask/tests/checks/watch_changes.rs" = "37fdacc82a0d26a1dd0e5106deb93d257a689898649003c3a198e679c1eb2550"
+"xtask/tests/int.rs" = "08079d2cb73255cb15df5e010093822af3c3cd609ffc72a4d6ab8e51e0477435"
+"xtask/tests/support/hook.rs" = "1b1542be76e5f7ce34e8e2ce1cd8cc9453d60fa11ab7d7882aa1f3df2ba3310c"
+"xtask/tests/support/mod.rs" = "98ea8b0ec3b383dc46e4cf4cf2a82beeaa108731fd6e1c5fc406b2a9e3492c82"
+"verify/oracle.lock" = "5a2c23984d3ee7c471561e220f1f79e679453c7ac714ef8f4b865568b3b718ed"
+
+[[change]]
+id = "harness-runner"
+reason = "The harness runner. Reuse hashes the VS Code that vscode/test runs: with WTPOOL_VERIFY_VSCODE set, the part hashes also hold its path and the version its own code command line reports, found where @vscode/test-electron's resolveCliPathFromVSCodeExecutablePath puts it, and that command line is the one hashed when WTPOOL_VERIFY_VSCODE_CLI is unset; a test pins the discovery order of support/vscode-app.mjs and the locked @vscode/test-electron version. The quick part gains harness:fmt, harness:clippy and harness:rustdoc: cargo fmt --check, clippy of all targets with -D warnings and rustdoc with -D warnings of xtask/, its own workspace, beside harness:self_test; for them priority.rs and xtask/tests/checks/hook_tasks.rs are formatted and a doc comment of catalog.rs is fixed. Their harness: prefix sends them to quick, as for harness:self_test, so neither verify/checks.toml nor the trace list names them. A part list refuses --only and passes --contract and --record on to the cc part; --contract without the cc part and --record without --contract are refused (enum Contract). A run refuses WTPOOL_VERIFY_RETRIES, WTPOOL_VERIFY_HOST_RETRIES, WTPOOL_VERIFY_HOST_ORDER and WTPOOL_VERIFY_HOST_INVERT unless unset or 0. The timeout of cmd::run also covers the readers of the command's output, so a process that keeps the pipes open past it is killed with the group; a part list waits for the parts of a wave it started when a later one fails to start. The int checks run at the normal priority once their binary is built at the lower one: the utility QoS clamp of macOS coalesces timers, which stretched the ten 10 ms sleeps of watch__should_merge_a_burst_into_one_document to over 340 ms against its 200 ms; verification.md, No side effects, says so. parts.rs splits into parts/ctx.rs (Ctx) and parts/quick.rs, Reused moves to results.rs, rebuild.rs names WtpoolPackage, and lib.rs gains a module map. What every check judges is unchanged."
+[change.files]
+"docs/design/status-panel/verification.md" = "3d82fab65331195046d5018ce9b451980253ac99d6c6de929e9d7200fcbe75df"
+"xtask/src/catalog.rs" = "50a180e265c7860fa818db118cf399f834a7ef09014ff6f056064d279fb516da"
+"xtask/src/cmd.rs" = "f11cbe20ea46e5bedcbc2d278b1666ac03e47a0e8140a32412c2de468399038c"
+"xtask/src/lib.rs" = "16a7dc98d9ab66842c8bc33ffa66e975c9cbb0f64d27f6da88cf2378d1d6fc47"
+"xtask/src/main.rs" = "1fb4a70005866102b5660c272cd4be3aa3ae767c237dad1181743f6a95e2fe80"
+"xtask/src/parts.rs" = "8642e3fafcbc0b94111ef7015af25314517e6dbbe802cbbe66084a2d6263c0fe"
+"xtask/src/parts/ctx.rs" = "a2add234f93b6e2d229f7cdd1fb05aa1f1afdcd352831ea9a9497e6e4ea6698d"
+"xtask/src/parts/int.rs" = "bf4d87ddc69932573b7e8b7b81e82df13805a0cd7254acbf98a422875bbec16f"
+"xtask/src/parts/quick.rs" = "2014f0a3cce7ee865e2085225a2bfaeeda4faefff42934ab1aa3381d2343b551"
+"xtask/src/priority.rs" = "7dabc75a3b4a11a8cdeba77751184453b03ddd174609bf9fbf74452741b3035d"
+"xtask/src/rebuild.rs" = "b7aa5f47edc1f02c06039c7cf687406b56e51ee974b56ca98eb64f5485bc6665"
+"xtask/src/results.rs" = "be5ffb974f60a181b47e561632ee3ab6cfe9c36f6eebe224d886d62ee9ed404a"
+"xtask/src/reuse.rs" = "9a2c57400672336151c9fb8a0246cf272f18f239e05d62a8d63068b9a6422e9e"
+"xtask/src/schedule.rs" = "2ea94824c70c2abad92c17bdf64bcd3d34ce23afa0b24d661274f9f7b85d692d"
+"xtask/tests/checks/hook_tasks.rs" = "176bbd1eae7a123fdd4e37aab07ce2b0d4cdee0672f5d27e30cd23051d524bf4"
+
+[[change]]
+id = "design-jobs"
+reason = "A design for approval; nothing is built and no check changes. docs/design/jobs/jobs.md is new: heavy jobs, a per-user machine-wide limit on heavy commands run as wtpool job -- <command>, where heavy is a list of command patterns kept per repository, suggested from the stack markers the repository holds (one data table in wtpool-core, and the scripts of package.json, read only and bounded) and heavy only once the user accepts them, plus a machine list that starts empty; the list drives the queue, build detection and a policy (off, warn by default, require) that flags heavy work outside a job and lets a harness adapter refuse it with the wrapped command. The panel's strip edits the limit, the policy and the patterns, and adds suggestions, through wtpool job limit, enforce and heavy add|rm [--repo] [--suggested], which edit machine.toml or the repository's wtpool.toml in place, keeping other keys and comments. It holds requirements, choices, the J rows J1 to J24, the heading's muted count of this repository's suggestions until its first pattern, user flows, failure modes, adoption with the planned plugin skill, privacy and security, a verification plan, open questions Q1 to Q18, all resolved, and a follow-up naming autodetect.md as planned. docs/design/jobs/attachments/ holds its mockups with their HTML sources, mockup.css and render.mjs, which renders them through vscode/src/webview/icons.css and style.css and the theme values of verify/themes/ in the Chromium of vscode/test's Playwright. status-panel.md gains the phase 4 rows H29, A8, S14, S15, W10, U10 to U15, X20, X21 and X22, and amends R7, H1 to H4 and H22 (a sync PreToolUse policy entry for shell calls, wtpool hook policy, the only hook command that prints), H14 (a summary skips wtpool job up to --), S4 and A1 (builds are processes matching a heavy pattern, or a suggestion while a repository has no list), the document's field list, U6, U8, X11 (the jobSettings message with pattern edits), X14, the legend, the Phases table (phase 4, planned) and the UI mockups table; docs/design/status-panel/attachments/ gains the SeveralAgents mockups of U12 and U13 with their sources. Every new ID is phase 4 and in no trace list, flow table or scenario catalog yet, so trace_complete, flows__should_each_have_an_e2e_check and catalog__should_match_the_files judge nothing new."
+[change.files]
+"docs/design/jobs/attachments/ChipFocus.html" = "9da5e420ebe9ca634bcd158587ae0ec05bba8af5b9dd92129ea186870c5b5b04"
+"docs/design/jobs/attachments/ChipFocus.png" = "3393af1d5d5a5de2f2a5cbc1fe2ae8cbafbbdc6ae09c758eca7d505eaf079731"
+"docs/design/jobs/attachments/EditOptions.html" = "0572ba5995eb5d571ff433b1602d1ce0b0bd46a2839d6a10e463610055c65e2d"
+"docs/design/jobs/attachments/EditOptions.png" = "1a645ff3f02933d530a434090198ab2037acd6f5dc971aebfe85b1a985f09d73"
+"docs/design/jobs/attachments/FirstOpen.html" = "ffcabad30682b1bfe15809b5215d614cf89a00567e4f46ef10fe9b435758bb89"
+"docs/design/jobs/attachments/FirstOpen.png" = "e37ea87ed1cd6c19d6642af9c7fc954d58597716ced7fc60eababb76f08ad3cc"
+"docs/design/jobs/attachments/Heading.html" = "9782309bee451b320f84915733dd376d8d2459c44b11e52cffe5116a9b87c212"
+"docs/design/jobs/attachments/Heading.png" = "23e56c134f10c55a5ace13cc8e0917ad1794881c1ea939528e6e6bfff71ccb12"
+"docs/design/jobs/attachments/HeadingBusy.html" = "0d686b0851610c0d926d6dfb355714d9065dd1b9060a858d581a272de3bd4ab9"
+"docs/design/jobs/attachments/HeadingError.html" = "493c4696cc18bc4b8a666af41cbcadc0cb1d1f08851b5e7b0d1b67e669a806ae"
+"docs/design/jobs/attachments/HeadingFocus.html" = "b8edeceb2bbe3ed4b57c54284a7b2055f38a723ae38afd6fa314d7c7a96af27f"
+"docs/design/jobs/attachments/HeadingIdle.html" = "abd4442108074798ed8f52bca0d7fda47c5c1a0fda442c613a6bcf5e1087f4dc"
+"docs/design/jobs/attachments/HeadingOld.html" = "0b8ee6af9733faf3e97587769e0f121cac66ed4e5383e04ad07c69c8d1ef4fa8"
+"docs/design/jobs/attachments/NotQueued.html" = "6ee9892c9feb6ccffe9647bf4d964a34517364ee8d7f9f3f856be7255339c050"
+"docs/design/jobs/attachments/NotQueued.png" = "d1dc10a53ba74b14746e92701ebc485ed749c92d911c6722cb3af83852d5d23a"
+"docs/design/jobs/attachments/OptionNative.html" = "9d1b294b9b58e84ebd8e9ba65fb74c31f9f721475c3a9d889a580e681c233b4f"
+"docs/design/jobs/attachments/PatternError.html" = "0f9036de02f912dfeba63650c2b3f8c3ae61e43dff2ccdb4ef4d2520b6f71d98"
+"docs/design/jobs/attachments/PatternError.png" = "345e29d36dd1753e0740e8853c5fbb36d7e3a9f24cab605927dd04b27603d9ae"
+"docs/design/jobs/attachments/Strip-600.png" = "611b7d063e762acaa1aba1b9ca40f585b81b7609738401864c464bda52c731ff"
+"docs/design/jobs/attachments/Strip.html" = "aceb43c552a167a79ff48e7675b9e313a034361ed93c1d72a1dc95a73eaa2c05"
+"docs/design/jobs/attachments/Strip.png" = "85306af4357afc60d689ba2a3360f684917ad53f9a4ce99ac49b9711019274c3"
+"docs/design/jobs/attachments/StripInvalid.html" = "524b6920af3a83d4fa5f06e5a24fac05b5c564d664ba1c324f1226e214dedefd"
+"docs/design/jobs/attachments/StripLowered.html" = "597f79ef257d5952240b11cb4c896c2a8f57ee0cf364bffb905da9e9a5b46ab0"
+"docs/design/jobs/attachments/StripOld.html" = "07f525159a17e3a3ab8d1b68f8942c642ff24f293b45cac4e6ab0128b42a97f5"
+"docs/design/jobs/attachments/StripRefused.html" = "fbc4bce9424e54103bb33ddc7ef7fb2ac5d5cce33f3afaca6791701825395f51"
+"docs/design/jobs/attachments/StripRemote.html" = "d7a6ca987409bcb00681c1f375dca3e71f8f4d35c6c26967d2c3373636daa603"
+"docs/design/jobs/attachments/StripRequire.html" = "54439c94a919ec3fa7b48509b5830672f4058e94f1b03972ad3f4c21f69caeb3"
+"docs/design/jobs/attachments/StripStates.html" = "77cd6d9f4ae91d01b5e036d9cfe85eca2fb036d89667d69eba57c99a9524e63a"
+"docs/design/jobs/attachments/StripStates.png" = "fa36a29b9df0a49d7bd14867ae5a948ce24ce963e36e203118209ffd421f2a93"
+"docs/design/jobs/attachments/mockup.css" = "baa93b09414983105169494b2fe123b48397366a56bbfc6bde2f989a263f1d37"
+"docs/design/jobs/attachments/render.mjs" = "25767b3437f20595866fbff379bf5a293cf9b9a38704e5b510c175676fbfaa87"
+"docs/design/jobs/jobs.md" = "90a8528ba3a5c101f15a804c771a789afd0aea9564df5f2002f6b9ed1df0555c"
+"docs/design/status-panel/attachments/SeveralAgents-1100.png" = "28e99f0feb05a9b07559c82839ab394f54a8e787e4351b25a08f8917a8731190"
+"docs/design/status-panel/attachments/SeveralAgents-600.png" = "cfd588c34f907d361e4debc4c9a8a838cba96affc576251bd29a7f26ff8d92d2"
+"docs/design/status-panel/attachments/SeveralAgents.html" = "d427965dd44c9730070d80db3b69676c321a3f76662fc78ffa8ba2ac90b3905f"
+"docs/design/status-panel/attachments/SeveralAgentsThemes.html" = "6204b1e20d1d216006fce08ca68cd752675c065b94429c1ec74ff46bedfb55b5"
+"docs/design/status-panel/attachments/SeveralAgentsThemes.png" = "18c7d642555e5cf38a00fa3a3c6bbe905225dcc8b71a0e9d2f9585f07ae4e5b0"
+"docs/design/status-panel/status-panel.md" = "e1ff6e23225fd7cb1b27319c789409262585116e83354d72b18f33f9b64b8d34"
+
+[[change]]
+id = "ts-host"
+reason = "R12 of status-panel.md gains a sentence: the extension reads a listed output path only when it ends in /tasks/<id>.output with <id> as H27 accepts it, \\ counting as / on Windows; the tail of any other path says why it shows nothing, and a follow of it does nothing. In output.test.cjs each check writes its output files into a tasks folder below its own folder, and tail__should_never_read_an_unlisted_path gains the variant task_output_shape: six listed paths of other shapes each get a tail with a reason and no lines, none is opened, lstatted or watched, and a follow of each opens no terminal. tab.test.cjs gains spawn__should_use_the_setting_and_no_shell bare_name_from_absolute_path (X4: a bare wtpool.path runs the first runnable file of that name in an absolute PATH entry, past a relative first entry, a file that may not run and a folder of that name, and a bare name on no absolute entry pauses with wtpool did not start: spawn <name> ENOENT and never runs the file of that name in the workspace folder) and messages__should_ignore_everything_outside_the_set failed_action (open and terminal that fail by a rejection and by a throw each show Worktrees: <type> failed: <reason>, and the message never rejects). vscode/package.json declares capabilities.untrustedWorkspaces with supported false, and overrides @azure/msal-node to 7.1.0, the first release outside GHSA-xcx6-jx8p-x3h5, a dev dependency through @vscode/vsce and @azure/identity; package-lock.json changes those two packages only. What the other checks judge is unchanged."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "c116aacd7bba46f95e6e605e93bbbc42b9f5454099bdc4aab5f1d46c813057b4"
+"vscode/package-lock.json" = "c359205fd7022788d6639f317c30cb034456a3b3e65689fe0048c3de6d041f3a"
+"vscode/package.json" = "ad818da6778c417f9371aac0000eaf3e2303095584ab50178cf5cdaaa2e1038a"
+"vscode/test/host/output.test.cjs" = "ec9be7caacf7534ca10c729bbc3e3154845fdb6b51e03fc4adce5e9179c8bfcf"
+"vscode/test/host/tab.test.cjs" = "6a4e5d636dfa63e522e22bb6114ce4a2be6bd5954b2d0c6f0714f642ae111650"
+
+[[change]]
+id = "design-harnesses"
+reason = "New design document docs/design/harnesses/harnesses.md, approved at revision 2 with every recommendation and planned for phase 5, with nothing built: how the hook-dependent features of status-panel.md work with coding agent harnesses other than Claude Code. It defines a harness-neutral event protocol, the generic adapter's JSON format and its version rule (HR1 to HR8); capabilities and tiers, how the panel degrades per capability, and the rule that adapters map every harness onto the document's closed enums, so a new enum value raises the document's version (HR9 to HR13); the adapter trait and what it needs beyond parsing, process identity across shells and shared processes, the open stem grammar in core's activity module, and the refusal of other harnesses' payloads in the Claude Code adapter (HR14 to HR19); the generic adapter with glue examples for Aider and Goose (HR20 to HR22); the launcher and process detection (HR23 to HR27); install per harness (HR28); a sign that an agent is busy while its model generates, by progress events or the harness process's CPU time, with the measurements of two sandboxed Claude Code sessions, which show its transcript written once per complete message (HR29 to HR34); the security rules, the Claude Code mapping, mapping tables for the researched harnesses, the status-panel.md rows to amend or add in phase 5, a verification plan, the refactor, open questions and a build order. Every HR ID is phase 5 and stays out of verify/trace.toml; no check, spec row or harness file changes. docs/design/jobs/jobs.md, approved, now says so in its status line, planned for phase 4; nothing else in it changes."
+[change.files]
+"docs/design/harnesses/harnesses.md" = "e8de2cb793e0dce88d3176d68df36e8983f276940b18686858f6857ddb04f840"
+"docs/design/jobs/jobs.md" = "fe815fcd8e0a8415ef6819766218270da17e4adbcc8c2c58c1645e04daeb650f"
+
+[[change]]
+id = "design-autodetect"
+reason = "An approved design; nothing is built and no check changes. docs/design/jobs/autodetect.md, approved with every recommendation and planned for phase 6, after the jobs of phase 4 and the harnesses of phase 5: one wtpool status --watch per machine, chosen by a lock, samples the process table through sysinfo, groups processes into runs below shells, harness processes and jobs, keys each run by its program and the words before its first option, and keeps the CPU time, peak memory and wall time of heavy runs per repository in the user's state folder, keys and numbers only. A key whose runs keep a quarter of the cores busy, or a quarter of the memory, for at least a minute, three times among its last ten runs, becomes a suggestion in the machine strip with its evidence, beside the stack-marker suggestions; the user adds it or dismisses it, dismissals kept in heavy_dismissed of wtpool.toml, and nothing becomes heavy by itself. Measured evidence may suggest cargo check, which no marker suggests, and one Dismiss hides it. jobs.md gains its phase 6 additions, each marked from phase 6, in J2, J3, J5, J6, J20, J23, Q13, Q18, the section 2 rows, the privacy table and the verification plan, and a revision 6 note in its status line. status-panel.md marks the rows it amends as phase 6, R7, S2, S4, S14, W11, U15, X11, X21 and X22, and its Phases table gains a phase 5 row that points to section 11 of harnesses.md and a phase 6 row. The Measured, Measured-600 and MeasuredDismissed mockups render through render.mjs, which lists them, with autodetect.css."
+[change.files]
+"docs/design/jobs/attachments/Measured-600.png" = "75e14ef7b1e1ae4c1ba0eeff0ad4343cfe6d3b054661b42d7786e9b26536e0d4"
+"docs/design/jobs/attachments/Measured.html" = "116a8067ccc414d26801f21212e97fd9c0d67a735bd0499b3ed4612209869d76"
+"docs/design/jobs/attachments/Measured.png" = "555204d3b52af9addc54e40e7c7bf46c748d47f1ed7167abe0c67b527158a0a5"
+"docs/design/jobs/attachments/MeasuredDismissed.html" = "62868f7e480cf9e96c323e5c9ac479ec9cf8210dc216ee816a2313e137e5e3b2"
+"docs/design/jobs/attachments/MeasuredDismissed.png" = "a77435dc2d782c8f07d43136ce59b3ce66c89b05f9d2af34d1f10c353c04f6e8"
+"docs/design/jobs/attachments/autodetect.css" = "ada650a3daa50b9e0ae7d90bbbd1fbb07a67daf15beeec1546f2bb2bfba46afd"
+"docs/design/jobs/attachments/render.mjs" = "c1cbf1dbb198d62602889c828832b9b1961000e82719fad93641ce51adf004bf"
+"docs/design/jobs/autodetect.md" = "c6edf81a0ebf54d8d7b8627ed2a4f128ec4b5d902135ab1f6e00c81189cff2dd"
+"docs/design/jobs/jobs.md" = "d685961842517e089fa87eefab77e22b714370703de74893f4333c53d560711e"
+"docs/design/status-panel/status-panel.md" = "5a03adf2d37b30f2cbe8f1a338fd2ff9b602cacf5c9cc57689e53a2cd6e79179"
+
+[[change]]
+id = "adapter-split"
+reason = "The Claude Code adapter of wtpool hook moves out of wtpool-core into a crate of its own, crates/wtpool-claude-code, so the workspace members gain that crate. wtpool-core keeps the rules of wtpool hook that hold for every harness behind an Adapter trait, and a shared activity module holds the record folder, the record reader, the stem grammar, the ids and the values records hold; the binary wtpool picks the adapter. The Claude Code adapter paragraph of status-panel.md section 1 names that layout instead of hook/claude_code/. Record JSON, the output of wtpool status and wtpool hook install, the schema text, every other CLI output and every exit code stay the same, so what each existing check judges is unchanged. One int check is new, status__should_read_the_kind_of_an_older_call: it reads a record as an older wtpool wrote it, with no harness and a Bash call without a kind during a build in its worktree, and the same call in a record of a harness without an adapter, so that int reaches the frozen kind map of H26 in wtpool-core; verify/trace.toml and the H26 entry of the trace list in verification.md name it."
+[change.files]
+"Cargo.toml:workspace.members" = "6edd4a49173a43ab2a16688f33b6e5fe0eb33bedd706b6285e7d05133e83ab64"
+"docs/design/status-panel/status-panel.md" = "d0754c59affc653b1b413b240f46663417a4b4553f346a04d19a5f23630f80ec"
+"docs/design/status-panel/verification.md" = "ef585ae5e052f96cc7db6b68d89c042a2326b21631b8f51d6a988ab713333a39"
+"verify/trace.toml" = "b7c763fd8fe93078d65b14afe7c95241283650610b5287234fa9dc14977fbf01"
+"xtask/tests/checks/status_agents.rs" = "d32fe53481062ca330883c7ee6918a0cc60fe7f4034268b55c224352371d5c2f"
+
+[[change]]
+id = "sec-cc-harness"
+reason = "The cc layer runs Claude Code locked down. Each session's canUseTool allows only the calls of its script, each tool with its command or path, and denies any other with a message that names it; the scripted calls keep their hold, allow and deny as before. The contract turn runs in auto mode with no tools, as auto mode approves calls without canUseTool. Only an allowlist of variables reaches claude, its hooks and commands: PATH, HOME, TMPDIR, USER, LOGNAME, SHELL, LANG, LANGUAGE, LC_*, ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_OAUTH_TOKEN, GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM and WTPOOL_* but WTPOOL_BIN, so no SSH agent, GitHub or cloud token or variable of the starting session; HOME stays the real one, as macOS finds the login keychain through it. DISABLE_AUTOUPDATER=1 keeps a session from replacing the installed claude, since the run's configuration folder lacks the owner's autoUpdates setting. The run's settings deny WebFetch and WebSearch, which Claude Code runs for some hosts without asking, and turn Claude Code's sandbox on: Bash writes only in the session's working directories, all in the run folder, and Claude Code's temporary folder, reaches no host but localhost, never runs unsandboxed, asks as it would unsandboxed, and a sandbox that cannot start stops the session. The sessions' XDG_DATA_HOME and XDG_CACHE_HOME, like XDG_STATE_HOME, name folders in <run>/cc/: Claude Code's start-up cleanup prunes the versions it finds unlocked, and with only the state folder in the run folder it pruned the owner's real versions folder while it saw none of the owner's locks. contract__should_run_in_the_sandbox also fails when the owner's Claude Code install changed during the run: an entry of its versions folder, by name and modification time, or the target of ~/.local/bin/claude; it reads no file's content. The harness supports the latest installed Claude Code alone: a --record run in which every cc check passes moves each other claude-<version> folder of the recordings into recordings-backup/ beside them, as <folder>.bak-<seconds since the epoch>, so the next freeze locks the new version's recordings only; xtask/src/layers/cc.rs tests it. verification.md says so under No side effects and Contract test."
+[change.files]
+"docs/design/status-panel/verification.md" = "3fb4372d5de8060fab12202f7be563ed9d10be8f1295810e458b6ed1ff3ba74f"
+"vscode/test/cc/run.mjs" = "d70b81bcb58f1c260f93279e639ab5c7204fb2e90f6c470dd0a72adb3d3016f2"
+"vscode/test/cc/sandbox.mjs" = "72ae13adaed2511a8cf13726f963faacc66809dc4fb74e9416917b87ccd24f43"
+"vscode/test/cc/sessions.mjs" = "02c4c3124dc34dea954a078dbbbe84a4613a6cd48473c45ee58745408b95a905"
+"xtask/src/layers/cc.rs" = "66395b020f9a7338856c13e37217504330a4ffd4d771f5dca25e4ff2867a0434"
+
+[[change]]
+id = "merge-cc-adapter"
+reason = "verification.md holds both the adapter-split trace entry for H26 and the sec-cc-harness Contract test and No side effects text; this pins the merged file."
+[change.files]
+"docs/design/status-panel/verification.md" = "81fb2c9b6d61d91ba494676f8563daf78d34e686776ad2beab4c1bf24593b1df"
+
+[[change]]
+id = "harness-layers"
+reason = "The layers, the int part, the report and the standards copy, in leaf modules. layers.rs holds only its module declarations, re-exports, two limits and Wanted: the release wtpool, the npm installs, the web build and Chromium move to layers/builds.rs, the JavaScript layers with the quick and ui entry points to layers/js.rs, the manifest checks to layers/manifests.rs and the cc judges to layers/cc_judge.rs; web.rs splits into web/registry.rs and web/merge.rs, and web/files.rs is renamed web/reporters.rs. The int part runs as step functions over a pure TestEnv. junit::to_outcomes is the one converter of nextest reports, so the message of a failed Rust budget starts with its test's full name, as an int check's does. cc judges the live result in a pure judge_live with typed runner outcomes and kinds, and a --record run that cannot keep its live result for the lock reports the error cc:live_result instead of ignoring the write, and retires no recordings of other versions; the cc runner's limit is the layer limit, which the 3 h cap never lowered. The static checks tell setup problems from findings by enum Problem, with the same messages. The report lists each budget result under Budgets; its oracle diff lists the files oracle::is_oracle_path names and the files of oracle keys, so verify/reviews, verify/oracle-changes.toml and verify/accepted.txt leave that section; Verdict implements Display; report.rs splits into report/verdict.rs, report/markdown.rs and report/write.rs. trace_complete reads its problems as a struct and judges harness:self_test, harness:fmt, harness:clippy and harness:rustdoc, which verify/trace.toml and the harness checks paragraph of verification.md now list. verify/standards/google-rust-style-guide.md, the guide's own rustguide.md at google/styleguide 89e0e1b with a note naming its source and licence, replaces the HTML copy, and static:doc_links counts the HTML anchors the guide links to. The header of verify/themes/webview-default.css names src/vs, and a comment of vscode/test/e2e/vscode.mjs names the pool each attempt builds. Two test races end: two must_load cases shared one temporary file, and the machine lock tests failed while a process another test spawned still held a copy of the lock file."
+[change.files]
+"docs/design/status-panel/verification.md" = "a3cdc1ac1d1bd18bb7ba3b93cda20d45d8484f331d8988b49f08c70206da8f90"
+"verify/standards/google-rust-style-guide.html" = "missing"
+"verify/standards/google-rust-style-guide.md" = "bf5ecd7b79c2af0ae569e78b5d371e530b201c468a658867559d66be49e2383b"
+"verify/themes/webview-default.css" = "83d7f27b71b5f8d4ca141c96f0d1bab6ce252a9d162bc9d45fa02dc3b82640e6"
+"verify/trace.toml" = "b08405a966a613a0e3583e5a17d5554414a2c89a477ddb83f1f08105b92bb00c"
+"vscode/test/e2e/vscode.mjs" = "e8d69f489fd5b2487f6307fabb367456bc9b4e2ef31f91f346370f79380dfbce"
+"xtask/src/clone/canaries.rs" = "7831eb5a6d34af0d86a0fbf5de0bdbbf685338944b70de41d3960824aec13d59"
+"xtask/src/doclinks.rs" = "46a8db7bcad16742a49936e8d544e32de7fe2a48a0fa3b777788393efa1db879"
+"xtask/src/flaky.rs" = "91b671c0c59e293d8617fdad676b737bb3e6fc2653b189bde1ceb18b0fa56409"
+"xtask/src/junit.rs" = "0f9701bad55d19c35b5ba6730fe4b5e8a159f3102fea6254446dbeb2551677eb"
+"xtask/src/layers.rs" = "0eb121f69b68fbf17c4e8996c5babe4f2a69d7f0784fac5ab1f31c2d300031e1"
+"xtask/src/layers/bench.rs" = "b2f40c786d11de2db9ee360b59bf6083b11b1afe2e9978945183d935729d0fd3"
+"xtask/src/layers/builds.rs" = "546ab4ad6dc651c7d6c0edbe69539afd5ab56796f4088933c37b3947c34223ba"
+"xtask/src/layers/cc.rs" = "0762ffc02fa78bdd36588ed436d65293ed0d807d3c002a9ea4c98fa3818dde48"
+"xtask/src/layers/cc_judge.rs" = "0fee633e457ee96fd598a31bb1754490f4367b692e244b5d097c313320c686dd"
+"xtask/src/layers/e2e.rs" = "ac3e9a1fe5ab8e0c3a9b58340ff384785414d66e17752837e131c537180a1995"
+"xtask/src/layers/focus.rs" = "54ffea32dbc125a67d13fc93387988db92791a748ba8927d12a660eb59e7abd9"
+"xtask/src/layers/js.rs" = "11e92834032d29fd000657afc64a80337c1f9326c95fe34db2a7ad96987c2a26"
+"xtask/src/layers/manifests.rs" = "1798aef08b9b129ae4e848e25fb2e03c6404facc96fd4c1a98a54c18753b7c39"
+"xtask/src/layers/product.rs" = "d058d5f8014153b2da60a333af2f3cc07e9debef35f32d28834becb323acfe46"
+"xtask/src/layers/statics.rs" = "19dd4fec5bb9d7968787ae93043aeee0d6cec67a3fa8856ec5430fd8ae045467"
+"xtask/src/machine_lock.rs" = "84f87abacdd2132eb25acec850cc83e009fd15591972038548368512b5b53a93"
+"xtask/src/parts/int.rs" = "c9619cbca62a1ed0afb1a194b11d054b8ee4e8048554bf26671790536ed4d16a"
+"xtask/src/report.rs" = "27f7d0e5bb90c73bffcf952e48f71c565d46d9a452efa5f1a55eec870b87a0ce"
+"xtask/src/report/markdown.rs" = "5e5b7ed2bd0fc44b564180e42fed2bb7e0b9e5f84004f4a476471682f6891899"
+"xtask/src/report/verdict.rs" = "365f92129564ad587ca09570ff1dd3a4712f8cd079142a18e4e6139d49f7a7d4"
+"xtask/src/report/write.rs" = "fc5e0e409e4a953ff165f78557bbc896490e0f5f6408f21c9ea3dc3bce5e8390"
+"xtask/src/results.rs" = "49504478992b0eec0fd8d0011ed25d209bc06345e3d0fb863f904070603c247e"
+"xtask/src/scrub.rs" = "bafd9cd06976d937a2a16319a1b43e489b9dba47ab549a1a4031fac46c2c0612"
+"xtask/src/trace.rs" = "a87294bed9f3a1a3343204408ebe8e864585df138f02c75eb6ca9cecfc6936d4"
+"xtask/src/web.rs" = "86fb4908c63755b95a544133f127156bd1700c9764c04fd18d9c5b31e96b4196"
+"xtask/src/web/files.rs" = "missing"
+"xtask/src/web/merge.rs" = "81299d9ee0f716c16b594d9ee0c7688d0b8b7fdb2801e52cfce65355e8280cb3"
+"xtask/src/web/registry.rs" = "356ad8737914434b1f28067c446f2a847a869fb1a4064020de420c79f7de7e78"
+"xtask/src/web/reporters.rs" = "17f4fb5f96c361da731aef409747781f7734cf1d81968edf27ef84cb5fc8dc1a"
+
+[[change]]
+id = "cli-presentation"
+reason = "The terminal presentation of the CLI leaves wtpool-core: the worktree facts (Row, Role, State, Uncommitted, Upstream, Unreferenced, Operation) move to a domain module of wtpool-core, and the ls and setup table with its ANSI colours, column layout and shortening moves to the wtpool binary. The CLI also shows each control, bidi and zero width character of a branch, path or other string from git, a record or a setting as \\u{XXXX}, with the character set of X10, in every line it writes itself: the ls and setup table, each warning, progress line and error, the commit subject fg prints, the note of wtpool hook install and the text of wtpool config; JSON output, the output of git and on_new_slot that it passes on, and a path that fg, bg or path prints to a pipe stay as they are. Row R2 of status-panel.md says so. Every other byte of CLI output, wtpool status --json and the schema stay the same. Four int checks are new in xtask/tests/checks/cli_text.rs: wtpool ls with a branch that holds an OSC 52 sequence, a bidi override and a zero width space, and a gone worktree whose name holds a C1 control and a bidi override; the fetching line of wtpool bg for a branch only a local origin has; the commit subject wtpool fg prints; and a slot_dir that wtpool config prints. Each asserts the escapes and that stdout and stderr hold no raw character of the set but the line feed."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "6767604aff6f0f63af461a91851c8a7a98cd834e2ec047ad5c5c6f7679e37056"
+"xtask/tests/checks/cli_text.rs" = "4faea214e6ecf625311f49f9087962aeae5643070c8fdd99f29b130fc8e4581b"
+"xtask/tests/checks/mod.rs" = "a5a04524cba02ce6977449c396fe5451bd485c5e576a2f2eaa9e0e3d0bd260b7"
+
+[[change]]
+id = "ts-webview"
+reason = "The host and the webview share one definition of the characters X10 shows as \\u{XXXX}: control (Cc) and format (Cf) characters, the line (U+2028) and paragraph (U+2029) separators and the whole tag block. The webview's own list lacked the separators and several format characters, so a branch, name or label holding one showed it raw. render__should_escape_and_isolate_controls gains the variant separators_and_format: a branch and an agent label holding U+2028, U+2029, U+0600, U+06DD, U+070F, U+08E2, U+206A, U+FFF9, U+110BD, U+1D173 and U+E0001 show each as \\u{XXXX}, and none reaches the page raw. What the other checks judge is unchanged."
+[change.files]
+"vscode/test/render/panel.test.mjs" = "c8807991e67e28f903649a5cffa6e8eeda9ab8f07debdb18f9b3562c525704ed"
+
+[[change]]
+id = "scrub"
+reason = "Publication scrub, data and wording only. The mockups of docs/design/jobs/attachments/ and docs/design/status-panel/attachments/SeveralAgents.html show the placeholder pool acme/app with the slots app-wt1 to app-wt4 on the machine my-mac and a neutral session title, and the EditOptions caption names the strip as the design; render.mjs renders every PNG again from its page, at the same size and layout. jobs.md names my-mac in its walkthroughs. The status lines of jobs.md, harnesses.md and autodetect.md, and the choice rows of jobs.md, state outcomes without attribution, and harnesses.md states the shared Claude Code version as a fact. No check, spec row or behaviour changes."
+[change.files]
+"docs/design/harnesses/harnesses.md" = "7acc6103f0f63117c4307cb518c17e2ebac1f63c9e5fadbdfdfbdb55258d9efe"
+"docs/design/jobs/attachments/ChipFocus.html" = "ef8b7038a6309065176381b03f49feda5edf0c81bdb9ea830ff09cb906c2f880"
+"docs/design/jobs/attachments/ChipFocus.png" = "7d09a5f0d81d6956e9314d1432c7b54c154e0cfc67233ec134fddcaaf01c730a"
+"docs/design/jobs/attachments/EditOptions.html" = "70951688b5916baf63eed49237dfde3489daba0fef9a1d533f215cbc7bcc63db"
+"docs/design/jobs/attachments/EditOptions.png" = "aee45a032fa3823aa0d6d2edc2e0d032e852e592e60db71e7207361636d73f13"
+"docs/design/jobs/attachments/FirstOpen.html" = "a050351429537a75618097b0ceb91ea144335f6e444f8131697fd04435adbe70"
+"docs/design/jobs/attachments/FirstOpen.png" = "67c39b3232fec9a1758a6b15a77081114bd463b8c0eeb015aa7837135e04115f"
+"docs/design/jobs/attachments/Heading.png" = "c91767d0c919348d642e248eecfdf86598c1664113dff39d4679732adec62d87"
+"docs/design/jobs/attachments/HeadingBusy.html" = "14d28a52210cd1041e269a438add6d38912f3b449fa5ce0e68ff472d204506bb"
+"docs/design/jobs/attachments/HeadingError.html" = "fdc529928fd89ee334816f3dbfd42b3f4c28fc7f9c0e10f8fc52f957b70cba67"
+"docs/design/jobs/attachments/HeadingFocus.html" = "b643717170318bffca8691564c11be92d5c39d1f6a0a9325ef18e12c0777189c"
+"docs/design/jobs/attachments/HeadingIdle.html" = "0256d33568cb887dbd1306eb4d279271e627be8d42a226a81ef18fc756a5e2f2"
+"docs/design/jobs/attachments/HeadingOld.html" = "b1804c8136cf5744fcff1fa150beb8dcd42ee2f5e78718c8934954bdffaeff62"
+"docs/design/jobs/attachments/Measured-600.png" = "50236a93d4bc518aaf3b61a7fc2f9838dd0ec32c72f09ce2922b333cafe38419"
+"docs/design/jobs/attachments/Measured.html" = "ffdf310f96f4689633f447d0fbdc064459ab937a6bf8cf3f718028d8be1e940f"
+"docs/design/jobs/attachments/Measured.png" = "933fab93ba6cfeabab1083eef0ea3b200171ab1e952f3f191107865e89ac30fa"
+"docs/design/jobs/attachments/MeasuredDismissed.html" = "3ba5171dab0b1587bd3c553496b2b25c8a2b48004334bdc522f414f555f2292e"
+"docs/design/jobs/attachments/MeasuredDismissed.png" = "8039a175adfe246d65c7915a88529d3aa4692a20e191b12133945eb095348fd8"
+"docs/design/jobs/attachments/NotQueued.html" = "750ed3c14a569f16f82c667be5b9b1dbad3bbb93086c4056af59da4d1a62fe48"
+"docs/design/jobs/attachments/NotQueued.png" = "6d796fafc0d316ef746ea2028fd81b3ad9eedfab2b384d10e28d089dc77f89af"
+"docs/design/jobs/attachments/OptionNative.html" = "836ebbabbbfe3efedc4955a59e92aa671908eee9a28860e74d333e9a3b79cd1c"
+"docs/design/jobs/attachments/PatternError.html" = "eb66fe7477def6c2eb0184dcf423165ef89495320dcdea9ceb85913fd87062e5"
+"docs/design/jobs/attachments/PatternError.png" = "56bef5b2e5bb6373a0329018007493bfe94c06439e05cfbb2e37dfa37d7aa569"
+"docs/design/jobs/attachments/Strip-600.png" = "61c5916fe8d40ac80d3f9dbd66417fa71a45b7711eeb3379a774dcc3743856da"
+"docs/design/jobs/attachments/Strip.html" = "41bdf3634bb9383163dd04a9ed2fef0a60b93d5f9fed90d8dbc6b08624c916f2"
+"docs/design/jobs/attachments/Strip.png" = "4e0e3bdad6297bc6c42d6e5aed4adcd122e4718b4573b6432a8a8010a782663c"
+"docs/design/jobs/attachments/StripInvalid.html" = "7298c9624ab8b05096f2e63c51ed336f5aef2d5c0218e8bd757b372ea9853821"
+"docs/design/jobs/attachments/StripLowered.html" = "3186eabb04408d5abef780ed402feaae841e201c042a70fdb0bea52da0389c94"
+"docs/design/jobs/attachments/StripOld.html" = "d40f42422567a0e7a0d04717cf1250ac9bcc7ef88fd764df8d6e85853241273a"
+"docs/design/jobs/attachments/StripRefused.html" = "8ee5c611de26215a9168a3e89cd8910bc7f2d7242204338d2bb85e8577dcbb32"
+"docs/design/jobs/attachments/StripRemote.html" = "0803219a6dc12748f16240d884b4fb6ce0ec68c39d1a9e00ae198ea9136a601b"
+"docs/design/jobs/attachments/StripRequire.html" = "3249753138c01bba00ece88f3b177f965bc0fa22abe7e74fef0311b5a307198a"
+"docs/design/jobs/attachments/StripStates.png" = "d1b14e3ac51e63440794326053ceeb11548b1fa1730e361d351568c731f21fa9"
+"docs/design/jobs/autodetect.md" = "04d7b8fd7ac903bca098df037ee49f3adebb52386a5c42934eb55c64fc63f118"
+"docs/design/jobs/jobs.md" = "260855524ff2f4719b870dcc828c4669a79cbfcdbe32599ad929419e9e09f09a"
+"docs/design/status-panel/attachments/SeveralAgents-1100.png" = "550896bc41a0b88be339262f092d550c526f1a33ff38d6343d700f9892cc521f"
+"docs/design/status-panel/attachments/SeveralAgents-600.png" = "f86b4c9ee5ff2193005111f5b3b943ee284d1f24b123ed054c117bc4e9d2c1ff"
+"docs/design/status-panel/attachments/SeveralAgents.html" = "cba198799e87b91ef1f1c295f5807f3a8d96ffaa36d8006f7f86de218f2d2708"
+"docs/design/status-panel/attachments/SeveralAgentsThemes.png" = "aee763d60454be389df0772bb7261af7a16cb667603215c5669ff887ff81cb45"

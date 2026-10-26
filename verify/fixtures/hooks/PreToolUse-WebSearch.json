@@ -1,0 +1,12 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1.jsonl",
+  "cwd": "{pool}/fg",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "WebSearch",
+  "tool_input": {
+    "query": "git worktree prune"
+  },
+  "tool_use_id": "toolu_01Search"
+}

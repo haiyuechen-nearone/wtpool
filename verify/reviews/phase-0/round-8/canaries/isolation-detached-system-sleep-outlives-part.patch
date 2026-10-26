@@ -1,0 +1,35 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version, run by an int check, starts a detached /bin/sleep in / that runs on for 20 minutes
+after the part, as a hook that hands slow work to a system tool would. macOS shows no environment
+for its own programs, the process works outside the run folder, and its parent has exited, so
+nothing but its start ties it to the run. The portable form of
+isolation-lock-pool-after-report-from-system-shell: it touches no pool, so it is safe under the
+real HOME. Calls from the builder's own tests, whose foreground lies outside the run folder, do
+nothing.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..723b0be 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,18 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let foreground = std::env::var("WT_FOREGROUND").unwrap_or_default();
++            if foreground.contains("/verify/out/") {
++                let mut child = std::process::Command::new("/bin/sleep");
++                child
++                    .arg("1199")
++                    .current_dir("/")
++                    .stdin(std::process::Stdio::null())
++                    .stdout(std::process::Stdio::null())
++                    .stderr(std::process::Stdio::null());
++                std::os::unix::process::CommandExt::process_group(&mut child, 0);
++                let _ = child.spawn();
++            }
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

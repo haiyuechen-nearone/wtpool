@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<!-- A design mockup, not product code. docs/design/jobs/attachments/render.mjs renders it with the theme
+     values of verify/themes/ (?theme=, dark by default); the panel's own sheets come first, then
+     mockup.css with the proposed parts. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strip: a new repository</title>
+<link rel="stylesheet" href="/verify/themes/webview-default.css">
+<link rel="stylesheet" href="/vscode/src/webview/icons.css">
+<link rel="stylesheet" href="/vscode/src/webview/style.css">
+<link rel="stylesheet" href="/docs/design/jobs/attachments/mockup.css">
+</head>
+<body>
+<header class="header"><h1 class="title">Worktrees</h1><div class="chips"><span class="chip chip-free">1 free</span></div><span class="connection connection-live">live</span></header><div class="scroller"><table class="grid"><colgroup><col class="col-activity"><col class="col-worktree"><col class="col-branch"><col class="col-git"><col class="col-agent"><col class="col-last"><col class="col-actions"></colgroup>
+<thead><tr><th scope="col">Activity</th><th scope="col">Worktree</th><th scope="col">Branch</th><th scope="col">Git</th><th scope="col">Agent · doing</th><th scope="col">Last</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+<tbody>
+<tr class="pool-heading" data-machine="my-mac" data-pool="/Users/you/code/shop/.git">
+<td colspan="7"><span class="repo-icon" aria-hidden="true"></span><bdi class="repository">acme/shop</bdi><span class="heading-machine"> · <button type="button" class="machine-button" aria-expanded="true"><bdi>my-mac</bdi> · jobs 0/4 · 7 suggested</button></span></td>
+</tr>
+<tr class="machine-detail"><td class="detail-cell" colspan="7"><div class="strip" role="region" aria-label="Heavy jobs on my-mac">
+<div class="jobs-limit"><div class="agents-heading">Heavy jobs on my-mac</div>
+<div class="limit-row"><label for="job-limit">Limit</label><input id="job-limit" class="job-limit" type="text" inputmode="numeric" value="4" aria-invalid="false"><label for="job-enforce">Policy</label><select id="job-enforce" class="job-enforce"><option>off</option><option selected>warn</option><option>require</option></select><span class="policy-meaning">Heavy work outside a job shows as not queued.</span></div>
+<div class="limit-row"><button type="button" class="job-button job-save">Save</button><button type="button" class="job-button secondary job-default">Use defaults</button></div>
+<p class="limit-note">Saved in <bdi>~/.config/wtpool/machine.toml</bdi> · defaults 4, warn · 1 to 64</p>
+<div class="agents-heading heavy-heading">Heavy commands</div>
+<div class="heavy-list-heading"><span class="heavy-source">This machine</span></div>
+<p class="heavy-none">none</p>
+<div class="heavy-add"><input id="heavy-machine" class="heavy-input" type="text" placeholder="add a pattern, such as go test" aria-label="Add a heavy command to this machine" value="" aria-invalid="false"><button type="button" class="job-button secondary small">Add</button></div>
+
+<div class="heavy-list-heading"><span class="heavy-source">This repository · <bdi>.git/wtpool.toml</bdi></span></div>
+<p class="heavy-none">none</p>
+<div class="heavy-add"><input id="heavy-repository" class="heavy-input" type="text" placeholder="add a pattern, such as go test" aria-label="Add a heavy command to this repository" value="" aria-invalid="false"><button type="button" class="job-button secondary small">Add</button></div>
+
+<div class="heavy-list-heading"><span class="heavy-source">Suggested for this repository</span><button type="button" class="job-button secondary small suggest-all">Add all</button></div>
+<p class="suggest-group">from Makefile</p><ul class="heavy-chips heavy-suggested" aria-label="Suggested for this repository, 1"><li class="heavy-chip suggested" data-from="from Makefile">make<button type="button" class="chip-remove suggest-add" aria-label="Add make to this repository" tabindex="0"></button></li></ul>
+<p class="suggest-group">from package.json scripts (pnpm, from pnpm-lock.yaml)</p><ul class="heavy-chips heavy-suggested" aria-label="Suggested for this repository, 6"><li class="heavy-chip suggested" data-from="from package.json scripts (pnpm, from pnpm-lock.yaml)">pnpm run build<button type="button" class="chip-remove suggest-add" aria-label="Add pnpm run build to this repository" tabindex="0"></button></li><li class="heavy-chip suggested" data-from="from package.json scripts (pnpm, from pnpm-lock.yaml)">pnpm build<button type="button" class="chip-remove suggest-add" aria-label="Add pnpm build to this repository" tabindex="-1"></button></li><li class="heavy-chip suggested" data-from="from package.json scripts (pnpm, from pnpm-lock.yaml)">pnpm run test<button type="button" class="chip-remove suggest-add" aria-label="Add pnpm run test to this repository" tabindex="-1"></button></li><li class="heavy-chip suggested" data-from="from package.json scripts (pnpm, from pnpm-lock.yaml)">pnpm test<button type="button" class="chip-remove suggest-add" aria-label="Add pnpm test to this repository" tabindex="-1"></button></li><li class="heavy-chip suggested" data-from="from package.json scripts (pnpm, from pnpm-lock.yaml)">pnpm run test:e2e<button type="button" class="chip-remove suggest-add" aria-label="Add pnpm run test:e2e to this repository" tabindex="-1"></button></li><li class="heavy-chip suggested" data-from="from package.json scripts (pnpm, from pnpm-lock.yaml)">pnpm test:e2e<button type="button" class="chip-remove suggest-add" aria-label="Add pnpm test:e2e to this repository" tabindex="-1"></button></li></ul>
+<p class="limit-note">Nothing is heavy until you add it.</p>
+<p class="limit-hint">Agents and scripts take a place when they run a command as <code>wtpool job -- &lt;command&gt;</code>.</p>
+</div>
+<div class="jobs-lists">
+<div class="agents-heading">Running 0 of 4</div><p class="jobs-none">none</p>
+<div class="agents-heading">Queued 0</div><p class="jobs-none">none</p>
+<div class="agents-heading">Not queued 0</div><p class="jobs-none">none</p>
+</div>
+</div></td></tr>
+<tr class="row activity-foreground group-active" tabindex="0" aria-selected="false">
+<td class="activity"><span class="icon" aria-hidden="true"></span><span class="word">foreground</span></td>
+<td class="worktree" dir="ltr"><bdi class="name">shop</bdi> <span class="role">fg</span></td>
+<td class="branch" dir="ltr"><bdi>main</bdi></td>
+<td class="git" dir="ltr"><bdi>clean</bdi></td>
+<td class="agent" dir="ltr"><div class="line state-none"><span class="line-icon" aria-hidden="true"></span>no agent</div></td>
+<td class="last"><div class="line">1 m</div></td>
+<td class="actions"><button type="button" class="action action-open" aria-label="open"></button><button type="button" class="action action-terminal" aria-label="terminal"></button><button type="button" class="action action-copy-path" aria-label="copy-path"></button></td>
+</tr>
+<tr class="row activity-free group-quiet" tabindex="0" aria-selected="false">
+<td class="activity"><span class="icon" aria-hidden="true"></span><span class="word">free</span></td>
+<td class="worktree" dir="ltr"><bdi class="name">shop-wt1</bdi> <span class="role" hidden></span></td>
+<td class="branch" dir="ltr"><bdi class="detached">(detached)</bdi></td>
+<td class="git" dir="ltr"><bdi>clean</bdi></td>
+<td class="agent" dir="ltr"><div class="line state-none"><span class="line-icon" aria-hidden="true"></span>no agent</div></td>
+<td class="last"><div class="line">1 m</div></td>
+<td class="actions"><button type="button" class="action action-open" aria-label="open"></button><button type="button" class="action action-terminal" aria-label="terminal"></button><button type="button" class="action action-copy-path" aria-label="copy-path"></button></td>
+</tr>
+</tbody></table></div>
+</body>
+</html>

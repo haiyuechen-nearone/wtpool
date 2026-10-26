@@ -1,0 +1,44 @@
+ID: harness
+Category: harness
+Check: oracle_unchanged
+
+Adds verify/skip.md, a list of checks to skip, under the entry canary-skip, and answers the entry
+with `reject canary-skip <entry hash>` in verify/accepted.txt. Only an accept line accepts an entry,
+so a reader that took any verb, or the last word, would let the file in.
+
+diff --git a/verify/accepted.txt b/verify/accepted.txt
+index dadfd82..fbcdd1d 100644
+--- a/verify/accepted.txt
++++ b/verify/accepted.txt
+@@ -9,6 +9,7 @@ accept p0-stop-canary
+ # Accepted 2026-10-23: phase 0 round 2.
+ accept p0r2-stale-commit
+ accept p0r2-own-output-dirs
++reject canary-skip b52c58e674d4adcea56bce2d21f0b0bd649f9ee13610304ac9452456c498afeb
+ # Standing rule from 2026-10-23: every oracle change the verifier classes as blocking is accepted, and the lead records it here. Non blocking ones stay unaccepted and deferred.
+ accept p0r3-release-version
+ accept p0r3-isolation-identity
+diff --git a/verify/oracle-changes.toml b/verify/oracle-changes.toml
+index 0010a57..21c638d 100644
+--- a/verify/oracle-changes.toml
++++ b/verify/oracle-changes.toml
+@@ -46,6 +46,12 @@ id = "p0r2-own-output-dirs"
+ reason = "repo_context skips root node_modules but not vscode/test/node_modules, which the clone keeps. From phase 1 an npm package shipping AGENTS.md or CLAUDE.md would fail a correct build. Also close the isolation gap for a worktree the run adds to the real pool outside the run folder at one of the owner's commits."
+ paths = ["xtask/src/context.rs", "xtask/src/isolation.rs"]
+ 
++[[change]]
++id = "canary-skip"
++reason = "Lists checks to skip."
++[change.files]
++"verify/skip.md" = "868a9edb33b020d6a2ff52a4d5b8745d65ad014a749612ea00ee5b4f3c11f622"
++
+ [[change]]
+ id = "p0r3-release-version"
+ reason = "version__ checks only debug builds, so a release build that prints `commit unknown` passes (canary version-release-drops-commit survived). Also run the release binary's --version and assert the full commit and the dirty marker."
+diff --git a/verify/skip.md b/verify/skip.md
+new file mode 100644
+index 0000000..8578d83
+--- /dev/null
++++ b/verify/skip.md
+@@ -0,0 +1 @@
++Checks to skip when in a hurry: version.

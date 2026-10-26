@@ -1,0 +1,340 @@
+# Worktree status panel
+
+**Status:** approved, revision 23 (2026-10-25: approved for publishing; A1: a session or subagent whose turn ended shows `working` while one of its own background tasks runs, with the action `background: <summary>` of the newest running task, and the A1 table and the `working` legend row say so; A2: a done subagent shows for 1 minute, while `wtpool hook gc` keeps its 15 minutes (H21); H22: `wtpool hook install`'s note says whether Claude Code runs the hooks (`hooks present:`, `hooks present twice:` or `hooks missing:`, naming what is missing); H28: the repository's Claude Code plugin `wtpool@wtpool` installs the hooks of H1 with the bare command `wtpool`, and D5, S8 and the Phases table name it beside the block; R12 and X19: an output tail and Follow show a tab as spaces up to the next multiple of 8 columns, counted one per character from the start of the line after the escape and carriage return handling, and X10 names that tab as its one exception; revision 22: editorial: the tool is renamed wtpool (command, crates, settings file, activity folder, variables, extension id); no behaviour change; revision 21: U6 and the legend give working its own robot icon, whose arms swing in turn, and building the codicon `loading` dial, which spins; X14 stops both under reduce motion; revision 20: X15: the open detail strip follows every document in place; an agent's background tasks show live in the detail strip: the Claude Code adapter records each task with the path of its output file, never its output (H27), actors list them as `outputs` (S13), the extension reads the tail of each listed file for the selected row only (R12), shows it in an Output section (U9) and follows it in a terminal (X19), and the webview may also send `select` and `follow` (X11); revision 19: H16: a session's label is its title, the one you gave before the generated one, from the payload and the transcript, whose new bytes each event reads, and follows each change; a subagent's label is the description of the Agent call that started it; A1: a session shows `working` while a build it started runs, also after its turn ended, and S4 reads each process's parent; revision 18: U1 puts the table's horizontal scrollbar at the bottom edge of the tab; revision 17: R9 runs wtpool in the home folder when the first workspace folder is not local, and follows a change of that folder; R10 names an exit without stderr and a failed start, on its own line while paused; the tab shows one repository, the first pool, under one U8 heading with its glyph and colours, and several repositories in one tab are left for later (S1); revision 16: wtpool is generic, for any git repository: the pool is the repository wtpool runs in, §1 splits into activity records for any harness and the Claude Code adapter, records name their harness (H25) and each call a neutral kind (H26), H22 follows `CLAUDE_CONFIG_DIR`, pools name their repository (S10) and actors their harness (S11), the status document is a contract any IDE can read (S12), the extension runs wtpool in the workspace folder (R9), shows wtpool's error (R10) and accepts unknown properties (R11), one heading per pool (U8), builds are found through a portable library; revision 15: editorial, the approved screenshots replace the Main, States and Tooltip mockups, no remote machines note, no behaviour change; revision 14: nothing is clipped and the table scrolls sideways inside the tab, colours meet WCAG AA in all four themes, icons share one size, the tab has its own icon; revision 13: H22 prints the block alone on stdout)
+
+An editor tab that shows, per worktree of a git repository, the branch, what each coding agent
+there does, and whether the worktree needs you or is free. VS Code is the first IDE that shows it
+and Claude Code the first agent harness that reports to it. [verification.md](verification.md)
+says how a build proves each behaviour ID.
+
+## Requirements
+
+| # | Requirement |
+|---|---|
+| R1 | One row per worktree: name, role, branch or detached. |
+| R2 | The git facts that `wtpool ls` shows (U1). The CLI shows each control, bidi and zero width character of a branch, path or other string from git, a record or a setting as `\u{XXXX}`, as X10 does, in every line it writes itself but its JSON and a path that `fg`, `bg` or `path` prints to a pipe. |
+| R3 | Activity per worktree (A4, A5) with the age of the last event. |
+| R4 | Each agent in a worktree on its own line, newest first. |
+| R6 | Agent events and git changes show within 1 s, the rest within one 10 s heartbeat. |
+| R7 | Tool calls wait for no hook but the permission request (Claude Code's PermissionRequest) and, from phase 4, the policy check of shell calls (H29). Each hook the harness waits for adds at most 5 ms at p95 (B1). A closed tab runs no `wtpool`. An idle watcher starts git only on its heartbeat (B5). From phase 6 the sampler of [autodetect.md](../jobs/autodetect.md) reads the process table on the heartbeat while no run is busy, and every 2 s while one is (JA7, B16). |
+| R8 | Read only by default, changes ask first, nothing listens, all text is plain text. |
+
+These hold for any IDE that shows the pool. §3 adds R9 to R11 and the rules of the VS Code
+extension.
+
+Out of scope: controlling agents, diffs, transcripts and whole logs. The tail of a background
+task's output (U9) is in.
+
+## Decisions
+
+| # | Decision |
+|---|---|
+| D1 | An editor tab (webview panel), not a side bar tree. |
+| D2 | `wtpool status --watch` pushes updates. Nothing polls. |
+| D3 | A status bar item is designed, not built. Waits raise no popup. |
+| D5 | You add the hooks, either through the repository's plugin (H28) or by merging the block into Claude Code's `settings.json` (H22). `wtpool hook install` only prints the block. |
+
+## Measured on macOS in October 2026
+
+Each `claude` process and its transcript stay with the directory it started in, so agents report
+through hooks. A hook with a shell and git costs 15 to 20 ms, so `wtpool hook` runs neither.
+
+## Architecture
+
+```
+harness hooks (Claude Code) ─exec─► wtpool hook ─► <git-common-dir>/wtpool-activity/<actor>.json ─┐
+git worktrees, refs, processes ──────────────────────────────────► wtpool status --watch ◄────┘
+                               JSON lines (S12) ─► IDE extension (VS Code) ─► Worktrees tab
+```
+
+An actor is a session or a subagent. A harness is the program that runs the agents and their
+hooks, such as Claude Code. The rules are pure `wtpool-core` functions of the clock, files and process
+table. Settings live in `<git-common-dir>/wtpool.toml`, never a symlink. A background task's output
+stays in the file the harness writes: a record keeps only its path (H27), and the IDE reads the
+tail on this machine (R12).
+
+The pool is one git repository: the one `WTPOOL_FOREGROUND` names, else the one that holds the current
+directory, from any of its worktrees. Unless `wtpool.toml` or a variable says otherwise, the foreground
+is its main worktree and three slots sit beside it, named after that folder: `~/code/app` has
+`~/code/app-wt1` to `app-wt3`. Outside a repository and without `WTPOOL_FOREGROUND`, wtpool refuses.
+[configuration.md](../../configuration.md) lists every setting.
+
+## 1. `wtpool hook`
+
+A harness runs `wtpool hook` on its hook events. It keeps one record per actor in `wtpool-activity/`, which
+`wtpool status` reads. The first part holds for every harness. The second is the Claude Code adapter,
+the only one today: `wtpool hook` reads Claude Code's events. `wtpool hook --harness <name>` is reserved
+for the adapter of another harness and is not built. Such a harness writes the same records under
+its own file stems, as H25 reserves them.
+
+### Activity records (any harness)
+
+| ID | Behaviour |
+|---|---|
+| H2 | No stdout on any path. From phase 4, `wtpool hook policy` alone prints, at most one decision (H29). |
+| H3 | Exit 0 on every path, panics included; `wtpool hook policy` too. |
+| H4 | A watchdog exits 0 after 1 s; `wtpool hook policy`'s with no output. |
+| H5 | Reads stdin to EOF, keeps 32 MiB, parses only needed fields. Malformed input writes nothing. |
+| H23 | Diagnostics go to `$XDG_STATE_HOME/wtpool/hook.log`, 1 MiB, rotated once. The hook may create this log folder. |
+| H6 | Writes only into an existing, real, owned `<git-common-dir>/wtpool-activity/`, and never creates it. `wtpool setup` and every pool changing command create it. With `.verify-sandbox` in it, writes need `WTPOOL_VERIFY_SANDBOX=1`. |
+| H7 | A path's worktree: nearest existing ancestor, symlinks resolved, up to the first `.git`, whose back link `<common>/worktrees/<name>/gitdir` must match. Compare by component. No git. |
+| H9 | Path words of a shell command (the field the adapter reads it from, H8), also after `git -C`, `--manifest-path`, `sh -c` and `nix develop -c`, expand `~` and `$HOME`, resolve against the last `cd` or `cwd`, and map with H7. The last `cd` wins, else a single match, else no path. |
+| H10 | The first event places an actor: a session at `cwd` (`placed_by: "cwd"`), a subagent at its parent's worktree with the parent's `placed_by`. Later only a path moves it (`placed_by: "path"`). A change of folder back to the first `cwd` (Claude Code's `CwdChanged`) moves nothing. |
+| H11 | Events set `state` (`working`, `waiting`, `idle`, `done`, `ended`) as the adapter's event table says. |
+| H15 | Stored strings lose control, bidi and zero width characters and keep 80 characters (labels 40). No prompt text. |
+| H17 | `session_id` and `agent_id` match `^[A-Za-z0-9-]{1,64}$`, a call's id (Claude Code's `tool_use_id`) `^[A-Za-z0-9_-]{1,128}$`, else no write. Files: `<session_id>.json`, `<session_id>.<agent_id>.json`, with the prefix of H25 for a harness other than Claude Code. |
+| H18 | Writes go to a temp file opened `O_CREAT \| O_EXCL \| O_NOFOLLOW`, renamed over the record. A symlink, FIFO or record over 16 KiB is replaced, never read. |
+| H19 | `process` holds the pid and start time of the hook's parent, the harness process, unless that pid is 1. A newer main session in one process ends the older ones. |
+| H20 | The end of a session (Claude Code's `SessionEnd`) marks the record `ended` and deletes its subagent records. |
+| H21 | `wtpool hook gc` deletes `ended` or dead records after 7 days, and `done` subagents after 15 minutes but the newest per worktree, timed by `updated`. It looks up only the processes the records name, and skips a record whose lock another process holds, as a record being written is not old. The hook runs the same gc itself, at most once a day per pool, after the end of a session (Claude Code's `SessionEnd`) has written its record, so no daily job is needed. `wtpool-activity/gc.stamp` holds the RFC 3339 time the pool's last gc began. Under the stamp's lock, which a hook never waits for, a hook that finds the stamp missing, unreadable, or 24 hours or more before or any time after its clock writes its own time there, then runs gc. That gc stops 200 ms after the hook began, and a stopped gc removes the stamp, so the next session's end goes on. `wtpool hook gc` runs whatever the stamp says and writes its own time there too. The stamp is no record (H17): `wtpool status`, the watcher (W3) and gc pass it by, and a symlink, FIFO or other file that is not regular in its place is replaced, never read. |
+| H24 | A writer locks `<record>.lock`, checks the lock still names the file, merges, and never replaces a state written by a later hook process (the time its `main` began, in microseconds, `writer_started`; a hook that starts earlier but loads slower may count as later, accepted as a known edge case). Ties go to the later writer. |
+| H25 | A record names its `harness`, `claude-code` for Claude Code; a record without one reads as `claude-code`. File stems are reserved per harness: Claude Code keeps `<session_id>.json` and `<session_id>.<agent_id>.json` (H17), and any other harness must put `<harness>-` before them, as in `<harness>-<session_id>.json`, so two harnesses never share a file. |
+| H26 | Each call in `in_flight` has a neutral `kind`, which the adapter sets: `shell` (runs a command), `edit` (changes files), `agent` (starts a subagent) or `other`. `wtpool status` reads kinds, never tool names: a `shell` call during a build or an `agent` call while its subagent works or waits keeps an actor `working` (A1), and the end of an `edit` or `shell` call refreshes git (W4). A call without `kind`, written by an older wtpool, takes the kind the adapter maps its tool to. |
+
+A record holds `version` 1, `harness` (H25), `session_id`, `agent_id`, `agent_type`, `label`,
+`worktree`, `placed_by`, `state`, `waiting` (`reason`, `tool`, `target`, `match`, `call`),
+`action` (`tool`, `target`), `in_flight` (`id`, `tool`, `kind` (H26), `target`, `since`, `match`),
+`done_ids`, `error`, `since`, `updated`, `writer_started` (H24, in microseconds), `process`
+(`pid`, `started`), `first_cwd` (H10), `ended` (`id`, `tool`, `kind`: the last call that
+ended, for W4), `title` (`text`, `by`: `user` or `harness`, H16), `transcript_offset` (H16) and
+`subagents` (`agent_id`, `title`: the newest 16, H16). `tool` keeps the harness's own tool name,
+for display only. Its `.lock` file goes with it. Times in records and documents are RFC 3339 UTC.
+
+A record may also hold `tasks` (`id`, `path`, `summary`, `started`, `ended`): the last 5
+background tasks the actor started (H27). No record holds the output of a command: a task keeps
+the path of the file its harness writes the output to, and the command's summary (H14).
+
+### Claude Code adapter
+
+The adapter reads Claude Code's hook payloads: their event names, tool names and path fields, the
+waits of `AskUserQuestion` and `ExitPlanMode`, the title entries of the session's transcript (H16),
+and the block `wtpool hook install` prints. It is a crate of its own, `wtpool-claude-code`, that
+implements the `Adapter` trait of `wtpool-core`: it turns a payload into neutral events and facts,
+reads a transcript's titles, names a task's output file and writes the install text, and the
+binary `wtpool` picks it. `wtpool-core` names no event, tool, variable or file of Claude Code,
+save a frozen copy of the kinds below for calls an older wtpool wrote without one (H26). The
+adapter of another harness would be a crate beside it. Its kinds (H26): `Bash` is `shell`; `Edit`,
+`Write` and `NotebookEdit` are `edit`; `Agent` is `agent`; every other tool is `other`. The hook's
+parent (H19) is the `claude` process.
+
+| ID | Behaviour |
+|---|---|
+| H1 | `wtpool hook install` prints an exec form entry (`"command": "<absolute path of this wtpool>"`, `"args": ["hook"]`, `"onFailure": "continue"`) per event of the event table. `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionDenied` and `PostToolBatch` are `"async": true`. The rest are sync with `"timeout": 2`, except that `SessionEnd` has no `timeout` key. From phase 4 the block also holds a sync `PreToolUse` entry with the matcher `Bash|PowerShell|Monitor`, `"args": ["hook", "policy"]` and `"timeout": 2` (H29). It refuses a binary under `target`. Needs Claude Code 2.1.295. |
+| H22 | It says whether Claude Code runs the hooks, from Claude Code's `settings.json` in `$CLAUDE_CONFIG_DIR` (default `~/.claude`), and its hints name that path. It never writes that file. Stdout carries the block alone, as valid JSON; the note goes to stderr. The note starts `hooks present:` when every event runs this `wtpool` with `["hook"]`, from phase 4 with the policy entry of H1 too, or the file enables the plugin (H28), and then names the `wtpool` that `PATH` finds, or says none is there. It starts `hooks present twice:` when the file enables the plugin and also runs a `wtpool hook`, as each event then runs it twice, and says how to remove the block. Else it starts `hooks missing:` and names what is missing: the file, a file that is not valid JSON, each event without a `wtpool hook` entry, or another `wtpool` that the block runs, by its path. |
+| H8 | Path fields: `file_path` (Read, Edit, Write), `path` (Grep, Glob, EnterWorktree), `notebook_path` (NotebookEdit), `command` (Bash, PowerShell, Monitor), `new_cwd` (CwdChanged). |
+| H12 | `in_flight` holds at most 32 calls by `tool_use_id`, and drops the oldest. PostToolUse, PostToolUseFailure, PermissionDenied and each id in a PostToolBatch's `tool_calls` end a call. An ended call's id enters `done_ids`, a ring of 64, and a later PreToolUse with that id adds nothing. UserPromptSubmit, Stop, StopFailure, SubagentStop and `idle_prompt` clear `in_flight`. |
+| H13 | A wait binds to one call: by id for `AskUserQuestion` and `ExitPlanMode`, else, once PreToolUse and PermissionRequest both landed, to the oldest unbound call in flight with its tool and input hash (SHA 256, keys sorted). It ends only when that call ends (H12, or while unbound a PostToolBatch entry with its tool and hash), or on UserPromptSubmit, Stop, StopFailure, `idle_prompt`, SessionEnd or process death. A wait that a Notification set ends on the session's next call end or PostToolBatch. PreToolUse never ends a wait, nor does another call ending. When a wait ends by its call ending and an `AskUserQuestion` or `ExitPlanMode` call is still in flight, the actor waits on that call (by id). |
+| H27 | A Bash call that Claude Code runs in the background ends with a PostToolUse whose `tool_response` has a `backgroundTaskId`. When that id matches `^[A-Za-z0-9_-]{1,64}$`, the actor's record gains a task: `id`, `path`, `summary` (the call's target, H14, never output text), `started` (the event time) and `ended` (null). `path` is Claude Code's output file: the real path of `$CLAUDE_CODE_TMPDIR`, else of `/tmp`, then `claude-<uid>` (the owner of `wtpool-activity/`, 0 without Unix owners), the name of the folder that holds `transcript_path`, the `session_id`, `tasks` and `<id>.output`. The task counts only when `transcript_path` is absolute and named `<session_id>.jsonl`, that folder name matches `^[A-Za-z0-9._-]{1,255}$` and is neither `.` nor `..`, and the path is absolute, at most 1024 bytes, free of `.` and `..`, and directly inside that `tasks` folder. A record keeps the last 5 tasks, and a known id adds nothing. A Stop or SubagentStop with `background_tasks` lists the work in flight of its whole session, its subagents' included, and an entry counts unless its `status` is a text other than `running` or `pending`. It ends each running task of its own record that the list does not name, and each such task of the session's other records that name the same process (H19) when it started at least 60 s before the event, as a list made before a task started cannot name it. So a task still listed at its actor's last Stop ends at the next such list of its session that leaves it out, as does a task an older wtpool left running. A PostToolUse of `TaskStop` (`task_id`, else `shell_id`) or `KillShell` (`shell_id`) ends that task; SessionEnd ends them all; each at the event time. An end changes nothing else in another record. Without `background_tasks` nothing ends: Claude Code 2.1.310 sends it on every Stop and SubagentStop, `[]` when nothing is in flight. The hook never opens an output file. |
+| H28 | The repository is also a Claude Code plugin marketplace: `.claude-plugin/marketplace.json` names it `wtpool` and lists one plugin, `wtpool`, in `plugins/wtpool/`. You install it with `/plugin marketplace add haiyuechen-nearone/wtpool` and `/plugin install wtpool@wtpool`, which enables `wtpool@wtpool` under `enabledPlugins` in that `settings.json`. Its `hooks/hooks.json` holds the block of H1 with the command `wtpool` for the absolute path, generated from the same event table, so its events, `async` flags, timeouts and `onFailure` are the block's. Claude Code finds `wtpool` on the `PATH` its hooks see; without one the hook fails to start, which Claude Code treats as a non-blocking error. `wtpool hook install` stays the manual route. |
+| H29 | From phase 4, `wtpool hook policy` judges a PreToolUse payload of a Bash, PowerShell or Monitor call against the policy of [jobs.md](../jobs/jobs.md) (J21). Under `enforce = "require"`, when the call's `command` (H8) holds a simple command whose words match a heavy pattern (J19, J20, the repository's from the payload's `cwd` by H7), that `wtpool job` does not wrap, and the hook's own environment names no live job (J12), it prints one line on stdout and exits 0: `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"<reason>"}}`. The reason reads `wtpool: <words> is heavy on this machine (enforce = require). Run it as: <command>`, `<command>` the call's command with `wtpool job -- ` before the first word that is not a `VAR=value` of each such simple command; over 2000 characters it reads `Run each heavy command as wtpool job -- <command>: <words>, …` instead. In every other case, and on any error (a payload, config or command it cannot read, no answer before the watchdog, a panic), it prints nothing, so the call goes on as it would without the hook. It writes no file and runs no git or shell, and under `off` returns once it has read the policy. B14 bounds it: p95 5 ms, max 30 ms. |
+| H14 | The action is a tool plus a target: for files the path in the worktree, for Bash the program's basename after `cd`, `;`, `&&`, `VAR=value`, `nix develop -c`, `env`, `timeout N`, `time`, `nice` and, from phase 4, `wtpool job` with its options up to `--` ([jobs.md](../jobs/jobs.md)), plus for `git`, `cargo`, `gh`, `nix`, `npm`, `wtpool`, `docker`, `kubectl` a next word matching `^[a-z][a-z0-9-]{0,23}$`. A command substitution (`$(…)` or backquotes) or an arithmetic `$((…))` stays inside its word and is never the program, and a simple command of `VAR=value` words only names no program, so the next command's program is the target. |
+| H16 | Label: the session's title, else `session HH:MM` of the first event in local time. A title the user gave (Claude Code's `/rename`) outranks one the harness generated: a newer title replaces one of its own kind or a generated one, never the reverse, and the label follows each change. A given title comes from the payload's `session_title` and from `custom-title` entries (`customTitle`) of the transcript at `transcript_path`, a generated one from its `ai-title` entries (`aiTitle`). Only a session's events read the transcript, and only its new part: from `transcript_offset`, the end of the last whole line read before, to the end of the file, at most the last 1 MiB. An offset past the end, or one no newline precedes, means the file was cut or replaced, and the read starts again from its start, with the same cap. Only lines with a JSON string that ends in `-title` are parsed, only the title of a title entry is kept (H15), and a symlink, FIFO or other file that is not regular is not read. A subagent: the `description` of the Agent call that started it, else `agent_type`. That call's PostToolUse names the subagent's `agent_id` in `tool_response.agentId`; the session's record keeps the newest 16 such titles in `subagents`, and a writer that yields to a later one (H24) still adds those it found. |
+
+| Event | State |
+|---|---|
+| `UserPromptSubmit` | `working`, ends waiting |
+| `PreToolUse` | `working` unless waiting. `AskUserQuestion`: `waiting` (question). `ExitPlanMode`: `waiting` (plan) |
+| `PermissionRequest` | `waiting` (permission) |
+| `PostToolUse`, `PostToolUseFailure`, `PermissionDenied` | `working` unless waiting on another call |
+| `PostToolBatch` | ends a wait it lists |
+| `Notification` `permission_prompt`, `elicitation_dialog`, `elicitation_url_dialog` | `waiting` for the session if none of its actors waits |
+| `Notification` `idle_prompt` | `idle`, its subagents `done` |
+| other `Notification` | ignored |
+| `Stop`, `StopFailure` | `idle`, with `error` after StopFailure |
+| `SubagentStart`, `SubagentStop` | new `working` subagent, then `done` |
+| `CwdChanged` | none |
+| `SessionEnd` | H20 |
+
+An interrupt sends no Stop, so `working` decays to `quiet` (A1). A wait never decays, as missing
+one costs more than a stale one.
+
+## 2. `wtpool status`
+
+| ID | Behaviour |
+|---|---|
+| A1 | An actor shows as the first matching row below says. A session works on a build it started: a build process (S4), in any folder, that descends from the session's harness process (`process`, H19) through the parents of the process table. Its action is then the tool `build:` and the name of the outermost such build, the one nearest that process, then the lowest pid. So a build run in the background shows after the turn's Stop, and once it ends the record shows as its state says, within one heartbeat (R6). Other children of the harness, such as MCP servers, never count, and a subagent, whose record names the same process, never works on a build. Likewise a session or subagent whose turn ended, so that it would show `idle`, `quiet` or `done`, works while one of its own background tasks runs (H27; S13 `running`: no `ended` yet). Its action is then the tool `background:` and the `summary` of the newest running task, the first of its `outputs`. So a subagent that ends its turn to wait for its own background run shows `working` past A2's minute, and its worktree's activity follows from A4. Once H27 ends the task, as a Stop or SubagentStop that no longer lists it does, the record shows as its state says. |
+| A2 | A `done` subagent shows for 1 minute. `wtpool hook gc` keeps its own 15 minutes (H21). |
+| A3 | A dead actor leaves `actors`. |
+| A4 | Worktree activity is the first that applies: `missing`, `waiting`, `working`, `building`, `idle` (`quiet` counts, `done` counts as nothing). |
+| A5 | Else the availability: `foreground`, `free` (as `wtpool bg` picks), `not_reusable` (a detached slot `wtpool bg` refuses, also when git cannot tell), `unknown`, else `unused`. |
+| A6 | `last_event` is the newest `updated` of any record placed in the worktree, shown or not. An actor line's Last is its `updated`. A row without shown actors takes `last_event`, else the last change of `HEAD` or `index`. |
+| A7 | A record whose `worktree` is not in this pool is ignored. |
+| A8 | From phase 4, an actor with a job of its own (S15) shows `working` while the job waits, with the action tool `queued:` and the job's label, else its summary, as in `queued: cargo test`, also after its turn ended and past A1's 120 s. A `waiting` actor stays `waiting`. While its job runs, a `working` actor stays `working` past the 120 s, with its own action. Once the job leaves the job folder, the actor shows as the table says, within 1 s (W10). Under `enforce` `warn` or `require` (J21), a build that no job holds (S4 `queued` false) reads `build: <name> (not queued)`, on an actor's line and on a row's own build line |
+
+| Record | Condition | Shown |
+|---|---|---|
+| `ended`, or process dead | | hidden |
+| `waiting` | | as is |
+| `idle`, `working` or `done` | a job of its own waits (A8) | `working`, action `queued: <summary>` |
+| `working` | an event under 120 s ago, a `shell` call (H26) in flight during a build (S4) in its worktree, or an `agent` call in flight while its subagent works or waits | `working` |
+| `working` | a job of its own runs (A8) | `working` |
+| a session's `idle` or `working` | a build it started runs | `working`, action `build: <name>` |
+| `idle`, `working` or `done` | a background task it started runs (S13 `running`) | `working`, action `background: <summary>` of the newest running task |
+| `idle` | | as is |
+| `working` | otherwise | `quiet` |
+| `done` | under 1 minute | `done` |
+
+| ID | Behaviour |
+|---|---|
+| S1 | `wtpool status --json` prints one document with one pool, the repository wtpool runs in (Architecture), fields below. `pools` stays a list, so a later wtpool can add pools under the additive rule of S12. A consumer shows the first pool. |
+| S2 | Git runs with `--no-optional-locks` and `-c core.fsmonitor=false`. `wtpool status` writes no file and opens no socket. From phase 6 the one `wtpool status --watch` that samples ([autodetect.md](../jobs/autodetect.md), JA6) also writes its measurement folder, `<state>/wtpool/measure/` (JA12), and nothing else; `--json` still writes nothing. |
+| S3 | `role` is `foreground`, `slot` or `unmanaged`. A gone folder sets `missing`. |
+| S4 | Builds: processes named `cargo`, `cargo-*` or `rustc`, or any name in `build_processes` (`wtpool.toml`, for another toolchain such as `make` or `gradle`), working in the worktree. From phase 4 instead, a process whose words match a heavy pattern of the machine or of this repository ([jobs.md](../jobs/jobs.md), J19 and J20; `build_processes` names read as patterns), or while this repository has no list one of its suggestions (J23), working in the worktree; its `name` is the matched words, and `queued` says whether a live job's process (J8) is the build or one of its ancestors, true for a build that only a suggestion matches, so nothing flags it. The process table is read through the portable `sysinfo` crate, without `unsafe` in wtpool or an external tool such as `ps` or `lsof`, with each process's parent and arguments (A1); no argument leaves memory but the matched words. From phase 6 the read also takes each process's CPU time and resident memory, through one `sysinfo::System` kept for the watcher's life that reads `cmd` and `cwd` once per process, and the sampler shares it ([autodetect.md](../jobs/autodetect.md), JA7) |
+| S5 | Records open `O_NOFOLLOW \| O_NONBLOCK`, at most 16 KiB each and the newest 512. Bad names, temp and `.lock` files are skipped. Age never skips a live session. |
+| S6 | An unknown `version` or a parse error skips a record and counts in `skipped_records`. |
+| S7 | Types in `wtpool-core` generate a JSON Schema, which generates the extension's types and validator. |
+| S8 | Without `wtpool-activity/`, `agents` is `"off"` and the panel says how to turn it on: `wtpool setup`, then the hooks, through the plugin (`/plugin marketplace add haiyuechen-nearone/wtpool` and `/plugin install wtpool@wtpool`, H28) or the block `wtpool hook install` prints (H22). |
+| S9 | `free` uses the rule of `wtpool bg`. `reasons`: `foreground`, `unmanaged`, `branch`, `dirty`, `unreferenced`, `operation`, `unknown`, `missing`. |
+| S10 | Each pool has `repository`: `name`, the main worktree's folder name, and `github`, the `<owner>/<repo>` of the configured remote (`remote`, default `origin`), read offline from its URL in the form `https://github.com/<owner>/<repo>`, `git@github.com:<owner>/<repo>` or `ssh://git@github.com/<owner>/<repo>`, each with or without `.git`. Any other URL, or no such remote, gives `null`. |
+| S11 | Each actor has `harness`, the harness its record names (H25). `claude-code` is the only one today. |
+| S12 | The document is a contract. `wtpool status --schema` prints its JSON Schema (S7), the same text as `wtpool-core`'s `status_schema` example. Every property has a one-line `description`, and no object sets `additionalProperties: false`. Within `version` 1 changes only add; a removal or a rename raises `version`. A consumer ignores properties it does not know (R11). wtpool itself emits only the properties the schema lists. |
+| S13 | An actor with background tasks (H27) has `outputs`: its running tasks, newest `started` first, then the task that ended last, by `ended`, if any. Each has `task` (the id), `path`, `summary`, `running` (no `ended` yet), `started` and `ended` (null while running). A task whose path is not absolute, or holds `.` or `..`, is left out. `outputs` is omitted when empty, so a document without it stays valid under S12, and a consumer reads its absence as none. |
+| S14 | From phase 4 the document's `machine` has `jobs`, the heavy jobs of [jobs.md](../jobs/jobs.md): `limit` (null while `error` is set), `default`, `min` (1), `max` (64), `enforce` (`off`, `warn` or `require`), `source` (`machine` or `default`, for both), `config` (the path of `machine.toml`), `error` (why the config or the job folder cannot be read, else null), `heavy` (each pattern with its `source`: `machine`, `repository` or `build_processes`, J20), `suggested` (this repository's suggestions the list lacks, J23, each with `pattern` and `from`, the marker it came from, such as `Cargo.toml` or `package.json`), `running`, `waiting` in queue order, and `outside`: the outermost heavy processes no job holds, newest first. Each job or process has `id`, `summary` (J16), `label` (or null), `worktree` and `actor` (S15), and `since`: when it started, or for a waiting job when it queued. None holds an argument, the environment, a pid or a folder outside the pool. A wtpool without `wtpool job` omits `jobs`, which a consumer reads as no job support, and the document stays valid under S12. From phase 6 a `suggested` entry may hold `measured`, its evidence, and `from` reads `measured` for one that only measurement makes; `jobs` also has `dismissed` and `autodetect` ([autodetect.md](../jobs/autodetect.md), JA19). `from` is an open string, so a new source adds no value to a closed set (S12) |
+| S15 | A job's `worktree` is the `path` of the worktree of this pool that its `cwd` lies in (H7), else null. Its `actor` is the `key` of an actor of this pool whose harness process (`process`, H19) is the job's nearest ancestor among the harness processes of the records, through the parents of S4's process table. Of the actors on that process it is the one with a `shell` call in flight whose `target` equals the job's summary, the newest `since` first, else the session; null when no ancestor is one. `wtpool status` reads the job folder (J7) and probes each lock (J9) through files opened read only, writes nothing (S2), and skips a dead job's record without deleting it. |
+
+Document: `type`, `version`, `generated`, `machine.name`, from phase 4 `machine.jobs` (S14), `pools` (`common_dir`, `repository`
+(`name`, `github`), `agents`, `skipped_records`, `worktrees`). Worktree: `path`, `name`, `role`,
+`missing`, `branch`, `upstream`, `git` (`dirty`, `ahead`, `behind`, `unreferenced`, `operation`,
+`unknown`), `free`, `reasons`, `activity`, `actors`, `builds`, `last_event`, `last_change`. Actor:
+`key`, `kind`, `harness`, `label`, `state`, `reason`, `action`, `placed_by`, `error`, `since`,
+`updated`.
+
+An actor with background tasks also has `outputs` (`task`, `path`, `summary`, `running`,
+`started`, `ended`), as S13 says.
+
+| ID | `wtpool status --watch` |
+|---|---|
+| W1 | Prints a document (`"type": "status"`) per line at once and per change, and `{"type":"alive","seq":N}` per heartbeat. |
+| W2 | Watches folders, not files: `<common>`, each `<common>/worktrees/<name>/`, `<common>/refs` recursively, `<common>/wtpool-activity/`. |
+| W3 | Drops events for `*.lock`, temp files and other names. |
+| W4 | Recomputes only what changed. From phase 2, the end of an `edit` or `shell` call (H26) refreshes that worktree's git, once a second at most. |
+| W5 | Merges events within 200 ms. Prints only changed documents. |
+| W6 | Time based changes (A1, A2) fire at their exact time. |
+| W7 | A 10 s heartbeat, or a rescan flag, recomputes everything. |
+| W8 | Exits 0 on stdin EOF and on a stdout write error. |
+| W9 | Its own reads never trigger it. |
+| W10 | From phase 4 it also watches the job folder (J7) and the folder that holds `machine.toml` (J4), not recursively, when they exist, and reads only the changed job record. A heartbeat (W7) finds such a folder created later and a job that died without deleting its record (J9), and computes this repository's suggestions again (J23). |
+| W11 | From phase 6, the watcher that holds the sampler lock samples the process table as [autodetect.md](../jobs/autodetect.md) says (JA6 to JA8). A measured suggestion that a run's end adds shows in the next document, within one heartbeat; each heartbeat (W7) tries the lock again. |
+
+## 3. The VS Code extension
+
+Any IDE can consume `wtpool status --json` and `--watch` under the contract of S12, and VS Code is the
+first consumer. R9 to R11 hold for any consumer, the X rows for this extension. It lives in
+`vscode/`.
+
+| ID | Behaviour |
+|---|---|
+| R9 | A consumer runs `wtpool` in the folder it shows. The extension runs the watch and every action with the window's first workspace folder as the working directory, and sets no `WTPOOL_FOREGROUND` of its own; the inherited environment still applies. When that folder is not a local `file:` folder (Remote-SSH, WSL, a dev container, a virtual folder), it runs `wtpool` in the user's home folder instead: there `WTPOOL_FOREGROUND` names the local pool, and without it wtpool's own error shows (R10). With no folder open, no `wtpool` runs and the tab says "Open a folder inside a git repository to see its worktrees." When the first folder changes, the tab stops the old watch, drops the old document, resets the title to `Worktrees` and watches the new folder. |
+| R10 | When `wtpool` exits with an error, the tab shows wtpool's message: the last non-empty line of its stderr, else `wtpool exited with code N` (or `wtpool was stopped by <signal>`). A start that fails shows `wtpool did not start: <reason>`, as in `wtpool did not start: spawn wtpool ENOENT`. The text sits on its own line under the header, only while paused (X6), in the problem colour (U6), and wraps anywhere, so it is never clipped (U1). |
+| R11 | The consumer accepts documents with properties it does not know (S12). |
+| R12 | A consumer reads the output of a background task (S13) from the file its harness writes, on this machine only: wtpool keeps the path, never the output. The extension reads, for the actors of the selected row only, each `outputs` path the last document lists there, and no other: at most the file's last 64 KiB, decoded as UTF-8 with replacement characters, without the partial first line when the read starts inside the file, escape sequences and C1 controls removed, each line kept from its last carriage return, then the last 15 lines. In them a tab shows as spaces up to the next multiple of 8 columns, counted one per character from the start of the line after that escape and carriage return handling; every other control character shows as X10 says. The removal takes, in one pass over the decoded text: each control string with its payload, opened by U+0090 (DCS), U+0098 (SOS), U+009D (OSC), U+009E (PM) or U+009F (APC) and ended by BEL, ST (U+009C) or `ESC \`, opened by `ESC ]` and ended by BEL or `ESC \`, or opened by `ESC P`, `ESC X`, `ESC ^` or `ESC _` and ended by `ESC \`, each string also ending before any other ESC and at the end of the read; each CSI sequence, `ESC [` or U+009B with its parameters and final byte, SGR included; each two character escape; then every other C1 control (U+0080 to U+009F) and ESC. It reads a listed path only when it ends in `/tasks/<id>.output` with `<id>` as H27 accepts it, `\` counting as `/` on Windows; the tail of any other path says why it shows nothing, and a `follow` of it does nothing. It opens the file without following a symlink and reads only a regular file; for anything else the tail says why it shows nothing. It reads again when the file changes, through `fs.watch` with a 1 s poll for changes the watch misses, and posts at most 4 updates a second, only while the tab is visible. It stops watching when the row is deselected, a task leaves the document, or the tab is hidden or closed, and watches the selected row again when the tab shows. |
+| X1 | "Worktrees: Open Status" reveals the tab or opens it beside the active group. The tab shows the extension's own icon, a light and a dark variant (`iconPath`), also when a restored session brings it back (X2). |
+| X2 | A `WebviewPanelSerializer` and `onWebviewPanel:wtpool.status` restore the tab. `getState()` holds the selected row only, untrusted. |
+| X3 | `extensionKind: ["ui"]`, so `wtpool` runs on the local machine: a Remote-SSH, WSL or dev container window shows the local pool. |
+| X4 | `wtpool.path` has `"scope": "application"`. Only that binary runs, with an argument array and no shell. |
+| X5 | `--watch` runs through `spawn` with stdin kept open. Lines over 1 MiB, parse or schema errors and unknown versions restart it, backoff 1 s doubling to 30 s. An unknown property is no schema error (R11). |
+| X6 | 30 s without a line restarts the stream. The header shows `starting` (a new watch, until wtpool's first line) as "starting…", `live` as "live", `stale` (15 s without a line) as "updated N s ago", counted from the last line, and `paused` (restart backoff) as "updates paused, retrying in N s", counted down to the next restart. A tab shows "starting…" over an empty table from the moment it opens, before any message, and the extension posts that view at once, so the header is never blank while wtpool computes its first document. Before the first document, a fault shows the paused header over an empty table. |
+| X7 | Closing the tab stops the watch. A hidden tab keeps it for X18 but posts nothing to the webview, and showing it posts the last document at once. `retainContextWhenHidden` stays off. |
+| X18 | The tab title reads `Worktrees (N)` while N worktrees are `waiting` (A4), else `Worktrees`. The extension sets `WebviewPanel.title` from each document, hidden or not. |
+| X8 | CSP: `default-src 'none'; script-src 'nonce-<random>'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; require-trusted-types-for 'script'`. No inline `style`. |
+| X9 | `localResourceRoots` is `media/`. `enableCommandUris` and `enableForms` are false. |
+| X10 | Strings go only through `textContent` or `setAttribute`. No links. Control, bidi and zero width characters show as `\u{XXXX}`, except in an output tail, from which R12 removes escape sequences and C1 controls, and in which a tab shows as spaces. Each text cell is isolated. |
+| X11 | The extension accepts only `{type, id}` messages with `type` in `open`, `terminal`, `copyPath` (phase 3: `free`, `fg`, `select`, `follow`; phase 4: `jobSettings`) and `id` a row of the last document. A `select` names the selected row, or the empty string for none (R12). A `follow` names an `outputs` path that the last document lists instead of a row (X19). A `jobSettings` holds `type` and either one or both of `limit`, a whole number from the last document's `machine.jobs.min` to `max` or null for the default, and `enforce`, `off`, `warn`, `require` or null for the default; or `heavy` alone, exactly `{op, scope, pattern}` with `op` `add`, `rm` or `add-suggested`, `scope` `machine` or `repository`, and `pattern` a J18 pattern not in that scope's list for `add`, one in it for `rm`, and null for `add-suggested`, which takes `repository` only and the last document's `suggested`. From phase 6 `op` may also be `dismiss`, with a pattern of the last document's `suggested` that has `measured`, or `restore`, with one of its `dismissed`, each with `scope` `repository` ([autodetect.md](../jobs/autodetect.md), JA17). Nothing else; it counts only when that document has `machine.jobs` (X21). |
+| X12 | `free` and `fg` ask in a modal dialog naming worktree and branch. `free` refuses while an actor there works or waits, and warns for `idle`; `fg` does the same for the slot that holds the branch. |
+| X19 | Follow (U9) opens a VS Code terminal named `<agent label> · <summary>` for that output, through a `Pseudoterminal` that reads the file itself, with no shell and no `tail`, so it works on every OS. It shows the file's last 40 lines, then each new line as the file grows, with line ends as the terminal needs them, and each tab as spaces up to the next multiple of 8 columns, counted one per character from the start of the line or its last carriage return, SGR colours taking none. Only text, tabs as spaces, carriage returns, line ends and 7-bit SGR colours (`ESC [`, then digits, `;` and `:`, then `m`) reach the terminal: of the escape sequences and C1 controls R12 removes, it keeps only those SGR, so an 8-bit SGR (U+009B) goes, and it also removes every C0 control and DEL but tab, line feed and carriage return. It reads at most 1 MiB per tick of 1 s. A gain the rest of a tick cannot take waits for the next tick. When the file gained more than 1 MiB since the last read, the terminal shows one line saying it skipped, then the file's last 40 lines, and follows on from there. A file R12 would not read shows one line saying why. Closing the terminal stops the reading. |
+| X20 | From phase 4, opening the machine strip (U11) moves focus to its Limit field. Enter in the field or the Policy menu saves, as Save does; Escape anywhere in the strip, the open menu aside, closes it and returns focus to the button (U10). Tab goes from the field to the menu, Save, Use defaults, the pattern editor (X22), then the rows. The field checks as you type: anything but a whole number from `min` to `max` sets `aria-invalid` and shows `Enter a whole number from <min> to <max>.` under it in the problem colour, tied by `aria-describedby`, and a save then sends nothing. A save sends one `jobSettings` (X11) with what changed, Use defaults one with both null, and further saves wait for its answer (X21). The answer shows as `Saved.` or the error, and the polite live region (X14) announces it |
+| X21 | From phase 4, for each `jobSettings` X11 accepts, the extension runs `wtpool job limit <N|default>`, then `wtpool job enforce <policy|default>`, each only when the message holds its key, in the folder of R9, with an argument array and no shell (X4), one at a time, each killed after 10 s, and none after one that failed. For a `heavy` edit it runs `wtpool job heavy add` or `rm`, with `--repo` for `repository`, then `--` and the pattern as one argument; for `add-suggested`, `wtpool job heavy add --repo --` and each pattern of the last document's `suggested`, each checked against J18 again. It posts `{type: "jobSettings", version: 1, ok, error?, scope?}`, `scope` naming the list of a `heavy` edit: `error` is wtpool's last non-empty stderr line, `wtpool did not start: <reason>` or `wtpool job <setting> timed out`, worded as R10 words them. It writes no file itself; the next document shows the new settings (W10). From phase 6 a `dismiss` or `restore` runs `wtpool job heavy dismiss --` or `wtpool job heavy restore --` and the pattern as one argument ([autodetect.md](../jobs/autodetect.md), JA17) |
+| X22 | From phase 4, each list of chips (U15), the suggestions included, is one tab stop, `role="list"` labelled `Heavy commands of this machine, N`, `of this repository, N` or `Suggested for this repository, N`: focus enters on the last focused button, else the first; Left, Right, Up and Down move between them, Home and End go to the ends. In the two lists Delete, Backspace, Enter or Space removes that chip's pattern; among the suggestions Enter or Space adds it. Either way focus moves to the next chip, else the previous, else the list's input or `Add all`. Tab then goes to the input and Add, or to `Add all`. Enter in an input adds, as Add does. Every focus ring is whole (X14). The polite live region (X14) says `Added <pattern>.`, `Removed <pattern>.`, `Added N suggestions.` or the error, once the answer comes (X21). From phase 6 ([autodetect.md](../jobs/autodetect.md)) the measured suggestions are one more list, labelled `Measured on this machine, N`: Enter or Space adds the focused one, Delete or Backspace dismisses it as its Dismiss button does, and focus moves as after a removal; `Dismissed for this repository, N` is a list whose Enter, Space, Delete or Backspace restores; the live region says `Dismissed <pattern>.` or `Restored <pattern>.` |
+| X13 | Colours come only from `--vscode-*` variables and the theme body classes. |
+| X14 | A `<table>` with `<th scope="col">`, keyboard reachable rows and buttons, visible focus, a word plus an icon per state, no animation under `vscode-reduce-motion` (the building dial and the working robot's arms stand still, the arms in their rest pose; an agent line's robot never moves, U13), a polite live region for new waits. Every focus ring is fully visible: no box clips it, though a row wider than the tab shows its ring as the tab scrolls. |
+| X15 | Rows update in place, so focus, selection and the detail strip survive. The open detail strip shows each new document's facts, actors and outputs (U5, U9), also updated in place, so focus in it and a tail block's scroll survive. |
+| X16 | Each window runs its own tab and watcher. |
+| X17 | No networking module (`net`, `http`, `https`, `tls`, `dgram`), no server. |
+
+## Panel layout
+
+The tab shows one repository, the first pool (S1): its heading row (U8), then one row per worktree.
+
+| ID | Behaviour |
+|---|---|
+| U1 | Columns: Activity (icon, word), Worktree (plus ` fg` or ` unmanaged`, a tag always shown whole inside its cell, after the name), Branch (or `(detached)`), Git (`clean`, else joined by spaces: `N dirty`, `↑N`, `↓N`, `N unreferenced`, operation, `unknown`), Agent · doing, Last. Columns take the width their content needs. When the tab is narrower than the table, the table scrolls horizontally inside the tab; the page itself never scrolls sideways, the header (title, chips, connection) stays in view and the detail strip stays within the visible width. The horizontal scrollbar sits at the bottom edge of the tab at any tab height, never under a short table; rows that do not fit the tab's height scroll vertically with the table, and the header stays in view. Keyboard focus scrolls a focused action wholly into view with its focus ring, and a focused row's start. No text is clipped or cut with `…` anywhere: cells, agent lines, the pool heading (U8) with a long repository name too, wtpool's error text (R10), header labels and chips. |
+| U2 | Order: foreground, slots, unmanaged, by name. Rows never move. |
+| U3 | Waiting rows get a highlight bar. Chips count free, working and waiting worktrees and hide at 0. The waiting chip is a button that focuses the first waiting row and scrolls its start into view. |
+| U4 | Row actions on hover, focus and keyboard: open in a new window, open a terminal, copy path. Missing worktrees: copy path only. Shown actions never cover another column's text. Action glyphs are centred in their buttons. |
+| U5 | A selected row shows a detail strip: exact path, upstream, git facts, S9 reasons, and per actor its state, action, `placed_by` and the local time of its `since`. |
+| U6 | Each legend activity has its own icon and word. Icons come from the codicon font (`@vscode/codicons`) in `media/`, except working's robot, which wtpool draws itself: an inline SVG in the page on a 16 px grid, in `currentColor`, with a head, antenna, eyes, a body and two arms. Building shows the codicon `loading` dial, which spins; the robot swings its arms in turn about the shoulders, about 25° each way of a rest pose 30° out from the body, half a loop apart. No other icon moves. All icons are at one visual size: the longer side of each icon's ink, the robot's in its rest pose, is within 1 px of the median icon's. Agent line icons have a size of their own (U13). Colour only groups them, one token per group: attention `--vscode-list-warningForeground`, active `--vscode-textLink-foreground`, quiet `--vscode-descriptionForeground`, problem `--vscode-list-errorForeground`. On a selected row (`--vscode-list-activeSelectionBackground`), quiet and muted text take `--vscode-list-activeSelectionForeground`. Chips show their text in the colour of the group they count (free quiet, working active, waiting attention) inside a 1 px border of that colour. Focus rings are `--vscode-focusBorder`. On a selected row outside the high contrast themes they are `--vscode-list-focusAndSelectionOutline`, or `--vscode-list-activeSelectionForeground` where the theme leaves that unset. Hovered rows take `--vscode-list-hoverBackground`, and in the high contrast themes hovered rows and actions get a 1 px dashed `--vscode-contrastActiveBorder` outline. The detail strip has a 1 px `--vscode-descriptionForeground` border. In Dark Modern, Light Modern, High Contrast and High Contrast Light: all text, with every activity word, chip text and muted text, meets WCAG AA contrast (4.5:1, large text 3:1) against its actual background, on plain, hovered and selected rows; focus rings and the outlines of chips and the detail strip have 3:1. Hover is visible, chips keep a visible shape and the detail strip stands out from the page in every theme. |
+| U7 | Ages tick each second in the webview. |
+| U8 | The tab shows one repository: the pool of the folder wtpool runs in (S1, R9). Its heading row reads `repository.github`, or `repository.name` when that is null, then ` · ` and the machine name, as in `acme/app · my-mac`, or `app · my-mac` without a GitHub remote. The heading starts with the codicon `repo` glyph, in place of the old machine glyph; the repository is in the text colour at weight 600, and ` · ` with the machine name in `--vscode-descriptionForeground`. The tab title stays as X18. From phase 4 the machine part after ` · ` is a button (U10), which also names this repository's suggestions until its first pattern is added. |
+| U9 | Under the actors of the detail strip (U5), each actor with `outputs` (S13) has an Output section: per task, its `summary` as a heading followed by `running` or `ended HH:MM` (the local time of `ended`), a Follow button (X19), then its tail (R12) in a monospace block. Long lines wrap anywhere, so no text is clipped (U1). Lines taller than the block scroll inside it, and it stays scrolled to the end as lines arrive unless the user scrolled it up. Text reaches the page only through `textContent`, each line shown as X10 shows control characters. In the four themes of U6 the block's text meets AA contrast against its background, and the Follow button is keyboard reachable with a focus ring that is fully visible (X14). |
+| U10 | From phase 4 the machine name of the heading is a button, `button.machine-button`, after the ` · `. It holds the machine name, then ` · jobs R/L` (R running jobs, L the limit, S14), then ` · N queued` in the attention colour while N jobs wait, then ` · N not queued` in the attention colour while `enforce` is not `off` and N heavy processes run outside a job (S14 `outside`), then ` · N suggested` in `--vscode-descriptionForeground` while S14 `suggested` holds N and this repository's list (sources `repository` and `build_processes`) is empty, so it goes with the first add, then the codicon `chevron-down`, or `chevron-up` while the strip (U11) is open. Without `machine.jobs` it holds the name and the chevron. While `machine.jobs.error` is set, ` · ` is followed by the codicon `warning` and `jobs`, both in the problem colour. Its accessible name reads `Heavy jobs on <machine>: R of L running, N queued, N not queued, N suggested`, and `aria-expanded` says whether the strip is open. It takes `--vscode-toolbar-hoverBackground` on hover, in the high contrast themes a 1 px dashed `--vscode-contrastActiveBorder` outline, and the focus ring of U6. A click, Enter or Space opens or closes the strip. Its text meets U6's contrast in the four themes. |
+| U11 | The machine strip, `tr.machine-detail`, sits right under the heading, apart from a row's detail strip, in the detail strip's box and narrow layout (U5, U6). Left: `Heavy jobs on <machine>`; a Limit field in the theme's input colours, holding the limit; a Policy menu (`off`, `warn`, `require`) in the theme's dropdown colours, followed by the chosen policy's one-line meaning; Save; `Use defaults`; the answer of a save (X20); the note `Saved in <config> · defaults N, warn · <min> to <max>`, or `Not saved: the defaults apply`; then `Heavy commands`, the pattern editor (U15); and a last line, `Agents and scripts take a place when they run a command as wtpool job -- <command>.` Right: `Running R of L`, `Queued N` and, while `enforce` is not `off`, `Not queued N` with each name in the attention colour; a line per job or process: its position (Queued only), label or summary, the worktree's name and the actor's label, or `outside this pool`, and the age of `since` (U7). An empty list reads `none`. While more jobs run than the limit: `R running, over the limit of L: they finish, and queued jobs start once fewer than L run.` Without `machine.jobs` the strip holds only `This wtpool has no heavy job limit. Update wtpool to a version with wtpool job to set one.` While the tab's folder is not a local `file:` folder (R9), it adds `This window's folder is not on this computer: the settings are for this computer, <machine>.` The strip follows each document in place (X15) and keeps what the user changed but did not save. No text is clipped (U1) |
+| U12 | From phase 4, a row that lists two or more agent lines, one per shown actor with `done` ones counted and the `build:` and `no agent` lines not, shows `×N` after its Activity word, N the number of those lines, in the word's colour inside a 1 px border of that colour, on the word's line at any tab width. Screen readers read the cell as `<word>, N agents`: the `×N` is hidden from them, and a visually hidden `, N agents` follows the word. A row with one agent line or none shows no count. |
+| U13 | From phase 4, each agent line starts with a static state icon in a 14 px box with 5 px after it: working the robot of U6 in its rest pose, quiet the codicon `history`, waiting `bell`, idle `record`, idle with an API error `error`, done `check`. Each takes its group's colour (U6), the API error the problem colour; on a selected row quiet icons take `--vscode-list-activeSelectionForeground`, as quiet text does. Icons are hidden from screen readers, and a visually hidden `<state>: ` (`idle, API error: ` for an error) starts each line. The `build:` and `no agent` lines keep an empty box, so every line's text in the column starts at the same x. Line icons share one size: the longer side of each icon's ink is within 1 px of the median line icon's. The centre of an icon's ink is within 1 px of the centre of its line's capital letters. A line icon never moves, with or without reduce motion; the Activity icon moves as U6 says. Icons have 3:1 contrast against plain, hovered and selected rows in the four themes of U6. |
+| U14 | From phase 4, ` (not queued)` after a build's name (A8) is in the attention colour, on plain, hovered and selected rows at U6's contrast. |
+| U15 | From phase 4 the strip's `Heavy commands` holds `This machine`, the machine's patterns (S14 `heavy`, source `machine`), and `This repository · .git/wtpool.toml`, the patterns of sources `repository` and `build_processes`, the latter tagged `build_processes`; an empty list reads `none`. Each pattern is a chip: its text in monospace inside a 1 px `--vscode-descriptionForeground` border, then a remove button, the codicon `close`, named `Remove <pattern> from this machine` or `from this repository`. After each list's chips, a text input in the theme's input colours, placeholder `add a pattern, such as go test`, then Add. While S14 `suggested` holds any, `Suggested for this repository` follows, grouped by `from` as `from Cargo.toml`, `from package.json scripts` and so on, so another source adds a group: each suggestion a chip with a dashed border and an add button, the codicon `add`, named `Add <pattern> to this repository`; then `Add all` and `Nothing is heavy until you add it.` The input checks J18 and that the pattern is not already in that list; an error shows under the input in the problem colour, tied by `aria-describedby`: `Not a pattern: 1 to 3 words of letters, digits and . _ + -, and : after the first, none starting with - or +; only the first may end in *.`, `Already in this list.`, or the CLI's refusal (X21). Add, Enter in an input, a remove or add button and `Add all` each send one `jobSettings` edit at once (X11); the chips change with the next document. Chips wrap, and no text is clipped (U1); chip borders, glyphs and focus rings meet 3:1 in the four themes of U6. From phase 6 ([autodetect.md](../jobs/autodetect.md)) the group `measured on this machine` comes first among the suggestions, one a line: its chip with the add button, then `Dismiss`, named `Dismiss <pattern> for this repository`, and the evidence (JA16) under them in `--vscode-descriptionForeground`, at U6's contrast; a pattern a marker also suggests shows only there, with `also from <marker>`. After the groups a note gives the thresholds and since when runs are measured (S14 `autodetect`), else why none are, an error in the problem colour. While `dismissed` holds any, `Dismissed for this repository · .git/wtpool.toml` follows, each a chip with a restore button, the codicon `discard`, named `Restore <pattern> to the suggestions` |
+
+| Actor state | Agent line after `<label> · ` |
+|---|---|
+| `working` | `<tool> <target>`, or `working` |
+| `quiet` | `quiet · <tool> <target>`, or `quiet` |
+| `waiting` | `<reason>: <tool> <target>`, or `<reason>`. Reasons: `permission`, `question`, `plan approval`, `input` |
+| `idle` | `idle`, or `API error: <error>` |
+| `done` | `done` |
+
+Each actor line has its own age in the Last cell (A6). A row without actors has one line,
+`build: <process>` (with ` (not queued)`, A8) or `no agent`. Ages read `now` under 5 s, `N s` under 60 s, `N m` under 60
+minutes, `N h` under 48 hours, else `N d`, or empty when no time is known.
+
+| Activity | Group | Meaning |
+|---|---|---|
+| foreground | active | Your editor worktree, with no agent or build. |
+| waiting | attention | An agent waits for permission, an answer, a plan approval or MCP input. |
+| working | active | An agent acted here within 2 minutes, its shell call builds here, a build or background task it started runs (A1), or a job of its own waits or runs (A8). |
+| building | active | A build without a working agent. |
+| idle | quiet | A live session finished, went quiet, or hit an API error. |
+| free | quiet | A detached, clean slot `wtpool bg` may reuse. |
+| not reusable | problem | A detached slot `wtpool bg` refuses. |
+| unused | quiet | A slot holding a branch, or an unmanaged worktree. |
+| unknown | problem | Git could not tell. Not safe. |
+| missing | problem | Its folder is gone. |
+
+Working shows wtpool's robot, whose arms swing, and building the codicon `loading` dial, which spins
+(U6). Under `vscode-reduce-motion` both stand still (X14).
+
+## Alternatives considered
+
+Rejected: a side bar tree, transcripts as the source of activity (the hook reads only their title
+entries, H16), process directories, the Claude Code status line, sync hooks per call, polling,
+servers, a terminal UI.
+
+Left for later: several repositories in one tab (multi-root workspaces).
+
+## Phases
+
+| Phase | Content |
+|---|---|
+| 0 | `wtpool --version` (version, commit, cargo features), the harness core. |
+| 1 | `wtpool status` with git and builds, the read only tab. |
+| 2 | `wtpool hook`, gc, install, `wtpool-activity/` creation, the contract test, the title count (X18). |
+| 3 | `free` and `fg` (X12), the live output of background tasks (H27, S13, R12, U9, X19), the Claude Code plugin (H28). |
+| 4 | Planned, not built: heavy jobs ([jobs.md](../jobs/jobs.md): J1 to J24; the policy entry of R7, H1 to H4 and H22; H14's `wtpool job`; H29; S4's heavy patterns; A8, S14, S15, W10, U10, U11, U14, U15; X11's `jobSettings`, X20, X21, X22) and several agents in one row (U12, U13). |
+| 5 | Planned, not built: other coding agent harnesses ([harnesses.md](../harnesses/harnesses.md): HR1 to HR34); the rows of this document it changes are listed in its [§11](../harnesses/harnesses.md#11-rows-for-status-panelmd-planned-phase-5) and change here when it is built. |
+| 6 | Planned, not built, after phase 5's harnesses: measured heavy commands ([autodetect.md](../jobs/autodetect.md): JA1 to JA20; R7's sampler; S2's measurement folder; S4's CPU time and memory; S14's `measured`, `dismissed` and `autodetect`; W11; U15's measured and dismissed lists; X11's `dismiss` and `restore`, X21, X22). |
+
+## UI mockups
+
+Main and States are crops of the approved screenshot `dark-every_activity_focused_slot-1100` in
+`verify/shots/approved/` (Dark Modern, 1100 px, the wt2 slot row focused), which replaced the
+first mockups. Main is its top 468 px, the U8 heading row included; States is its Activity column
+with the heading row left out. StatusBar is still a mockup: no screenshot shows VS Code's tab strip
+or status bar. No approved screenshot shows the detail strip, so U5 and U9 alone bind it. The
+heading row in Main is one example of U8, which alone binds it. SeveralAgents and SeveralAgentsThemes are mockups of U12 and U13, rendered through the panel's stylesheets by [render.mjs](../jobs/attachments/render.mjs); the heavy jobs mockups are in [jobs.md](../jobs/jobs.md#2-status-hook-and-panel). Only normative parts bind. Colours follow U6
+and text follows U1, whole and never cut with `…`, not the images.
+
+| Image | Normative | Not normative |
+|---|---|---|
+| [Main](attachments/Main.png) | columns, row text, icons, highlight, chips, header, row actions | the sample names, branches and ages, the heading row (U8) |
+| [States](attachments/States.png) | icon and word per activity | |
+| [StatusBar](attachments/StatusBar.png) (mockup) | tab title text (X18) | status bar rows (D3), the tab icon's look (X1 only asks for one), captions |
+| [SeveralAgents-1100](attachments/SeveralAgents-1100.png), [SeveralAgents-600](attachments/SeveralAgents-600.png) (mockups, phase 4) | the count after the Activity word, an icon per agent line, the line text aligned after the icons (U12, U13) | the sample names and ages, the other rows |
+| [SeveralAgentsThemes](attachments/SeveralAgentsThemes.png) (mockup, phase 4) | the icon and count colours per group in the four themes | captions |

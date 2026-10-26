@@ -1,0 +1,100 @@
+[
+  {
+    "check": "contract__should_run_in_the_sandbox",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "one auto mode turn on Claude Code 2.1.306: UserPromptSubmit, Stop, SessionEnd"
+  },
+  {
+    "check": "cc_read_edit_bash",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "events UserPromptSubmit, PreToolUse:Read, PostToolUse:Read, PostToolBatch, PreToolUse:Edit, PermissionRequest:Edit, PostToolUse:Edit, PreToolUse:Bash, PostToolUse:Bash, PostToolBatch, Stop"
+  },
+  {
+    "check": "cc_subagent_elsewhere",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "Agent description \"read wt2\"; agent_type Explore"
+  },
+  {
+    "check": "cc_subagent_permission",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "permission_prompt recorded"
+  },
+  {
+    "check": "cc_cd_into_slot",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "CwdChanged \"/Users/you/.cache/wt-verify/work/contract/verify/out/live-contract/cc/pools/cc_cd_into_slot-1792910644137/wt2\"; later cwd /Users/you/.cache/wt-verify/work/contract/verify/out/live-contract/cc/pools/cc_cd_into_slot-1792910644137/wt2"
+  },
+  {
+    "check": "cc_permission",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "event order UserPromptSubmit, PreToolUse:Bash, PermissionRequest:Bash, Notification:permission_prompt, CwdChanged, PostToolUse:Bash, PostToolBatch, Stop"
+  },
+  {
+    "check": "cc_permission_deny",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "PostToolUseFailure absent; UserPromptSubmit, PreToolUse:Bash, PermissionRequest:Bash, PostToolBatch, Stop"
+  },
+  {
+    "check": "cc_permission_deny_interrupt",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "idle_prompt absent; UserPromptSubmit, PreToolUse:Bash, PermissionRequest:Bash"
+  },
+  {
+    "check": "cc_interrupt",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "PostToolUseFailure absent; UserPromptSubmit, PreToolUse:Bash"
+  },
+  {
+    "check": "cc_idle_prompt",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "idle_prompt absent"
+  },
+  {
+    "check": "cc_stop_failure",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "StopFailure \"model_not_found\""
+  },
+  {
+    "check": "cc_session_end",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "ended, subagent gone"
+  },
+  {
+    "check": "cc_no_hook_output",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": ""
+  },
+  {
+    "check": "cc_records_claude_pid",
+    "outcome": "pass",
+    "kind": null,
+    "code": null,
+    "message": "the hooks' parent is /Users/you/.local/bin/claude"
+  }
+]

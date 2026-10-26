@@ -1,0 +1,79 @@
+== control run of the round 3 freeze in a scratch clone (quick, int, report): verdict PASS
+== quick
+Pass harness:self_test 
+Pass oracle_unchanged equal to the round 3 freeze
+Pass repo_context__should_be_unchanged 0 files equal spec-base
+Pass lint__no_suppressions no suppression
+Pass static:doc_links every relative Markdown link resolves
+Pass static:fmt 
+Pass static:clippy 
+Pass static:clippy_all_features 
+Pass static:rustdoc 
+run: <scratch>/src/verify/out/ctl
+exit 0
+== int
+Pass unit 
+Pass int:build 
+Pass int:build_release 
+Pass release__should_have_no_verify_feature 
+Pass version__should_list_version_commit_and_features 
+run: <scratch>/src/verify/out/ctl
+exit 0
+== report
+verdict: PASS
+report: <scratch>/src/verify/out/ctl/report.md
+exit 0
+
+[exited with code 0]
+== round 2 survivor (round 2 file and adopted copy)
+caught: verify/reviews/phase-0/round-2/canaries/version-stale-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: the rebuild after an empty commit in one target folder, at commit 984ea2ef417c147a6e98e0ae4261d66ddb2d4ace, names another commit: "wt 0.1.0\ncommit c9e2678c7846fbf87b95584a7aa7438c6eebc42b\nfeatures: verify\n"
+caught: verify/canaries/phase-0/version-stale-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: the rebuild after an empty commit in one target folder, at commit 76e24b42c0effd15c02f980724637ef6d866798b, names another commit: "wt 0.1.0\ncommit e5177a8c3408f382d99802e73cad5921378a5740\nfeatures: verify\n"
+== new canaries (round-3/canaries/)
+SURVIVED: verify/reviews/phase-0/round-3/canaries/version-release-drops-commit.patch (harness, harness) by version__should_list_version_commit_and_features: 
+caught: verify/reviews/phase-0/round-3/canaries/edit-oracle-under-round-2-entry.patch (harness, harness) by oracle_unchanged: changed since the round 3 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/parts.rs
+caught: verify/reviews/phase-0/round-3/canaries/add-claude-md-in-vscode-test.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: vscode/test/CLAUDE.md
+SURVIVED: verify/reviews/phase-0/round-3/canaries/isolation-move-pool-head.patch (harness, harness) by isolation__left_no_trace: 2 part runs left no trace
+== verify/canaries/phase-0/
+caught: verify/canaries/phase-0/add-claude-md-in-nested-target.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: crates/wt/src/target/CLAUDE.md
+caught: verify/canaries/phase-0/add-claude-md.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: CLAUDE.md
+caught: verify/canaries/phase-0/add-claude-settings.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: .claude/settings.json
+caught: verify/canaries/phase-0/add-nested-claude-md.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: crates/wt/CLAUDE.md
+caught: verify/canaries/phase-0/add-oracle-file.patch (harness, harness) by oracle_unchanged: changed since the round 3 freeze without an entry added to verify/oracle-changes.toml after it: verify/notes.md
+caught: verify/canaries/phase-0/edit-oracle-file.patch (harness, harness) by oracle_unchanged: changed since the round 3 freeze without an entry added to verify/oracle-changes.toml after it: verify/nextest.toml
+caught: verify/canaries/phase-0/edit-oracle-key.patch (harness, harness) by oracle_unchanged: changed since the round 3 freeze without an entry added to verify/oracle-changes.toml after it: Cargo.toml:workspace.lints
+caught: verify/canaries/phase-0/edit-oracle-reusing-spent-id.patch (harness, harness) by oracle_unchanged: changed since the round 3 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/suppress.rs
+caught: verify/canaries/phase-0/edit-oracle-under-spent-entry.patch (harness, harness) by oracle_unchanged: changed since the round 3 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/cover.rs
+caught: verify/canaries/phase-0/edit-oracle-with-lock.patch (harness, harness) by oracle_unchanged: changed since the round 3 freeze without an entry added to verify/oracle-changes.toml after it: verify/oracle.lock
+caught: verify/canaries/phase-0/isolation-outside-remote.patch (harness, harness) by isolation__left_no_trace: sandbox/pool/leftover/.git: remote https://github.com/acme/widget is outside the run folder
+caught: verify/canaries/phase-0/release-reads-verify-clock.patch (harness, harness) by release__should_have_no_verify_feature: release__should_have_no_verify_feature: the release binary reads WT_VERIFY_CLOCK
+caught: verify/canaries/phase-0/release-verify-by-default.patch (harness, harness) by release__should_have_no_verify_feature: release__should_have_no_verify_feature: the release feature list of "wt 0.1.0\ncommit be7b47b790de1ff4d844ec4405253bd8bd2a54bd\nfeatures: default, verify\n" must exist and leave out verify
+caught: verify/canaries/phase-0/stop-check-by-renaming-the-binary.patch (harness, harness) by trace_complete: harness: release__should_have_no_verify_feature failed
+caught: verify/canaries/phase-0/stop-frozen-check-accepted.patch (harness, harness) by trace_complete: harness: version__should_list_version_commit_and_features did not run
+caught: verify/canaries/phase-0/suppress-allow-attribute.patch (harness, harness) by lint__no_suppressions: crates/wt/src/main.rs:345: #[allow(clippy::indexing_slicing)]
+caught: verify/canaries/phase-0/suppress-cargo-config-rustflags.patch (harness, harness) by lint__no_suppressions: .cargo/config.toml:0: target.cfg(all()).rustflags lowers a lint level
+caught: verify/canaries/phase-0/suppress-in-target-module.patch (harness, harness) by lint__no_suppressions: crates/wt/src/target/mod.rs:1: #[allow(clippy::indexing_slicing)]
+caught: verify/canaries/phase-0/version-always-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit e2802d0ea9c62f13df83f207cbcfcbafbd3a9baa (dirty)\nfeatures: verify\n"
+caught: verify/canaries/phase-0/version-drop-features.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the feature list of "wt 0.1.0\ncommit 97cb328f792b5c58383bbab23aff9381bdbeb91c\nfeatures: none\n"
+caught: verify/canaries/phase-0/version-never-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit <round 3 freeze>\nfeatures: verify\n"
+caught: verify/canaries/phase-0/version-short-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: no full commit 416b3c41f64d5ae77b3b0903d72795bbd4c60f21 in "wt 0.1.0\ncommit 416b3c4\nfeatures: verify\n"
+== experiments
+SURVIVED: <scratch>/experiments/isolation-move-pool-branch.patch (harness, harness) by isolation__left_no_trace: 2 part runs left no trace
+SURVIVED: <scratch>/experiments/move-readme.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: setup: WT_VERIFY_REBUILD_STEPS is not set; run the checks through `cargo xtask verify --part int`
+== fake pool after
+* main 56aebac b
+  side 7a92ff4 a
+<scratch>/home/code/app      56aebac [main]
+<scratch>/home/code/app-wt1  7a92ff4 (detached HEAD)
+
+[exited with code 0]
+== pool worktree canary (round-3/canaries/isolation-add-pool-worktree.patch)
+SURVIVED: verify/reviews/phase-0/round-3/canaries/isolation-add-pool-worktree.patch (harness, harness) by isolation__left_no_trace: 2 part runs left no trace
+<scratch>/home/code/app      56aebac [main]
+<scratch>/home/code/app-wt1  7a92ff4 (detached HEAD)
+<scratch>/home/code/app-wt9  7a92ff4 (detached HEAD)
+0000000000000000000000000000000000000000 7a92ff46f940717bef769fa0e16df0ca9bb2d60d Pool Owner <you@mac.example> 1792788089 +0200
+
+[exited with code 0]
+== fake pool reflog after isolation-move-pool-head (app-wt1 logs/HEAD)
+0000000000000000000000000000000000000000 56aebac73b65a911849ae135f89561f93b149152 h <h@example.invalid> 1792787616 +0200
+56aebac73b65a911849ae135f89561f93b149152 7a92ff46f940717bef769fa0e16df0ca9bb2d60d Pool Owner <you@mac.example> 1792787786 +0200	checkout: moving from 56aebac73b65a911849ae135f89561f93b149152 to owner-base

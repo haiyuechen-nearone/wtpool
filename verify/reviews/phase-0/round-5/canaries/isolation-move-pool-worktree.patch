@@ -1,0 +1,23 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version moves slot app-wt1 of the pool to app-wt7 with git worktree move, outside the run
+folder. It moves no HEAD and writes no reflog entry. Tests the new before and after comparison of
+the worktree list (oracle change p0r4-worktree-removed). Machine specific: the path is a fake pool
+under the verifier's temporary HOME, never the real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..15fe379 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,9 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let _ = std::process::Command::new("git")
++                .args(["-C", "<scratchpad>/v5/h2/code/app", "worktree", "move", "<scratchpad>/v5/h2/code/app-wt1", "<scratchpad>/v5/h2/code/app-wt7"])
++                .status();
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

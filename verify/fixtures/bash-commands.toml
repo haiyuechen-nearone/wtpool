@@ -1,0 +1,375 @@
+# Bash commands with the worktree a session ends up in and the summary `wtpool hook` stores
+# (status-panel.md H9 and H14), read by `bash_paths__should_match_the_table`,
+# `summary__should_match_the_table` and the scenario `bash_attribution`.
+#
+# Each command runs as the PreToolUse of a fresh session whose first event, a UserPromptSubmit,
+# placed it at `cwd`. `worktree` is where the session is after the Bash call: `cwd` when the
+# command names no path (H9: the last `cd` wins, else a single match, else no path). `summary` is
+# the record's action target. `home`, when set, is the hook's HOME, `{pool}` standing for the pool
+# folder. `secret` must appear in no file the hook writes. `{pool}` in a command is the pool.
+#
+# The oracle's readings of what the spec leaves open, the stricter one each time:
+# - A path word holds a `/` or starts with `~` or `$HOME`. The program and bare words are not
+#   path words.
+# - A heredoc's body is the command's input, not its words.
+# - The word H14 adds after git, cargo, gh, nix, npm, wtpool, docker and kubectl is the word right
+#   after the program, kept only when it matches `^[a-z][a-z0-9-]{0,23}$`. A later word never
+#   takes its place, so `gh --token abc auth` cannot store `abc`.
+# - A command substitution, `$(…)` or backquotes, and an arithmetic `$((…))` stay inside their
+#   word, so no part of one is the program or reaches the summary. The path words of a
+#   substitution's command count, its `cd` targets among them, but its `cd` moves no shell.
+# - A simple command of `VAR=value` words only runs no program: the summary is the next one's.
+# - A `cd` in a subshell `( … )` is a `cd` of H9, as one after `sh -c` is.
+
+[[command]]
+form = "a single match"
+command = "ls {pool}/wt2"
+cwd = "fg"
+worktree = "wt2"
+summary = "ls"
+
+[[command]]
+form = "two matches, no path"
+command = "ls {pool}/wt2 {pool}/wt3"
+cwd = "fg"
+worktree = "fg"
+summary = "ls"
+
+[[command]]
+form = "the last cd wins over a single match"
+command = "cd {pool}/wt2 && ls {pool}/wt3"
+cwd = "fg"
+worktree = "wt2"
+summary = "ls"
+
+[[command]]
+form = "the last of several cd"
+command = "cd {pool}/wt2; cd {pool}/wt3; ls"
+cwd = "fg"
+worktree = "wt3"
+summary = "ls"
+
+[[command]]
+form = "git -C, and an option after the program adds no word"
+command = "git -C {pool}/wt1 status"
+cwd = "fg"
+worktree = "wt1"
+summary = "git"
+
+[[command]]
+form = "--manifest-path, a file that does not exist"
+command = "cargo test --manifest-path {pool}/wt3/Cargo.toml"
+cwd = "fg"
+worktree = "wt3"
+summary = "cargo test"
+
+[[command]]
+form = "sh -c"
+command = "sh -c \"ls {pool}/wt2\""
+cwd = "fg"
+worktree = "wt2"
+summary = "sh"
+
+[[command]]
+form = "nix develop -c"
+command = "nix develop -c cargo build --manifest-path {pool}/wt1/Cargo.toml"
+cwd = "fg"
+worktree = "wt1"
+summary = "cargo build"
+
+[[command]]
+form = "~ expands to HOME"
+command = "cat ~/wt2/f.txt"
+cwd = "fg"
+home = "{pool}"
+worktree = "wt2"
+summary = "cat"
+
+[[command]]
+form = "$HOME expands to HOME"
+command = "cat $HOME/wt3/f.txt"
+cwd = "fg"
+home = "{pool}"
+worktree = "wt3"
+summary = "cat"
+
+[[command]]
+form = "a relative path resolves against cwd"
+command = "cat ../wt2/f.txt"
+cwd = "fg"
+worktree = "wt2"
+summary = "cat"
+
+[[command]]
+form = "a relative cd resolves against cwd"
+command = "cd ../wt3 && cat f.txt"
+cwd = "fg"
+worktree = "wt3"
+summary = "cat"
+
+[[command]]
+form = "cd, then the program after &&"
+command = "cd {pool}/wt1 && pwd"
+cwd = "fg"
+worktree = "wt1"
+summary = "pwd"
+
+[[command]]
+form = "no path word"
+command = "echo hello"
+cwd = "fg"
+worktree = "fg"
+summary = "echo"
+
+[[command]]
+form = "a path outside the pool"
+command = "ls /tmp"
+cwd = "fg"
+worktree = "fg"
+summary = "ls"
+
+[[command]]
+form = "the session's cwd, no path word"
+command = "git push --force origin main"
+cwd = "wt3"
+worktree = "wt3"
+summary = "git push"
+
+[[command]]
+form = "a symlink free .. resolves before matching"
+command = "ls {pool}/wt2/../wt3"
+cwd = "fg"
+worktree = "wt3"
+summary = "ls"
+
+[[command]]
+form = "the last cd wins over --manifest-path"
+command = "cd {pool}/wt2 && cargo test --manifest-path {pool}/wt3/Cargo.toml"
+cwd = "fg"
+worktree = "wt2"
+summary = "cargo test"
+
+[[command]]
+form = "a redirect target is a path word"
+command = "cargo build 2>&1 | tee {pool}/wt1/build.log"
+cwd = "fg"
+worktree = "wt1"
+summary = "cargo build"
+
+[[command]]
+form = "a heredoc's body is not words"
+command = "cat > /tmp/wtpool-verify-notes.txt <<'EOF'\n{pool}/wt3/f.txt\nEOF"
+cwd = "fg"
+worktree = "fg"
+summary = "cat"
+
+[[command]]
+form = "a heredoc into a pool file"
+command = "cat > {pool}/wt2/notes.txt <<'EOF'\nhello\nEOF"
+cwd = "fg"
+worktree = "wt2"
+summary = "cat"
+
+[[command]]
+form = "a secret after export"
+command = "export GH_TOKEN=ghp_wtverifysecret1"
+cwd = "fg"
+worktree = "fg"
+summary = "export"
+secret = "ghp_wtverifysecret1"
+
+[[command]]
+form = "a secret in VAR=value before the program"
+command = "TOKEN=wtverifysecret2 cargo build"
+cwd = "fg"
+worktree = "fg"
+summary = "cargo build"
+secret = "wtverifysecret2"
+
+[[command]]
+form = "a secret in a URL"
+command = "curl https://user:wtverifysecret3@example.invalid/x"
+cwd = "fg"
+worktree = "fg"
+summary = "curl"
+secret = "wtverifysecret3"
+
+[[command]]
+form = "a secret in a header"
+command = "curl -H \"Authorization: Bearer sk-wtverifysecret4\" https://api.example.invalid"
+cwd = "fg"
+worktree = "fg"
+summary = "curl"
+secret = "sk-wtverifysecret4"
+
+[[command]]
+form = "a secret after an option, which no word replaces"
+command = "gh --token wtverifysecret5 auth status"
+cwd = "fg"
+worktree = "fg"
+summary = "gh"
+secret = "wtverifysecret5"
+
+[[command]]
+form = "timeout N"
+command = "timeout 600 cargo test"
+cwd = "fg"
+worktree = "fg"
+summary = "cargo test"
+
+[[command]]
+form = "env and VAR=value"
+command = "env RUST_LOG=debug npm run build"
+cwd = "fg"
+worktree = "fg"
+summary = "npm run"
+
+[[command]]
+form = "time and nice"
+command = "time nice make check"
+cwd = "fg"
+worktree = "fg"
+summary = "make"
+
+[[command]]
+form = "the program's basename"
+command = "/usr/bin/git status"
+cwd = "fg"
+worktree = "fg"
+summary = "git status"
+
+[[command]]
+form = "gh"
+command = "gh pr view 1234"
+cwd = "fg"
+worktree = "fg"
+summary = "gh pr"
+
+[[command]]
+form = "wtpool"
+command = "wtpool bg feature-x"
+cwd = "fg"
+worktree = "fg"
+summary = "wtpool bg"
+
+[[command]]
+form = "docker"
+command = "docker ps"
+cwd = "fg"
+worktree = "fg"
+summary = "docker ps"
+
+[[command]]
+form = "kubectl"
+command = "kubectl get pods"
+cwd = "fg"
+worktree = "fg"
+summary = "kubectl get"
+
+[[command]]
+form = "nix"
+command = "nix flake check"
+cwd = "fg"
+worktree = "fg"
+summary = "nix flake"
+
+[[command]]
+form = "cargo nextest"
+command = "cargo nextest run -E 'package(wtpool)'"
+cwd = "fg"
+worktree = "fg"
+summary = "cargo nextest"
+
+[[command]]
+form = "a next word with a capital letter is dropped"
+command = "git Status"
+cwd = "fg"
+worktree = "fg"
+summary = "git"
+
+[[command]]
+form = "a next word over 24 characters is dropped"
+command = "npm install-a-very-long-package-name"
+cwd = "fg"
+worktree = "fg"
+summary = "npm"
+
+[[command]]
+form = "a next word of exactly 24 characters is kept"
+command = "npm abcdefghijklmnopqrstuvwx"
+cwd = "fg"
+worktree = "fg"
+summary = "npm abcdefghijklmnopqrstuvwx"
+
+[[command]]
+form = "no next word for a program outside the list"
+command = "make test"
+cwd = "fg"
+worktree = "fg"
+summary = "make"
+
+[[command]]
+form = "a command substitution in VAR=value, then the program after ;"
+command = "D=$(ls -d ~/wt2/x | head -1); echo $D"
+cwd = "fg"
+home = "{pool}"
+worktree = "wt2"
+summary = "echo"
+
+[[command]]
+form = "a secret in a command substitution before the program"
+command = "TOKEN=$(echo wtverifysecret6) gh auth login"
+cwd = "fg"
+worktree = "fg"
+summary = "gh auth"
+secret = "wtverifysecret6"
+
+[[command]]
+form = "a secret in backquotes before the program"
+command = "TOKEN=`echo wtverifysecret7` gh auth status"
+cwd = "fg"
+worktree = "fg"
+summary = "gh auth"
+secret = "wtverifysecret7"
+
+[[command]]
+form = "a path in backquotes"
+command = "D=`ls {pool}/wt1`; echo $D"
+cwd = "fg"
+worktree = "wt1"
+summary = "echo"
+
+[[command]]
+form = "a cd in a subshell"
+command = "(cd {pool}/wt2 && make)"
+cwd = "fg"
+worktree = "wt2"
+summary = "make"
+
+[[command]]
+form = "a cd in a command substitution, assignments only"
+command = "X=$(cd {pool}/wt3 && pwd)"
+cwd = "fg"
+worktree = "wt3"
+summary = ""
+
+[[command]]
+form = "a cd in a command substitution is no last cd"
+command = "X=$(cd {pool}/wt3 && pwd); ls {pool}/wt2"
+cwd = "fg"
+worktree = "fg"
+summary = "ls"
+
+[[command]]
+form = "an arithmetic expansion is no path word"
+command = "echo $((6/3)) {pool}/wt3/x"
+cwd = "fg"
+worktree = "wt3"
+summary = "echo"
+
+[[command]]
+form = "a quoted parenthesis in a quoted command substitution"
+command = "cat \"$(echo \")\")\" {pool}/wt2/f.txt"
+cwd = "fg"
+worktree = "wt2"
+summary = "cat"

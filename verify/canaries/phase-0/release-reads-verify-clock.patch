@@ -1,0 +1,18 @@
+ID: harness
+Category: harness
+Check: release__should_have_no_verify_feature
+
+Reads WTPOOL_VERIFY_CLOCK in every build, so the release binary holds a test hook.
+
+diff --git a/crates/wtpool/src/main.rs b/crates/wtpool/src/main.rs
+--- a/crates/wtpool/src/main.rs
++++ b/crates/wtpool/src/main.rs
+@@ -327,7 +327,7 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     }
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+-        _ if cli.version => {
++        _ if cli.version && std::env::var_os("WTPOOL_VERIFY_CLOCK").is_none() || cli.version => {
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

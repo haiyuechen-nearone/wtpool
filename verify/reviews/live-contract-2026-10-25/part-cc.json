@@ -1,0 +1,148 @@
+{
+  "part": "cc",
+  "phase": 3,
+  "commit": "main after the H22 docs fix",
+  "results": [
+    {
+      "check": "cc_cd_into_slot",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "CwdChanged \"/Users/you/.cache/wt-verify/work/contract/verify/out/live-contract/cc/pools/cc_cd_into_slot-1792910644137/wt2\"; later cwd /Users/you/.cache/wt-verify/work/contract/verify/out/live-contract/cc/pools/cc_cd_into_slot-1792910644137/wt2",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "cc_idle_prompt",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "idle_prompt absent",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "cc_interrupt",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "PostToolUseFailure absent; UserPromptSubmit, PreToolUse:Bash",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "cc_no_hook_output",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "cc_permission",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "event order UserPromptSubmit, PreToolUse:Bash, PermissionRequest:Bash, Notification:permission_prompt, CwdChanged, PostToolUse:Bash, PostToolBatch, Stop",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "cc_permission_deny",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "PostToolUseFailure absent; UserPromptSubmit, PreToolUse:Bash, PermissionRequest:Bash, PostToolBatch, Stop",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "cc_permission_deny_interrupt",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "idle_prompt absent; UserPromptSubmit, PreToolUse:Bash, PermissionRequest:Bash",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "cc_read_edit_bash",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "events UserPromptSubmit, PreToolUse:Read, PostToolUse:Read, PostToolBatch, PreToolUse:Edit, PermissionRequest:Edit, PostToolUse:Edit, PreToolUse:Bash, PostToolUse:Bash, PostToolBatch, Stop",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "cc_records_claude_pid",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "the hooks' parent is /Users/you/.local/bin/claude",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "cc_session_end",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "ended, subagent gone",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "cc_stop_failure",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "StopFailure \"model_not_found\"",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "cc_subagent_elsewhere",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "Agent description \"read wt2\"; agent_type Explore",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "cc_subagent_permission",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "permission_prompt recorded",
+      "seconds": 0.0,
+      "flaky": false
+    },
+    {
+      "check": "contract__should_run_in_the_sandbox",
+      "layer": "cc",
+      "outcome": "pass",
+      "kind": null,
+      "code": null,
+      "message": "one auto mode turn on Claude Code 2.1.306: UserPromptSubmit, Stop, SessionEnd",
+      "seconds": 0.0,
+      "flaky": false
+    }
+  ],
+  "input_hash": "514c0cfdc4c8954d3be939ecf0eda79b495a769d9532b0cf3d76d9840cc48e58"
+}

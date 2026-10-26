@@ -1,0 +1,34 @@
+ID: harness
+Category: harness
+Check: lint__no_suppressions
+
+Allows clippy::indexing_slicing in a product module that lives in a folder named target.
+
+diff --git a/crates/wtpool/src/main.rs b/crates/wtpool/src/main.rs
+--- a/crates/wtpool/src/main.rs
++++ b/crates/wtpool/src/main.rs
+@@ -9,6 +9,7 @@ use wtpool_core::{AbsolutePath, Config, Error, Pool, RefArgs, Report, Settings, Slot
+ use version::{BUILD, version_text};
+ 
+ mod hook;
++mod target;
+ mod version;
+ 
+ const HELP: &str = "\
+@@ -328,6 +329,7 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let _ = target::first(&["wtpool"]);
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }
+diff --git a/crates/wtpool/src/target/mod.rs b/crates/wtpool/src/target/mod.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/wtpool/src/target/mod.rs
+@@ -0,0 +1,4 @@
++#[allow(clippy::indexing_slicing)]
++pub fn first<'a>(args: &[&'a str]) -> &'a str {
++    args[0]
++}

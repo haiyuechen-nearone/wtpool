@@ -1,0 +1,26 @@
+ID: harness
+Category: harness
+Check: version__should_list_version_commit_and_features
+
+Breaks wt --version of the installed build: build.rs reruns for a release build only when the
+HEAD reflog changes. A commit reruns it, an edit does not, so after an edit cargo build --release
+keeps printing a clean commit line. Debug builds rerun on every build, as now. Tests the dirty
+half of the new release rebuild steps (oracle change p0r4-release-rebuild).
+
+diff --git a/crates/wt/build.rs b/crates/wt/build.rs
+index 0edbd29..dca732e 100644
+--- a/crates/wt/build.rs
++++ b/crates/wt/build.rs
+@@ -6,7 +6,11 @@ use std::process::Command;
+ fn main() {
+     // An edit or a new file anywhere in the repository changes the tree state without touching
+     // a file cargo watches. A path that never exists makes cargo run this script on every build.
+-    println!("cargo::rerun-if-changed=wt-version-reads-the-tree-on-every-build");
++    if std::env::var("PROFILE").as_deref() == Ok("release") {
++        println!("cargo::rerun-if-changed=../../.git/logs/HEAD");
++    } else {
++        println!("cargo::rerun-if-changed=wt-version-reads-the-tree-on-every-build");
++    }
+ 
+     let commit = git(&["rev-parse", "--verify", "HEAD"]).unwrap_or_default();
+     let dirty = git(&[

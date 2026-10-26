@@ -1,0 +1,28 @@
+{
+  // The extension host side: src/extension.ts, src/host/ and src/html.ts, in Node with the
+  // VS Code API, and src/shared/, the panel core with no VS Code, Node or DOM API: both sides
+  // include it, so the webview's check refuses Node there and this one the DOM. scripts/build.mjs
+  // type checks it; esbuild bundles it. `noImplicitReturns` through `noUnusedParameters` are the
+  // flags of the Google TypeScript Style Guide.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": ["node", "vscode"],
+    "strict": true,
+    "noImplicitReturns": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src/extension.ts", "src/host/**/*.ts", "src/html.ts", "src/shared/**/*.ts", "src/generated/*.d.ts"]
+}

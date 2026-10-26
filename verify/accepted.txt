@@ -1,0 +1,162 @@
+# Accepted 2026-10-23: phase 0 round 1.
+accept p0-nested-target
+accept p0-canary-clean-tree
+accept p0-cover-stale-binaries
+accept p0-version-dirty-marker
+accept p0-isolation-scope
+accept p0-test-helpers
+accept p0-stop-canary
+# Accepted 2026-10-23: phase 0 round 2.
+accept p0r2-stale-commit
+accept p0r2-own-output-dirs
+# Standing rule from 2026-10-23: every oracle change the verifier classes as blocking is accepted, and the lead records it here. Non blocking ones stay unaccepted and deferred.
+accept p0r3-release-version
+accept p0r3-isolation-identity
+accept p0r4-release-rebuild
+accept p0r4-worktree-removed
+# p0r4-identity-scope: fail only on identities a run can produce.
+accept p0r4-identity-scope
+accept p0r5-worktree-folder-deleted
+accept p0r6-listing-names-run
+accept p0r7-suppress-parser
+accept p0r7-late-traces
+# 2026-10-24: a source file stays around 500 lines; 1000 lines is a hard cap.
+accept p0r8-file-length
+# 2026-10-24: the simplified verification (verification.md revision 9). p0r8-no-process-hunt is blocking (standing rule); p0r9-mutants is the new process.
+accept p0r8-no-process-hunt
+accept p0r9-mutants
+# Blocking findings from the phase 1 host builder (standing rule for blocking fixes).
+accept p1-host-coverage
+accept p1-host-fault-order
+accept p1-gitignore-css
+# 2026-10-24: run mutants in parallel. This changes only how many mutants run at once, no check.
+accept p1-mutants-jobs
+# 2026-10-24, phase 1 review 1: a second test fix round, retry_at, the W4 refresh in phase 2, the paused header before the first document, codicons.
+accept p1r2-hide-and-show
+accept p1r2-retry-n
+accept p1r2-first-fault
+accept p1r2-csp-inline
+accept p1r2-gitignore-early
+accept p1r2-codicons
+accept p1r2-spec-decisions
+# 2026-10-24: the phase 1 screenshots are the visual baseline.
+accept p1-visual-baseline
+# 2026-10-24, phase 2: @anthropic-ai/claude-agent-sdk in vscode/test; live contract runs as the spec says; X18 accepted as built early (proved by the canaries in verify/canaries/phase-2/).
+# Blocking oracle fixes from the phase 2 builders, accepted under the standing rule (phase 2's one oracle round).
+accept p2-b1-wait
+accept p2-cc-interrupt-allow
+accept p2-w4-quiet-window
+# 2026-10-24, verification.md revision 13: no mutation testing; unit, integration and e2e tests are the bar, aiming at 100 % line coverage.
+accept drop-mutants
+# 2026-10-24, verification.md revision 14: the load model is one wt instance on a machine with fewer than 10 worktrees.
+accept p2-realistic-load
+accept p2-int-first
+accept p2-visual-baseline
+# 2026-10-25: blocking oracle fix accepted under the standing rule (phase 3 run 1 cover).
+accept p3-x12-error-paths
+# 2026-10-25: phase 3 review 1 B1 and N20, resolved in status-panel.md revision 12.
+accept p3-review1-fg-and-overlap
+accept p3-visual-baseline
+accept p3-spec-rev12
+# 2026-10-25: blocking oracle fix accepted under the standing rule (phase 3 run 3 cover).
+accept p3-spawn-throw
+# 2026-10-25: the live-hook finding, H22 stdout is the block alone (status-panel.md revision 13).
+accept h22-stdout-json
+# 2026-10-25: every copied file names its source and licence; headers, notes and licence fields only, no check changes.
+accept provenance-headers
+# 2026-10-25: the visual audit (horizontal scroll, nothing clipped; WCAG AA in all four themes), status-panel.md revision 14.
+accept visual-round
+accept visual-baseline-2
+# 2026-10-25: prepare the repository for being shown to others (showcase, scrub, approved screenshots for the mockups); editorial only, no check changes.
+accept showcase-scrub
+# 2026-10-25: remove conversation records; editorial only, no check changes.
+accept no-decisions
+# The fresh-clone fixes: verify runs on another machine from a fresh clone; no check weakened where its subject exists.
+accept fresh-clone
+# Generic wt: the spec of status-panel.md revision 16 and verification.md revision 18.
+accept generic-spec
+# Generic wt, the pool settings: clippy.toml's Unix socket types allow-invalid for Windows; the disallowed list is unchanged.
+accept generic-pool
+# The harness runs on every system without the tools of one, and assumes no particular user.
+accept generic-harness
+# The spec follows the extension: status-panel.md revision 17 and verification.md revision 19.
+accept generic-spec-2
+# Generic wt: the checks of status-panel.md revision 16.
+accept generic-oracle
+# xtask reads the machine through sysinfo 0.39.6 on every system; the isolation check follows CLAUDE_CONFIG_DIR; the part hashes find a downloaded VS Code.
+accept sysinfo-upgrade
+# Short links clear a stale folder or link; the isolation check names the settings file it read.
+accept generic-polish
+# All 16 approved shots re-locked after the U8 heading and the neutral sample data; Main and States cropped again.
+accept visual-baseline-3
+# Checks for the extension lines no oracle layer ran: a first folder change, wt's stderr line, keyboard focus scrolling.
+accept ext-cover
+# The bench pool works from a detached source, a p95 budget stops once it fails, and the budgets run with no other verify part under way.
+accept fix-b4
+# The table's horizontal scrollbar sits at the bottom edge of the tab at any tab height.
+accept scrollbar-bottom
+# Labels follow the transcript's titles and the Agent call's description; a build a session started keeps it working.
+accept live-labels
+# The live output of background tasks: the adapter records output paths, never output, and the panel shows the tail of the selected row's tasks.
+accept live-output
+# Working shows wt's own robot with swinging arms, building the spinning codicon dial; both stop under reduce motion.
+accept icons-robot-dial
+# The 6 approved shots with a working or building row re-locked after the robot and dial icons; Main and States cropped again.
+accept visual-baseline-4
+# The tool is renamed wtpool: command, crates, settings file, activity folder, variables and extension id; names only, no check judges anything new.
+accept rename-wtpool
+# A tab in an output tail and in Follow shows as spaces to the next multiple of 8 columns; the extension manifest gains Marketplace metadata.
+accept publish-extension
+# Background work keeps a session or subagent working; a done subagent shows for 1 minute.
+accept publish-cli
+# The Claude Code plugin installs the hooks (H28), and wtpool hook install counts it and names what is missing (H22).
+accept publish-plugin
+# Harness fixes: --help, one socket length error, log paths, reuse past a missing recordings folder, agentId scrubbed, two canaries rebased.
+accept publish-harness
+# Seven phase 0 canaries rebuilt against the current build.rs and Cargo.toml; D5, S8, phase 3 and the agents off note checks name the plugin (H28).
+accept publish-fixups
+# VS Code windows of host and e2e open behind the others and never take focus; a focus guard fails the layer if one becomes the frontmost app.
+accept quiet-windows
+# Revision 23 status lines for the publish round; the spec is marked approved for publishing.
+accept publish-status
+# A run has no side effects on the owner's Mac: transparent click-through test windows, a private clipboard, no recent documents, dialogs or sounds, cc's Claude Code config in the run folder, jobs at utility QoS.
+accept no-side-effects
+# verification.md revision 24 status line.
+accept status-24
+# A Stop or SubagentStop lists its whole session's work in flight, so it also ends old tasks it leaves out in the session's other records of the same process (H27).
+accept task-end
+# H14: substitutions and arithmetic stay inside their word and are never the program; assignments alone name no program; 9 bash-commands.toml rows, 2 of them secrets.
+accept bash-summary 2b0a935fe7292fd3779f4d7955434ccaef73a21f95333cca12ef5f9967666b6e
+# The output tail and Follow remove C1 controls and control strings; Follow passes only text and 7-bit SGR, and skips ahead of a writer that outruns 1 MiB per tick.
+accept output-filter cb7a5e18c4aae8fe80410118ea8834a82f38f55919165ee9923d3e170e2f1c00
+# X6's starting header: a new tab shows and posts "starting…" until wtpool's first line; the webview's first script is inline.
+accept predoc-header e16f12a0205eea1b9e0282f8d1c160f8ecd7e06650649dae2c789d1a7481f063
+# The hook runs gc itself after a session ends, at most once a day per pool, timed by wtpool-activity/gc.stamp (H21); no daily job.
+accept auto-gc 50b547ae391c589a720357bf0e5a7c9cd53ff2b43440aa433963f038de4f72c8
+# The oracle gate reads the lock alone: freeze writes spent ids and a seal, each entry pins its files' hashes, accept lines name the entry hash; this entry pins today's tree until the next freeze.
+# Re-accepted after the publication scrub: the reason names the phase 3 freeze in place of its commit hash.
+accept oracle-gate 919aa924e39a78979ac4913fe42ebc43223f300958b5813bde8abb6a69a641d8
+# The harness runner: reuse hashes the VS Code WTPOOL_VERIFY_VSCODE names; harness:fmt, harness:clippy and harness:rustdoc lint xtask/; part lists refuse --only and pass --contract and --record on; runner retry variables only unset or 0; cmd timeouts cover the pipe readers; the int checks run at the normal priority once built.
+accept harness-runner bf5f7f9e4b4efc8a9723a6e6e5e28bc46192683bd60fce228dbd5ad263b20704
+# A planned phase 4 design: heavy jobs with per-repository suggested patterns, a policy and a pattern editor (jobs.md), and several agents in one row (U12, U13), with mockups; no check changes.
+accept design-jobs 5e1514a08f65704e1962e4fbff9739c270e0ad2c05eef63f064aad8e1c47702a
+# R12 reads only a listed path that ends in /tasks/<id>.output; host checks for that shape, a bare wtpool.path found on absolute PATH entries only, and a failing row action; untrustedWorkspaces and the msal-node override.
+accept ts-host 52d2f60f4d760e98716e8315403ca26d67b92b856654e95e57743bd47bca532b
+# Approved design docs/design/harnesses/harnesses.md, planned for phase 5: a neutral event protocol, adapters, the generic adapter, launcher, detection and a liveness sign for harnesses other than Claude Code; jobs.md's status line reads approved, planned for phase 4.
+accept design-harnesses 0020e31ea31abd0126317a1625c58d23657871fd96a2b5899beccf2e954385b0
+# The approved phase 6 design: measured heavy commands, sampled by one watcher per machine and suggested in the machine strip with their evidence (autodetect.md), its phase 6 additions in jobs.md, and the phase 5 and 6 rows of the Phases table; no check changes.
+accept design-autodetect f944d13fd3b74471f4c3bdfa5017cf6e055020439d988dd4e80005e8e6419898
+# The Claude Code adapter becomes the crate wtpool-claude-code beside wtpool-core, so the workspace members gain it; the adapter paragraph of status-panel.md section 1 names that layout; a new int check reads calls an older wtpool wrote without a kind (H26).
+accept adapter-split e540b1f223da5c301a359d0fae43e8498d5140712bd8446191654c80302a70fc
+# The cc layer runs Claude Code locked down: canUseTool allows only each session's scripted calls, the contract turn has no tools, an allowlist of variables with DISABLE_AUTOUPDATER=1 and the XDG folders in the run, no web tools, Claude Code's sandbox on for Bash; the contract check fails when the owner's install changes; a passing --record retires older recordings.
+accept sec-cc-harness 5f46247bfab2e820abb21713a5526ab262d3b5b8ce9122c404fee117380e3938
+# verification.md pinned after merging adapter-split and sec-cc-harness, which both edit it.
+accept merge-cc-adapter 02dd6ec1e1078344fb633b3f4a5ad2f2db04ce6349d3c631043b0e33d99b03b0
+# The layers, int part, report and trace in leaf modules: one JUnit converter, a pure judge_live and TestEnv, enum Problem, budgets in the report, the harness:* checks traced; the Google Rust guide as its Markdown source.
+accept harness-layers 2f7824b866417f2e365a14fb27e65ff8b88881850cf70dedd727ad6d06d193e2
+# The CLI's table moves from wtpool-core to the wtpool binary, the worktree facts to a domain module of wtpool-core; the CLI shows control, bidi and zero width characters of strings from git, records and settings as \u{XXXX} (R2, X10's set); four new int checks: ls, the bg fetching line, the fg commit subject and config.
+accept cli-presentation 84bc307425673e077bda58baa80dfe2758ecd371592f0c4d1cae4793eb831339
+# X10: the host and the webview share one set of invisible characters, now with U+2028, U+2029 and every format character; a render variant proves they show as \u{XXXX}.
+accept ts-webview 436ee842d55ad068edc6e224c2bbf737b4ba8fb4b183ec638b9ba1c90f7fb891
+# Publication scrub, data and wording only: the design mockups show the placeholder pool acme/app, slots app-wt1 to app-wt4 and the machine my-mac, their PNGs rendered again at the same size and layout; design status lines and choice rows state outcomes without attribution; no check changes.
+accept scrub a2cb8d7d0c72b372f5d3cddb3d73a4b08b86cd00e435fae15ef35eea60fef8db

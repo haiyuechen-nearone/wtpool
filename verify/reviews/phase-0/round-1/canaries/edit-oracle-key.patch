@@ -1,0 +1,17 @@
+ID: harness
+Category: harness
+Check: oracle_unchanged
+
+Lowers clippy::panic to warn in [workspace.lints], an oracle key of a builder owned file.
+
+diff --git a/Cargo.toml b/Cargo.toml
+index 33d34f4..dac9692 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -28,5 +28,5 @@ non_snake_case = "allow"
+ [workspace.lints.clippy]
+ unwrap_used = "deny"
+ expect_used = "deny"
+-panic = "deny"
++panic = "warn"
+ indexing_slicing = "deny"

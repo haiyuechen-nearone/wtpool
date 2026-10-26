@@ -1,0 +1,19 @@
+ID: harness
+Category: harness
+Check: version__should_list_version_commit_and_features
+
+Breaks wt --version: a build of a tree with uncommitted changes never says dirty.
+
+diff --git a/crates/wt/build.rs b/crates/wt/build.rs
+index 2e2a9d8..ac130fb 100644
+--- a/crates/wt/build.rs
++++ b/crates/wt/build.rs
+@@ -15,7 +15,7 @@ fn main() {
+         "--porcelain",
+         "--untracked-files=normal",
+     ])
+-    .is_some_and(|status| !status.is_empty());
++    .is_some_and(|status| status.is_empty() && !status.is_empty());
+     let mut features: Vec<String> = std::env::vars()
+         .filter_map(|(name, _)| {
+             name.strip_prefix("CARGO_FEATURE_")

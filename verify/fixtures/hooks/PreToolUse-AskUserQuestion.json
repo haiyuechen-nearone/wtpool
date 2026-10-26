@@ -1,0 +1,28 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1.jsonl",
+  "cwd": "{pool}/fg",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "AskUserQuestion",
+  "tool_input": {
+    "questions": [
+      {
+        "question": "Which branch should I use?",
+        "header": "Branch",
+        "options": [
+          {
+            "label": "main",
+            "description": "The default"
+          },
+          {
+            "label": "side",
+            "description": "The feature"
+          }
+        ],
+        "multiSelect": false
+      }
+    ]
+  },
+  "tool_use_id": "toolu_01Ask"
+}

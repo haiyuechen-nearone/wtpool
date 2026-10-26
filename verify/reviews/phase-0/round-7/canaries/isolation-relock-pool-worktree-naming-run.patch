@@ -1,0 +1,33 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+The owner locked slot app-wt1 (git worktree lock, reason "owner keeps it"). wt --version, run by an
+int check, unlocks it and locks it again with a reason that names its sandbox foreground, a path in
+the run folder, as a wt free or wt bg that takes over a slot of the real pool would. The listing
+had a locked line before the part and has one after it; only the reason changed. Calls from the
+builder's own tests, whose foreground lies outside the run folder, do nothing. Run with a pool that
+mkpool.sh builds with the lock option. Machine specific: the path is a fake pool under the
+verifier's temporary HOME, never the real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..89f1d1c 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,16 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let foreground = std::env::var("WT_FOREGROUND").unwrap_or_default();
++            if foreground.contains("/verify/out/") {
++                for args in [vec!["unlock"], vec!["lock", "--reason", foreground.as_str()]] {
++                    let _ = std::process::Command::new("git")
++                        .args(["-C", "<scratchpad>/v7c/h2/code/app", "worktree"])
++                        .args(args)
++                        .arg("<scratchpad>/v7c/h2/code/app-wt1")
++                        .status();
++                }
++            }
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

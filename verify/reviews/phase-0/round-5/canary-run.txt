@@ -1,0 +1,130 @@
+seeded at Fri Oct 23 23:35:15 CEST 2026
+all done at Fri Oct 23 23:41:07 CEST 2026
+######## job1
+== round 3 isolation-move-pool-head
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r5/verify/reviews/phase-0/round-3/canaries/isolation-move-pool-head.patch (harness, harness) by isolation__left_no_trace: int: the HEAD of ~/code/app worktree <scratchpad>/home/code/app-wt1 moved under you@mac.example, an identity of the run
+exit 0
+worktree <scratchpad>/home/code/app
+worktree <scratchpad>/home/code/app-wt1
+app
+app-wt1
+-- <scratchpad>/home/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792791316 +0200	commit (initial): a
+h <h@example.invalid> 1792791316 +0200	commit: b
+-- <scratchpad>/home/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792791316 +0200
+== round 3 isolation-add-pool-worktree
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r5/verify/reviews/phase-0/round-3/canaries/isolation-add-pool-worktree.patch (harness, harness) by isolation__left_no_trace: int: the HEAD of ~/code/app worktree <scratchpad>/home/code/app-wt9 moved under you@mac.example, an identity of the run
+exit 0
+worktree <scratchpad>/home/code/app
+worktree <scratchpad>/home/code/app-wt1
+worktree <scratchpad>/home/code/app-wt9
+app
+app-wt1
+app-wt9
+-- <scratchpad>/home/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792791414 +0200	commit (initial): a
+h <h@example.invalid> 1792791414 +0200	commit: b
+-- <scratchpad>/home/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792791414 +0200
+-- <scratchpad>/home/code/app/.git/worktrees/app-wt9/logs/HEAD
+== round 4 isolation-remove-pool-worktree
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r5/verify/reviews/phase-0/round-4/canaries/isolation-remove-pool-worktree.patch (harness, harness) by isolation__left_no_trace: int: ~/code/app lost or moved its worktree <scratchpad>/v4/h4/code/app-wt1
+exit 0
+worktree <scratchpad>/v4/h4/code/app
+app
+-- <scratchpad>/v4/h4/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792791484 +0200	commit (initial): a
+h <h@example.invalid> 1792791484 +0200	commit: b
+== experiment: owner commits under t@t and under their own identity during int
+quick exit 0
+owner moves done at Fri Oct 23 23:40:33 CEST 2026
+int exit 0
+verdict: PASS
+report exit 0
+worktree <scratchpad>/v4/h4/code/app
+worktree <scratchpad>/v4/h4/code/app-wt1
+app
+app-wt1
+-- <scratchpad>/v4/h4/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792791580 +0200	commit (initial): a
+h <h@example.invalid> 1792791580 +0200	commit: b
+h <h@example.invalid> 1792791633 +0200	commit: owner, own identity
+-- <scratchpad>/v4/h4/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792791580 +0200
+t <t@t> 1792791633 +0200	commit: owner agent, throwaway identity
+h <h@example.invalid> 1792791633 +0200	checkout: moving from 90f5e00a09a028c78dfa53901cdb45cb6ce3a8b0 to owner-base
+######## job2
+== new isolation-move-pool-worktree
+caught: <scratchpad>/v5/canaries/isolation-move-pool-worktree.patch (harness, harness) by isolation__left_no_trace: int: ~/code/app lost or moved its worktree <scratchpad>/v5/h2/code/app-wt1
+exit 0
+worktree <scratchpad>/v5/h2/code/app
+worktree <scratchpad>/v5/h2/code/app-wt7
+app
+app-wt7
+-- <scratchpad>/v5/h2/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792791316 +0200	commit (initial): a
+h <h@example.invalid> 1792791316 +0200	commit: b
+-- <scratchpad>/v5/h2/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792791316 +0200
+== new isolation-delete-pool-worktree-folder
+SURVIVED: <scratchpad>/v5/canaries/isolation-delete-pool-worktree-folder.patch (harness, harness) by isolation__left_no_trace: 2 part runs left no trace
+exit 1
+worktree <scratchpad>/v5/h2/code/app
+worktree <scratchpad>/v5/h2/code/app-wt1
+prunable gitdir file points to non-existent location
+app
+-- <scratchpad>/v5/h2/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792791420 +0200	commit (initial): a
+h <h@example.invalid> 1792791420 +0200	commit: b
+-- <scratchpad>/v5/h2/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792791420 +0200
+== new isolation-unit-test-moves-pool-head
+caught: <scratchpad>/v5/canaries/isolation-unit-test-moves-pool-head.patch (harness, harness) by isolation__left_no_trace: int: the HEAD of ~/code/app worktree <scratchpad>/v5/h2/code/app-wt1 moved under verify@wt.invalid, an identity of the run
+exit 0
+worktree <scratchpad>/v5/h2/code/app
+worktree <scratchpad>/v5/h2/code/app-wt1
+app
+app-wt1
+-- <scratchpad>/v5/h2/code/app/.git/logs/HEAD
+h <h@example.invalid> 1792791496 +0200	commit (initial): a
+h <h@example.invalid> 1792791496 +0200	commit: b
+-- <scratchpad>/v5/h2/code/app/.git/worktrees/app-wt1/logs/HEAD
+h <h@example.invalid> 1792791496 +0200
+######## job3
+== version canaries: verify/canaries/phase-0, round 4 original, new
+caught: <scratchpad>/v5/c3/verify/canaries/phase-0/version-always-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit 79912239962802a1fb39aa18cff690786e39a473 (dirty)\nfeatures: verify\n"
+caught: <scratchpad>/v5/c3/verify/canaries/phase-0/version-drop-features.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the feature list of "wt 0.1.0\ncommit 7be68959db7733920a6fde6b3b1a35116dd3e852\nfeatures: none\n"
+caught: <scratchpad>/v5/c3/verify/canaries/phase-0/version-never-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit <round 5 freeze>\nfeatures: verify\n"
+caught: <scratchpad>/v5/c3/verify/canaries/phase-0/version-release-drops-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: no full commit 6c64931b9c1dce10a4b23f489fec75f6946bbdef in the release build's "wt 0.1.0\ncommit unknown\nfeatures: none\n"
+caught: <scratchpad>/v5/c3/verify/canaries/phase-0/version-release-never-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the release rebuild after an edit in one target folder marks the commit line dirty only for a tree with uncommitted changes, here dirty: "wt 0.1.0\ncommit 84110d3df972aa882e160d122a9ea7973e1333b5\nfeatures: none\n"
+caught: <scratchpad>/v5/c3/verify/canaries/phase-0/version-release-stale-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: the release rebuild after an empty commit in one target folder, at commit aaeb0181fc95f38c179d0b255a4152039af215d3, names another commit: "wt 0.1.0\ncommit 9bc9f64641d43bfae2695f359e09ae29003c5f82\nfeatures: none\n"
+caught: <scratchpad>/v5/c3/verify/canaries/phase-0/version-short-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: no full commit 1a689f80f4ffa49c536c8c6a88f3735ab42ec196 in "wt 0.1.0\ncommit 1a689f8\nfeatures: verify\n"
+caught: <scratchpad>/v5/c3/verify/canaries/phase-0/version-stale-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: the debug rebuild after an empty commit in one target folder, at commit 8de698290802921d9d909837cbca72777108de65, names another commit: "wt 0.1.0\ncommit 6e580eced0b3e6de3249e7c748439b9df72e8ec0\nfeatures: verify\n"
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r5/verify/reviews/phase-0/round-4/canaries/version-release-stale-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: the release rebuild after an empty commit in one target folder, at commit cbe7b76f6a1bdc59312c76ed1ae9a5be539f3953, names another commit: "wt 0.1.0\ncommit 359c4e2bd6e38a757487e5097fc6a4de6bce7058\nfeatures: none\n"
+caught: /Users/you/.cache/wt-verify/clones/phase-0-r5/verify/reviews/phase-0/round-4/canaries/version-release-never-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the release build's commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit <round 5 freeze>\nfeatures: none\n"
+caught: <scratchpad>/v5/canaries/version-release-misses-an-edit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the release rebuild after an edit in one target folder marks the commit line dirty only for a tree with uncommitted changes, here dirty: "wt 0.1.0\ncommit c768636c8c9e29925065a3d6b1784d331f4f45e7\nfeatures: none\n"
+exit 0
+######## job4
+== the other verify/canaries/phase-0
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/add-claude-md-in-nested-target.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: crates/wt/src/target/CLAUDE.md
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/add-claude-md-in-vscode-test.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: vscode/test/CLAUDE.md
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/add-claude-md.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: CLAUDE.md
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/add-claude-settings.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: .claude/settings.json
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/add-nested-claude-md.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: crates/wt/CLAUDE.md
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/add-oracle-file.patch (harness, harness) by oracle_unchanged: changed since the round 5 freeze without an entry added to verify/oracle-changes.toml after it: verify/notes.md
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/edit-oracle-file.patch (harness, harness) by oracle_unchanged: changed since the round 5 freeze without an entry added to verify/oracle-changes.toml after it: verify/nextest.toml
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/edit-oracle-key.patch (harness, harness) by oracle_unchanged: changed since the round 5 freeze without an entry added to verify/oracle-changes.toml after it: Cargo.toml:workspace.lints
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/edit-oracle-reusing-spent-id.patch (harness, harness) by oracle_unchanged: changed since the round 5 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/suppress.rs
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/edit-oracle-under-round-2-entry.patch (harness, harness) by oracle_unchanged: changed since the round 5 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/parts.rs
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/edit-oracle-under-spent-entry.patch (harness, harness) by oracle_unchanged: changed since the round 5 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/cover.rs
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/edit-oracle-with-lock.patch (harness, harness) by oracle_unchanged: changed since the round 5 freeze without an entry added to verify/oracle-changes.toml after it: verify/oracle.lock
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/isolation-outside-remote.patch (harness, harness) by isolation__left_no_trace: sandbox/pool/leftover/.git: remote https://github.com/acme/widget is outside the run folder
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/release-reads-verify-clock.patch (harness, harness) by release__should_have_no_verify_feature: release__should_have_no_verify_feature: the release binary reads WT_VERIFY_CLOCK
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/release-verify-by-default.patch (harness, harness) by release__should_have_no_verify_feature: release__should_have_no_verify_feature: the release feature list of "wt 0.1.0\ncommit 95b923e0a7fdfb1db0760b527f3287bbcd0ba876\nfeatures: default, verify\n" must exist and leave out verify
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/stop-check-by-renaming-the-binary.patch (harness, harness) by trace_complete: harness: release__should_have_no_verify_feature failed
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/stop-frozen-check-accepted.patch (harness, harness) by trace_complete: harness: version__should_list_version_commit_and_features did not run
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/suppress-allow-attribute.patch (harness, harness) by lint__no_suppressions: crates/wt/src/main.rs:345: #[allow(clippy::indexing_slicing)]
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/suppress-cargo-config-rustflags.patch (harness, harness) by lint__no_suppressions: .cargo/config.toml:0: target.cfg(all()).rustflags lowers a lint level
+caught: <scratchpad>/v5/c4/verify/canaries/phase-0/suppress-in-target-module.patch (harness, harness) by lint__no_suppressions: crates/wt/src/target/mod.rs:1: #[allow(clippy::indexing_slicing)]
+exit 0

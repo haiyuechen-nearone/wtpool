@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<!-- A design mockup, not product code. docs/design/jobs/attachments/render.mjs renders it with the theme
+     values of verify/themes/ (?theme=, dark by default); the panel's own sheets come first, then
+     mockup.css with the proposed parts. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heavy jobs: heading states</title>
+<link rel="stylesheet" href="/verify/themes/webview-default.css">
+<link rel="stylesheet" href="/docs/design/jobs/attachments/mockup.css">
+</head>
+<body class="mock-page">
+<div class="mock-stack"><p class="mock-label">An older wtpool: the machine name and the chevron</p><iframe class="mock-frame" src="HeadingOld.html" width="1100" height="118" title="An older wtpool: the machine name and the chevron"></iframe>
+<p class="mock-label">No job runs: jobs 0 of a limit of 4</p><iframe class="mock-frame" src="HeadingIdle.html" width="1100" height="118" title="No job runs: jobs 0 of a limit of 4"></iframe>
+<p class="mock-label">4 run, 2 wait, 1 heavy process outside a job, under the pointer</p><iframe class="mock-frame" src="HeadingBusy.html" width="1100" height="118" title="4 run, 2 wait, 1 heavy process outside a job, under the pointer"></iframe>
+<p class="mock-label">Keyboard focus, strip open</p><iframe class="mock-frame" src="HeadingFocus.html" width="1100" height="118" title="Keyboard focus, strip open"></iframe>
+<p class="mock-label">The machine config cannot be read</p><iframe class="mock-frame" src="HeadingError.html" width="1100" height="118" title="The machine config cannot be read"></iframe></div>
+</body>
+</html>

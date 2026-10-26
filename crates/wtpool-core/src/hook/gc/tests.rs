@@ -1,0 +1,211 @@
+use rstest::rstest;
+
+use super::super::record::{Process, Record};
+use super::super::store::tests::{eventually, must_record};
+use super::*;
+
+const NOW: i64 = 1_792_497_600;
+const CLAUDE: &str =
+    r#"{"pid":7001,"ppid":1,"started":"2026-10-20T11:00:00Z","name":"claude","cwd":"/"}"#;
+
+fn record(session: &str, agent: Option<&str>, state: State, age: i64, alive: bool) -> Record {
+    let mut record = must_record(session);
+    record.agent_id = agent.map(str::to_owned);
+    record.state = state;
+    record.updated = clock::rfc3339(NOW - age);
+    record.process = Some(Process {
+        pid: if alive { 7001 } else { 7099 },
+        started: "2026-10-20T11:00:00Z".to_owned(),
+    });
+    record
+}
+
+#[rstest]
+#[case::ended_8_days(record("s", None, State::Ended, 8 * 86_400, true), false)]
+#[case::ended_6_days(record("s", None, State::Ended, 6 * 86_400, true), true)]
+#[case::dead_8_days(record("s", None, State::Idle, 8 * 86_400, false), false)]
+#[case::live_8_days(record("s", None, State::Working, 8 * 86_400, true), true)]
+#[case::done_16_minutes_alone(record("s", Some("a"), State::Done, 16 * 60, true), true)]
+fn collect__should_delete_only_old_dead_or_ended_records(
+    #[case] record: Record,
+    #[case] kept: bool,
+) {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("wtpool-activity")).unwrap();
+    let procs = dir.path().join("procs");
+    std::fs::write(&procs, CLAUDE).unwrap();
+    let activity = Activity::open(dir.path()).unwrap();
+    let stem = match &record.agent_id {
+        Some(agent) => format!("{}.{agent}", record.session_id),
+        None => record.session_id.clone(),
+    };
+    activity.write(&stem, &record).unwrap();
+    std::fs::write(dir.path().join("wtpool-activity/orphan.json.lock"), "").unwrap();
+
+    // When
+    let collected = collect(&activity, NOW, &ProcessTable::File(procs), None);
+
+    // Then
+    assert_eq!(activity.read(&stem).is_some(), kept);
+    assert_eq!(collected.kept + collected.deleted, 1);
+    assert!(activity.orphan_locks().is_empty());
+}
+
+#[test]
+fn collect__should_keep_the_newest_done_subagent_of_each_worktree() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("wtpool-activity")).unwrap();
+    let procs = dir.path().join("procs");
+    std::fs::write(&procs, CLAUDE).unwrap();
+    let activity = Activity::open(dir.path()).unwrap();
+    for (agent, worktree, age) in [
+        ("a1", "/p/wt1", 30),
+        ("a2", "/p/wt1", 20),
+        ("a3", "/p/wt2", 40),
+    ] {
+        let mut subagent = record("s1", Some(agent), State::Done, age * 60, true);
+        subagent.worktree = worktree.to_owned();
+        activity.write(&format!("s1.{agent}"), &subagent).unwrap();
+    }
+
+    // When
+    let collected = collect(&activity, NOW, &ProcessTable::File(procs), None);
+
+    // Then
+    assert_eq!(
+        activity.stems(),
+        vec!["s1.a2".to_owned(), "s1.a3".to_owned()]
+    );
+    assert_eq!(
+        collected,
+        Collected {
+            kept: 2,
+            deleted: 1,
+            stopped: false
+        }
+    );
+}
+
+/// A pool of `count` sessions that ended 8 days ago, and the table of their live claude.
+fn ended_week_old(count: usize) -> (tempfile::TempDir, Activity, ProcessTable) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("wtpool-activity")).unwrap();
+    let procs = dir.path().join("procs");
+    std::fs::write(&procs, CLAUDE).unwrap();
+    let activity = Activity::open(dir.path()).unwrap();
+    for n in 0..count {
+        let session = format!("s{n}");
+        let ended = record(&session, None, State::Ended, 8 * 86_400, true);
+        activity.write(&session, &ended).unwrap();
+    }
+    (dir, activity, ProcessTable::File(procs))
+}
+
+#[rstest]
+#[case::passed(Some(0), 0, true)]
+#[case::far_ahead(Some(i64::MAX), 3, false)]
+#[case::none(None, 3, false)]
+fn collect__should_stop_at_its_deadline(
+    #[case] deadline: Option<i64>,
+    #[case] deleted: usize,
+    #[case] stopped: bool,
+) {
+    // Given
+    let (_dir, activity, table) = ended_week_old(3);
+
+    // When
+    let collected = collect(&activity, NOW, &table, deadline);
+
+    // Then
+    assert_eq!(
+        collected,
+        Collected {
+            kept: 0,
+            deleted,
+            stopped
+        }
+    );
+    assert_eq!(activity.stems().len(), 3 - deleted);
+}
+
+#[test]
+fn after_session_end__should_collect_once_a_day() {
+    // Given
+    let (_dir, activity, table) = ended_week_old(2);
+
+    // When
+    let first = after_session_end(&activity, NOW, &table, i64::MAX);
+    let ended = record("s9", None, State::Ended, 8 * 86_400, true);
+    activity.write("s9", &ended).unwrap();
+    let same_day = after_session_end(&activity, NOW + 23 * 3600, &table, i64::MAX);
+    let mut next_day = None;
+    let ran = eventually(|| {
+        next_day = after_session_end(&activity, NOW + 24 * 3600, &table, i64::MAX);
+        next_day.is_some()
+    });
+
+    // Then
+    assert_eq!(first.map(|c| c.deleted), Some(2));
+    assert_eq!(same_day, None);
+    assert!(ran, "a day later the stamp gave no gc");
+    assert_eq!(next_day.map(|c| c.deleted), Some(1));
+    assert!(activity.stems().is_empty());
+}
+
+#[test]
+fn after_session_end__should_leave_the_day_open_when_stopped() {
+    // Given
+    let (_dir, activity, table) = ended_week_old(2);
+
+    // When
+    let stopped = after_session_end(&activity, NOW, &table, 0);
+    let again = after_session_end(&activity, NOW + 60, &table, i64::MAX);
+
+    // Then
+    assert_eq!(
+        stopped,
+        Some(Collected {
+            kept: 0,
+            deleted: 0,
+            stopped: true
+        })
+    );
+    assert_eq!(again.map(|c| c.deleted), Some(2));
+}
+
+#[test]
+fn collect_now__should_run_on_a_fresh_stamp_and_stamp_the_pool() {
+    // Given
+    let (_dir, activity, table) = ended_week_old(1);
+    assert!(after_session_end(&activity, NOW - 60, &table, i64::MAX).is_some());
+    let ended = record("s9", None, State::Ended, 8 * 86_400, true);
+    activity.write("s9", &ended).unwrap();
+
+    let stamp = || std::fs::read_to_string(activity.file_path("gc.stamp")).unwrap();
+
+    // When
+    let collected = collect_now(&activity, NOW, &table);
+    let stamped = eventually(|| {
+        let _ = collect_now(&activity, NOW, &table);
+        stamp() == format!("{}\n", clock::rfc3339(NOW))
+    });
+
+    // Then
+    assert_eq!(collected.deleted, 1);
+    assert!(stamped, "wtpool hook gc left the stamp at {}", stamp());
+}
+
+#[test]
+fn collect_pool__should_find_nothing_without_the_folder() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let env = HookEnv::from_process(None, None);
+
+    // When
+    let collected = collect_pool(dir.path(), &env);
+
+    // Then
+    assert_eq!(collected, Collected::default());
+}

@@ -1,0 +1,96 @@
+{
+  "name": "wtpool",
+  "displayName": "wtpool",
+  "description": "A tab that shows, per worktree of a wtpool pool, the branch, what each agent does there, and whether the worktree needs you or is free.",
+  "publisher": "haiyuechen-nearone",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "icon": "media/marketplace-icon.png",
+  "galleryBanner": {
+    "color": "#1c2639",
+    "theme": "dark"
+  },
+  "homepage": "https://github.com/haiyuechen-nearone/wtpool#readme",
+  "bugs": {
+    "url": "https://github.com/haiyuechen-nearone/wtpool/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/haiyuechen-nearone/wtpool"
+  },
+  "keywords": [
+    "git",
+    "worktree",
+    "worktrees",
+    "claude code",
+    "agents",
+    "status"
+  ],
+  "engines": {
+    "vscode": "^1.140.0"
+  },
+  "extensionKind": [
+    "ui"
+  ],
+  "categories": [
+    "SCM Providers",
+    "AI",
+    "Visualization"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onWebviewPanel:wtpool.status"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "The Worktrees tab runs wtpool in the workspace folder, where wtpool reads the repository's git state and wtpool.toml, so it waits until you trust the workspace."
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "wtpool.openStatus",
+        "title": "Open Status",
+        "category": "Worktrees"
+      }
+    ],
+    "configuration": {
+      "title": "Worktrees",
+      "properties": {
+        "wtpool.path": {
+          "type": "string",
+          "default": "wtpool",
+          "scope": "application",
+          "markdownDescription": "The `wtpool` binary the Worktrees tab runs, with an argument array and no shell."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "generate": "node scripts/generate.mjs",
+    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/haiyuechen-nearone/wtpool/blob/main/vscode --baseImagesUrl https://github.com/haiyuechen-nearone/wtpool/raw/main/vscode --out wtpool.vsix",
+    "lint": "eslint . && stylelint --allow-empty-input \"src/**/*.css\" \"media/**/*.css\""
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "25.9.9",
+    "@types/vscode": "1.140.0",
+    "@vscode/codicons": "0.0.46-24",
+    "@vscode/vsce": "4.0.0",
+    "ajv": "8.20.0",
+    "esbuild": "0.28.2",
+    "eslint": "10.12.0",
+    "globals": "17.13.0",
+    "json-schema-to-typescript": "16.0.0",
+    "stylelint": "17.16.0",
+    "stylelint-config-standard": "40.0.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1"
+  },
+  "overrides": {
+    "@azure/msal-node": "7.1.0"
+  }
+}

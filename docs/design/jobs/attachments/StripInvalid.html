@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!-- A design mockup, not product code. docs/design/jobs/attachments/render.mjs renders it with the theme
+     values of verify/themes/ (?theme=, dark by default); the panel's own sheets come first, then
+     mockup.css with the proposed parts. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strip: invalid value</title>
+<link rel="stylesheet" href="/verify/themes/webview-default.css">
+<link rel="stylesheet" href="/vscode/src/webview/icons.css">
+<link rel="stylesheet" href="/vscode/src/webview/style.css">
+<link rel="stylesheet" href="/docs/design/jobs/attachments/mockup.css">
+</head>
+<body>
+<header class="header"><h1 class="title">Worktrees</h1><div class="chips"><span class="chip chip-free">1 free</span><span class="chip chip-working">2 working</span><button class="chip chip-waiting">1 waiting</button></div><span class="connection connection-live">live</span></header><div class="scroller"><table class="grid"><colgroup><col class="col-activity"><col class="col-worktree"><col class="col-branch"><col class="col-git"><col class="col-agent"><col class="col-last"><col class="col-actions"></colgroup>
+<thead><tr><th scope="col">Activity</th><th scope="col">Worktree</th><th scope="col">Branch</th><th scope="col">Git</th><th scope="col">Agent · doing</th><th scope="col">Last</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+<tbody>
+<tr class="pool-heading" data-machine="my-mac" data-pool="/Users/you/code/app/.git">
+<td colspan="7"><span class="repo-icon" aria-hidden="true"></span><bdi class="repository">acme/app</bdi><span class="heading-machine"> · <button type="button" class="machine-button" aria-expanded="true"><bdi>my-mac</bdi> · jobs 4/4 · <span class="jobs-queued">2 queued</span> · <span class="jobs-queued">1 not queued</span></button></span></td>
+</tr>
+<tr class="machine-detail"><td class="detail-cell" colspan="7"><div class="strip" role="region" aria-label="Heavy jobs on my-mac">
+<div class="jobs-limit"><div class="agents-heading">Heavy jobs on my-mac</div>
+<div class="limit-row"><label for="job-limit">Limit</label><input id="job-limit" class="job-limit focus" type="text" inputmode="numeric" value="0" aria-invalid="true" aria-describedby="limit-error"><label for="job-enforce">Policy</label><select id="job-enforce" class="job-enforce"><option>off</option><option selected>warn</option><option>require</option></select><span class="policy-meaning">Heavy work outside a job shows as not queued.</span></div>
+<p class="limit-error" id="limit-error">Enter a whole number from 1 to 64.</p><div class="limit-row"><button type="button" class="job-button job-save">Save</button><button type="button" class="job-button secondary job-default">Use defaults</button></div>
+<p class="limit-note">Saved in <bdi>~/.config/wtpool/machine.toml</bdi> · defaults 4, warn · 1 to 64</p>
+<div class="agents-heading heavy-heading">Heavy commands</div>
+<div class="heavy-list-heading"><span class="heavy-source">This machine</span></div>
+<ul class="heavy-chips" data-scope="machine" aria-label="Heavy commands of this machine, 1"><li class="heavy-chip">just<button type="button" class="chip-remove" aria-label="Remove just from this machine" tabindex="0"></button></li></ul>
+<div class="heavy-add"><input id="heavy-machine" class="heavy-input" type="text" placeholder="add a pattern, such as go test" aria-label="Add a heavy command to this machine" value="" aria-invalid="false"><button type="button" class="job-button secondary small">Add</button></div>
+
+<div class="heavy-list-heading"><span class="heavy-source">This repository · <bdi>.git/wtpool.toml</bdi></span></div>
+<ul class="heavy-chips" data-scope="repository" aria-label="Heavy commands of this repository, 4"><li class="heavy-chip">cargo build<button type="button" class="chip-remove" aria-label="Remove cargo build from this repository" tabindex="0"></button></li><li class="heavy-chip">cargo test<button type="button" class="chip-remove" aria-label="Remove cargo test from this repository" tabindex="-1"></button></li><li class="heavy-chip">cargo xtask verify<button type="button" class="chip-remove" aria-label="Remove cargo xtask verify from this repository" tabindex="-1"></button></li><li class="heavy-chip">protoc<span class="heavy-tag">build_processes</span><button type="button" class="chip-remove" aria-label="Remove protoc from this repository" tabindex="-1"></button></li></ul>
+<div class="heavy-add"><input id="heavy-repository" class="heavy-input" type="text" placeholder="add a pattern, such as go test" aria-label="Add a heavy command to this repository" value="" aria-invalid="false"><button type="button" class="job-button secondary small">Add</button></div>
+
+<div class="heavy-list-heading"><span class="heavy-source">Suggested for this repository</span><button type="button" class="job-button secondary small suggest-all">Add all</button></div>
+<p class="suggest-group">from Cargo.toml</p><ul class="heavy-chips heavy-suggested" aria-label="Suggested for this repository, 2"><li class="heavy-chip suggested" data-from="from Cargo.toml">cargo nextest<button type="button" class="chip-remove suggest-add" aria-label="Add cargo nextest to this repository" tabindex="0"></button></li><li class="heavy-chip suggested" data-from="from Cargo.toml">cargo clippy<button type="button" class="chip-remove suggest-add" aria-label="Add cargo clippy to this repository" tabindex="-1"></button></li></ul>
+<p class="limit-note">Nothing is heavy until you add it.</p>
+<p class="limit-hint">Agents and scripts take a place when they run a command as <code>wtpool job -- &lt;command&gt;</code>.</p>
+</div>
+<div class="jobs-lists">
+<div class="agents-heading">Running 4 of 4</div>
+<ol class="jobs-list jobs-running"><li><bdi class="job-summary">cargo nextest</bdi><bdi class="job-where">app-wt1 · Panel build</bdi><span class="job-age">4 m</span></li><li><bdi class="job-summary">npm run</bdi><bdi class="job-where">app-wt3 · session 08:40</bdi><span class="job-age">2 m</span></li><li><bdi class="job-summary">verify</bdi><bdi class="job-where">outside this pool</bdi><span class="job-age">12 m</span></li><li><bdi class="job-summary">cargo build</bdi><bdi class="job-where">outside this pool</bdi><span class="job-age">1 m</span></li></ol>
+<div class="agents-heading">Queued 2</div>
+<ol class="jobs-list jobs-waiting"><li><span class="job-position">1</span><bdi class="job-summary">cargo test</bdi><bdi class="job-where">app-wt1 · Design jobs</bdi><span class="job-age">1 m</span></li><li><span class="job-position">2</span><bdi class="job-summary">cargo clippy</bdi><bdi class="job-where">app</bdi><span class="job-age">20 s</span></li></ol>
+<div class="agents-heading">Not queued 1</div>
+<ol class="jobs-list jobs-running jobs-outside"><li><bdi class="job-summary">make</bdi><bdi class="job-where">outside this pool</bdi><span class="job-age">3 m</span></li></ol>
+</div>
+</div></td></tr>
+<tr class="row activity-foreground group-active" tabindex="0" aria-selected="false">
+<td class="activity"><span class="icon" aria-hidden="true"></span><span class="word">foreground</span></td>
+<td class="worktree" dir="ltr"><bdi class="name">app</bdi> <span class="role">fg</span></td>
+<td class="branch" dir="ltr"><bdi>main</bdi></td>
+<td class="git" dir="ltr"><bdi>clean</bdi></td>
+<td class="agent" dir="ltr"><div class="line state-none"><span class="line-icon" aria-hidden="true"></span>no agent</div></td>
+<td class="last"><div class="line">10 m</div></td>
+<td class="actions"><button type="button" class="action action-open" aria-label="open"></button><button type="button" class="action action-terminal" aria-label="terminal"></button><button type="button" class="action action-copy-path" aria-label="copy-path"></button></td>
+</tr>
+</tbody></table></div>
+</body>
+</html>

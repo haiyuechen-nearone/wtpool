@@ -1,0 +1,28 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+A unit test of the builder checks out another commit in slot app-wt1 of the pool. It runs in the
+unit layer's environment (cargo's, GIT_CONFIG_GLOBAL=/dev/null, no EMAIL), not the int sandbox's,
+so git names its fallback identity. Tests the p0r4-identity-scope rule on the layer where a
+builder's test most likely reaches the pool. Machine specific: the path is a fake pool under the
+verifier's temporary HOME, never the real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..2e62e7e 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -391,6 +391,13 @@ mod tests {
+ 
+     use super::*;
+ 
++    #[test]
++    fn pool__should_stay_untouched() {
++        let _ = std::process::Command::new("git")
++            .args(["-C", "<scratchpad>/v5/h2/code/app-wt1", "checkout", "--quiet", "--detach", "owner-base"])
++            .status();
++    }
++
+     const COMMIT: &str = "0123456789abcdef0123456789abcdef01234567";
+ 
+     #[rstest]

@@ -1,0 +1,18 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1.jsonl",
+  "cwd": "{pool}/fg",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "{pool}/wt1/notes/new.txt",
+    "content": "new file\n"
+  },
+  "tool_use_id": "toolu_01Write",
+  "tool_response": {
+    "type": "create",
+    "filePath": "{pool}/wt1/notes/new.txt",
+    "content": "new file\n"
+  }
+}

@@ -1,0 +1,18 @@
+ID: harness
+Category: harness
+Check: lint__no_suppressions
+
+Allows clippy::indexing_slicing on a product function.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 94d2700..3d90c49 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -342,6 +342,7 @@ struct Build<'a> {
+     features: &'a str,
+ }
+ 
++#[allow(clippy::indexing_slicing)]
+ fn version_text(build: &Build<'_>) -> String {
+     let commit = if build.commit.is_empty() {
+         "unknown"

@@ -1,0 +1,24 @@
+ID: harness
+Category: harness
+Check: lint__no_suppressions
+
+Allows clippy::indexing_slicing in a product module that lives in a folder named target.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 94d2700..5b8e141 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -1,3 +1,5 @@
++mod target;
++
+ use std::path::Path;
+ use std::process::ExitCode;
+ 
+@@ -272,6 +274,7 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let _ = target::first(&["wt"]);
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

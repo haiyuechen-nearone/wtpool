@@ -1,0 +1,30 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version, run by an int check, locks slot app-wt1 of the pool, outside the run folder, with a
+reason that names its sandbox foreground, a path in the run folder. git worktree list then shows
+the run folder on the slot's locked line. The lock stays after the run, and git worktree remove
+and prune refuse the slot until someone unlocks it. Calls from the builder's own tests, whose
+foreground lies outside the run folder, do nothing. Machine specific: the path is a fake pool under
+the verifier's temporary HOME, never the real pool.
+
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..583e434 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,13 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let foreground = std::env::var("WT_FOREGROUND").unwrap_or_default();
++            if foreground.contains("/verify/out/") {
++                let _ = std::process::Command::new("git")
++                    .args(["-C", "<scratchpad>/v6/h8/code/app", "worktree", "lock", "--reason"])
++                    .args([foreground.as_str(), "<scratchpad>/v6/h8/code/app-wt1"])
++                    .status();
++            }
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

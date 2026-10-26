@@ -1,0 +1,37 @@
+# Nextest profiles of the verify parts. A check may take 60 s in unit and 120 s in int.
+
+[profile.harness]
+fail-fast = false
+slow-timeout = { period = "30s", terminate-after = 2 }
+
+[profile.unit]
+fail-fast = false
+retries = 0
+slow-timeout = { period = "30s", terminate-after = 2 }
+
+[profile.unit.junit]
+path = "junit.xml"
+store-success-output = false
+store-failure-output = true
+
+[profile.int]
+fail-fast = false
+retries = 0
+slow-timeout = { period = "60s", terminate-after = 2 }
+
+[profile.int.junit]
+path = "junit.xml"
+store-success-output = false
+store-failure-output = true
+
+# The Rust budgets of the bench part. A budget may take 120 s and is never retried.
+[profile.bench]
+fail-fast = false
+retries = 0
+test-threads = 1
+slow-timeout = { period = "60s", terminate-after = 2 }
+
+[profile.bench.junit]
+path = "junit.xml"
+store-success-output = true
+store-failure-output = true

@@ -1,0 +1,214 @@
+{
+  "description": "Runs wtpool hook on each Claude Code event that wtpool status reads.",
+  "hooks": {
+    "CwdChanged": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "command": "wtpool",
+            "onFailure": "continue",
+            "timeout": 2,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "command": "wtpool",
+            "onFailure": "continue",
+            "timeout": 2,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "async": true,
+            "command": "wtpool",
+            "onFailure": "continue",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "command": "wtpool",
+            "onFailure": "continue",
+            "timeout": 2,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "async": true,
+            "command": "wtpool",
+            "onFailure": "continue",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "async": true,
+            "command": "wtpool",
+            "onFailure": "continue",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "async": true,
+            "command": "wtpool",
+            "onFailure": "continue",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "async": true,
+            "command": "wtpool",
+            "onFailure": "continue",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "command": "wtpool",
+            "onFailure": "continue",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "command": "wtpool",
+            "onFailure": "continue",
+            "timeout": 2,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "command": "wtpool",
+            "onFailure": "continue",
+            "timeout": 2,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "command": "wtpool",
+            "onFailure": "continue",
+            "timeout": 2,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "command": "wtpool",
+            "onFailure": "continue",
+            "timeout": 2,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "args": [
+              "hook"
+            ],
+            "command": "wtpool",
+            "onFailure": "continue",
+            "timeout": 2,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}

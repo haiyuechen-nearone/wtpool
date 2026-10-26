@@ -1,0 +1,588 @@
+/*
+ * The Worktrees tab (status-panel.md, "Panel layout" and "UI mockups"). Colours come only from
+ * --vscode-* variables (X13). Each activity group has one token (U6), chosen so its text reads at
+ * 4.5:1 on plain, hovered and selected rows in the light, dark and high contrast themes:
+ * attention list-warningForeground, active textLink-foreground, quiet descriptionForeground,
+ * problem list-errorForeground. The build puts icons.css, the glyphs, in front of this sheet.
+ */
+
+/* The page is a column as tall as the tab (U1): the header and notes keep their height at the
+ * top, and the box that scrolls the table takes the rest, down to the tab's bottom edge. */
+html {
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  padding: 12px 20px 0;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Header: title, chips, connection, and wtpool's error while paused (U3, X6, R10). It stays put while
+ * the table scrolls sideways or down, and wraps in a narrow tab rather than cut anything. */
+
+.header {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin-bottom: 6px;
+}
+
+.title {
+  margin: 0 6px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Each chip shows its count in the colour of the group it counts, inside a 1 px border of that
+ * colour, which keeps its shape at 3:1 in every theme where a fill would not (U6). */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border: 1px solid currentcolor;
+  border-radius: 10px;
+  background-color: transparent;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.chip[hidden] {
+  display: none;
+}
+
+.chip-free {
+  color: var(--vscode-descriptionForeground);
+}
+
+.chip-working {
+  color: var(--vscode-textLink-foreground);
+}
+
+.chip-waiting {
+  color: var(--vscode-list-warningForeground);
+  cursor: pointer;
+}
+
+.connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.connection[hidden] {
+  display: none;
+}
+
+.connection-paused {
+  padding: 1px 7px;
+  border: 1px dashed var(--vscode-descriptionForeground);
+  border-radius: 3px;
+}
+
+/* wtpool's last stderr line, on a line of its own under the connection and aligned with it. It wraps
+ * anywhere, a long path too, so none of it is cut (U1). The problem token reads at 4.5:1 on the
+ * page in every theme (U6). */
+.wtpool-error {
+  flex-basis: 100%;
+  min-width: 0;
+  margin: 0;
+  color: var(--vscode-list-errorForeground);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* No top margin: margins do not collapse in the page's column, and the header's 6 px is the gap. */
+.no-folder,
+.agents-off {
+  flex: none;
+  margin: 0 0 10px;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* The table (U1). Every column is as wide as its content; nothing is cut or ends in an ellipsis.
+ * A tab narrower than the table scrolls it sideways inside .scroller. The px widths are minimums
+ * that keep the columns still while words and ages change; Agent · doing takes the rest. */
+
+/* .scroller fills the page's column to the tab's bottom edge, so its horizontal scrollbar sits
+ * there at any tab height, never under a short table, and rows that do not fit scroll down inside
+ * it under the header. position: relative holds the hidden "Actions" header label inside it, so
+ * the page itself never scrolls sideways. */
+.scroller {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  container-type: inline-size;
+}
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.col-activity {
+  width: 118px;
+}
+
+.col-worktree {
+  width: 96px;
+}
+
+.col-branch {
+  width: 1px;
+}
+
+.col-git {
+  width: 104px;
+}
+
+.col-last {
+  width: 52px;
+}
+
+.col-actions {
+  width: 132px;
+}
+
+th {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+th:nth-child(6) {
+  text-align: right;
+}
+
+td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  vertical-align: top;
+  line-height: 19px;
+  white-space: nowrap;
+}
+
+/* The pool's heading row (U8): the repository in the text colour, then ` · <machine>` muted, both
+ * at 4.5:1 on the page in every theme (U6). */
+.pool-heading td {
+  padding-top: 10px;
+  font-weight: 600;
+}
+
+.repo-icon {
+  margin-right: 7px;
+}
+
+.heading-machine {
+  color: var(--vscode-descriptionForeground);
+  font-weight: 400;
+}
+
+/* Rows. Hover and selection follow VS Code's lists: the high contrast themes have no hover or
+ * selection background and mark both with a contrastActiveBorder outline instead. */
+
+.row {
+  cursor: default;
+}
+
+.row:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.row[aria-selected="true"] {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+  outline: 1px dotted var(--vscode-contrastActiveBorder, transparent);
+  outline-offset: -1px;
+}
+
+.row:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+body.vscode-high-contrast .row:hover:not(:focus) {
+  outline: 1px dashed var(--vscode-contrastActiveBorder);
+  outline-offset: -1px;
+}
+
+.worktree,
+.branch {
+  font-weight: 500;
+}
+
+.role {
+  margin-left: 3px;
+  padding: 0 4px;
+  border: 1px solid currentcolor;
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 14px;
+  vertical-align: 1px;
+}
+
+.detached,
+.last .line + .line,
+.state-quiet,
+.state-idle,
+.state-done {
+  color: var(--vscode-descriptionForeground);
+}
+
+.state-waiting > bdi:first-child {
+  color: var(--vscode-list-warningForeground);
+}
+
+.last {
+  text-align: right;
+}
+
+/* Activity: an icon and a word per value, coloured by group (U6). */
+
+.group-attention .activity {
+  color: var(--vscode-list-warningForeground);
+  font-weight: 600;
+}
+
+.group-active .activity {
+  color: var(--vscode-textLink-foreground);
+}
+
+.group-quiet .activity {
+  color: var(--vscode-descriptionForeground);
+}
+
+.group-problem .activity {
+  color: var(--vscode-list-errorForeground);
+}
+
+.icon {
+  display: inline-block;
+  width: 16px;
+  margin-right: 5px;
+  text-align: center;
+}
+
+.group-attention > td:first-child {
+  box-shadow: inset 3px 0 0 var(--vscode-list-warningForeground);
+}
+
+/* A selected row's muted text takes the selection foreground, as in VS Code's lists, since
+ * descriptionForeground does not reach 4.5:1 on every selection background. */
+.row[aria-selected="true"] .role,
+.row[aria-selected="true"] .detached,
+.row[aria-selected="true"] .last .line + .line,
+.row[aria-selected="true"] .state-quiet,
+.row[aria-selected="true"] .state-idle,
+.row[aria-selected="true"] .state-done,
+.row[aria-selected="true"].group-quiet .activity {
+  color: inherit;
+}
+
+/* Row actions: shown on hover and focus (U4), in a column of their own that fits all five (X12),
+ * so a shown action never covers another column's text. */
+
+.actions {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 4px;
+  text-align: right;
+}
+
+/* 24 px squares: the WCAG 2.2 target size, five side by side. The cell's padding holds the focus
+ * ring, and scroll-margin keeps it in view when focus scrolls a button in. */
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background-color: transparent;
+  color: var(--vscode-icon-foreground);
+  font: inherit;
+  line-height: 1;
+  vertical-align: top;
+  cursor: pointer;
+  opacity: 0;
+  scroll-margin: 4px;
+}
+
+.action:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.row:hover .action,
+.row:focus-within .action {
+  opacity: 1;
+}
+
+body.vscode-high-contrast .action:hover:not(:focus-visible) {
+  outline: 1px dashed var(--vscode-contrastActiveBorder);
+  outline-offset: -1px;
+}
+
+button:focus {
+  outline: none;
+}
+
+button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+/* focusBorder is under 3:1 on Dark Modern's selection; VS Code's focusAndSelectionOutline, or the
+ * selection foreground where a theme has none, is not. The high contrast themes keep focusBorder. */
+.row[aria-selected="true"]:focus,
+.row[aria-selected="true"] button:focus-visible {
+  outline-color: var(--vscode-list-focusAndSelectionOutline, var(--vscode-list-activeSelectionForeground));
+}
+
+body.vscode-high-contrast .row[aria-selected="true"]:focus,
+body.vscode-high-contrast .row[aria-selected="true"] button:focus-visible {
+  outline-color: var(--vscode-focusBorder);
+}
+
+/* The detail strip (U5): a boxed panel, its 1 px descriptionForeground border at 3:1 against the
+ * page in every theme (U6). It keeps to the visible width of the scroller and stays in view while
+ * a wide table scrolls sideways. */
+
+.detail-cell {
+  padding: 0 0 0 4px;
+  white-space: normal;
+}
+
+.strip {
+  display: grid;
+  position: sticky;
+  left: 0;
+  box-sizing: border-box;
+  max-width: calc(100cqw - 4px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 32px;
+  padding: 10px 16px 12px;
+  border: 1px solid var(--vscode-descriptionForeground);
+  background-color: var(--vscode-textBlockQuote-background);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 24px;
+  align-content: start;
+}
+
+.fact-label {
+  color: var(--vscode-descriptionForeground);
+}
+
+.fact-value {
+  overflow-wrap: anywhere;
+}
+
+.agents-heading {
+  margin-bottom: 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.actor {
+  margin-bottom: 6px;
+}
+
+.actor-state,
+.actor-facts {
+  overflow-wrap: anywhere;
+}
+
+.actor-facts {
+  color: var(--vscode-descriptionForeground);
+}
+
+.actor .actor-label {
+  color: var(--vscode-foreground);
+}
+
+.actor.state-waiting .actor-label {
+  color: var(--vscode-list-warningForeground);
+}
+
+/* The Output section (U9): under both columns of the strip, per agent, each task's heading and
+ * Follow button over its tail in a monospace block. Lines wrap anywhere, so nothing is clipped
+ * (U1); a tail taller than the block scrolls inside it. Text and border meet U6 in every theme:
+ * the foreground on the editor background, and a descriptionForeground border at 3:1. */
+
+.output-area {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.outputs {
+  margin-top: 4px;
+}
+
+.outputs-heading {
+  margin-bottom: 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.output {
+  margin-bottom: 10px;
+}
+
+.output-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-bottom: 4px;
+}
+
+.output-heading {
+  flex: 1 1 12em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.output-state {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* A text button with a 1 px border in the link colour, which meets 3:1 on the strip. */
+.follow {
+  flex: none;
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid var(--vscode-textLink-foreground);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.follow:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+body.vscode-high-contrast .follow:hover:not(:focus-visible) {
+  outline: 1px dashed var(--vscode-contrastActiveBorder);
+  outline-offset: -1px;
+}
+
+.output-tail {
+  box-sizing: border-box;
+  max-height: 16.5em;
+  margin: 0;
+  padding: 6px 8px;
+  overflow: hidden auto;
+  border: 1px solid var(--vscode-descriptionForeground);
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.output-tail:focus {
+  outline: none;
+}
+
+.output-tail:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.output-note {
+  font-style: italic;
+}
+
+/* A narrow tab: tighter padding and minimums; the table scrolls sideways when it still does not fit. */
+
+@media (width <= 760px) {
+  body {
+    padding: 8px 10px 0;
+  }
+
+  .col-activity {
+    width: 112px;
+  }
+
+  .col-worktree {
+    width: 88px;
+  }
+
+  .col-git {
+    width: 60px;
+  }
+
+  .col-last {
+    width: 44px;
+  }
+
+  .col-actions {
+    width: 128px;
+  }
+
+  th,
+  td {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

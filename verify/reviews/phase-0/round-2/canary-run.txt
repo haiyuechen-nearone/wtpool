@@ -1,0 +1,50 @@
+== round-1 survivors (round-1 files and their adopted copies)
+SURVIVED: verify/reviews/phase-0/round-1/canaries/suppress-in-target-module.patch (harness, harness) by lint__no_suppressions: no suppression
+caught: verify/reviews/phase-0/round-1/canaries/version-always-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit 429a743219cdf1c35fefe12e57ee3a439d8d775b (dirty)\nfeatures: verify\n"
+caught: verify/canaries/phase-0/suppress-in-target-module.patch (harness, harness) by lint__no_suppressions: crates/wt/src/target/mod.rs:1: #[allow(clippy::indexing_slicing)]
+caught: verify/canaries/phase-0/version-always-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit 24e3463c59d437eb18a37a8847c6bae1a7f7cb3d (dirty)\nfeatures: verify\n"
+
+== new canaries (canaries/) and verify/canaries/phase-0/
+caught: canaries/add-claude-md-in-nested-target.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: crates/wt/src/target/CLAUDE.md
+caught: canaries/edit-oracle-reusing-spent-id.patch (harness, harness) by oracle_unchanged: changed since the round 2 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/suppress.rs
+caught: canaries/stop-check-by-renaming-the-binary.patch (harness, harness) by trace_complete: harness: release__should_have_no_verify_feature failed
+SURVIVED: canaries/version-stale-commit.patch (harness, harness) by version__should_list_version_commit_and_features: 
+caught: verify/canaries/phase-0/add-claude-md.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: CLAUDE.md
+caught: verify/canaries/phase-0/add-claude-settings.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: .claude/settings.json
+caught: verify/canaries/phase-0/add-nested-claude-md.patch (harness, harness) by repo_context__should_be_unchanged: differs from spec-base: crates/wt/CLAUDE.md
+caught: verify/canaries/phase-0/add-oracle-file.patch (harness, harness) by oracle_unchanged: changed since the round 2 freeze without an entry added to verify/oracle-changes.toml after it: verify/notes.md
+caught: verify/canaries/phase-0/edit-oracle-file.patch (harness, harness) by oracle_unchanged: changed since the round 2 freeze without an entry added to verify/oracle-changes.toml after it: verify/nextest.toml
+caught: verify/canaries/phase-0/edit-oracle-key.patch (harness, harness) by oracle_unchanged: changed since the round 2 freeze without an entry added to verify/oracle-changes.toml after it: Cargo.toml:workspace.lints
+caught: verify/canaries/phase-0/edit-oracle-under-spent-entry.patch (harness, harness) by oracle_unchanged: changed since the round 2 freeze without an entry added to verify/oracle-changes.toml after it: xtask/src/cover.rs
+caught: verify/canaries/phase-0/edit-oracle-with-lock.patch (harness, harness) by oracle_unchanged: changed since the round 2 freeze without an entry added to verify/oracle-changes.toml after it: verify/oracle.lock
+caught: verify/canaries/phase-0/isolation-outside-remote.patch (harness, harness) by isolation__left_no_trace: sandbox/pool/leftover/.git: remote https://github.com/acme/widget is outside the run folder
+caught: verify/canaries/phase-0/release-reads-verify-clock.patch (harness, harness) by release__should_have_no_verify_feature: release__should_have_no_verify_feature: the release binary reads WT_VERIFY_CLOCK
+caught: verify/canaries/phase-0/release-verify-by-default.patch (harness, harness) by release__should_have_no_verify_feature: release__should_have_no_verify_feature: the release feature list of "wt 0.1.0\ncommit 6e121b551a50e845ddbe49722840b977268db930\nfeatures: default, verify\n" must exist and leave out verify
+caught: verify/canaries/phase-0/stop-frozen-check-accepted.patch (harness, harness) by trace_complete: harness: version__should_list_version_commit_and_features did not run
+caught: verify/canaries/phase-0/suppress-allow-attribute.patch (harness, harness) by lint__no_suppressions: crates/wt/src/main.rs:345: #[allow(clippy::indexing_slicing)]
+caught: verify/canaries/phase-0/suppress-cargo-config-rustflags.patch (harness, harness) by lint__no_suppressions: .cargo/config.toml:0: target.cfg(all()).rustflags lowers a lint level
+caught: verify/canaries/phase-0/suppress-in-target-module.patch (harness, harness) by lint__no_suppressions: crates/wt/src/target/mod.rs:1: #[allow(clippy::indexing_slicing)]
+caught: verify/canaries/phase-0/version-always-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit 850bec881e98cad9e48d53fa701337054ea51152 (dirty)\nfeatures: verify\n"
+caught: verify/canaries/phase-0/version-drop-features.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the feature list of "wt 0.1.0\ncommit e5e6456fcbdd5eb0276454bb20b3fd90b0c9d8e4\nfeatures: none\n"
+caught: verify/canaries/phase-0/version-never-dirty.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: assertion `left == right` failed: the commit line marks a build of a tree with uncommitted changes, and only such a build, dirty: "wt 0.1.0\ncommit <version build fix>\nfeatures: verify\n"
+caught: verify/canaries/phase-0/version-short-commit.patch (harness, harness) by version__should_list_version_commit_and_features: version__should_list_version_commit_and_features: no full commit fbf8fe9e0bfd113420803b5dde46a4bce1aadaed in "wt 0.1.0\ncommit fbf8fe9\nfeatures: verify\n"
+
+== stale commit demonstration
+== control, product as is
+HEAD <version build fix>
+wt 0.1.0
+commit <version build fix>
+features: none
+HEAD ac2635c772d7a43c83b06c3914d6578f60a4ff6a
+wt 0.1.0
+commit ac2635c772d7a43c83b06c3914d6578f60a4ff6a
+features: none
+== with version-stale-commit applied
+HEAD 0d00b0d8e772f7932c8dca2cc838f4ff8be00499
+wt 0.1.0
+commit 0d00b0d8e772f7932c8dca2cc838f4ff8be00499
+features: none
+HEAD 9c1cef2c9291a5bcdfa0cb529ccb2ffbe5de95af
+wt 0.1.0
+commit 0d00b0d8e772f7932c8dca2cc838f4ff8be00499
+features: none

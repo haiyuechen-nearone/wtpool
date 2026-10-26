@@ -1,0 +1,49 @@
+ID: harness
+Category: harness
+Check: oracle_unchanged
+
+Stops lint__no_suppressions from flagging expect attributes, under a new entry that reuses the id of
+the spent entry p0-nested-target. The entry pins xtask/src/suppress.rs after the edit and
+verify/accepted.txt accepts it at its content, so only the spent id stops it.
+
+diff --git a/verify/accepted.txt b/verify/accepted.txt
+index dadfd82..b61f226 100644
+--- a/verify/accepted.txt
++++ b/verify/accepted.txt
+@@ -9,6 +9,7 @@ accept p0-stop-canary
+ # Accepted 2026-10-23: phase 0 round 2.
+ accept p0r2-stale-commit
+ accept p0r2-own-output-dirs
++accept p0-nested-target 923e389a5c20a97541f87ca41d2ea17dd65296b2f096cdd5f7799cdad10059ab
+ # Standing rule from 2026-10-23: every oracle change the verifier classes as blocking is accepted, and the lead records it here. Non blocking ones stay unaccepted and deferred.
+ accept p0r3-release-version
+ accept p0r3-isolation-identity
+diff --git a/verify/oracle-changes.toml b/verify/oracle-changes.toml
+index 0010a57..cc1505b 100644
+--- a/verify/oracle-changes.toml
++++ b/verify/oracle-changes.toml
+@@ -46,6 +46,12 @@ id = "p0r2-own-output-dirs"
+ reason = "repo_context skips root node_modules but not vscode/test/node_modules, which the clone keeps. From phase 1 an npm package shipping AGENTS.md or CLAUDE.md would fail a correct build. Also close the isolation gap for a worktree the run adds to the real pool outside the run folder at one of the owner's commits."
+ paths = ["xtask/src/context.rs", "xtask/src/isolation.rs"]
+ 
++[[change]]
++id = "p0-nested-target"
++reason = "Allow expect attributes again."
++[change.files]
++"xtask/src/suppress.rs" = "69128c9147bc82b5a497eb02cf825de0d7e0f7cce5c1ca12df1c399f648930b8"
++
+ [[change]]
+ id = "p0r3-release-version"
+ reason = "version__ checks only debug builds, so a release build that prints `commit unknown` passes (canary version-release-drops-commit survived). Also run the release binary's --version and assert the full commit and the dirty marker."
+diff --git a/xtask/src/suppress.rs b/xtask/src/suppress.rs
+index 83461f6..45b9e57 100644
+--- a/xtask/src/suppress.rs
++++ b/xtask/src/suppress.rs
+@@ -105,7 +105,6 @@ fn bracket_body(chars: &[char], start: usize) -> String {
+ 
+ pub fn is_suppression(body: &str) -> bool {
+     body.starts_with("allow(")
+-        || body.starts_with("expect(")
+         || (body.starts_with("cfg_attr(")
+             && (body.contains(",allow(") || body.contains(",expect(")))
+         || body.contains("rustfmt::skip")

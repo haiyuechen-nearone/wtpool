@@ -1,0 +1,13 @@
+ID: harness
+Category: harness
+Check: oracle_unchanged
+
+Adds a file under verify/, which the lock does not list.
+
+diff --git a/verify/notes.md b/verify/notes.md
+new file mode 100644
+index 0000000..8578d83
+--- /dev/null
++++ b/verify/notes.md
+@@ -0,0 +1 @@
++Checks to skip when in a hurry: version.

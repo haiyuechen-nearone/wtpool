@@ -1,0 +1,26 @@
+# git diff --stat of verify/fixtures/claude-2.1.306 after scrubbing this run's recordings
+ .../fixtures/claude-2.1.306/cc_cd_into_slot.jsonl  | 18 ++++++-------
+ .../fixtures/claude-2.1.306/cc_idle_prompt.jsonl   |  6 ++---
+ verify/fixtures/claude-2.1.306/cc_interrupt.jsonl  |  6 ++---
+ verify/fixtures/claude-2.1.306/cc_permission.jsonl | 18 ++++++-------
+ .../claude-2.1.306/cc_permission_deny.jsonl        | 12 ++++-----
+ .../cc_permission_deny_interrupt.jsonl             |  8 +++---
+ .../claude-2.1.306/cc_read_edit_bash.jsonl         | 25 +++++++++---------
+ .../fixtures/claude-2.1.306/cc_session_end.jsonl   | 26 +++++++++----------
+ .../fixtures/claude-2.1.306/cc_stop_failure.jsonl  |  6 ++---
+ .../claude-2.1.306/cc_subagent_elsewhere.jsonl     | 26 +++++++++----------
+ .../claude-2.1.306/cc_subagent_permission.jsonl    | 30 +++++++++++-----------
+ 11 files changed, 90 insertions(+), 91 deletions(-)
+
+# differing fields per fixture (count of payloads)
+cc_cd_into_slot.jsonl {'last_assistant_message': 1, 'prompt_id': 9, 'duration_ms': 2, 'tool_input.description': 2, 'tool_calls': 1}
+cc_idle_prompt.jsonl {'prompt_id': 3}
+cc_interrupt.jsonl {'tool_input.description': 1, 'prompt_id': 3}
+cc_permission.jsonl {'last_assistant_message': 1, 'prompt_id': 9, 'tool_input.description': 3, 'duration_ms': 1, 'tool_calls': 1}
+cc_permission_deny.jsonl {'last_assistant_message': 1, 'prompt_id': 6}
+cc_permission_deny_interrupt.jsonl {'prompt_id': 4}
+cc_read_edit_bash.jsonl {'last_assistant_message': 1, 'prompt_id': 12, 'payload only in old: PostToolBatch:None': 1, 'duration_ms': 2, 'tool_input.description': 2, 'tool_calls': 1}
+cc_session_end.jsonl {'last_assistant_message': 3, 'background_tasks': 2, 'prompt_id': 13, 'tool_calls': 1, 'duration_ms': 1, 'tool_input.description': 2, 'tool_input.prompt': 2, 'tool_response.outputFile': 1, 'tool_response.description': 1, 'tool_response.agentId': 1, 'tool_response.prompt': 1, 'prompt': 1}
+cc_stop_failure.jsonl {'prompt_id': 3}
+cc_subagent_elsewhere.jsonl {'last_assistant_message': 3, 'prompt_id': 13, 'tool_calls': 2, 'tool_response.file.content': 1, 'tool_response.file.numLines': 1, 'tool_input.limit': 2, 'duration_ms': 2, 'tool_input.prompt': 2, 'tool_response.prompt': 1, 'prompt': 1}
+cc_subagent_permission.jsonl {'last_assistant_message': 3, 'background_tasks': 2, 'prompt_id': 15, 'tool_input.description': 5, 'tool_calls': 2, 'duration_ms': 2, 'tool_input.prompt': 2, 'tool_response.description': 1, 'tool_response.prompt': 1, 'prompt': 1}

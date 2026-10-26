@@ -1,0 +1,19 @@
+ID: harness
+Category: harness
+Check: release__should_have_no_verify_feature
+
+Reads WT_VERIFY_CLOCK in every build, so the release binary holds a test hook.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 94d2700..5806229 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -271,7 +271,7 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     })?;
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+-        _ if cli.version => {
++        _ if cli.version && std::env::var_os("WT_VERIFY_CLOCK").is_none() || cli.version => {
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

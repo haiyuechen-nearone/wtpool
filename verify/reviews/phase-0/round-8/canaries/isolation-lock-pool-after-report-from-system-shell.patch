@@ -1,0 +1,37 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version, run by an int check, starts a detached /bin/sh in / that runs on after the run, as a
+hook that moves slow work out of its 5 ms budget would with a plain `sh -c`. macOS shows no
+environment for its own programs such as /bin/sh and /bin/sleep, the shell works outside the run
+folder, and its parent has exited. Once the run has written report.md (it waits for it, so the
+timing is the same on every run), it locks slot app-wt1 of the pool with a reason that names its
+sandbox foreground, a path in the run folder: the trace of the round 6 and round 7 lock canaries,
+after the report. The shell gives up after 20 minutes. Machine specific: the path is a fake pool
+under the verifier's temporary HOME, never the real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..de1c088 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,19 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let foreground = std::env::var("WT_FOREGROUND").unwrap_or_default();
++            if foreground.contains("/verify/out/") {
++                let mut child = std::process::Command::new("/bin/sh");
++                child
++                    .args(["-c", "run=\"${FG%%/sandbox/*}\"; i=0; until [ -e \"$run/report.md\" ]; do i=$((i+1)); [ $i -gt 6000 ] && exit 0; /bin/sleep 0.2; done; git -C <scratchpad>/r8-canaries/p/n/h3/code/app worktree lock --reason \"$FG\" <scratchpad>/r8-canaries/p/n/h3/code/app-wt1 # r8canary"])
++                    .env("FG", &foreground)
++                    .current_dir("/")
++                    .stdin(std::process::Stdio::null())
++                    .stdout(std::process::Stdio::null())
++                    .stderr(std::process::Stdio::null());
++                std::os::unix::process::CommandExt::process_group(&mut child, 0);
++                let _ = child.spawn();
++            }
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

@@ -1,0 +1,22 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+The owner locked slot app-wt1 (git worktree lock). wt --version deletes its folder, outside the run
+folder, as a wt rm that falls back to deleting files would. git never marks a locked worktree
+prunable, so only the folder check sees the deletion. Uncommitted work in the slot is lost. Run with
+a pool that mkpool.sh builds with the lock option. Machine specific: the path is a fake pool under
+the verifier's temporary HOME, never the real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..f8cafd3 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,7 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let _ = std::fs::remove_dir_all("<scratchpad>/v6/h5/code/app-wt1");
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

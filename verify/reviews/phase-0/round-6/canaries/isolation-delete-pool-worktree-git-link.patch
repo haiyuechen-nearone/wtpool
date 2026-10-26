@@ -1,0 +1,23 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version deletes the .git link of slot app-wt1 of the pool, outside the run folder, as a wt rm
+that deletes the link first and then fails would. The slot folder and its files stay, but git no
+longer knows the folder as a worktree: git worktree list marks it prunable, and the next prune drops
+the slot and any uncommitted work in its index. No HEAD moves. Tests the .git link half of the
+folder check (oracle change p0r5-worktree-folder-deleted) end to end. Machine specific: the path is
+a fake pool under the verifier's temporary HOME, never the real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..e9dd88b 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,7 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let _ = std::fs::remove_file("<scratchpad>/v6/h5/code/app-wt1/.git");
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

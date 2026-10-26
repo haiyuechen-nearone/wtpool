@@ -1,0 +1,17 @@
+== cc_cd_into_slot.jsonl: old 9 payloads, new 9; sequence DIFFERS
+  old: UserPromptSubmit, PreToolUse:Bash, CwdChanged, PostToolUse:Bash, PreToolUse:Bash, PostToolUse:Bash, PostToolBatch, Stop, SessionEnd
+  new: UserPromptSubmit, PreToolUse:Bash, PostToolUse:Bash, CwdChanged, PreToolUse:Bash, PostToolUse:Bash, PostToolBatch, Stop, SessionEnd
+== cc_idle_prompt.jsonl: old 3 payloads, new 3; sequence same
+== cc_interrupt.jsonl: old 3 payloads, new 3; sequence same
+== cc_permission.jsonl: old 9 payloads, new 9; sequence same
+== cc_permission_deny.jsonl: old 6 payloads, new 6; sequence same
+== cc_permission_deny_interrupt.jsonl: old 4 payloads, new 4; sequence same
+== cc_read_edit_bash.jsonl: old 13 payloads, new 12; sequence DIFFERS
+  old: UserPromptSubmit, PreToolUse:Read, PostToolUse:Read, PostToolBatch, PreToolUse:Edit, PermissionRequest:Edit, PostToolUse:Edit, PostToolBatch, PreToolUse:Bash, PostToolUse:Bash, PostToolBatch, Stop, SessionEnd
+  new: UserPromptSubmit, PreToolUse:Read, PostToolUse:Read, PostToolBatch, PreToolUse:Edit, PermissionRequest:Edit, PostToolUse:Edit, PreToolUse:Bash, PostToolUse:Bash, PostToolBatch, Stop, SessionEnd
+== cc_session_end.jsonl: old 13 payloads, new 13; sequence DIFFERS
+  old: UserPromptSubmit, PreToolUse:Agent, PostToolUse:Agent, SubagentStart, PostToolBatch, PreToolUse:Read, PostToolUse:Read, PostToolBatch, Stop, SubagentStop, UserPromptSubmit, Stop, SessionEnd
+  new: UserPromptSubmit, PreToolUse:Agent, SubagentStart, PostToolUse:Agent, PostToolBatch, PreToolUse:Read, PostToolUse:Read, PostToolBatch, Stop, SubagentStop, UserPromptSubmit, Stop, SessionEnd
+== cc_stop_failure.jsonl: old 3 payloads, new 3; sequence same
+== cc_subagent_elsewhere.jsonl: old 13 payloads, new 13; sequence same
+== cc_subagent_permission.jsonl: old 15 payloads, new 15; sequence same

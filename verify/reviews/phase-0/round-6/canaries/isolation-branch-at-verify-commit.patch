@@ -1,0 +1,31 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version makes a commit by wt-verify in the pool, outside the run folder, and points the new
+branch verify-leak at it, as a run that fetches a sandbox branch into the real pool would. No HEAD
+moves, so only the branch and tag rule of isolation__left_no_trace can see it. Machine specific: the
+path is a fake pool under the verifier's temporary HOME, never the real pool.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..cb9438e 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,17 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            if let Ok(made) = std::process::Command::new("git")
++                .args(["-C", "<scratchpad>/v6/h6/code/app", "-c", "user.name=wt-verify"])
++                .args(["-c", "user.email=verify@wt.invalid", "commit-tree", "HEAD^{tree}"])
++                .args(["-m", "leak"])
++                .output()
++            {
++                let commit = String::from_utf8_lossy(&made.stdout).trim().to_owned();
++                let _ = std::process::Command::new("git")
++                    .args(["-C", "<scratchpad>/v6/h6/code/app", "update-ref", "refs/heads/verify-leak", commit.as_str()])
++                    .status();
++            }
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

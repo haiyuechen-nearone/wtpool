@@ -1,0 +1,430 @@
+# Verify report, phase 2
+
+**Verdict: PASS**
+
+- Commit: the phase 2 review 2 head
+- spec-base: spec-base
+- Claude Code: 2.1.306 (Claude Code)
+- Run: phase2-r6
+
+## Reused parts
+
+None: every part ran in this run.
+
+## Needs you
+
+Nothing.
+
+## Oracle changes since the freeze
+
+```
+ docs/design/status-panel/status-panel.md           |    4 +-
+ docs/design/status-panel/verification.md           |   36 +-
+ verify/accepted.txt                                |    6 +
+ .../phase-0/mutants-test-assertion-removed.patch   |   40 -
+ verify/nextest.toml                                |    7 -
+ verify/oracle-changes.toml                         |   20 +
+ verify/reviews/phase-2/review-1/review.md          |  266 +
+ verify/reviews/phase-2/run-1/mutants-missed.txt    |   18 +
+ verify/reviews/phase-2/run-1/verify-report.md      | 5279 ++++++++++++++++++
+ verify/reviews/phase-2/run-2/verify-report.md      | 5662 +++++++++++++++++++
+ verify/reviews/phase-2/run-3/verify-report.md      | 5570 +++++++++++++++++++
+ verify/reviews/phase-2/run-4/verify-report.md      | 5668 ++++++++++++++++++++
+ verify/reviews/phase-2/run-5/verify-report.md      | 5468 +++++++++++++++++++
+ .../dark-permission_wait_and_answer-1100.png       |  Bin 0 -> 36385 bytes
+ .../dark-permission_wait_and_answer-600.png        |  Bin 0 -> 31525 bytes
+ .../dark-several_agents_one_worktree-1100.png      |  Bin 0 -> 38461 bytes
+ ...trast-light-permission_wait_and_answer-1100.png |  Bin 0 -> 36361 bytes
+ ...rast-light-several_agents_one_worktree-1100.png |  Bin 0 -> 38338 bytes
+ ...gh-contrast-permission_wait_and_answer-1100.png |  Bin 0 -> 35763 bytes
+ ...h-contrast-several_agents_one_worktree-1100.png |  Bin 0 -> 37709 bytes
+ .../light-permission_wait_and_answer-1100.png      |  Bin 0 -> 35580 bytes
+ .../light-several_agents_one_worktree-1100.png     |  Bin 0 -> 37506 bytes
+ verify/trace.toml                                  |    1 -
+ xtask/src/clone.rs                                 |   24 +-
+ xtask/src/layers.rs                                |   24 +-
+ xtask/src/layers/bench.rs                          |    4 +-
+ xtask/src/layers/cc.rs                             |   32 +-
+ xtask/src/lib.rs                                   |    3 +-
+ xtask/src/main.rs                                  |   16 +-
+ xtask/src/mutants/mod.rs                           |  461 --
+ xtask/src/mutants/outcomes.rs                      |  431 --
+ xtask/src/mutants/parallel.rs                      |  254 -
+ xtask/src/mutants/shim.rs                          |  299 --
+ xtask/src/mutants/skips.rs                         |  108 -
+ xtask/src/oracle.rs                                |    8 +-
+ xtask/src/parts.rs                                 |   11 +-
+ xtask/src/parts/int.rs                             |    7 +-
+ xtask/src/rebuild.rs                               |    5 +-
+ xtask/src/replay.rs                                |  115 +-
+ xtask/src/report.rs                                |   49 +-
+ xtask/src/reuse.rs                                 |   28 +-
+ xtask/src/schedule.rs                              |   62 +-
+ xtask/src/scrub.rs                                 |   10 +-
+ xtask/tests/checks/bench/agents.rs                 |    2 +-
+ xtask/tests/checks/budget_size.rs                  |   10 +-
+ xtask/tests/checks/hook_files.rs                   |   19 +-
+ 46 files changed, 28245 insertions(+), 1782 deletions(-)
+```
+
+## verify/accepted.txt since the freeze
+
+```
+diff --git a/verify/accepted.txt b/verify/accepted.txt
+index e3743fa..b4b57fd 100644
+--- a/verify/accepted.txt
++++ b/verify/accepted.txt
+@@ -46,3 +46,9 @@ accept p1-visual-baseline
+ accept p2-b1-wait
+ accept p2-cc-interrupt-allow
+ accept p2-w4-quiet-window
++# 2026-10-24, verification.md revision 13: no mutation testing; unit, integration and e2e tests are the bar, aiming at 100 % line coverage.
++accept drop-mutants
++# 2026-10-24, verification.md revision 14: the load model is one wt instance on a machine with fewer than 10 worktrees.
++accept p2-realistic-load
++accept p2-int-first
++accept p2-visual-baseline
+```
+
+## Spec changes since spec-base
+
+```
+ docs/design/status-panel/status-panel.md |  10 +-
+ docs/design/status-panel/verification.md | 159 ++++++++++++++++++++-----------
+ 2 files changed, 111 insertions(+), 58 deletions(-)
+```
+
+## Failures
+
+None.
+
+## Flaky checks
+
+Checks that passed only on a retry. One flaky in 3 runs in a row fails.
+
+- `flow__theme_switch`: flaky in 1 run(s) in a row
+
+## Budgets
+
+None in this phase.
+
+## Coverage
+
+4644 of 4644 changed lines covered by unit or an oracle layer (int, render, host). Lines no oracle layer covers:
+
+The per-line list (5128 lines: 832 unit only, 4296 not measured) was dropped from this copy for size.
+
+## Check results
+
+| Check | Layer | Result | Seconds |
+|---|---|---|---|
+| `actions__should_match_the_row_kind` | render | pass | 0.0 |
+| `agent_working_in_slot` | host+render | pass | 0.0 |
+| `agents_off` | host+render | pass | 0.0 |
+| `ages__should_tick_without_messages` | render | pass | 0.0 |
+| `ages__should_use_the_format` | render | pass | 0.0 |
+| `auto_mode_denied` | render | pass | 0.0 |
+| `bash_attribution` | host+render | pass | 0.0 |
+| `budget__b10` | host | pass | 0.0 |
+| `budget__b7` | host+render | pass | 0.0 |
+| `building_without_agent` | host+render | pass | 0.0 |
+| `bundle__should_contain_no_listen_call` | static | pass | 0.0 |
+| `catalog__should_match_the_files` | static | pass | 0.0 |
+| `chips__should_count_and_scroll_to_waiting` | render | pass | 0.0 |
+| `csp__should_match_the_template` | render | pass | 0.0 |
+| `cwd_changed_moves` | host+render | pass | 0.0 |
+| `dead_process` | host+render | pass | 0.0 |
+| `detail__should_show_every_fact_and_actor` | render | pass | 0.0 |
+| `early_exit` | host | pass | 0.0 |
+| `fixtures__should_match_a_fresh_scrub` | static | pass | 0.0 |
+| `folder_missing` | host+render | pass | 0.0 |
+| `foreground_with_agent` | host+render | pass | 0.0 |
+| `garbage_line` | host | pass | 0.0 |
+| `git_operations` | host+render | pass | 0.0 |
+| `harness:self_test` | harness | pass | 1.1 |
+| `header__should_show_live_updated_and_paused` | render | pass | 0.0 |
+| `header__should_show_paused_before_the_first_document` | render | pass | 0.0 |
+| `hidden_then_shown` | host | pass | 0.0 |
+| `hostile_agent_strings` | host+render | pass | 0.0 |
+| `hostile_git_strings` | host+render | pass | 0.0 |
+| `idle_pool` | host+render | pass | 0.0 |
+| `idle_prompt_is_idle` | host+render | pass | 0.0 |
+| `interrupt_mid_tool` | render | pass | 0.0 |
+| `lint__no_colour_literals` | static | pass | 0.0 |
+| `lint__no_html_sinks` | static | pass | 0.0 |
+| `lint__no_network_modules` | static | pass | 0.0 |
+| `lint__no_socket_apis` | static | pass | 0.0 |
+| `lint__no_suppressions` | static | pass | 0.0 |
+| `live_region__should_announce_only_waiting` | render | pass | 0.0 |
+| `main_waits_for_subagent` | render | pass | 0.0 |
+| `manifest__should_be_a_ui_extension` | static | pass | 0.0 |
+| `manifest__should_contribute_no_status_bar_item` | host+static | pass | 0.0 |
+| `manifest__should_contribute_no_views` | static | pass | 0.0 |
+| `manifest__should_scope_wt_path_to_application` | static | pass | 0.0 |
+| `messages__should_ignore_everything_outside_the_set` | host | pass | 0.0 |
+| `new_session_same_process` | host+render | pass | 0.0 |
+| `open__should_reveal_or_create_beside` | host | pass | 0.0 |
+| `options__should_limit_roots_and_disable_commands_and_forms` | host | pass | 0.0 |
+| `oracle_unchanged` | harness | pass | 0.0 |
+| `order__should_not_change_when_states_change` | render | pass | 0.0 |
+| `outside_pool` | host+render | pass | 0.0 |
+| `oversize_line` | host | pass | 0.0 |
+| `parallel_batch_keeps_waiting` | host+render | pass | 0.0 |
+| `partial_lines` | host | pass | 0.0 |
+| `pathless_events_keep_place` | host+render | pass | 0.0 |
+| `permission_denied` | host+render | pass | 0.0 |
+| `permission_denied_then_interrupt` | render | pass | 0.0 |
+| `permission_request_before_pre` | host+render | pass | 0.0 |
+| `permission_wait_and_answer` | host+render | pass | 0.0 |
+| `post_before_pre` | host+render | pass | 0.0 |
+| `question_and_plan` | host+render | pass | 0.0 |
+| `render__should_escape_and_isolate_controls` | render | pass | 0.0 |
+| `repo_context__should_be_unchanged` | harness | pass | 0.0 |
+| `restore__should_ignore_hostile_state` | render | pass | 0.0 |
+| `rows__should_follow_the_grammar` | render | pass | 0.0 |
+| `rows__should_show_name_role_and_branch` | render | pass | 0.0 |
+| `schema__generated_files_current` | static | pass | 0.0 |
+| `session_end_cleanup` | render | pass | 0.0 |
+| `several_agents_one_worktree` | host+render | pass | 0.0 |
+| `slow_start` | host | pass | 0.0 |
+| `spawn__should_use_the_setting_and_no_shell` | host | pass | 0.0 |
+| `stall_30s` | host | pass | 0.0 |
+| `static:clippy` | static | pass | 3.1 |
+| `static:clippy_all_features` | static | pass | 1.8 |
+| `static:doc_links` | static | pass | 0.0 |
+| `static:eslint` | static | pass | 1.0 |
+| `static:fmt` | static | pass | 0.2 |
+| `static:rustdoc` | static | pass | 0.8 |
+| `static:stylelint` | static | pass | 0.5 |
+| `stop_failure` | host+render | pass | 0.0 |
+| `stream__should_post_paused_before_the_first_document` | host | pass | 0.0 |
+| `stream__should_spawn_one_watch_and_never_poll` | host | pass | 0.0 |
+| `stream__should_survive_2000_documents` | host | pass | 0.0 |
+| `subagent_elsewhere` | render | pass | 0.0 |
+| `subagent_permission` | host+render | pass | 0.0 |
+| `title__should_count_waits_while_hidden` | host | pass | 0.0 |
+| `title__should_drop_the_count_when_a_wait_ends` | host | pass | 0.0 |
+| `title__should_read_worktrees_without_waits` | host | pass | 0.0 |
+| `unknown_git` | host+render | pass | 0.0 |
+| `unknown_version` | host | pass | 0.0 |
+| `unmanaged_worktree` | host+render | pass | 0.0 |
+| `update__should_keep_focus_selection_and_detail` | render | pass | 0.0 |
+| `validator__should_accept_every_scenario_document` | host | pass | 0.0 |
+| `web:build` | static | pass | 0.0 |
+| `web:package` | static | pass | 0.0 |
+| `activity__should_follow_the_precedence` | int | pass | 0.0 |
+| `agent_working_in_slot` | int | pass | 0.0 |
+| `agents_off` | int | pass | 0.0 |
+| `auto_mode_denied` | int | pass | 0.0 |
+| `bash_attribution` | int | pass | 0.0 |
+| `bash_paths__should_match_the_table` | int | pass | 0.0 |
+| `budget__b11` | int | pass | 0.0 |
+| `budget__b2` | int | pass | 0.0 |
+| `budget__b9` | int | pass | 0.0 |
+| `building_without_agent` | int | pass | 0.0 |
+| `builds__should_match_cargo_star_and_rustc` | int | pass | 0.0 |
+| `builds__should_read_the_setting` | int | pass | 0.0 |
+| `cc_replay:cc_cd_into_slot` | int | pass | 0.0 |
+| `cc_replay:cc_idle_prompt` | int | pass | 0.0 |
+| `cc_replay:cc_interrupt` | int | pass | 0.0 |
+| `cc_replay:cc_permission` | int | pass | 0.0 |
+| `cc_replay:cc_permission_deny` | int | pass | 0.0 |
+| `cc_replay:cc_permission_deny_interrupt` | int | pass | 0.0 |
+| `cc_replay:cc_read_edit_bash` | int | pass | 0.0 |
+| `cc_replay:cc_records_claude_pid` | int | pass | 0.0 |
+| `cc_replay:cc_session_end` | int | pass | 0.0 |
+| `cc_replay:cc_stop_failure` | int | pass | 0.0 |
+| `cc_replay:cc_subagent_elsewhere` | int | pass | 0.0 |
+| `cc_replay:cc_subagent_permission` | int | pass | 0.0 |
+| `cwd_changed_moves` | int | pass | 0.0 |
+| `dead_process` | int | pass | 0.0 |
+| `decay__should_match_the_table` | int | pass | 0.0 |
+| `folder_missing` | int | pass | 0.0 |
+| `foreground_with_agent` | int | pass | 0.0 |
+| `free__should_agree_with_wt_bg` | int | pass | 0.0 |
+| `gc__should_delete_done_subagents_but_the_newest` | int | pass | 0.0 |
+| `gc__should_delete_only_old_dead_or_ended_records` | int | pass | 0.0 |
+| `gc__should_delete_the_lock_with_the_record` | int | pass | 0.0 |
+| `git_operations` | int | pass | 0.0 |
+| `hook__should_cap_its_log` | int | pass | 0.0 |
+| `hook__should_exit_within_a_second_when_stdin_stays_open` | int | pass | 0.0 |
+| `hook__should_exit_within_a_second_when_the_record_is_a_fifo` | int | pass | 0.0 |
+| `hook__should_exit_zero_after_a_panic` | int | pass | 0.0 |
+| `hook__should_exit_zero_for_every_fixture` | int | pass | 0.0 |
+| `hook__should_ignore_input_past_32_mib` | int | pass | 0.0 |
+| `hook__should_keep_records_whole_under_parallel_writers` | int | pass | 0.0 |
+| `hook__should_lose_no_update_under_parallel_writers` | int | pass | 0.0 |
+| `hook__should_not_create_wt_activity` | int | pass | 0.0 |
+| `hook__should_not_follow_a_symlinked_record` | int | pass | 0.0 |
+| `hook__should_not_log_into_watched_folders` | int | pass | 0.0 |
+| `hook__should_print_nothing_for_every_fixture` | int | pass | 0.0 |
+| `hook__should_refuse_a_forged_dot_git_file` | int | pass | 0.0 |
+| `hook__should_refuse_a_symlinked_wt_activity` | int | pass | 0.0 |
+| `hook__should_refuse_ids_outside_the_pattern` | int | pass | 0.0 |
+| `hook__should_restart_when_gc_deleted_the_lock` | int | pass | 0.0 |
+| `hook__should_run_no_git` | int | pass | 0.0 |
+| `hook__should_skip_a_sandbox_pool_without_the_variable` | int | pass | 0.0 |
+| `hook__should_store_no_prompt_text` | int | pass | 0.0 |
+| `hook__should_write_nothing_for_malformed_json` | int | pass | 0.0 |
+| `hook__should_write_only_inside_wt_activity` | int | pass | 0.0 |
+| `hostile_agent_strings` | int | pass | 0.0 |
+| `hostile_git_strings` | int | pass | 0.0 |
+| `idle_pool` | int | pass | 0.0 |
+| `idle_prompt_is_idle` | int | pass | 0.0 |
+| `in_flight__should_clear_on_turn_end` | int | pass | 0.0 |
+| `in_flight__should_keep_at_most_32` | int | pass | 0.0 |
+| `install__should_match_the_event_table` | int | pass | 0.0 |
+| `install__should_never_write_settings` | int | pass | 0.0 |
+| `install__should_refuse_a_binary_under_target` | int | pass | 0.0 |
+| `install__should_report_presence` | int | pass | 0.0 |
+| `int:build` | int | pass | 0.9 |
+| `int:build_release` | int | pass | 0.0 |
+| `interrupt_mid_tool` | int | pass | 0.0 |
+| `labels__should_prefer_session_title` | int | pass | 0.0 |
+| `labels__should_use_agent_type` | int | pass | 0.0 |
+| `last__should_use_the_newest_known_time` | int | pass | 0.0 |
+| `liveness__should_keep_the_record_when_reparented` | int | pass | 0.0 |
+| `liveness__should_record_the_parent_process` | int | pass | 0.0 |
+| `main_waits_for_subagent` | int | pass | 0.0 |
+| `merge__should_refuse_an_older_state` | int | pass | 0.0 |
+| `new_session_same_process` | int | pass | 0.0 |
+| `outside_pool` | int | pass | 0.0 |
+| `parallel_batch_keeps_waiting` | int | pass | 0.0 |
+| `pathless_events_keep_place` | int | pass | 0.0 |
+| `permission_denied` | int | pass | 0.0 |
+| `permission_denied_then_interrupt` | int | pass | 0.0 |
+| `permission_request_before_pre` | int | pass | 0.0 |
+| `permission_wait_and_answer` | int | pass | 0.0 |
+| `placement__should_compare_paths_by_component` | int | pass | 0.0 |
+| `placement__should_read_the_path_field_of_each_tool` | int | pass | 0.0 |
+| `placement__should_use_the_nearest_existing_ancestor` | int | pass | 0.0 |
+| `post_before_pre` | int | pass | 0.0 |
+| `question_and_plan` | int | pass | 0.0 |
+| `release__should_have_no_verify_feature` | int | pass | 0.0 |
+| `sanitize__should_strip_controls_bidi_and_zero_width` | int | pass | 0.0 |
+| `session_end_cleanup` | int | pass | 0.0 |
+| `setup__should_create_wt_activity` | int | pass | 0.0 |
+| `several_agents_one_worktree` | int | pass | 0.0 |
+| `status__should_ignore_a_record_outside_the_pool` | int | pass | 0.0 |
+| `status__should_keep_the_newest_512_records` | int | pass | 0.0 |
+| `status__should_leave_every_file_unchanged` | int | pass | 0.0 |
+| `status__should_match_the_schema` | int | pass | 0.0 |
+| `status__should_never_create_index_lock` | int | pass | 0.0 |
+| `status__should_not_start_fsmonitor` | int | pass | 0.0 |
+| `status__should_print_one_pool` | int | pass | 0.0 |
+| `status__should_report_the_facts_wt_ls_reports` | int | pass | 0.0 |
+| `status__should_skip_an_unknown_record_version` | int | pass | 0.0 |
+| `status__should_skip_fifos_symlinks_locks_and_large_records` | int | pass | 0.0 |
+| `stop_failure` | int | pass | 0.0 |
+| `subagent_elsewhere` | int | pass | 0.0 |
+| `subagent_permission` | int | pass | 0.0 |
+| `summary__should_match_the_table` | int | pass | 0.0 |
+| `transitions__should_match_the_event_table` | int | pass | 0.0 |
+| `unit` | unit | pass | 25.9 |
+| `unknown_git` | int | pass | 0.0 |
+| `unmanaged_worktree` | int | pass | 0.0 |
+| `version__should_list_version_commit_and_features` | int | pass | 0.0 |
+| `wait__should_hash_input_with_sorted_keys` | int | pass | 0.0 |
+| `watch__should_exit_on_stdin_eof` | int | pass | 0.0 |
+| `watch__should_exit_zero_on_a_closed_pipe` | int | pass | 0.0 |
+| `watch__should_ignore_lock_and_temp_files` | int | pass | 0.0 |
+| `watch__should_merge_a_burst_into_one_document` | int | pass | 0.0 |
+| `watch__should_print_a_document_at_once` | int | pass | 0.0 |
+| `watch__should_print_alive_lines` | int | pass | 0.0 |
+| `watch__should_print_only_changes` | int | pass | 0.0 |
+| `watch__should_read_only_the_changed_record` | int | pass | 0.0 |
+| `watch__should_recompute_git_after_a_change` | int | pass | 0.0 |
+| `watch__should_recompute_on_rescan` | int | pass | 0.0 |
+| `watch__should_refresh_git_after_an_edit_or_bash_call` | int | pass | 0.0 |
+| `watch__should_see_a_fetch` | int | pass | 0.0 |
+| `watch__should_see_head_and_index_after_many_renames` | int | pass | 0.0 |
+| `watch__should_see_nested_branch_refs` | int | pass | 0.0 |
+| `watch__should_see_packed_refs` | int | pass | 0.0 |
+| `watch__should_show_a_missed_change_within_one_heartbeat` | int | pass | 0.0 |
+| `watch__should_stay_quiet_on_an_idle_pool` | int | pass | 0.0 |
+| `watch__should_turn_quiet_on_time` | int | pass | 0.0 |
+| `agent_working_in_slot` | e2e | pass | 0.0 |
+| `agents_off` | e2e | pass | 0.0 |
+| `axe__should_report_no_violation` | shot | pass | 0.0 |
+| `bash_attribution` | e2e | pass | 0.0 |
+| `building_without_agent` | e2e | pass | 0.0 |
+| `csp__should_report_no_violation` | shot | pass | 0.0 |
+| `cwd_changed_moves` | e2e | pass | 0.0 |
+| `e2e_csp_clean` | e2e | pass | 0.0 |
+| `e2e_no_listening_sockets` | e2e | pass | 0.0 |
+| `flow__agents_off_note` | e2e | pass | 0.0 |
+| `flow__close_stops_watch` | e2e | pass | 0.0 |
+| `flow__connection_states` | e2e | pass | 0.0 |
+| `flow__copy_path` | e2e | pass | 0.0 |
+| `flow__every_activity_shows` | e2e | pass | 0.0 |
+| `flow__hide_and_show` | e2e | pass | 0.0 |
+| `flow__keyboard_only` | e2e | pass | 0.0 |
+| `flow__live_update_keeps_place` | e2e | pass | 0.0 |
+| `flow__missing_worktree_actions` | e2e | pass | 0.0 |
+| `flow__narrow_window` | e2e | pass | 0.0 |
+| `flow__open_again_reveals` | e2e | pass | 0.0 |
+| `flow__open_from_palette` | e2e | pass | 0.0 |
+| `flow__open_in_new_window` | e2e | pass | 0.0 |
+| `flow__open_terminal` | e2e | pass | 0.0 |
+| `flow__reduced_motion` | e2e | pass | 0.0 |
+| `flow__reload_restores` | e2e | pass | 0.0 |
+| `flow__select_and_deselect` | e2e | pass | 0.0 |
+| `flow__theme_switch` | e2e | pass (flaky) | 0.0 |
+| `flow__two_windows` | e2e | pass | 0.0 |
+| `flow__wait_answered` | e2e | pass | 0.0 |
+| `flow__wait_appears` | e2e | pass | 0.0 |
+| `flow__waiting_chip_focuses` | e2e | pass | 0.0 |
+| `folder_missing` | e2e | pass | 0.0 |
+| `foreground_with_agent` | e2e | pass | 0.0 |
+| `git_operations` | e2e | pass | 0.0 |
+| `hostile_agent_strings` | e2e | pass | 0.0 |
+| `hostile_git_strings` | e2e | pass | 0.0 |
+| `idle_pool` | e2e | pass | 0.0 |
+| `idle_prompt_is_idle` | e2e | pass | 0.0 |
+| `keyboard__should_reach_every_row_and_action` | shot | pass | 0.0 |
+| `legend__should_cover_every_activity_value` | shot | pass | 0.0 |
+| `motion__should_stop_the_spinner` | shot | pass | 0.0 |
+| `new_session_same_process` | e2e | pass | 0.0 |
+| `outside_pool` | e2e | pass | 0.0 |
+| `parallel_batch_keeps_waiting` | e2e | pass | 0.0 |
+| `pathless_events_keep_place` | e2e | pass | 0.0 |
+| `permission_denied` | e2e | pass | 0.0 |
+| `permission_request_before_pre` | e2e | pass | 0.0 |
+| `permission_wait_and_answer` | e2e | pass | 0.0 |
+| `post_before_pre` | e2e | pass | 0.0 |
+| `question_and_plan` | e2e | pass | 0.0 |
+| `restore__should_rebuild_after_reload` | e2e | pass | 0.0 |
+| `several_agents_one_worktree` | e2e | pass | 0.0 |
+| `shot__should_render_every_theme` | shot | pass | 0.0 |
+| `stop_failure` | e2e | pass | 0.0 |
+| `subagent_permission` | e2e | pass | 0.0 |
+| `unknown_git` | e2e | pass | 0.0 |
+| `unmanaged_worktree` | e2e | pass | 0.0 |
+| `web:build` | ui | pass | 0.0 |
+| `web:package` | ui | pass | 0.0 |
+| `windows__should_run_one_watcher_each` | e2e | pass | 0.0 |
+| `budget__b1` | bench | pass | 0.0 |
+| `budget__b3` | bench | pass | 0.0 |
+| `budget__b4` | bench | pass | 0.0 |
+| `budget__b5` | bench | pass | 0.0 |
+| `budget__b6` | bench | pass | 0.0 |
+| `budget__b8` | bench-chromium | pass | 0.0 |
+| `web:build` | bench | pass | 0.0 |
+| `cc_cd_into_slot` | cc | pass | 0.0 |
+| `cc_idle_prompt` | cc | pass | 0.0 |
+| `cc_interrupt` | cc | pass | 0.0 |
+| `cc_no_hook_output` | cc | pass | 0.0 |
+| `cc_permission` | cc | pass | 0.0 |
+| `cc_permission_deny` | cc | pass | 0.0 |
+| `cc_permission_deny_interrupt` | cc | pass | 0.0 |
+| `cc_read_edit_bash` | cc | pass | 0.0 |
+| `cc_records_claude_pid` | cc | pass | 0.0 |
+| `cc_session_end` | cc | pass | 0.0 |
+| `cc_stop_failure` | cc | pass | 0.0 |
+| `cc_subagent_elsewhere` | cc | pass | 0.0 |
+| `cc_subagent_permission` | cc | pass | 0.0 |
+| `contract__should_run_in_the_sandbox` | cc | pass | 0.0 |
+| `cover` | cover | pass | 0.0 |
+| `isolation__left_no_trace` | report | pass | 0.0 |
+| `flows__should_each_have_an_e2e_check` | report | pass | 0.0 |
+| `trace_complete` | report | pass | 0.0 |

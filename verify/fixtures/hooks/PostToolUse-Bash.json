@@ -1,0 +1,19 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/Users/verify/.claude/projects/-verify-pool/s1.jsonl",
+  "cwd": "{pool}/fg",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "cd {pool}/wt2 && git status",
+    "description": "Show the working tree status"
+  },
+  "tool_use_id": "toolu_01Bash",
+  "tool_response": {
+    "stdout": "HEAD detached at 1a2b3c4\nnothing to commit, working tree clean\n",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false
+  }
+}

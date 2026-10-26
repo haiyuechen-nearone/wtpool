@@ -1,0 +1,22 @@
+ID: harness
+Category: harness
+Check: trace_complete
+
+Stops the frozen int checks from the product side, without touching an oracle file: the binary is
+renamed, so the int build of `wt` fails and no version check can pass.
+
+diff --git a/crates/wt/Cargo.toml b/crates/wt/Cargo.toml
+index 637d5c7..8b44aa1 100644
+--- a/crates/wt/Cargo.toml
++++ b/crates/wt/Cargo.toml
+@@ -6,6 +6,10 @@ edition.workspace = true
+ rust-version.workspace = true
+ publish.workspace = true
+ 
++[[bin]]
++name = "wt-cli"
++path = "src/main.rs"
++
+ [features]
+ # The test interface of docs/design/status-panel/verification.md. Release builds leave it out.
+ verify = []

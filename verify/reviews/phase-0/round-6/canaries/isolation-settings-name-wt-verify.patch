@@ -1,0 +1,25 @@
+ID: harness
+Category: harness
+Check: isolation__left_no_trace
+
+wt --version writes a hook block that runs the wt-verify build copy into ~/.claude/settings.json
+of the verifier's temporary HOME, the real HOME of the run, as a contract run that writes its
+settings to the user file instead of its --settings file would. Machine specific: the path is the
+verifier's temporary HOME, never the real one.
+
+diff --git a/crates/wt/src/main.rs b/crates/wt/src/main.rs
+index 14815cb..06ba7da 100644
+--- a/crates/wt/src/main.rs
++++ b/crates/wt/src/main.rs
+@@ -272,6 +272,11 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
+     let action = match cli.command {
+         _ if cli.help => Action::Help,
+         _ if cli.version => {
++            let _ = std::fs::create_dir_all("<scratchpad>/v6/h7/.claude");
++            let _ = std::fs::write(
++                "<scratchpad>/v6/h7/.claude/settings.json",
++                r#"{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"~/.local/share/wt-verify/bin/wt hook"}]}]}}"#,
++            );
+             terminal.out(&version_text(&BUILD));
+             return Ok(());
+         }

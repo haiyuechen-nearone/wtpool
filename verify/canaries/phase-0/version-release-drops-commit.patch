@@ -1,0 +1,23 @@
+ID: harness
+Category: harness
+Check: version__should_list_version_commit_and_features
+
+Breaks wtpool --version of the installed build: a release build (README.md:12) prints
+"commit unknown". Debug builds, which every version__ build is, keep the commit.
+
+diff --git a/crates/wtpool/src/version.rs b/crates/wtpool/src/version.rs
+--- a/crates/wtpool/src/version.rs
++++ b/crates/wtpool/src/version.rs
+@@ -3,7 +3,11 @@
+ /// What build.rs recorded about this binary.
+ pub(crate) const BUILD: Build<'static> = Build {
+     version: env!("CARGO_PKG_VERSION"),
+-    commit: env!("WTPOOL_BUILD_COMMIT"),
++    commit: if cfg!(debug_assertions) {
++        env!("WTPOOL_BUILD_COMMIT")
++    } else {
++        ""
++    },
+     dirty: matches!(env!("WTPOOL_BUILD_DIRTY").as_bytes(), b"true"),
+     features: env!("WTPOOL_BUILD_FEATURES"),
+ };
