@@ -1,5 +1,4 @@
-//! The activity records in `<common dir>/wtpool-activity/` (status-panel.md, section 1), read only
-//! when their file changed.
+//! The activity records in `<common dir>/wtpool-activity/`, read only when their file changed.
 
 use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
@@ -18,7 +17,7 @@ use crate::clock::Timestamp;
 use crate::platform::fs::{self, FileId};
 use crate::processes::RecordedProcess;
 
-/// Only the newest records by modification time count, and older ones of live sessions (S5).
+/// The number of newest records, by modification time, that always count.
 const MAX_RECORDS: usize = 512;
 
 /// The records of one `wtpool-activity/` folder, each kept with the file state it was read at.
@@ -34,11 +33,11 @@ struct Entry {
     content: Content,
 }
 
-/// What reading a record gave.
+/// The result of reading a record.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Content {
     Record(Box<Record>),
-    /// An unknown version or a parse error, counted in `skipped_records` (S6).
+    /// An unknown version or a parse error, counted in `skipped_records`.
     Skipped,
     /// Not a regular file, too large, or unreadable.
     Ignored,
@@ -50,7 +49,7 @@ enum Content {
 pub struct Record {
     /// The file name without `.json`, the actor's key.
     pub key: String,
-    /// The harness whose hooks wrote the record, `claude-code` when it names none (H25).
+    /// The harness whose hooks wrote the record, `claude-code` when it names none.
     pub harness: String,
     pub label: String,
     pub worktree: PathBuf,
@@ -59,22 +58,22 @@ pub struct Record {
     pub waiting: Option<Waiting>,
     pub action: Option<ToolTarget>,
     pub in_flight: Vec<Call>,
-    /// The last call that ended, by its PostToolUse, PostToolUseFailure or PermissionDenied.
+    /// The last call that ended.
     pub ended: Option<Call>,
     pub error: Option<String>,
     pub since: RecordTime,
     pub updated: RecordTime,
-    /// When the hook that wrote the state started, in microseconds: orders writes within a
-    /// second.
+    /// The start of the hook process that wrote the state, in microseconds. It orders writes
+    /// within a second.
     pub writer_started: i64,
     pub process: Option<RecordedProcess>,
-    /// A session's titles of its subagents by agent id, the newest last (H16).
+    /// A session's titles of its subagents by agent id, the newest last.
     pub subagents: Vec<SubagentTitle>,
-    /// The background tasks the actor started (H27).
+    /// The background tasks the actor started.
     pub tasks: Vec<Task>,
 }
 
-/// The title of a subagent that its session's record keeps (H16).
+/// The title of a subagent that its session's record keeps.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct SubagentTitle {
     pub agent_id: String,
@@ -96,8 +95,7 @@ pub struct ToolTarget {
     pub target: String,
 }
 
-/// A call, in flight or ended, by what it does: `wtpool status` reads the kind, never the tool
-/// (H26).
+/// A call, in flight or ended, by its kind. `wtpool status` reads the kind, never the tool.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Call {
     pub id: String,
@@ -113,7 +111,7 @@ struct CallFields {
     kind: Option<CallKind>,
 }
 
-/// The file state a record was read at. A change of mode alone keeps the stamp, and where the
+/// The file state a record was read at. A change of mode alone keeps the stamp. Where the
 /// system tells no file id, size and time alone make it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Stamp {
@@ -172,7 +170,7 @@ impl Records {
         }
     }
 
-    /// Whether the folder exists as a real folder, so agents report activity (S8).
+    /// True when the folder exists as a real directory, the only kind the hook writes into.
     #[must_use]
     pub fn enabled(&self) -> bool {
         self.dir
@@ -199,7 +197,7 @@ impl Records {
 
     /// Reads the record called `name` again if its file changed, or forgets it when it is
     /// gone. Other names are ignored. Gives the record's worktree when the change ended a call
-    /// that edits files there (W4).
+    /// that edits files there.
     pub fn refresh(&mut self, name: &OsStr) -> Option<PathBuf> {
         if !is_record_name(name) {
             return None;
@@ -216,9 +214,9 @@ impl Records {
     }
 
     /// The records that count: the newest [`MAX_RECORDS`] by modification time, and older ones
-    /// that `live` accepts, as age never skips a live session (S5).
+    /// that `live` accepts.
     pub fn counted(&self, live: impl Fn(&Record) -> bool) -> Vec<&Record> {
-        self.ranked()
+        self.newest_first()
             .into_iter()
             .enumerate()
             .filter_map(|(rank, entry)| {
@@ -228,11 +226,11 @@ impl Records {
             .collect()
     }
 
-    /// How many of the newest [`MAX_RECORDS`] had an unknown version or did not parse.
+    /// The number of the newest [`MAX_RECORDS`] that had an unknown version or did not parse.
     #[must_use]
     pub fn skipped(&self) -> u64 {
         let count = self
-            .ranked()
+            .newest_first()
             .into_iter()
             .take(MAX_RECORDS)
             .filter(|entry| entry.content == Content::Skipped)
@@ -248,8 +246,7 @@ impl Records {
             .record()
     }
 
-    /// Every entry, newest modification first.
-    fn ranked(&self) -> Vec<&Entry> {
+    fn newest_first(&self) -> Vec<&Entry> {
         let mut entries: Vec<&Entry> = self.entries.values().collect();
         entries.sort_by_key(|entry| std::cmp::Reverse(entry.stamp.modified));
         entries
@@ -279,8 +276,6 @@ impl Entry {
     }
 }
 
-/// Whether `new` names an ended call that `old` did not, and that call's kind edits files: an
-/// edit or a shell command.
 fn ended_an_edit(old: Option<&Record>, new: &Record) -> bool {
     new.ended.as_ref().is_some_and(|ended| {
         ended.kind.edits_files()
@@ -290,7 +285,7 @@ fn ended_an_edit(old: Option<&Record>, new: &Record) -> bool {
     })
 }
 
-/// `<stem>.json` for a record [`Stem`] (H17, H25). Temp and `.lock` files never match.
+/// True for `<stem>.json` with a record [`Stem`]. Temp and `.lock` files never match.
 pub fn is_record_name(name: &OsStr) -> bool {
     name.to_str()
         .and_then(|name| name.strip_suffix(".json"))
@@ -306,7 +301,6 @@ fn stamp(meta: &Metadata) -> Stamp {
     }
 }
 
-/// Reads one record without following a symlink or blocking on a FIFO.
 fn read_record(path: &Path) -> Content {
     let Some(bytes) = read_record_file(path) else {
         return Content::Ignored;
@@ -360,7 +354,7 @@ fn record_of(key: String, fields: RecordFields) -> Option<Record> {
 }
 
 /// A call with its kind. One without, as an older wtpool wrote it, takes the kind
-/// [`legacy_kind`] gives its tool, `other` for a harness this wtpool has no adapter for (H26).
+/// [`legacy_kind`] gives its tool, or [`CallKind::Other`] for a harness this wtpool does not know.
 fn call_of(harness: &str, call: CallFields) -> Call {
     let kind = call.kind.unwrap_or_else(|| {
         harness

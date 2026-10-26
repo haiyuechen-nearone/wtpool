@@ -1,17 +1,16 @@
-//! The tokens of a shell command line (H9, H14). A substitution stays inside its word as
-//! written, so no part of one can stand in the program's place or reach the summary, and the
-//! command inside it is kept for its path words.
+//! The tokens of a shell command line. A substitution stays inside its word as written, so no
+//! part of one can stand in the program's place or reach the summary, and the command inside it
+//! is kept for its path words.
 
 use std::iter::Peekable;
 use std::str::Chars;
 
-/// One token of the command line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Token {
     Word(Word),
     /// `;`, `&&`, `||`, `|`, `&`, a new line, or a `{` or `}` that stands alone.
     Separator,
-    /// `>`, `>>`, `<`, `2>`, `&>` and the like; the next word is its target.
+    /// `>`, `>>`, `<`, `2>`, `&>` and the like. The next word is its target.
     Redirect,
     /// The `(` that opens a subshell.
     Open,
@@ -84,7 +83,7 @@ impl Lexer<'_> {
                 self.end_word();
                 self.tokens.push(Token::Close);
             }
-            // Only a lone `{` or `}` is a group's reserved word; `{}` and `a{b,c}` are words.
+            // Only a lone `{` or `}` is a group's reserved word. `{}` and `a{b,c}` are words.
             '{' | '}' if !self.in_word && self.at_boundary() => self.tokens.push(Token::Separator),
             '#' if !self.in_word => self.comment(),
             c if c.is_whitespace() => self.end_word(),
@@ -126,7 +125,7 @@ impl Lexer<'_> {
         while let Some(c) = self.chars.next() {
             match c {
                 '"' => return,
-                // Inside double quotes a backslash escapes only these; before others it stays.
+                // Inside double quotes a backslash escapes only these. Before others it stays.
                 '\\' => match self.chars.next() {
                     Some('\n') | None => {}
                     Some(escaped @ ('$' | '`' | '"' | '\\')) => self.word.text.push(escaped),
@@ -206,7 +205,7 @@ impl Lexer<'_> {
     }
 
     /// The text up to the delimiter that closes the outermost of `nests`, read as written.
-    /// A stack, not recursion, so no nesting depth can exhaust the hook's stack (H3).
+    /// A stack, not recursion, so no nesting depth can exhaust the hook's stack.
     fn raw(&mut self, nests: &[Nest]) -> String {
         let mut stack = nests.to_vec();
         let mut text = String::new();
@@ -263,7 +262,7 @@ impl Lexer<'_> {
         text
     }
 
-    /// A `(` that ends no word opens a subshell; `((` there is an arithmetic command. One
+    /// A `(` that ends no word opens a subshell, and `((` there is an arithmetic command. One
     /// right after `NAME=` holds an array and one after `?*+@!` an extended glob, both words.
     fn open(&mut self) {
         let text = &self.word.text;

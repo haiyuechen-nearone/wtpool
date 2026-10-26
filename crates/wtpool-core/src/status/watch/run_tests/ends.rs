@@ -1,4 +1,4 @@
-//! How the watch loop ends: its senders gone, its input closed or its output failing.
+//! The ends of the watch loop: its senders gone, its input closed or its output failing.
 
 use rstest::rstest;
 

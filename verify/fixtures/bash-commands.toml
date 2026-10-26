@@ -373,3 +373,39 @@ command = "cat \"$(echo \")\")\" {pool}/wt2/f.txt"
 cwd = "fg"
 worktree = "wt2"
 summary = "cat"
+
+[[command]]
+form = "an escaped line end in double quotes joins the lines"
+command = "cat \"{pool}/wt\\\n2/f.txt\""
+cwd = "fg"
+worktree = "wt2"
+summary = "cat"
+
+[[command]]
+form = "a path in backquotes in double quotes"
+command = "cat \"`ls {pool}/wt1`\""
+cwd = "fg"
+worktree = "wt1"
+summary = "cat"
+
+[[command]]
+form = "a quoted parenthesis in a command substitution"
+command = "X=$(echo ')'; ls {pool}/wt2)"
+cwd = "fg"
+worktree = "wt2"
+summary = ""
+
+[[command]]
+form = "parameter expansions in a command substitution"
+command = "X=$(cat ${HOME}/wt3/f.txt $1)"
+cwd = "fg"
+home = "{pool}"
+worktree = "wt3"
+summary = ""
+
+[[command]]
+form = "backquotes in a command substitution"
+command = "X=$(echo `ls {pool}/wt1`)"
+cwd = "fg"
+worktree = "wt1"
+summary = ""

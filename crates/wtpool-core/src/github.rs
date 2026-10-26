@@ -111,42 +111,41 @@ mod tests {
     const LOGIN: &str = "To get started with GitHub CLI, please run:  gh auth login\n\
         Alternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.\n";
     const LAST_LOGIN_LINE: &str = "Alternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.";
+    const NOT_LOGGED_IN: &str = "the GitHub CLI is not logged in";
+    const GH_FAILED: &str = "the GitHub CLI failed";
 
-    /// The variant of `error` and the line of gh it keeps, for comparison.
-    fn summary(error: &ViewPrError) -> (&'static str, &str) {
-        match error {
-            ViewPrError::Unavailable => ("unavailable", ""),
-            ViewPrError::NotLoggedIn { said } => ("not logged in", said),
-            ViewPrError::NotFound => ("not found", ""),
-            ViewPrError::GhFailed { said, .. } => ("failed", said),
-            ViewPrError::Malformed => ("malformed", ""),
-            ViewPrError::Failed(_) => ("could not run", ""),
-        }
+    /// The message of `error` and the line of gh it keeps, for comparison.
+    fn summary(error: &ViewPrError) -> (String, &str) {
+        let said = match error {
+            ViewPrError::NotLoggedIn { said } | ViewPrError::GhFailed { said, .. } => said,
+            _ => "",
+        };
+        (error.to_string(), said)
     }
 
     #[rstest]
-    #[case::not_logged_in(Some(4), LOGIN, ("not logged in", LAST_LOGIN_LINE))]
+    #[case::not_logged_in(Some(4), LOGIN, (NOT_LOGGED_IN, LAST_LOGIN_LINE))]
     #[case::bad_token(
         Some(1),
         "HTTP 401: Bad credentials (https://api.github.com/graphql)\nTry authenticating with:  gh auth login\n",
-        ("not logged in", "Try authenticating with:  gh auth login")
+        (NOT_LOGGED_IN, "Try authenticating with:  gh auth login")
     )]
     #[case::no_such_pr(
         Some(1),
         "GraphQL: Could not resolve to a PullRequest with the number of 42. (repository.pullRequest)\n",
-        ("not found", "")
+        ("no such PR", "")
     )]
     #[case::no_network(
         Some(1),
         "error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com\n",
-        ("failed", "check your internet connection or https://githubstatus.com")
+        (GH_FAILED, "check your internet connection or https://githubstatus.com")
     )]
     #[case::no_such_repository(
         Some(1),
         "GraphQL: Could not resolve to a Repository with the name 'acme/app'. (repository)\n",
-        ("failed", "GraphQL: Could not resolve to a Repository with the name 'acme/app'. (repository)")
+        (GH_FAILED, "GraphQL: Could not resolve to a Repository with the name 'acme/app'. (repository)")
     )]
-    #[case::silent(None, "", ("failed", ""))]
+    #[case::silent(None, "", (GH_FAILED, ""))]
     fn failure__should_tell_a_missing_login_from_a_missing_pr(
         #[case] code: Option<i32>,
         #[case] stderr: &str,
@@ -156,6 +155,6 @@ mod tests {
         let error = failure(code, stderr);
 
         // Then
-        assert_eq!(summary(&error), expected);
+        assert_eq!(summary(&error), (expected.0.to_owned(), expected.1));
     }
 }

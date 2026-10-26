@@ -132,6 +132,8 @@ checks = [
   "tail__should_refuse_symlinks_and_other_files",
   "tail__should_never_read_an_unlisted_path",
   "tail__should_stop_on_deselect_and_hide",
+  "tail__should_poll_a_file_it_cannot_watch",
+  "tail__should_read_a_change_made_during_a_read",
   "flow__live_output",
 ]
 
@@ -268,7 +270,7 @@ checks = ["hook__should_give_each_call_its_kind", "status__should_read_kinds_onl
 # the old tasks it leaves out in the session's other records of the same process.
 [ids.H27]
 phase = 3
-checks = ["hook__should_record_background_tasks", "hook__should_end_a_task_through_its_session"]
+checks = ["hook__should_record_background_tasks", "hook__should_end_a_task_through_its_session", "hook__should_end_no_task_of_a_record_it_cannot_lock"]
 
 # H28: the repository's Claude Code plugin installs the hooks of H1, and wtpool hook install counts
 # it as present.
@@ -495,7 +497,13 @@ checks = ["title__should_read_worktrees_without_waits", "title__should_count_wai
 # X19 (status-panel.md revision 20): Follow streams an output file into a terminal.
 [ids.X19]
 phase = 3
-checks = ["follow__should_stream_the_file_into_a_terminal", "flow__live_output"]
+checks = [
+  "follow__should_stream_the_file_into_a_terminal",
+  "follow__should_poll_a_file_it_cannot_watch",
+  "follow__should_read_one_gain_at_a_time",
+  "follow__should_stop_at_a_file_replaced_by_a_symlink",
+  "flow__live_output",
+]
 
 [ids.U1]
 phase = 1
@@ -536,6 +544,7 @@ phase = 3
 checks = [
   "output__should_show_each_task_tail",
   "output__should_follow_the_end_unless_scrolled_up",
+  "output__should_drop_what_the_document_no_longer_lists",
   "output__should_clip_nothing_in_every_theme",
   "output__should_show_the_follow_ring_whole",
   "flow__live_output",

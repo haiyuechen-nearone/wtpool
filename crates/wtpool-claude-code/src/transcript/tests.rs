@@ -47,13 +47,13 @@ fn titles__should_read_the_newest_title_entries_of_whole_lines(
 ) {
     // Given
     let (_dir, path) = must_transcript(text);
+    let whole = text.rfind('\n').map_or(0, |at| at + 1);
 
     // When
     let found = titles(&path, 0).unwrap();
 
     // Then
     assert_eq!(titles_of(&found), expected);
-    let whole = text.rfind('\n').map_or(0, |at| at + 1);
     assert_eq!(found.offset, len(&text[..whole]));
 }
 

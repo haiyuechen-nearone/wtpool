@@ -1,4 +1,4 @@
-//! What differs between operating systems, behind one portable function per fact. Outside its
+//! The differences between operating systems, behind one portable function per fact. Outside its
 //! tests, the rest of the library holds no `cfg(unix)` or `cfg(windows)` code.
 
 pub mod dirs;

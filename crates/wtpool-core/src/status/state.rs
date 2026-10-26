@@ -1,5 +1,5 @@
-//! What `wtpool status` knows of one pool: the worktrees with their git facts, the build processes
-//! and the activity records, each refreshed on its own, and the document they make.
+//! The state `wtpool status` keeps of one pool: the worktrees with their git facts, the build
+//! processes and the activity records, each refreshed on its own, and the document they make.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsStr;
@@ -49,7 +49,6 @@ struct Tracked {
     git_dir: Option<PathBuf>,
     /// `None` when the folder is gone.
     facts: Option<Facts>,
-    /// The newest modification of its `HEAD` and index.
     last_change: Option<Timestamp>,
 }
 
@@ -161,9 +160,9 @@ impl PoolState {
         });
     }
 
-    /// Reads the record called `name` again. Gives its worktree when the change ended an edit
-    /// tool or Bash call there. A record of a process the table does not hold yet reads the
-    /// process table again, so a new session shows at once.
+    /// Reads the record called `name` again, and gives its worktree as [`Records::refresh`]
+    /// does. A record of a process the table does not hold yet reads the process table again, so
+    /// a new session shows at once.
     pub fn refresh_record(
         &mut self,
         name: &OsStr,
@@ -193,7 +192,7 @@ impl PoolState {
         git_dir.is_some_and(|git_dir| self.refresh_git_dir(&git_dir))
     }
 
-    /// When an actor next changes state on its own, by the clock of the records.
+    /// The time an actor next changes state on its own, by the clock of the records.
     #[must_use]
     pub fn next_change(&self, now: Timestamp) -> Option<Timestamp> {
         agents::next_change(&self.counted_records(), now)
@@ -211,7 +210,7 @@ impl PoolState {
         self.agents = agents_of(&self.records);
     }
 
-    /// Whether the linked worktrees' git folders differ from the listed ones, so the worktree
+    /// True when the linked worktrees' git folders differ from the listed ones, so the worktree
     /// list may have changed.
     #[must_use]
     pub fn git_dirs_changed(&self) -> bool {
@@ -225,7 +224,7 @@ impl PoolState {
         found != known
     }
 
-    /// The document of what is known now, generated at `now`.
+    /// The document of the current state, generated at `now`.
     #[must_use]
     pub fn document(&self, now: Timestamp) -> Document {
         let paths: Vec<PathBuf> = self
@@ -288,7 +287,7 @@ impl PoolState {
 }
 
 impl Tracked {
-    /// Whether `path` names this worktree, as written or with symlinks resolved.
+    /// True when `path` names this worktree, as written or with symlinks resolved.
     fn holds(&self, path: &Path) -> bool {
         path == self.worktree.path().as_path() || path == self.comparable
     }
@@ -350,7 +349,6 @@ impl Tracked {
     }
 }
 
-/// Every listed worktree with its facts, read in parallel. A bare repository is no worktree.
 fn track_all(listed: Vec<Worktree>, common: &Path) -> Vec<Tracked> {
     let linked = linked_git_dirs(common);
     thread::scope(|scope| {

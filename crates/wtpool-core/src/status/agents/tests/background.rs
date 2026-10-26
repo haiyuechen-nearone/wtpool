@@ -1,4 +1,4 @@
-//! A background task an actor started keeps it working once its turn ended (A1, H27, S13).
+//! A background task an actor started keeps it working once its turn ended.
 
 use rstest::rstest;
 use serde_json::{Value, json};

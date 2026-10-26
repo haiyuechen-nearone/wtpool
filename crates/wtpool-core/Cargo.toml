@@ -19,10 +19,10 @@ toml.workspace = true
 serde_json = "=1.0.154"
 # RFC 3339 times of the status document and the activity records.
 jiff = { version = "=0.2.37", default-features = false, features = ["std"] }
-# The process table of S4, H19 and H21 and the machine name: names, working folders, parents and
-# start times of processes, on macOS, Linux and Windows, without unsafe.
+# The process table and the machine name: names, working folders, parents and start times of
+# processes, on macOS, Linux and Windows, without unsafe.
 sysinfo.workspace = true
-# The folder watch of W2: FSEvents on macOS, without unsafe.
+# The folder watch of `wtpool status --watch`: FSEvents on macOS, without unsafe.
 notify = { version = "=8.2.0", default-features = false, features = ["macos_fsevent"] }
 
 [target.'cfg(unix)'.dependencies]

@@ -1,5 +1,5 @@
-//! The hook's diagnostics (H23): `$XDG_STATE_HOME/wtpool/hook.log`, at most 1 MiB, rotated once to
-//! `hook.log.1`. Never inside a git directory, which a watcher may watch.
+//! The hook's diagnostics: `$XDG_STATE_HOME/wtpool/hook.log`, at most [`MAX_LOG`] bytes, rotated
+//! once to `hook.log.1`. Never inside a git directory, as a watcher may watch it.
 
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -35,7 +35,6 @@ pub fn append(dir: &Path, line: &str) {
     }
 }
 
-/// Whether `dir` or one of its ancestors is a git directory: a folder holding `HEAD`.
 fn in_git_dir(dir: &Path) -> bool {
     dir.ancestors().any(|ancestor| {
         ancestor.join("HEAD").is_file()

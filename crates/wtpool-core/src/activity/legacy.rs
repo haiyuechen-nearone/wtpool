@@ -1,13 +1,11 @@
-//! The kinds of the calls an older wtpool wrote without one (H26). Only a wtpool that read Claude
-//! Code alone wrote such calls, so this is a frozen copy of that adapter's map: a new harness's
-//! records always name their kinds.
+//! The kinds of the calls an older wtpool wrote without one. Only a wtpool that read Claude Code
+//! alone wrote such calls, so the map stays as that adapter had it, and a new harness's records
+//! always name their kinds.
 
 use super::harness::Harness;
 use super::values::CallKind;
 
-/// The kind of a call of `tool` that an older wtpool wrote without one in a record of
-/// `harness` (H26): `Bash` runs a shell, `Edit`, `Write` and `NotebookEdit` edit a file, `Agent`
-/// starts a subagent, and every other tool is `other`.
+/// The kind of a call of `tool` that an older wtpool wrote without one in a record of `harness`.
 #[must_use]
 pub fn legacy_kind(harness: Harness, tool: &str) -> CallKind {
     match harness {

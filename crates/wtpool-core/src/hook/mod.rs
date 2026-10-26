@@ -1,7 +1,7 @@
 //! `wtpool hook`: turns a coding agent harness's hook input into the record of its actor in
-//! `<git-common-dir>/wtpool-activity/` (status-panel.md, section 1). It runs no git and no shell,
-//! prints nothing, and leaves every failure to its log. A harness's [`Adapter`] reads the
-//! harness's input and files. Every rule here is the same for every harness.
+//! `<git-common-dir>/wtpool-activity/`. It runs no git and no shell, prints nothing, and leaves
+//! every failure to its log. A harness's [`Adapter`] reads the harness's input and files. Every
+//! rule here is the same for every harness.
 
 mod adapter;
 mod apply;

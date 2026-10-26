@@ -46,7 +46,7 @@ pub struct PoolStatus {
     pub repository: Repository,
 }
 
-/// The repository of a pool (S10).
+/// The repository of a pool.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Repository {
     /// The main worktree's folder name.
@@ -55,7 +55,7 @@ pub struct Repository {
     pub github: Option<String>,
 }
 
-/// Whether `<common dir>/wtpool-activity/` exists, so hooks record agent activity (S8).
+/// [`Agents::On`] when `<common dir>/wtpool-activity/` exists, so hooks record agent activity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Agents {
@@ -81,7 +81,7 @@ pub struct WorktreeStatus {
     pub last_change: Option<Timestamp>,
 }
 
-/// The git facts of one worktree. `None` counts, and `unknown`, mean git could not tell.
+/// The git facts of one worktree. `None` counts and [`Self::unknown`] mean git could not tell.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub struct GitStatus {
     pub dirty: Option<u64>,
@@ -92,7 +92,7 @@ pub struct GitStatus {
     pub unknown: bool,
 }
 
-/// Why `wtpool bg` would not take a worktree (S9), in this order.
+/// A cause that keeps `wtpool bg` from taking a worktree. Causes sort in this order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Reason {
@@ -106,7 +106,7 @@ pub enum Reason {
     Missing,
 }
 
-/// What a worktree is doing or, without activity, whether it is available (A4, A5).
+/// A worktree's activity or, without one, its availability.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Activity {
@@ -147,10 +147,10 @@ pub struct Actor {
     pub error: Option<String>,
     pub since: RecordTime,
     pub updated: RecordTime,
-    /// The harness whose hooks wrote the actor's record, such as `claude-code` (S11).
+    /// The harness whose hooks wrote the actor's record, such as `claude-code`.
     pub harness: String,
-    /// The actor's running background tasks, newest first, then the one that ended last;
-    /// omitted when there is none (S13).
+    /// The actor's running background tasks, newest first, then the one that ended last.
+    /// Omitted from the JSON when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub outputs: Vec<Output>,
 }
@@ -179,14 +179,14 @@ pub struct Action {
     pub target: String,
 }
 
-/// A build process working in a worktree (S4).
+/// A build process working in a worktree.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Build {
     pub pid: u32,
     pub name: String,
 }
 
-/// A background task of an actor and the file its output goes to (S13). wtpool names the file and
+/// A background task of an actor and the file its output goes to. wtpool names the file and
 /// never reads it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Output {
@@ -199,7 +199,7 @@ pub struct Output {
 }
 
 impl Document {
-    /// Whether `other` says the same, whenever each was generated.
+    /// True when `other` says the same, apart from [`Self::generated`].
     #[must_use]
     pub fn same_content(&self, other: &Self) -> bool {
         self.machine == other.machine && self.pools == other.pools

@@ -1,11 +1,11 @@
-//! Strings a record stores (H15), and the label of a session without a title (H16).
+//! Strings a record stores, and the label of a session without a title.
 
 use crate::clock::Timestamp;
 use crate::platform::zone;
 
-/// Stored strings keep this many characters.
+/// The most characters a stored string keeps.
 pub const MAX_TEXT: usize = 80;
-/// Labels keep this many characters.
+/// The most characters a label keeps.
 pub const MAX_LABEL: usize = 40;
 
 /// `text` without control, bidi and zero width characters, cut to `limit` characters.
@@ -33,7 +33,7 @@ fn is_invisible(c: char) -> bool {
 }
 
 /// `session HH:MM`, the label of a session without a title, at `at` in the local time zone, `TZ`
-/// being `tz` (H16).
+/// being `tz`.
 #[must_use]
 pub fn session_label(at: Timestamp, tz: Option<&str>) -> String {
     match zone::local_time(at, tz) {

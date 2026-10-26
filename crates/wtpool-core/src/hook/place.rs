@@ -1,4 +1,4 @@
-//! A path's worktree without git (H7), and how a call names its path (H8).
+//! A path's worktree, found without git, and the path a call names.
 
 use std::path::{Component, Path, PathBuf, Prefix};
 
@@ -70,11 +70,11 @@ fn linked_worktree(dir: &Path, dot_git: &Path) -> Option<Worktree> {
     })
 }
 
-/// `true` when the hook may read `path`: stat it, open it or resolve its symlinks (H7). Opening a
-/// path that starts with a UNC share, a device or a verbatim prefix other than a drive's may
-/// reach another host, over SMB with the user's NTLM hash, or a pipe; so may a root without a
-/// drive on Windows, as in `\??\UNC\…` or a `\\server` without a share. Such a path lies
-/// outside every pool.
+/// `true` when the hook may read `path`: stat it, open it or resolve its symlinks. Opening a path
+/// that starts with a UNC share, a device or a verbatim prefix other than a drive's may reach
+/// another host, over SMB with the user's NTLM hash, or a pipe. So may a root without a drive on
+/// Windows, as in `\??\UNC\…` or a `\\server` without a share. Such a path lies outside every
+/// pool.
 #[must_use]
 pub fn is_local(path: &Path) -> bool {
     (path.is_absolute() || !path.has_root()) && is_local_prefix(path_prefix(path))
@@ -95,7 +95,7 @@ fn is_local_prefix(prefix: Option<Prefix<'_>>) -> bool {
     )
 }
 
-/// Whether two paths name the same folder component by component.
+/// `true` when `a` and `b` hold the same components, `.` ones aside.
 #[must_use]
 pub fn same_components(a: &Path, b: &Path) -> bool {
     let parts = |path: &Path| {
@@ -118,12 +118,12 @@ pub fn absolute(base: &Path, path: &str) -> PathBuf {
     }
 }
 
-/// How a call names the path it works on (H8), as a harness's adapter reads its input.
+/// The path a call works on, as a harness's adapter reads it from the call's input.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ToolPath {
     /// A file or folder.
     File(String),
-    /// A command of `shell`, whose words name paths (H9).
+    /// A command of `shell`, whose words name paths.
     Command {
         command: String,
         shell: Shell,
@@ -131,11 +131,10 @@ pub enum ToolPath {
     None,
 }
 
-/// The shell a command is written for, the grammar its words read by (H9, H14).
+/// The shell a command is written for, the grammar its words are read by.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shell {
-    /// A POSIX shell. An adapter gives a command of a shell that wtpool has no reader for this
-    /// one too.
+    /// A POSIX shell. An adapter also gives it for a shell that wtpool has no reader of.
     Posix,
 }
 

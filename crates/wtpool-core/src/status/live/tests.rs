@@ -43,7 +43,6 @@ fn message_of__should_pass_paths_and_ask_for_a_rescan_when_events_were_lost() {
     assert_eq!(messages, expected);
 }
 
-/// A clock that always reads the same time.
 struct FixedClock;
 
 impl crate::clock::ReadClock for FixedClock {
@@ -52,10 +51,10 @@ impl crate::clock::ReadClock for FixedClock {
     }
 }
 
-/// What a refresh may have read again, seen in the document.
+/// The facts a refresh may have read again, as the document shows them.
 #[derive(Debug, PartialEq, Eq)]
 struct Seen {
-    /// The process table, which only a full refresh reads.
+    /// Only a full refresh reads the process table.
     builds: bool,
     wt1_unreferenced: Option<u64>,
     main_ahead: Option<u64>,

@@ -1,7 +1,7 @@
-//! A call's input as the hook keeps it: the input hash a wait matches calls by (H13), and the top
-//! level strings a harness's adapter reads the call's path from (H8). It is read straight from
-//! the payload's JSON into the text it hashes, as a whole value of a large input would take many
-//! times its size (H5).
+//! A call's input as the hook keeps it: the input hash a wait matches calls by, and the top level
+//! strings a harness's adapter reads the call's path from. It is read straight from the payload's
+//! JSON into the text it hashes, as a whole [`Value`] of a large input would take many times its
+//! size.
 
 use std::collections::BTreeMap;
 use std::fmt::{self, Write as _};

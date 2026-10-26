@@ -52,9 +52,8 @@ pub fn status_line<C: ReadClock, P: ListProcesses>(
     Ok(line)
 }
 
-/// Per path of `paths`, the actors of that worktree as the document of the pool of `config`,
-/// whose common git directory is `common`, shows them at the time of `sources`, read through
-/// git in `git_mode`.
+/// The actors of each worktree of `paths`, as the document of the pool of `config` shows them at
+/// the time of `sources`.
 pub(crate) fn actors_at(
     config: Config,
     common: PathBuf,

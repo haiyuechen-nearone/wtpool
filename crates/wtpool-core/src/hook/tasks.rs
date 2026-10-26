@@ -1,21 +1,21 @@
-//! The background tasks of an actor (H27): which ones its calls started, and when each ended,
-//! by its own events or by the list of work in flight another actor of its session sends. Pure
-//! functions of the record and what the harness's adapter read from the event. The adapter
-//! names the file each task's output goes to; the hook never opens it.
+//! The background tasks of an actor: the ones its calls started, and the time each ended, by its
+//! own events or by the list of work in flight another actor of its session sends. Pure functions
+//! of the record and the facts the harness's adapter read from the event. The adapter names the
+//! file each task's output goes to, and the hook never opens it.
 
 use super::record::{Record, Task, push_bounded};
 use crate::activity::TaskId;
 use crate::clock::Timestamp;
 
-/// Tasks kept per actor (H27).
+/// Tasks kept per actor.
 pub const MAX_TASKS: usize = 5;
 
-/// How long, in seconds, a task of another record of the session must have run before a list
-/// that leaves it out ends it (H27): long enough that the list, made before the hook ran, was
-/// made after the task started.
+/// The age, in seconds, a task of another record of the session must reach before a list that
+/// leaves it out ends it: long enough that the list, made before the hook ran, was made after
+/// the task started.
 pub const LISTED_AFTER: i64 = 60;
 
-/// A task an event started: its id, output file and command summary (H14).
+/// A task an event started: its id, output file and command summary.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Started {
     pub id: TaskId,
@@ -23,7 +23,7 @@ pub struct Started {
     pub summary: String,
 }
 
-/// What one event says about the actor's background tasks.
+/// The facts one event gives about the actor's background tasks.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TaskEvent {
     pub started: Option<Started>,
@@ -35,8 +35,8 @@ pub struct TaskEvent {
     pub all_ended: bool,
 }
 
-/// `record` after `event` at `now`: a started task joins the end, dropping the oldest past
-/// [`MAX_TASKS`], unless its id is known; a running task ends when the event ends it.
+/// Applies `event` at `now` to `record`. A started task joins the end, dropping the oldest past
+/// [`MAX_TASKS`], unless its id is known. A running task ends when the event ends it.
 pub fn update(record: &mut Record, event: &TaskEvent, now: &str) {
     if let Some(started) = &event.started
         && !record
@@ -69,10 +69,10 @@ pub fn update(record: &mut Record, event: &TaskEvent, now: &str) {
     }
 }
 
-/// `record`, another record of the session whose harness lists `running` as its work in flight,
-/// after that list at `now` (H27): each running task the list does not name ends when it started
-/// at least [`LISTED_AFTER`] seconds before `now`. Whether a task ended. A task or a time that
-/// does not parse never ends.
+/// Applies `running`, the session's work in flight that another actor's harness lists at `now`,
+/// to `record`: each running task the list does not name ends when it started at least
+/// [`LISTED_AFTER`] seconds before `now`. `true` when a task ended. Nothing ends when `now` or a
+/// task's start does not parse.
 pub fn end_unlisted(record: &mut Record, running: &[TaskId], now: &str) -> bool {
     let Some(now_at) = Timestamp::parse(now) else {
         return false;

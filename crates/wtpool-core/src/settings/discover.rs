@@ -66,11 +66,8 @@ impl Main {
     /// directory `common` itself as its main worktree, as for a git directory found by discovery
     /// whose config says `bare = false`.
     fn is_git_dir(&self, common: &AbsolutePath) -> bool {
-        match self {
-            Main::Bare { .. } => true,
-            Main::Worktree(path) => paths::same_path(path, common),
-            Main::Unknown(_) => false,
-        }
+        matches!(self, Main::Bare { .. })
+            || matches!(self, Main::Worktree(path) if paths::same_path(path, common))
     }
 }
 

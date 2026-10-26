@@ -1,7 +1,6 @@
-//! The activity records in `<git-common-dir>/wtpool-activity/` as `wtpool hook` writes them and
-//! `wtpool status` reads them (status-panel.md, section 1): the folder and its record files, the
-//! actor each file is named after (H17, H25), the ids an adapter checks (H17, H27) and the values
-//! a record holds.
+//! The activity records in `<git-common-dir>/wtpool-activity/` that `wtpool hook` writes and
+//! `wtpool status` reads: their folder and files, the [`ActorKey`] each file is named after, the
+//! ids an adapter checks and the values a record holds.
 
 mod files;
 mod harness;

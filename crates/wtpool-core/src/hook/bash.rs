@@ -1,14 +1,8 @@
-//! A shell command's path words and last `cd` (H9) and its program summary (H14).
+//! The path words, `cd` targets and program summary of a shell command.
 //!
-//! Readings of points the spec leaves open: a path word holds a `/` or starts with `~` or
-//! `$HOME`, and is no option, URL, program or word with a substitution in it. The arguments of
-//! `git -C`, `cd` and `--manifest-path` are path words whatever they hold. A heredoc's body is
-//! input, not words. The word added after a listed program is the word right after it.
-//!
-//! A `cd` in a subshell `( … )` is a `cd` of H9, as one after `sh -c` is: the last folder the
-//! command works in, though the subshell's folder ends at its `)`. A substitution's command
-//! moves no shell: its path words count, its `cd` targets among them, and its words never
-//! reach the summary.
+//! A `cd` in a subshell `( … )` joins [`Command::cds`], as one after `sh -c` does, though the
+//! subshell's folder ends at its `)`. A substitution's command moves no shell: its path words
+//! and `cd` targets join [`Command::paths`], and its words never reach the summary.
 
 mod lex;
 
@@ -23,7 +17,7 @@ const WITH_SUBCOMMAND: [&str; 8] = [
 ];
 /// Shells whose `-c` argument is a command of its own.
 const SHELLS: [&str; 4] = ["sh", "bash", "zsh", "dash"];
-/// Nesting of `sh -c` and substitutions read for path words; deeper ones are skipped.
+/// The deepest nesting of `sh -c` and substitutions that is read for path words.
 const MAX_DEPTH: u8 = 4;
 
 /// The paths and program of a command.
@@ -52,7 +46,6 @@ pub fn parse(command: &str, cwd: &Path, home: Option<&Path>) -> Command {
 fn walk(command: &str, dir: &mut PathBuf, home: Option<&Path>, out: &mut Command, depth: u8) {
     let mut simple = Simple::default();
     let mut pending_redirect = false;
-    // The folder at each open `(`, back in place at its `)`.
     let mut outer: Vec<PathBuf> = Vec::new();
     for token in lex::tokenize(command) {
         match token {
@@ -124,7 +117,7 @@ fn substitution(inner: &str, dir: &Path, home: Option<&Path>, out: &mut Command,
     out.paths.extend(found.paths);
 }
 
-/// One simple command: its prefixes, program and arguments.
+/// Reads one simple command into `out`, and moves `dir` to the target of a `cd`.
 fn simple_command(
     words: &[String],
     dir: &mut PathBuf,
@@ -268,8 +261,8 @@ fn is_path_word(word: &str) -> bool {
         && (word.contains('/') || word.starts_with('~') || word.starts_with("$HOME"))
 }
 
-/// A program word that starts with `-` or still holds `$(`, a backquote or `)` can only be a
-/// piece of a construct the lexer missed, so it stores nothing (H14).
+/// `false` for a word that starts with `-` or still holds a substitution or `)`: such a word is
+/// a piece of a construct the lexer missed, so it names no program.
 fn is_program(word: &str) -> bool {
     !word.starts_with('-') && !has_substitution(word) && !word.contains(')')
 }
@@ -278,7 +271,7 @@ fn has_substitution(word: &str) -> bool {
     word.contains("$(") || word.contains('`') || word.contains("<(") || word.contains(">(")
 }
 
-/// `~` and `$HOME` at the start of `word` replaced by `home`.
+/// `~`, `$HOME` or `${HOME}` at the start of `word` replaced by `home`.
 fn expand(word: &str, home: Option<&Path>) -> String {
     let Some(home) = home.map(|h| h.to_string_lossy().into_owned()) else {
         return word.to_owned();

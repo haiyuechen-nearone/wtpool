@@ -1,19 +1,19 @@
-//! The text of `wtpool hook install`, the same shape for every harness's adapter (H1, H22).
+//! The text of `wtpool hook install`, the same shape for every harness's adapter.
 
 use std::path::{Component, Path};
 
-/// What `wtpool hook install` prints, one part per stream.
+/// The text `wtpool hook install` prints, one part per stream.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Printed {
     /// The hook block alone, valid JSON, so that `wtpool hook install > hooks.json` is a file the
     /// harness can load.
     pub stdout: String,
-    /// Whether the harness runs the hooks, and else what is missing (H22).
+    /// The note that tells if the harness runs the hooks, and else names the missing parts.
     pub stderr: String,
 }
 
-/// Whether `binary` lies under a folder called `target`, a build that `cargo` may replace, so
-/// no hook may run it (H1).
+/// `true` when `binary` lies under a folder called `target`, a build that `cargo` may replace,
+/// so no hook may run it.
 #[must_use]
 pub fn is_under_target(binary: &Path) -> bool {
     binary

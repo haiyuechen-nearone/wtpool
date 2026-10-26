@@ -1074,3 +1074,19 @@ reason = "Eight host and e2e checks wait for the state their next step needs ins
 "vscode/test/host/stream.test.cjs" = "6a54eaf5e10c1f46735455c4c6adcb79de6d182f3a4b42ecaaf8116bb298e918"
 "vscode/test/host/tab.test.cjs" = "34f59742dfe0df1650d479fae405ed3da979c758f9c8b7a3f03cd71005de2dfe"
 "vscode/test/host/title.test.cjs" = "d084d2c391ee26350aa2373d67f0c0fe33f64ef2b27cda6d8edd71c5d68d5584"
+
+[[change]]
+id = "cover-gaps"
+reason = "New checks reach the changed product lines that no layer reached. verify/fixtures/bash-commands.toml gains five commands: an escaped line end in double quotes, backquotes in double quotes, and a quoted parenthesis, parameter expansions and backquotes in a command substitution. The int checks gain the PR lookup of wtpool bg through a fake gh on PATH, for a found head and each failure of gh (pr_lookup.rs), and a turn end that leaves a session record whose lock cannot be taken unchanged (hook_tasks.rs). The host checks gain the output tails and Follow with a watch that cannot be made or that fails, a change made during a read, and a followed file that a symlink replaced (output-faults.test.cjs); the helpers they share with output.test.cjs move to outputs.cjs. The render checks gain the Output section dropping the tasks and sections the document no longer lists. verify/checks.toml registers the new render and host checks, and verify/trace.toml and the trace list of verification.md list them under R12, X19, U9 and H27. No existing check changes what it judges."
+[change.files]
+"docs/design/status-panel/verification.md" = "982fd3a6994636a95ecf85a2ed8e1085546f843db9e48a3abbd2cffc6f304c4c"
+"verify/checks.toml" = "65826f1c293537b8b466ea09485329f92804d6822ba2af737f2ccaf51d2588ae"
+"verify/fixtures/bash-commands.toml" = "5d733a24a3a03cc6305cae55dcaae06257df3243e102346879eb32cd0546dfd3"
+"verify/trace.toml" = "263f25bbd886ecf69df113bae2d2eb7a41777e1dafec61ddcb970a750eea5d8f"
+"vscode/test/host/output-faults.test.cjs" = "b32e10f4673a5df97748324662bc8d27f9f7582d06987f261cba4bc9a284ae26"
+"vscode/test/host/output.test.cjs" = "9f9898473670a110da7da2d96884a84a82127c386b2a6d2e800c0b49cde9b21d"
+"vscode/test/host/outputs.cjs" = "3c8cc71454ddd3307d15c586483c832a0896fd949591c97ab2e68af0ef8733e8"
+"vscode/test/render/output.test.mjs" = "09c9dae93ddd24fff391bb69971dff9d5a2852bdb5114565cbdbd6b03bc72f16"
+"xtask/tests/checks/hook_tasks.rs" = "b21a8d41a102547cfcf2d4c17fd955ec4ffed4f9af5a88faaae6eb3c467c1707"
+"xtask/tests/checks/mod.rs" = "847c2100fbaaf8603203e016519cd2cdfefdb3c2a09842e53fed42d5ece285e7"
+"xtask/tests/checks/pr_lookup.rs" = "e9bce63344df6e74d8011c3b506d3f94db2ad0a8b8d908f568cf05c5d3f0b9c5"

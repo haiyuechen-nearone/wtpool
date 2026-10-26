@@ -42,6 +42,7 @@ restore__should_ignore_hostile_state = ["render"]
 # render, phase 3 (status-panel.md revision 20): the Output section of the detail strip (U9).
 output__should_show_each_task_tail = ["render"]
 output__should_follow_the_end_unless_scrolled_up = ["render"]
+output__should_drop_what_the_document_no_longer_lists = ["render"]
 # render, phase 3: the open detail strip renders again for each new document (X15, U5).
 detail__should_update_while_open = ["render"]
 # render and e2e (status-panel.md revision 16): the heading names the repository, then the
@@ -97,6 +98,13 @@ tail__should_refuse_symlinks_and_other_files = ["host"]
 tail__should_never_read_an_unlisted_path = ["host"]
 tail__should_stop_on_deselect_and_hide = ["host"]
 follow__should_stream_the_file_into_a_terminal = ["host"]
+# host, phase 3: the tails and Follow when a watch cannot be made or fails, or a change comes
+# during a read, and Follow of a file a symlink replaced.
+tail__should_poll_a_file_it_cannot_watch = ["host"]
+tail__should_read_a_change_made_during_a_read = ["host"]
+follow__should_poll_a_file_it_cannot_watch = ["host"]
+follow__should_read_one_gain_at_a_time = ["host"]
+follow__should_stop_at_a_file_replaced_by_a_symlink = ["host"]
 # host, phase 3: the extension posts each new document while the strip is open (X15, U5).
 detail__should_post_each_document_while_open = ["host"]
 

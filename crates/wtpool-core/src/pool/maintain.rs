@@ -148,7 +148,7 @@ impl<V: ViewPr> Pool<V> {
             OsStr::new("remove"),
             worktree.path().as_os_str(),
         ])?;
-        ran.forward_stdout(report).forward_stderr(report).check()?;
+        ran.forward_stderr(report).check()?;
         report.info(&format!("removed {}", worktree.name()));
         Ok(())
     }

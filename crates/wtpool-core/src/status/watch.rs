@@ -1,5 +1,5 @@
 //! `wtpool status --watch`: a document at once and per change, an alive line per heartbeat.
-//! Folder events say what changed, so only that is read again.
+//! Folder events name the changes, so only those parts are read again.
 
 use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
@@ -21,7 +21,7 @@ use crate::git::layout;
 use crate::paths::comparable;
 use crate::processes::ListProcesses;
 
-/// What the watch loop hears: changed paths from the folder watch, or the end of its input.
+/// A message the watch loop hears: changed paths from the folder watch, or the end of its input.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
     /// `rescan` says events were lost, so everything must be read again.
@@ -63,14 +63,14 @@ pub struct Pending {
     pub clock: bool,
 }
 
-/// Refreshes what changed and describes the result.
+/// Refreshes the changed parts and describes the result.
 pub trait Track {
     fn refresh_all(&mut self);
-    /// Reads again what `pending` names, at `now`.
+    /// Reads again the parts `pending` names, at `now`.
     fn refresh(&mut self, pending: &Pending, now: Instant);
     fn document(&self) -> Document;
-    /// When the tracker next has work of its own, as seen at `now`: a timer or a refresh that
-    /// waits.
+    /// The time the tracker next has work of its own, as seen at `now`: a timer or a refresh
+    /// that waits.
     fn deadline(&self, now: Instant) -> Option<Instant>;
     /// Does the work due by `now`.
     fn tick(&mut self, now: Instant);
@@ -101,7 +101,7 @@ pub struct Watched {
     pub clock: Option<PathBuf>,
 }
 
-/// How long the loop waits for things.
+/// The waits of the watch loop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Timing {
     pub heartbeat: Duration,
@@ -120,8 +120,8 @@ pub const TIMING: Timing = Timing {
 };
 
 /// Runs `wtpool status --watch` on the pool of `config`, whose common git directory is `common`,
-/// until `input` ends or `output` fails, which both end it cleanly. The folder watch
-/// starts before the first read, so no change slips between them.
+/// until `input` ends or `output` fails. Both end it cleanly. The folder watch starts before the
+/// first read, so no change slips between them.
 pub fn watch<C: ReadClock, P: ListProcesses>(
     config: Config,
     common: PathBuf,
@@ -309,8 +309,8 @@ impl Pending {
         }
     }
 
-    /// When the merged changes are due: `merge` after the first, or half of it after the last
-    /// if that comes sooner. `None` without changes.
+    /// The time the merged changes are due: `merge` after the first, or half of it after the
+    /// last if that comes sooner. `None` without changes.
     fn due(&self, merge: Duration) -> Option<Instant> {
         let since = self.since?;
         // Past the range of `Instant` the window closes at once, so no change waits forever.
@@ -342,8 +342,8 @@ impl Timer for SystemTimer {
     }
 }
 
-/// What the event at `path` may have changed, `None` for lock, temp and other files.
-/// `roots` are spellings of the common git directory.
+/// The change the event at `path` may name, `None` for lock, temp and other files. `roots` are
+/// spellings of the common git directory.
 #[must_use]
 pub fn classify(roots: &[PathBuf], path: &Path) -> Option<Change> {
     let (root, relative) = roots

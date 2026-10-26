@@ -1,9 +1,9 @@
-//! The JSON Schema of [`Document`], generated from the document types (S7) and printed by
-//! `wtpool status --schema` (S12). The VS Code extension generates its types and validator from it
-//! through `cargo run -q -p wtpool-core --example status_schema`, which prints the same text.
+//! The JSON Schema of [`Document`], generated from the document types and printed by
+//! `wtpool status --schema`. The VS Code extension generates its types and validator from the
+//! same text, printed by `cargo run -q -p wtpool-core --example status_schema`.
 //!
 //! Every property has a description. No object forbids other properties: within version 1 a
-//! document only gains properties, and consumers ignore the ones they do not know (S12).
+//! document only gains properties, and consumers ignore the ones they do not know.
 
 use serde::Serialize;
 use serde_json::{Map, Value, json};
@@ -19,7 +19,7 @@ use crate::worktree_state::Role;
 
 /// A type whose JSON form a JSON Schema describes.
 pub trait ToSchema {
-    /// The schema of one value, which may refer to the `#/$defs` of [`status_schema`].
+    /// The schema of one value. It may refer to the `#/$defs` of [`status_schema`].
     fn to_schema() -> Value;
 }
 
@@ -84,7 +84,7 @@ fn definitions() -> Value {
 }
 
 /// An object that requires these properties, each given with its schema and description, and
-/// allows others (S12).
+/// allows others.
 fn object(properties: Vec<(&str, Value, &str)>) -> Value {
     let required: Vec<&str> = properties.iter().map(|(name, _, _)| *name).collect();
     let properties: Map<String, Value> = properties
@@ -94,8 +94,8 @@ fn object(properties: Vec<(&str, Value, &str)>) -> Value {
     json!({ "type": "object", "required": required, "properties": properties })
 }
 
-/// `object` with one more property that it does not require: a property wtpool omits when it is
-/// empty, as `outputs` (S13).
+/// [`object`] with one more property that it does not require: a property wtpool omits when it
+/// is empty, such as `outputs`.
 fn with_optional(mut object: Value, name: &str, schema: Value, description: &str) -> Value {
     if let Some(Value::Object(properties)) = object.get_mut("properties") {
         properties.insert(name.to_owned(), described(schema, description));
@@ -103,7 +103,6 @@ fn with_optional(mut object: Value, name: &str, schema: Value, description: &str
     object
 }
 
-/// `schema` with `description`.
 fn described(mut schema: Value, description: &str) -> Value {
     if let Value::Object(map) = &mut schema {
         map.insert("description".to_owned(), json!(description));

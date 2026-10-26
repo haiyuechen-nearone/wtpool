@@ -1,5 +1,5 @@
-//! The git facts of one worktree, read through read only git (S2), and the rules that turn
-//! them into `free`, `reasons` and `activity` (A4, A5, S9).
+//! The git facts of one worktree, read through read only git, and the rules that turn them
+//! into `free`, `reasons` and `activity`.
 
 use super::document::{Activity, GitStatus, OperationName, Reason};
 use crate::git::Git;
@@ -7,7 +7,7 @@ use crate::resolve::{self, Divergence};
 use crate::worktree::{Head, Worktree};
 use crate::worktree_state::{Operation, Role, Uncommitted, Unreferenced, Upstream};
 
-/// What git says about a worktree whose folder exists.
+/// The git facts of a worktree whose folder exists.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Facts {
     pub local: LocalFacts,
@@ -28,7 +28,7 @@ pub struct RefFacts {
     pub upstream: Option<Tracking>,
 }
 
-/// The upstream of a branch and how far the branch is from it.
+/// The upstream of a branch and the branch's ahead and behind counts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tracking {
     pub name: String,
@@ -131,7 +131,8 @@ fn operation_name(operation: Operation) -> Option<OperationName> {
     }
 }
 
-/// Why `wtpool bg` would not take this worktree, in the order of S9. Empty means free.
+/// The causes that keep `wtpool bg` from taking this worktree, in [`Reason`] order. Empty means
+/// free.
 #[must_use]
 pub fn reasons(role: Role, missing: bool, head: &Head, git: &GitStatus) -> Vec<Reason> {
     let mut reasons = Vec::new();
@@ -160,7 +161,7 @@ pub fn reasons(role: Role, missing: bool, head: &Head, git: &GitStatus) -> Vec<R
     reasons
 }
 
-/// What the actors and builds of a worktree are doing, for [`activity`].
+/// The states of a worktree's actors and builds that [`activity`] reads.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Busy {
     pub waiting: bool,
@@ -170,7 +171,7 @@ pub struct Busy {
     pub idle: bool,
 }
 
-/// The first activity that applies (A4), else the availability (A5).
+/// The first activity that applies, else the availability.
 #[must_use]
 pub fn activity(
     role: Role,

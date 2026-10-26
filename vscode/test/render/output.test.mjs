@@ -177,3 +177,43 @@ test('output__should_follow_the_end_unless_scrolled_up', async () => {
   assert.ok(followsAgain, 'a block scrolled back to its end does not follow new lines');
   assert.equal(block.textContent.split('\n').at(-1), 'line 26');
 });
+
+test('output__should_drop_what_the_document_no_longer_lists', async () => {
+  // Given
+  const status = poolWithOutputs(
+    [output('b1'), output('b2')],
+    [actor({ key: 's2', label: 'second agent', outputs: [output('b3', { summary: 'npm test' })] })],
+  );
+  const wt2 = status.pools[0].worktrees[1].path;
+  webview = await mount();
+  webview.show(status);
+  rowById(webview.document, wt2).click();
+  webview.post(outputMessage(wt2, [{ path: `${TASKS}/b2.output`, lines: ['old line'] }]));
+  const strip = () => webview.document.querySelector('tr.detail');
+  const task = (id) => strip().querySelector(`.output[data-output-path="${TASKS}/${id}.output"]`);
+  const kept = task('b1');
+
+  // When
+  const fewer = structuredClone(status);
+  const actors = fewer.pools[0].worktrees[1].actors;
+  actors[0].outputs = [actors[0].outputs[0]];
+  delete actors[1].outputs;
+  webview.show(fewer);
+  const listed = [...strip().querySelectorAll('.output[data-output-path]')].map((t) => t.getAttribute('data-output-path'));
+  const sections = [...strip().querySelectorAll('section.outputs')].map((s) => text(s.querySelector('.outputs-heading')));
+  const sameTask = task('b1') === kept;
+  webview.show(structuredClone(status));
+  const back = text(task('b2').querySelector('pre.output-tail'));
+  const none = structuredClone(status);
+  for (const one of none.pools[0].worktrees[1].actors) delete one.outputs;
+  webview.show(none);
+
+  // Then
+  assert.deepEqual(listed, [`${TASKS}/b1.output`], 'a task the document no longer lists still shows');
+  assert.deepEqual(sections, ['Output · build agent'], 'the section of an agent without tasks still shows');
+  assert.ok(sameTask, 'a task the document still lists was made anew');
+  assert.equal(back, 'reading the output', 'a task that came back shows its tail from before');
+  assert.equal(strip().querySelectorAll('.output').length, 0, 'tasks show with none listed');
+  assert.ok(strip().querySelector('.output-area').hidden, 'the empty Output area shows');
+  assert.deepEqual(webview.errors, []);
+});

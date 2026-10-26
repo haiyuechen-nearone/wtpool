@@ -1,6 +1,6 @@
-//! One hook event end to end: where it belongs (H6, H7), what it changes (H8 to H14), the
-//! records it writes under their locks (H18 to H20, H24), and after a session's end the day's gc
-//! (H21). A harness's adapter turns its input into the [`HookInput`] this works on.
+//! One hook event end to end: the worktree it belongs to, the change it makes, the records it
+//! writes under their locks, and after a session's end the day's gc. A harness's adapter turns
+//! its input into the [`HookInput`] this works on.
 
 use std::path::{Path, PathBuf};
 
@@ -26,7 +26,6 @@ struct Context<'a, A> {
     input: &'a HookInput,
     env: &'a HookEnv,
     activity: Activity,
-    /// The actor the event is of.
     key: ActorKey,
     cwd: PathBuf,
     cwd_worktree: Worktree,
@@ -119,8 +118,7 @@ impl<A: Adapter> Context<'_, A> {
         Some(())
     }
 
-    /// `None`, once the hook's log notes that the event wrote nothing, for `reason` (H23). The
-    /// hook still prints nothing and exits 0 (H2, H3).
+    /// Notes in the hook's log that the event wrote nothing, for `reason`, and returns `None`.
     fn skipped<T>(&self, reason: &str) -> Option<T> {
         if let Some(dir) = &self.env.log {
             log::append(dir, &format!("wtpool hook: skipped an event: {reason}"));
@@ -128,10 +126,9 @@ impl<A: Adapter> Context<'_, A> {
         None
     }
 
-    /// The list of work in flight a turn's end sends covers its whole session (H27):
-    /// it also ends the old running tasks it leaves out in the session's other records that name
-    /// this event's harness process (H19), each under its own lock, and changes nothing else in
-    /// them. Without the list, or without a known parent process, nothing more ends.
+    /// Ends the old running tasks that a turn end's list of work in flight leaves out in the
+    /// session's other records on this event's harness process, as the list covers the whole
+    /// session. Nothing else in those records changes.
     fn end_session_tasks(&self, own: &str) {
         let (Some(running), Some(process)) = (&self.input.tasks_running, &self.me.parent) else {
             return;
@@ -155,8 +152,8 @@ impl<A: Adapter> Context<'_, A> {
         }
     }
 
-    /// What the event says of the actor's background tasks (H27): a task its call started,
-    /// in the output file the harness's adapter names, and the tasks it ends.
+    /// The event's facts of the actor's background tasks: a task its call started, with the
+    /// output file the adapter names, and the tasks it ends.
     fn task_event(&self, event: &Event) -> TaskEvent {
         let started = match (event, &self.input.task_start) {
             (Event::CallEnd(call), Some(task)) => self
@@ -177,7 +174,6 @@ impl<A: Adapter> Context<'_, A> {
         }
     }
 
-    /// Whether a subagent of the session waits, so an [`Event::Notified`] leaves the session be.
     fn subagent_waits(&self) -> bool {
         self.activity
             .subagents_of(&self.key)
@@ -186,7 +182,7 @@ impl<A: Adapter> Context<'_, A> {
             .any(|record| record.state == State::Waiting)
     }
 
-    /// The event with its call targets, and the worktree its path names (H8 to H10, H14).
+    /// The event with its call targets, and the worktree its path names.
     fn located(&self, event: &Event, current: Option<&Record>) -> (Event, Option<String>) {
         let base = current.map_or_else(
             || self.cwd_worktree.root.clone(),
@@ -232,7 +228,6 @@ impl<A: Adapter> Context<'_, A> {
         }
     }
 
-    /// The last `cd` wins, else a single worktree among the path words, else none (H9).
     fn command_place(&self, parsed: &bash::Command) -> Option<String> {
         if let Some(last) = parsed.cds.last() {
             return self.in_pool(last).map(|w| path_text(&w.root));
@@ -256,7 +251,8 @@ impl<A: Adapter> Context<'_, A> {
         place::worktree_of(path).filter(|w| w.common == self.cwd_worktree.common)
     }
 
-    /// An [`Event::CwdChange`] moves the actor, unless back to the session's first folder (H10).
+    /// The worktree an [`Event::CwdChange`] moves the actor to, none when back to the session's
+    /// first folder.
     fn cwd_change(&self, current: Option<&Record>) -> Option<String> {
         let new_cwd = place::local(Path::new(self.input.new_cwd.as_deref()?))?;
         let first = current
@@ -319,8 +315,8 @@ impl<A: Adapter> Context<'_, A> {
     }
 
     /// The titles a session's event finds: the one the user gave in its payload, else in the
-    /// new part of its transcript, and the newest generated one there, with how far the
-    /// transcript is read now (H16). The read starts where the record's last one ended.
+    /// new part of its transcript, and the newest generated one there, with the transcript's new
+    /// offset. The read starts where the record's last one ended.
     fn titles(&self, current: Option<&Record>) -> (Titles, Option<u64>) {
         let offset = current.map_or(0, |record| record.transcript_offset);
         let read = self
@@ -339,7 +335,7 @@ impl<A: Adapter> Context<'_, A> {
         (titles, read.map(|read| read.offset))
     }
 
-    /// A new subagent starts at its session's worktree with the session's `placed_by` (H10).
+    /// A new subagent starts at its session's worktree with the session's [`PlacedBy`].
     fn parent_place(&self) -> (String, PlacedBy) {
         match self.activity.read(&self.key.session_key().stem()) {
             Some(parent) => (parent.worktree, parent.placed_by),
@@ -351,9 +347,9 @@ impl<A: Adapter> Context<'_, A> {
         (path_text(&self.cwd_worktree.root), PlacedBy::Cwd)
     }
 
-    /// What an event does to other records: [`Event::Idle`] finishes the subagents, the session's
-    /// end deletes them (H20). That a newer main session in one process ends the older ones (H19)
-    /// is read from the records by `wtpool status`; gc keeps both until they end or die.
+    /// The change an event makes to other records: [`Event::Idle`] finishes the subagents, and
+    /// the session's end deletes them. An older session on the process of a newer one stays as it
+    /// is, as `wtpool status` reads its end from the records.
     fn side_effects(&self, event: &Event, result: &Record, change: &Change) {
         if result.is_subagent() {
             return;
@@ -375,7 +371,7 @@ impl<A: Adapter> Context<'_, A> {
         }
     }
 
-    /// Rewrites the record `stem` under its lock, keeping a state a later hook wrote (H24).
+    /// Rewrites the record `stem` under its lock, keeping a state a later hook wrote.
     fn update(&self, stem: &str, change: impl Fn(&Record) -> Record) -> Option<()> {
         let lock = self.activity.lock(stem)?;
         let current = self.activity.read(stem)?;
@@ -396,12 +392,12 @@ fn path_text(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// `text` as a label stores it (H15), `None` when nothing is left.
+/// `text` as a label stores it, `None` when nothing is left.
 fn label_text(text: &str) -> Option<String> {
     Some(text::clean(text, MAX_LABEL)).filter(|text| !text.is_empty())
 }
 
-/// A file tool's target: its path inside `root` as written, else its file name (H14).
+/// A file tool's target: its path inside `root` as written, else its file name.
 fn file_target(text: &str, path: &Path, root: &Path) -> String {
     let root_text = root.to_string_lossy();
     let relative = text

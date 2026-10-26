@@ -1,4 +1,4 @@
-//! The activity folder and the record files in it (H6, H18, S5).
+//! The activity folder and the record files in it.
 
 use std::io::Read;
 use std::path::Path;
@@ -9,11 +9,12 @@ use crate::platform::fs::open_without_following;
 pub const ACTIVITY_DIR: &str = "wtpool-activity";
 /// The `version` of every record this wtpool writes and reads.
 pub const RECORD_VERSION: u32 = 1;
-/// A record larger than this is never read (H18, S5), so a write stays within it.
+/// The most bytes a record file holds. A reader never reads a larger one, so a writer stays
+/// within it.
 pub const MAX_RECORD_BYTES: usize = 16 * 1024;
 
 /// Creates `<common>/wtpool-activity/`, where hooks write, unless something is there already.
-/// `wtpool setup` and every pool changing command call it; the hook never does (H6).
+/// A hook never calls it, as it writes only into a folder that exists.
 pub fn create_activity(common: &Path) -> std::io::Result<()> {
     let dir = common.join(ACTIVITY_DIR);
     if dir.symlink_metadata().is_ok() {
@@ -26,7 +27,7 @@ pub fn create_activity(common: &Path) -> std::io::Result<()> {
 }
 
 /// The bytes of the record file at `path`. `None` for a symlink, a FIFO or anything else that is
-/// not a regular file, and for a file over [`MAX_RECORD_BYTES`] (H18, S5).
+/// not a regular file, and for a file over [`MAX_RECORD_BYTES`].
 #[must_use]
 pub fn read_record_file(path: &Path) -> Option<Vec<u8>> {
     let file = open_without_following(path).ok()?;

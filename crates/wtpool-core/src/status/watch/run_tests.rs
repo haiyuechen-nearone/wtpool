@@ -13,7 +13,7 @@ use crate::status::document::{DocumentKind, DocumentVersion, Machine};
 
 mod ends;
 
-/// What the loop asked a [`FakeTracker`] to do.
+/// A request the loop made of a [`FakeTracker`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Call {
     All,
@@ -96,7 +96,6 @@ const FAST: Timing = Timing {
     settle: Duration::from_millis(30),
 };
 
-/// No heartbeat within any test.
 const NO_HEARTBEAT: Timing = Timing {
     heartbeat: Duration::from_secs(3600),
     merge: Duration::from_millis(60),

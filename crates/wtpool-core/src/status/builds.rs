@@ -1,4 +1,4 @@
-//! Build processes, the worktrees they work in (S4) and the processes they descend from (A1).
+//! Build processes, the worktrees they work in and the processes they descend from.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use super::document::Build;
 use crate::processes::{ProcessQuery, RunningProcess};
 
-/// The facts `wtpool status` reads of every process: names and folders for the builds (S4),
-/// parents for the builds below an actor (A1), and start times for liveness (A1).
+/// The facts `wtpool status` reads of every process: names and folders for the builds, parents
+/// for the builds below an actor, and start times for liveness.
 #[must_use]
 pub fn query() -> ProcessQuery<'static> {
     ProcessQuery::all()
@@ -17,8 +17,6 @@ pub fn query() -> ProcessQuery<'static> {
         .with_cwd()
 }
 
-/// Whether a process called `name` builds: `cargo`, `cargo-*`, `rustc` or a name the
-/// `build_processes` setting lists.
 #[must_use]
 pub fn is_build(name: &str, build_processes: &[String]) -> bool {
     name == "cargo"
@@ -60,7 +58,7 @@ pub fn builds_by_worktree(
     builds
 }
 
-/// The outermost build below each process, by that process's pid (A1): of the build processes
+/// The outermost build below each process, by that process's pid: of the build processes
 /// whose chain of parents passes through the pid, the name of the one nearest to it, then of the
 /// lowest pid. A chain that comes back to a pid it passed, as a table read while pids are reused
 /// can give, stops there.

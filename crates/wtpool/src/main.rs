@@ -176,6 +176,13 @@ fn at_most_one(args: Vec<String>, usage: &'static str) -> Result<Option<String>,
 #[derive(Debug)]
 enum Action {
     Help,
+    ShowConfig(Format),
+    Pool(PoolAction),
+}
+
+/// A command that runs on the pool of the configuration.
+#[derive(Debug)]
+enum PoolAction {
     List,
     Foreground { args: RefArgs, force: bool },
     Background(RefArgs),
@@ -184,7 +191,6 @@ enum Action {
     Remove(String),
     Path(String),
     Setup,
-    ShowConfig(Format),
     Status(StatusMode),
     HookGc,
 }
@@ -205,8 +211,8 @@ enum Format {
 
 impl Action {
     fn parse(command: Command) -> Result<Self, Failure> {
-        Ok(match command {
-            Command::Help(_) => Self::Help,
+        Ok(Self::Pool(match command {
+            Command::Help(_) => return Ok(Self::Help),
             Command::Other(args) => {
                 return Err(Failure::UnknownCommand(
                     args.into_iter().next().unwrap_or_default(),
@@ -214,59 +220,59 @@ impl Action {
             }
             Command::Ls(rest) => {
                 rest.none("usage: wtpool ls")?;
-                Self::List
+                PoolAction::List
             }
             Command::Fg(rest) => {
                 let (args, force) = rest.without_force();
                 let usage =
                     "usage: wtpool fg <pr-number|pr-url|branch> [--refresh|--reset] [--force]";
-                Self::Foreground {
+                PoolAction::Foreground {
                     args: RefArgs::parse(&args, usage)?,
                     force,
                 }
             }
-            Command::Bg(rest) => Self::Background(RefArgs::parse(
+            Command::Bg(rest) => PoolAction::Background(RefArgs::parse(
                 &rest.raw(),
                 "usage: wtpool bg <pr-number|pr-url|branch> [--refresh|--reset]",
             )?),
             Command::Free(rest) => {
                 let (args, force) = rest.without_force();
                 let usage = "usage: wtpool free <slot|branch> [--force]";
-                Self::Free {
+                PoolAction::Free {
                     arg: at_most_one(args, usage)?.ok_or(Error::Usage(usage))?,
                     force,
                 }
             }
             Command::New(rest) => match rest.at_most_one("usage: wtpool new [name]")? {
                 Some(name) => match SlotName::try_new(&name) {
-                    Ok(slot) => Self::New(Some(slot)),
+                    Ok(slot) => PoolAction::New(Some(slot)),
                     Err(reason) => return Err(Error::InvalidSlotName { name, reason }.into()),
                 },
-                None => Self::New(None),
+                None => PoolAction::New(None),
             },
-            Command::Rm(rest) => Self::Remove(rest.required("usage: wtpool rm <slot>")?),
-            Command::Path(rest) => Self::Path(rest.required("usage: wtpool path <branch>")?),
+            Command::Rm(rest) => PoolAction::Remove(rest.required("usage: wtpool rm <slot>")?),
+            Command::Path(rest) => PoolAction::Path(rest.required("usage: wtpool path <branch>")?),
             Command::Setup(rest) => {
                 rest.none("usage: wtpool setup")?;
-                Self::Setup
+                PoolAction::Setup
             }
             Command::Config(rest) => match rest.raw().as_slice() {
-                [] => Self::ShowConfig(Format::Text),
-                [flag] if flag == "--json" => Self::ShowConfig(Format::Json),
+                [] => return Ok(Self::ShowConfig(Format::Text)),
+                [flag] if flag == "--json" => return Ok(Self::ShowConfig(Format::Json)),
                 _ => return Err(Error::Usage("usage: wtpool config [--json]").into()),
             },
             Command::Hook(rest) => match rest.raw().as_slice() {
-                [sub] if sub == "gc" => Self::HookGc,
+                [sub] if sub == "gc" => PoolAction::HookGc,
                 _ => return Err(Error::Usage("usage: wtpool hook [gc|install]").into()),
             },
             Command::Status(rest) => match rest.raw().as_slice() {
-                [flag] if flag == "--json" => Self::Status(StatusMode::Json),
-                [flag] if flag == "--watch" => Self::Status(StatusMode::Watch),
+                [flag] if flag == "--json" => PoolAction::Status(StatusMode::Json),
+                [flag] if flag == "--watch" => PoolAction::Status(StatusMode::Watch),
                 _ => {
                     return Err(Error::Usage("usage: wtpool status --json|--watch|--schema").into());
                 }
             },
-        })
+        }))
     }
 }
 
@@ -396,32 +402,33 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
             terminal.out(&version_text(&BUILD));
             return Ok(());
         }
-        None => Action::List,
+        None => Action::Pool(PoolAction::List),
         Some(command) => Action::parse(command)?,
     };
-    if let Action::Help = action {
-        terminal.out(HELP);
-        return Ok(());
-    }
+    let action = match action {
+        Action::Help => {
+            terminal.out(HELP);
+            return Ok(());
+        }
+        Action::ShowConfig(format) => {
+            let settings = load_settings(GitMode::Writing)?;
+            settings.require_repository()?;
+            terminal.out(&match format {
+                Format::Text => visible_lines(&settings.to_text()),
+                Format::Json => settings.to_json(),
+            });
+            return Ok(());
+        }
+        Action::Pool(action) => action,
+    };
 
-    let git_mode = if let Action::Status(_) = action {
+    let git_mode = if let PoolAction::Status(_) = action {
         GitMode::ReadOnly
     } else {
         GitMode::Writing
     };
-    let cwd = std::env::current_dir()
-        .ok()
-        .and_then(|cwd| AbsolutePath::try_new(cwd).ok());
-    let settings = Settings::load(|name| std::env::var_os(name), cwd.as_ref(), git_mode)?;
-    if let Action::ShowConfig(format) = action {
-        settings.require_repository()?;
-        terminal.out(&match format {
-            Format::Text => visible_lines(&settings.to_text()),
-            Format::Json => settings.to_json(),
-        });
-        return Ok(());
-    }
-    if let Action::Status(_) | Action::HookGc = action {
+    let settings = load_settings(git_mode)?;
+    if let PoolAction::Status(_) | PoolAction::HookGc = action {
         settings.require_repository()?;
     }
     let common = settings
@@ -432,41 +439,48 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
     let config = settings.into_config();
     let pool = Pool::new(config.clone());
     match action {
-        Action::Help | Action::ShowConfig(_) => {}
-        Action::HookGc => terminal.out(&hook::gc_line(&common)),
-        Action::List => {
+        PoolAction::HookGc => terminal.out(&hook::gc_line(&common)),
+        PoolAction::List => {
             let rows = pool.list(terminal)?;
             terminal.out(&table::render(&rows, table_style(terminal.colour)));
         }
-        Action::Foreground { args, force } => {
+        PoolAction::Foreground { args, force } => {
             let sources = status_sources();
             let guard = agent_guard(force, &sources);
             let foreground = pool.foreground(&args.reference, args.sync, guard, terminal)?;
             print_path(terminal, &foreground);
         }
-        Action::Background(args) => {
+        PoolAction::Background(args) => {
             let slot = pool.background(&args.reference, args.sync, terminal)?;
             print_path(terminal, &slot);
         }
-        Action::Free { arg, force } => {
+        PoolAction::Free { arg, force } => {
             let sources = status_sources();
             pool.free(&arg, agent_guard(force, &sources), terminal)?;
         }
-        Action::New(name) => {
+        PoolAction::New(name) => {
             pool.new_slot(name, terminal)?;
         }
-        Action::Remove(arg) => pool.remove(&arg, terminal)?,
-        Action::Path(branch) => {
+        PoolAction::Remove(arg) => pool.remove(&arg, terminal)?,
+        PoolAction::Path(branch) => {
             let path = pool.path_of(&branch)?;
             print_path(terminal, &path);
         }
-        Action::Setup => {
+        PoolAction::Setup => {
             let rows = pool.setup(terminal)?;
             terminal.out(&table::render(&rows, table_style(terminal.colour)));
         }
-        Action::Status(mode) => run_status(mode, config, common, terminal)?,
+        PoolAction::Status(mode) => run_status(mode, config, common, terminal)?,
     }
     Ok(())
+}
+
+/// The settings of the repository of the working folder.
+fn load_settings(git_mode: GitMode) -> Result<Settings, Error> {
+    let cwd = std::env::current_dir()
+        .ok()
+        .and_then(|cwd| AbsolutePath::try_new(cwd).ok());
+    Settings::load(|name| std::env::var_os(name), cwd.as_ref(), git_mode)
 }
 
 /// `wtpool status --json` or `--watch` on the pool of `config`, whose common git directory is

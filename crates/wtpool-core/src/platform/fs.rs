@@ -68,7 +68,7 @@ pub fn file_id(_: &Metadata) -> Option<FileId> {
     None
 }
 
-/// Whether `a` and `b` describe one file, `None` where the system tells no file identity.
+/// `Some(true)` when `a` and `b` describe one file, `None` where the system tells no file identity.
 #[must_use]
 pub fn same_file(a: &Metadata, b: &Metadata) -> Option<bool> {
     same_id(file_id(a), file_id(b))

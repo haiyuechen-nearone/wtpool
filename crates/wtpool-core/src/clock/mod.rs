@@ -43,9 +43,8 @@ pub enum Clock {
     File(FileClock),
 }
 
-/// The system clock in microseconds, finer than a [`Timestamp`]: when a hook began (H24) and the
-/// end of its gc's budget (H21). Both run on the system clock under a file clock too, as a
-/// file clock holds a whole second.
+/// The system clock in microseconds, finer than a [`Timestamp`]. A [`FileClock`] holds whole
+/// seconds, so times this fine come from the system clock under one too.
 #[must_use]
 pub fn system_micros() -> i64 {
     SystemTime::now()

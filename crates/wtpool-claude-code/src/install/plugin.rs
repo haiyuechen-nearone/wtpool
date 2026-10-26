@@ -38,20 +38,20 @@ mod tests {
         // Given
         let expected = hooks_file();
         let path = tracked_file();
-        if std::env::var_os("WTPOOL_WRITE_PLUGIN_HOOKS").is_some_and(|value| value == "1") {
-            std::fs::write(&path, &expected).unwrap();
-        }
+        std::env::var_os("WTPOOL_WRITE_PLUGIN_HOOKS")
+            .is_some_and(|value| value == "1")
+            .then(|| std::fs::write(&path, &expected).unwrap());
+        let mismatch = format!(
+            "{} is not what the event table makes; run WTPOOL_WRITE_PLUGIN_HOOKS=1 cargo test -p \
+             wtpool-claude-code hooks_file to write it. Expected:\n{expected}",
+            path.display()
+        );
 
         // When
         let tracked = std::fs::read_to_string(&path).unwrap_or_default();
 
         // Then
-        assert!(
-            tracked == expected,
-            "{} is not what the event table makes; run WTPOOL_WRITE_PLUGIN_HOOKS=1 cargo test -p \
-             wtpool-claude-code hooks_file to write it. Expected:\n{expected}",
-            path.display()
-        );
+        assert!(tracked == expected, "{mismatch}");
     }
 
     /// The plugin's version is the workspace's, so a release of `wtpool` is a release of its

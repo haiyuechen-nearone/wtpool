@@ -25,13 +25,6 @@ impl Ran {
         self
     }
 
-    pub fn forward_stdout(&self, report: &mut impl Report) -> &Self {
-        if !self.stdout.is_empty() {
-            report.out(&self.stdout);
-        }
-        self
-    }
-
     /// The first line of standard output when the command succeeded.
     pub fn line(&self) -> Option<&str> {
         self.success

@@ -1,16 +1,15 @@
-//! One hook's input: the bytes a harness sends on stdin (H5), and the neutral facts its adapter
-//! reads from them. The rules of `wtpool hook` work on these facts alone.
+//! One hook's input: the bytes a harness sends on stdin, and the neutral facts its adapter reads
+//! from them. The rules of `wtpool hook` work on these facts alone.
 
 use std::io::Read;
 
 use super::place::ToolPath;
 use crate::activity::{ActorId, CallId, CallKind, TaskId, WaitReason};
 
-/// Stdin past this many bytes is read and dropped (H5).
+/// Stdin past this many bytes is read and dropped.
 const MAX_INPUT: usize = 32 * 1024 * 1024;
 
-/// One hook event as a harness's adapter reads it: the facts the rules need, ids already
-/// checked against their patterns (H17).
+/// One hook event as a harness's adapter reads it: the facts the rules need.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HookInput {
     pub event: Event,
@@ -21,30 +20,29 @@ pub struct HookInput {
     pub agent_type: Option<String>,
     /// A title the user gave the session, as sent.
     pub session_title: Option<String>,
-    /// The harness's transcript of the session, as sent (H16).
+    /// The harness's transcript of the session, as sent.
     pub transcript: Option<String>,
-    /// The subagent the event's call started (H16).
+    /// The subagent the event's call started.
     pub spawned: Option<Spawned>,
     /// The working folder of the event, as sent.
     pub cwd: String,
     /// The new working folder of an [`Event::CwdChange`].
     pub new_cwd: Option<String>,
-    /// The path field of the event's call (H8).
+    /// The path field of the event's call.
     pub tool_path: ToolPath,
-    /// The background task the event's call started (H27).
+    /// The background task the event's call started.
     pub task_start: Option<TaskId>,
-    /// The background tasks the harness lists as still in flight in the whole session (H27).
+    /// The background tasks the harness lists as still in flight in the whole session.
     pub tasks_running: Option<Vec<TaskId>>,
-    /// The background task the event's call stopped (H27).
+    /// The background task the event's call stopped.
     pub task_stopped: Option<TaskId>,
 }
 
-/// An event as the state rules see it (H11).
+/// An event as the rules of `wtpool hook` see it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     /// The user sent a prompt: a turn starts.
     TurnStart,
-    /// A call starts.
     CallStart(CallFacts),
     /// A call waits for the user's permission.
     PermissionAsked(CallFacts),
@@ -71,15 +69,14 @@ pub struct CallFacts {
     pub id: Option<CallId>,
     /// The harness's own tool name, kept in records for display.
     pub tool: String,
-    /// What the call does, from the harness's adapter (H26).
     pub kind: CallKind,
-    /// Empty from the adapter: the hook names it from the call's path (H14).
+    /// Empty from the adapter: the hook names it from the call's path.
     pub target: String,
-    /// The hash of the call's input, the key a wait matches calls by (H13).
+    /// The hash of the call's input, the key a wait matches calls by.
     pub input_hash: String,
 }
 
-/// A subagent that a call started, as sent (H16).
+/// A subagent that a call started, as sent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Spawned {
     /// The `agent_id` of the subagent's own events.
@@ -88,12 +85,12 @@ pub struct Spawned {
     pub title: String,
 }
 
-/// Reads stdin to its end, keeping the first 32 MiB (H5).
+/// Reads `input` to its end and keeps the first 32 MiB, and one more byte so that a cut payload
+/// cannot parse.
 #[must_use]
 pub fn read_input(mut input: impl Read) -> Vec<u8> {
     let limit = u64::try_from(MAX_INPUT).unwrap_or(u64::MAX);
     let mut kept = Vec::with_capacity(64 * 1024);
-    // One byte past the limit stays, so a cut payload cannot parse; the rest is drained.
     let _ = input
         .by_ref()
         .take(limit.saturating_add(1))

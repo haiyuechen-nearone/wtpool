@@ -442,3 +442,35 @@ fn hook__should_end_a_task_through_its_session() {
         "{cleared}"
     );
 }
+
+/// The session's turn end changes another record only under that record's lock: one whose lock
+/// path holds a folder, which no lock can be taken on, keeps its running task.
+#[test]
+fn hook__should_end_no_task_of_a_record_it_cannot_lock() {
+    // Given
+    let tasks = Tasks::must_new("hook-tasks-unlockable");
+    tasks.send(&tasks.ev("UserPromptSubmit", "s1", &[]));
+    for (agent, id) in [("a1", "b1"), ("a2", "b2")] {
+        tasks.send(&as_agent(tasks.ev("SubagentStart", "s1", &[]), agent));
+        tasks.send(&as_agent(tasks.background("s1", &json!(id)), agent));
+    }
+    let lock = tasks.hooks.activity().join("s1.a1.json.lock");
+    let _ = fs::remove_file(&lock);
+    fs::create_dir(&lock).expect("setup: a folder at the lock path");
+    tasks.hooks.advance(600);
+
+    // When
+    tasks.send(&tasks.ev("Stop", "s1", &stop_fields(&[])));
+
+    // Then
+    assert_eq!(
+        tasks.ended("s1.a1"),
+        pairs(&[("b1", false)]),
+        "a record whose lock cannot be taken"
+    );
+    assert_eq!(
+        tasks.ended("s1.a2"),
+        pairs(&[("b2", true)]),
+        "left out of the list"
+    );
+}

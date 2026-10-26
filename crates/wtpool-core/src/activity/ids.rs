@@ -1,5 +1,5 @@
-//! The ids of a hook input, checked against their patterns before any use (H17, H27). An id
-//! names a record file or a task's output file, so nothing else reaches a path.
+//! The ids of a hook input, checked against their patterns before any use. An id names a record
+//! file or a task's output file, so only a checked id reaches a path.
 
 use std::fmt;
 
@@ -14,18 +14,16 @@ pub struct InvalidId {
     id: String,
 }
 
-/// `true` when `id` has 1 to `longest` ASCII letters, digits and dashes, and underscores too
-/// with `underscore`.
-fn is_valid(id: &str, longest: usize, underscore: bool) -> bool {
-    (1..=longest).contains(&id.len())
+fn is_valid(id: &str, max_len: usize, allow_underscore: bool) -> bool {
+    (1..=max_len).contains(&id.len())
         && id
             .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || (underscore && b == b'_'))
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || (allow_underscore && b == b'_'))
 }
 
 /// Defines an id type that holds only a string matching its pattern.
 macro_rules! id_type {
-    ($(#[$doc:meta])* $name:ident, $what:literal, $pattern:literal, $longest:literal, $underscore:literal) => {
+    ($(#[$doc:meta])* $name:ident, $what:literal, $pattern:literal, $max_len:literal, $allow_underscore:literal) => {
         $(#[$doc])*
         #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
         #[serde(try_from = "String")]
@@ -42,7 +40,7 @@ macro_rules! id_type {
             type Error = InvalidId;
 
             fn try_from(id: String) -> Result<Self, InvalidId> {
-                if is_valid(&id, $longest, $underscore) {
+                if is_valid(&id, $max_len, $allow_underscore) {
                     Ok(Self(id))
                 } else {
                     Err(InvalidId {
@@ -71,7 +69,7 @@ macro_rules! id_type {
 }
 
 id_type!(
-    /// A `session_id` or `agent_id`, `^[A-Za-z0-9-]{1,64}$`, the name of a record file (H17).
+    /// A `session_id` or `agent_id`, `^[A-Za-z0-9-]{1,64}$`, the name of a record file.
     ActorId,
     "actor id",
     "^[A-Za-z0-9-]{1,64}$",
@@ -80,7 +78,7 @@ id_type!(
 );
 
 id_type!(
-    /// The id of a call, `^[A-Za-z0-9_-]{1,128}$` (H17).
+    /// The id of a call, `^[A-Za-z0-9_-]{1,128}$`.
     CallId,
     "call id",
     "^[A-Za-z0-9_-]{1,128}$",
@@ -89,7 +87,7 @@ id_type!(
 );
 
 id_type!(
-    /// The id of a background task, `^[A-Za-z0-9_-]{1,64}$`, the name of its output file (H27).
+    /// The id of a background task, `^[A-Za-z0-9_-]{1,64}$`, the name of its output file.
     TaskId,
     "task id",
     "^[A-Za-z0-9_-]{1,64}$",

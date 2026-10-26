@@ -1,4 +1,4 @@
-//! The record of one actor in `<git-common-dir>/wtpool-activity/` (status-panel.md, section 1).
+//! The record of one actor in `<git-common-dir>/wtpool-activity/`.
 
 use std::borrow::Cow;
 use std::io;
@@ -9,18 +9,18 @@ use crate::activity::{
     CallKind, Harness, MAX_RECORD_BYTES, PlacedBy, RECORD_VERSION, State, WaitReason, legacy_kind,
 };
 
-/// Calls in flight kept per actor (H12).
+/// Calls in flight a record keeps.
 pub const MAX_IN_FLIGHT: usize = 32;
-/// Ended call ids kept per actor (H12).
+/// Ended call ids a record keeps.
 pub const MAX_DONE_IDS: usize = 64;
-/// Subagent titles a session's record keeps (H16).
+/// Subagent titles a session's record keeps.
 pub const MAX_SUBAGENTS: usize = 16;
 
 /// One actor: a session, or a subagent of one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Record {
     pub version: u32,
-    /// The harness whose hooks write the record (H25).
+    /// The harness whose hooks write the record.
     #[serde(default)]
     pub harness: Harness,
     pub session_id: String,
@@ -39,40 +39,39 @@ pub struct Record {
     pub error: Option<String>,
     pub since: String,
     pub updated: String,
-    /// The start time of the hook process that wrote `state`, in microseconds (H24).
+    /// The start time of the hook process that wrote `state`, in microseconds.
     pub writer_started: i64,
     pub process: Option<HarnessProcess>,
-    /// The folder the session started in, so a `CwdChanged` back to it moves nothing (H10).
+    /// The folder the session started in, so a change of folder back to it moves nothing.
     #[serde(default)]
     pub first_cwd: Option<String>,
-    /// The last call that ended, in flight or not, so `wtpool status --watch` knows which tool
-    /// ended (W4).
+    /// The last call that ended, in flight or not, for `wtpool status --watch` to refresh git
+    /// after an edit or a shell call.
     #[serde(default)]
     pub ended: Option<Ended>,
-    /// The session's title, which its label shows, and who gave it (H16).
+    /// The session's title, the source of its label.
     #[serde(default)]
     pub title: Option<Title>,
-    /// How far the session's transcript has been read for titles, in bytes: the end of the last
-    /// whole line read (H16).
+    /// The end of the last whole line of the session's transcript read for titles, in bytes.
     #[serde(default)]
     pub transcript_offset: u64,
-    /// The titles of the session's subagents by agent id, the newest last (H16).
+    /// The titles of the session's subagents by agent id, the newest last.
     #[serde(default)]
     pub subagents: Vec<SubagentTitle>,
-    /// The background tasks the actor started, oldest first, at most 5 (H27).
+    /// The background tasks the actor started, oldest first, at most
+    /// [`MAX_TASKS`](super::tasks::MAX_TASKS).
     #[serde(default)]
     pub tasks: Vec<Task>,
 }
 
-/// A session's title and who gave it (H16).
+/// A session's title and who gave it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Title {
     pub text: String,
     pub by: TitleBy,
 }
 
-/// Who gave a title: the user, or the harness, which generated it. A title the user gave
-/// outranks a generated one (H16).
+/// The giver of a title: the user, or the harness that generated it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TitleBy {
@@ -80,15 +79,15 @@ pub enum TitleBy {
     Harness,
 }
 
-/// The title of a subagent, by its agent id, that its session's record keeps (H16).
+/// The title of a subagent, kept in its session's record.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SubagentTitle {
     pub agent_id: String,
     pub title: String,
 }
 
-/// A background task a call started (H27): its id, the file its harness writes its output to,
-/// the command's summary (H14), and when it started and ended. Never its output.
+/// A background task a call started. `path` is the file its harness writes the output to, as a
+/// record never holds output. `summary` is the target of the call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {
     pub id: String,
@@ -99,17 +98,17 @@ pub struct Task {
     pub ended: Option<String>,
 }
 
-/// A call that ended: its id, tool and kind.
+/// A call that ended.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ended {
     pub id: String,
     pub tool: String,
-    /// `None` only as an older wtpool wrote it, until [`Record::from_json`] maps its tool (H26).
+    /// `None` only in a record an older wtpool wrote, until [`Record::from_json`] maps its tool.
     #[serde(default)]
     pub kind: Option<CallKind>,
 }
 
-/// What an actor waits for (H13). A wait a Notification set names no tool and binds to no
+/// The wait of an actor for the user. A wait a notification set names no tool and binds to no
 /// call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Wait {
@@ -156,19 +155,18 @@ impl Wait {
     }
 }
 
-/// A tool and its target (H14).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Action {
     pub tool: String,
     pub target: String,
 }
 
-/// A call in flight (H12), with its input hash so a later PermissionRequest can bind to it.
+/// A call in flight, with its input hash so a later permission request can bind a wait to it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Call {
     pub id: String,
     pub tool: String,
-    /// `None` only as an older wtpool wrote it, until [`Record::from_json`] maps its tool (H26).
+    /// `None` only in a record an older wtpool wrote, until [`Record::from_json`] maps its tool.
     #[serde(default)]
     pub kind: Option<CallKind>,
     pub target: String,
@@ -177,7 +175,7 @@ pub struct Call {
     pub input_hash: Option<String>,
 }
 
-/// The agent harness process that ran the hook (H19).
+/// The harness process that ran the hook.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HarnessProcess {
     pub pid: u32,
@@ -187,7 +185,7 @@ pub struct HarnessProcess {
 impl Record {
     /// The record's JSON, dropping the oldest ended ids, then the oldest calls, until it fits
     /// in [`MAX_RECORD_BYTES`]. An error when it still does not fit, as a reader would refuse
-    /// it (H18).
+    /// it.
     pub fn to_json(&self) -> io::Result<Vec<u8>> {
         let mut record = Cow::Borrowed(self);
         loop {
@@ -207,8 +205,8 @@ impl Record {
         }
     }
 
-    /// The record in `bytes`, if it parses and has version 1. A call an older wtpool wrote
-    /// without a kind gets the kind [`legacy_kind`] gives its tool (H26).
+    /// The record in `bytes`, if it parses and has version [`RECORD_VERSION`]. A call an older
+    /// wtpool wrote without a kind gets the kind [`legacy_kind`] gives its tool.
     #[must_use]
     pub fn from_json(bytes: &[u8]) -> Option<Self> {
         let mut record: Self = serde_json::from_slice(bytes).ok()?;
@@ -225,7 +223,6 @@ impl Record {
         (record.version == RECORD_VERSION).then_some(record)
     }
 
-    /// Whether this is a subagent's record.
     #[must_use]
     pub fn is_subagent(&self) -> bool {
         self.agent_id.is_some()

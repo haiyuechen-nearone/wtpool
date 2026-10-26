@@ -188,3 +188,5 @@ accept eslint-p8 1909c07f704ac40cd1b55f4ec256f711af695d3bad20b0a5d66979aa2581cfa
 accept status-lines-3 01a2deaa58d4eb63865f2ba2b6ef3b3f085e2eb7364ebb236e9fc759b10aa2f0
 # Eight host and e2e checks wait for the state their next step needs, not a fixed moment: the palette helper opens the palette through the View menu's command when keys are dropped, narrow_scroll waits for the page's frame to be focused, and the host checks wait for their own tab's view or the paused view before acting.
 accept flake-fixes c88a7f91f584a711b078e3962980bf79679c5576d72db9f32764a67524c4ea37
+# Checks for the changed product lines no layer reached: lexer forms in bash-commands.toml, the PR lookup of wtpool bg through a fake gh, a session record whose lock cannot be taken, output tails and Follow when a watch fails or a change comes during a read or a symlink replaces the file, and the Output section dropping what the document no longer lists; checks.toml, trace.toml and the trace list of verification.md list them.
+accept cover-gaps d33b1f358b9ef928969cf69ae4e61e7c78eb48767d9386170e3fd8873dbfc414

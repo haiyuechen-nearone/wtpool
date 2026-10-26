@@ -1,4 +1,4 @@
-//! The inputs of a hook run besides its payload, and the facts of its own process (H19, H24).
+//! The environment of a hook run, and the facts of its own process.
 
 use std::path::PathBuf;
 
@@ -8,27 +8,27 @@ use crate::clock::{self, Clock};
 use crate::platform::dirs;
 use crate::processes::{ListProcesses, ProcessQuery, ProcessTable, StartTime};
 
-/// What a hook run reads besides its input.
+/// The inputs of a hook run besides its payload.
 #[derive(Debug, Clone)]
 pub struct HookEnv {
     pub clock: Clock,
     pub processes: ProcessTable,
-    /// `WTPOOL_VERIFY_SANDBOX` is `1`.
+    /// `true` when `WTPOOL_VERIFY_SANDBOX` is `1`.
     pub sandbox: bool,
     pub home: Option<PathBuf>,
     pub tz: Option<String>,
-    /// When `main` began, in microseconds.
+    /// The time `main` began, in microseconds.
     pub entered_micros: i64,
-    /// The folder of the hook's log (H23), `None` without a usable one.
+    /// The folder of the hook's log, `None` without a usable one.
     pub log: Option<PathBuf>,
 }
 
 /// The facts of this hook process.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Me {
-    /// The start time of this process in microseconds (H24).
+    /// The start time of this process, in microseconds.
     pub started_micros: i64,
-    /// The parent, unless it is pid 0 or 1 or its start time is unknown (H19).
+    /// The parent, unless it is pid 0 or 1 or its start time is unknown.
     pub parent: Option<HarnessProcess>,
 }
 
@@ -50,8 +50,8 @@ impl HookEnv {
         }
     }
 
-    /// The facts of this process from its process table, the start being when `main` began
-    /// unless the table tells it.
+    /// The facts of this process from its process table. The start is
+    /// [`Self::entered_micros`] when the table does not tell it.
     #[must_use]
     pub fn me(&self) -> Me {
         let this = self.processes.this_process();

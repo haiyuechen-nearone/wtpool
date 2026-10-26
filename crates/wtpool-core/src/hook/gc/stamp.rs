@@ -1,6 +1,6 @@
-//! `wtpool-activity/gc.stamp` (H21): the time the last gc began, which keeps the gc the hook runs
-//! itself to once a day per pool. Its name is no record name (H17), so `wtpool status`, the
-//! watcher and gc pass it by.
+//! `wtpool-activity/gc.stamp`: the time the last gc began. It keeps the gc the hook runs itself
+//! to once a day per pool. Its name is no record name, so `wtpool status`, the watcher and gc
+//! pass it by.
 
 use std::fs::File;
 use std::io::{self, Read, Seek, Write};
@@ -10,7 +10,8 @@ use crate::clock::Timestamp;
 
 pub const STAMP: &str = "gc.stamp";
 const DAY: i64 = 86_400;
-/// An RFC 3339 time and a newline fit; a longer stamp reads as no time.
+/// The longest stamp read, room for an RFC 3339 time and a newline. A longer one reads as no
+/// time.
 const MAX_BYTES: u64 = 64;
 
 /// Claims the pool's gc at `now`: under the stamp's lock, a stamp that is missing, unreadable,
@@ -35,7 +36,7 @@ pub fn mark(activity: &Activity, now: Timestamp) {
 }
 
 /// Removes the stamp after a gc its budget stopped, so the next session's end goes on. No lock:
-/// a hook that read the old stamp meanwhile at worst runs gc once more, which is safe.
+/// a hook that read the old stamp meanwhile at worst runs one more gc, and a second gc is safe.
 pub fn clear(activity: &Activity) {
     let _ = std::fs::remove_file(activity.file_path(STAMP));
 }

@@ -1,5 +1,5 @@
-//! What an event does to a record: the event table (H11), calls in flight (H12), waits (H13),
-//! placement (H10) and titles (H16). Pure functions of the record and the event.
+//! The change an event makes to a record: its state, calls in flight, waits, placement and
+//! titles. Pure functions of the record and the event.
 
 use super::adapter::WaitingTools;
 use super::input::{CallFacts, Event};
@@ -12,38 +12,36 @@ use crate::activity::{CallId, Harness, PlacedBy, RECORD_VERSION, State, WaitReas
 /// Everything besides the event that a change to a record takes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Change {
-    /// The harness of the event, which a new record keeps (H25).
+    /// The harness of the event, kept by a new record.
     pub harness: Harness,
-    /// The harness's tools whose calls wait for the user (H13).
     pub waiting_tools: WaitingTools,
     pub now: String,
     pub started_micros: i64,
     pub process: Option<HarnessProcess>,
-    /// Where a new record goes and how it got there.
+    /// The worktree a new record goes to, and the [`PlacedBy`] it records.
     pub first_place: (String, PlacedBy),
     /// The working folder of the session's first event.
     pub first_cwd: String,
-    /// The worktree a path of this event names, if any (H10).
+    /// The worktree a path of this event names, if any.
     pub moved_to: Option<String>,
-    /// The label of a new record, and a subagent's type that replaces it.
+    /// The label of a new record.
     pub new_label: String,
+    /// A subagent's type, to replace the record's label with.
     pub label: Option<String>,
-    /// The titles the event found for its session (H16).
+    /// The titles the event found for its session.
     pub titles: Titles,
-    /// How far the session's transcript is read now, when the event read it (H16).
+    /// The new [`Record::transcript_offset`], when the event read the transcript.
     pub transcript_offset: Option<u64>,
-    /// The subagent the event's call started, with its title (H16).
+    /// The subagent the event's call started, with its title.
     pub subagent: Option<SubagentTitle>,
     pub session_id: String,
     pub agent: Option<(String, Option<String>)>,
 }
 
-/// The titles an event found for its session, as labels store them (H15, H16).
+/// The titles an event found for its session, cleaned as labels are.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Titles {
-    /// A title the user gave.
     pub user: Option<String>,
-    /// A title the harness generated.
     pub generated: Option<String>,
 }
 
@@ -81,7 +79,7 @@ pub fn apply(current: Option<&Record>, event: &Event, change: &Change) -> Record
         Event::CallStart(call) => {
             record.action = Some(action_of(call));
             add_call(&mut record, call, &change.now);
-            state = pre(&mut record, call, change.waiting_tools);
+            state = call_start_state(&mut record, call, change.waiting_tools);
         }
         Event::PermissionAsked(call) => {
             record.action = Some(action_of(call));
@@ -147,7 +145,7 @@ pub fn apply(current: Option<&Record>, event: &Event, change: &Change) -> Record
     record
 }
 
-/// A subagent marked `done` by its session's [`Event::Idle`] (H11).
+/// A subagent marked `done` by its session's [`Event::Idle`].
 #[must_use]
 pub fn finish_subagent(current: &Record, change: &Change) -> Record {
     let mut record = current.clone();
@@ -162,7 +160,7 @@ pub fn finish_subagent(current: &Record, change: &Change) -> Record {
 }
 
 /// `result` as written over `current`: whole when this writer started no earlier than the one
-/// that wrote `current`, else merged by [`merge_older`] (H24).
+/// that wrote `current`, else merged by [`merge_older`].
 #[must_use]
 pub fn settle(
     current: &Record,
@@ -178,8 +176,8 @@ pub fn settle(
 }
 
 /// `result` merged over `current` by a writer that started before the one that wrote
-/// `current` (H24): it keeps the calls `result` tracks and the subagent titles it learnt, and
-/// otherwise never replaces the state, but a wait on a call that `result` ended ends with it.
+/// `current`. It keeps the calls `result` tracks and the subagent titles it learnt. It never
+/// replaces the state, but a wait on a call that `result` ended ends with it.
 #[must_use]
 pub fn merge_older(current: &Record, result: Record, waiting_tools: WaitingTools) -> Record {
     let mut merged = current.clone();
@@ -245,8 +243,8 @@ fn fresh(change: &Change) -> Record {
     }
 }
 
-/// The session's title after an event that found `titles` (H16): one the user gave replaces
-/// any, a generated one only a generated one or none. The label shows the title.
+/// Sets the session's title, and with it the label, from the `titles` an event found. A title
+/// the user gave replaces any, a generated one only a generated one or none.
 fn retitle(record: &mut Record, titles: &Titles) {
     let given = record
         .title
@@ -281,7 +279,8 @@ fn action_of(call: &CallFacts) -> Action {
     }
 }
 
-/// Adds a call by id, unless it ended already or flies; drops the oldest past 32 (H12).
+/// Adds a call by id, unless it ended already or is in flight, and drops the oldest past
+/// [`MAX_IN_FLIGHT`].
 fn add_call(record: &mut Record, call: &CallFacts, now: &str) {
     let Some(id) = &call.id else {
         return;
@@ -300,11 +299,10 @@ fn add_call(record: &mut Record, call: &CallFacts, now: &str) {
     push_bounded(&mut record.in_flight, flying, MAX_IN_FLIGHT);
 }
 
-/// The state after a [`Event::CallStart`]: a call that asks the user (a question or plan, as
-/// `waiting_tools` say) waits on its own call unless the actor waits already or the call ended,
-/// a call matching an unbound permission wait binds it, and anything else works unless the
-/// actor waits. A call start never ends a wait (H13).
-fn pre(record: &mut Record, call: &CallFacts, waiting_tools: WaitingTools) -> State {
+/// A call that asks the user, a question or plan as `waiting_tools` say, waits on its own call
+/// unless the actor waits already or the call ended. A call matching an unbound permission wait
+/// binds it. Anything else works unless the actor waits. A call start never ends a wait.
+fn call_start_state(record: &mut Record, call: &CallFacts, waiting_tools: WaitingTools) -> State {
     let reason = waiting_tools.reason(&call.tool);
     let ended = call
         .id
@@ -355,7 +353,7 @@ fn ask_permission(record: &mut Record, call: &CallFacts) {
     ));
 }
 
-/// Ends the call `id`: out of `in_flight`, into `done_ids`, and its wait ends (H12, H13).
+/// Ends the call `id` and the wait bound to it.
 fn end_call(record: &mut Record, id: &str) {
     record.in_flight.retain(|call| call.id != id);
     if !record.done_ids.iter().any(|done| done == id) {
@@ -384,8 +382,8 @@ fn end_listed(record: &mut Record, call: &CallFacts) {
     }
 }
 
-/// When a wait ended by its call ending, the oldest question or plan still in flight waits on
-/// its own call (H13).
+/// After a wait ended with its call, binds a new wait to the oldest question or plan still in
+/// flight.
 fn wait_on_a_question(record: &mut Record, was_waiting: bool, waiting_tools: WaitingTools) {
     if !was_waiting || record.waiting.is_some() {
         return;
@@ -402,7 +400,7 @@ fn wait_on_a_question(record: &mut Record, was_waiting: bool, waiting_tools: Wai
     });
 }
 
-/// A wait an [`Event::Notified`] set ends on the next call end or [`Event::CallsEnd`] (H13).
+/// A wait an [`Event::Notified`] set ends on the next call end or [`Event::CallsEnd`].
 fn end_notified_wait(record: &mut Record) {
     if record
         .waiting
@@ -413,24 +411,20 @@ fn end_notified_wait(record: &mut Record) {
     }
 }
 
-/// The end of a turn: nothing in flight, no wait (H12, H13).
 fn end_turn(record: &mut Record) {
     record.in_flight.clear();
     record.waiting = None;
 }
 
-/// `true` when `done_ids` holds the call `id`, so it ended already (H12).
 fn is_done(done_ids: &[String], id: &CallId) -> bool {
     done_ids.iter().any(|done| done == id.as_str())
 }
 
-/// `true` when `wait` is bound to no call yet and names the tool and input of `call`.
 fn is_unbound_wait_for(wait: &Wait, call: &CallFacts) -> bool {
     wait.call.is_none()
         && same_tool_and_input(wait.tool.as_deref(), wait.input_hash.as_deref(), call)
 }
 
-/// `true` when `tool` and `input_hash` are those of `call`.
 fn same_tool_and_input(tool: Option<&str>, input_hash: Option<&str>, call: &CallFacts) -> bool {
     tool == Some(call.tool.as_str()) && input_hash == Some(call.input_hash.as_str())
 }

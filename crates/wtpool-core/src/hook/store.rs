@@ -1,5 +1,5 @@
-//! Record files in `wtpool-activity/`: the lock each writer takes (H24), reads that never follow a
-//! symlink or block on a FIFO, and writes through a temp file renamed over the record (H18).
+//! Record files in `wtpool-activity/`: the lock each writer takes, reads that never follow a
+//! symlink or block on a FIFO, and writes through a temp file renamed over the record.
 
 use std::fs::{File, Metadata, OpenOptions};
 use std::io::{self, Write};
@@ -9,7 +9,7 @@ use super::record::Record;
 use crate::activity::{ACTIVITY_DIR, ActorKey, Stem, read_record_file};
 use crate::platform::fs::{open_private, owner, same_file};
 
-/// How often a writer takes the lock again after finding it replaced.
+/// The most attempts a writer makes at a lock that keeps being replaced.
 const LOCK_ATTEMPTS: usize = 64;
 
 /// The real, owned `wtpool-activity/` folder of one repository.
@@ -46,20 +46,18 @@ impl Activity {
         self.owner
     }
 
-    /// Whether the file `meta` describes belongs to the folder's owner. Where the system tells no
-    /// owner, as on Windows, nothing is checked, so the hook still writes there: the folder's
-    /// permissions alone keep other users' files out.
+    /// `true` when the file `meta` describes belongs to the folder's owner, or when the system
+    /// tells no owner, as on Windows. The folder's permissions alone then keep other users' files
+    /// out.
     fn owns(&self, meta: &Metadata) -> bool {
         self.owner.is_none() || owner(meta) == self.owner
     }
 
-    /// Whether the folder marks a sandbox pool (H6).
     #[must_use]
     pub fn is_sandbox(&self) -> bool {
         self.dir.join(".verify-sandbox").symlink_metadata().is_ok()
     }
 
-    /// The path of the file `name` in the folder.
     #[must_use]
     pub fn file_path(&self, name: &str) -> PathBuf {
         self.dir.join(name)
@@ -80,7 +78,7 @@ impl Activity {
     }
 
     /// The lock of the record `stem` in one attempt that never waits: `None` while another
-    /// process holds it. gc takes this one, as a record being written is not old (H21).
+    /// process holds it. gc takes this one, as a record being written is not old.
     #[must_use]
     pub fn lock_now(&self, stem: &str) -> Option<Locked> {
         self.try_lock(&self.dir.join(format!("{stem}.json.lock")), false)
@@ -116,12 +114,13 @@ impl Activity {
 
     /// The regular file `name` of the folder, open to read and write, created with mode 0600
     /// when missing. A symlink, FIFO or other entry there that is neither a regular file nor a
-    /// folder is replaced, never followed or read (H18). `None` when the file belongs to another
+    /// folder is replaced, never followed or read. `None` when the file belongs to another
     /// user or cannot be opened.
     #[must_use]
     pub fn open_file(&self, name: &str) -> Option<File> {
         let path = self.file_path(name);
-        for _ in 0..2 {
+        let mut replaced = false;
+        loop {
             let mut options = OpenOptions::new();
             options.read(true).write(true).create(true).truncate(false);
             let replace = match open_private(&mut options, &path) {
@@ -140,19 +139,20 @@ impl Activity {
                 return None;
             }
             std::fs::remove_file(&path).ok()?;
+            (!replaced).then_some(())?;
+            replaced = true;
         }
-        None
     }
 
-    /// The record `stem`, `None` when it is missing, no regular file, over 16 KiB or no
-    /// record of version 1. Never follows a symlink or blocks on a FIFO (H18).
+    /// The record `stem`, or `None` when [`read_record_file`] refuses its file or
+    /// [`Record::from_json`] its text.
     #[must_use]
     pub fn read(&self, stem: &str) -> Option<Record> {
         Record::from_json(&read_record_file(&self.record_path(stem))?)
     }
 
     /// Writes `record` as `stem` through a temp file opened `O_CREAT | O_EXCL | O_NOFOLLOW` and
-    /// renamed over the record, which replaces a symlink or FIFO there. A record that cannot fit
+    /// renamed over the record, so a symlink or FIFO there is replaced. A record that cannot fit
     /// in [`MAX_RECORD_BYTES`](crate::activity::MAX_RECORD_BYTES) leaves the file as it was
     /// ([`Record::to_json`]).
     pub fn write(&self, stem: &str, record: &Record) -> io::Result<()> {
@@ -173,7 +173,7 @@ impl Activity {
         written
     }
 
-    /// Deletes the record `stem` and its lock, which the caller holds.
+    /// Deletes the record `stem` and its lock, held by the caller.
     pub fn delete(&self, stem: &str, lock: Locked) {
         let _ = std::fs::remove_file(self.record_path(stem));
         let _ = std::fs::remove_file(&lock.path);
@@ -229,7 +229,6 @@ impl Activity {
     }
 }
 
-/// `true` for the stem of a record (H17, H25).
 fn is_stem(stem: &str) -> bool {
     Stem::parse(stem).is_some()
 }

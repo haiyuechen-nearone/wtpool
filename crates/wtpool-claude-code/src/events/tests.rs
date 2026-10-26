@@ -6,13 +6,23 @@ use super::*;
 
 const BASE: &str = r#""session_id":"s1","cwd":"/p""#;
 
-fn must_parse(fields: &str) -> HookInput {
+fn parse_fields(fields: &str) -> HookInput {
     parse(format!("{{{BASE},{fields}}}").as_bytes()).unwrap()
 }
 
 /// The facts of a call event whose payload names no call.
 fn no_call() -> CallFacts {
     call_facts(None, None, &CallInput::null())
+}
+
+fn call(id: Option<&str>, tool: &str, kind: CallKind, input_hash: &str) -> CallFacts {
+    CallFacts {
+        id: id.map(|id| CallId::try_from(id).unwrap()),
+        tool: tool.to_owned(),
+        kind,
+        target: String::new(),
+        input_hash: input_hash.to_owned(),
+    }
 }
 
 #[rstest]
@@ -70,19 +80,19 @@ fn parse__should_follow_the_event_table(
 #[test]
 fn parse__should_give_a_call_its_kind_and_path() {
     // When
-    let input = must_parse(
+    let input = parse_fields(
         r#""hook_event_name":"PreToolUse","agent_id":"a1","agent_type":"Explore","tool_name":"Bash","tool_use_id":"c1","tool_input":{"command":"git status"}"#,
     );
 
     // Then
-    let Event::CallStart(call) = &input.event else {
-        panic!("{:?}", input.event)
-    };
-    assert_eq!(call.id.as_ref().map(CallId::as_str), Some("c1"));
-    assert_eq!((call.tool.as_str(), call.kind), ("Bash", CallKind::Shell));
     assert_eq!(
-        call.input_hash,
-        "e0d3e391760d0a9b6c24bf66cecfc5a66557784782cbc704052385bf6e9bb287"
+        input.event,
+        Event::CallStart(call(
+            Some("c1"),
+            "Bash",
+            CallKind::Shell,
+            "e0d3e391760d0a9b6c24bf66cecfc5a66557784782cbc704052385bf6e9bb287"
+        ))
     );
     assert_eq!(
         input.tool_path,
@@ -107,37 +117,27 @@ fn parse__should_give_a_call_its_kind_and_path() {
 #[test]
 fn parse__should_give_each_batch_call_its_kind_and_no_path() {
     // When
-    let input = must_parse(
+    let input = parse_fields(
         r#""hook_event_name":"PostToolBatch","tool_name":"Read","tool_input":{"file_path":"/p/f"},"tool_calls":[{"tool_use_id":"c1","tool_name":"Edit"},{"tool_name":"Agent","tool_input":{"x":1}}]"#,
     );
 
     // Then
-    let Event::CallsEnd(calls) = &input.event else {
-        panic!("{:?}", input.event)
-    };
-    let kinds: Vec<(Option<&str>, &str, CallKind)> = calls
-        .iter()
-        .map(|call| {
-            (
-                call.id.as_ref().map(CallId::as_str),
-                call.tool.as_str(),
-                call.kind,
-            )
-        })
-        .collect();
     assert_eq!(
-        kinds,
-        vec![
-            (Some("c1"), "Edit", CallKind::Edit),
-            (None, "Agent", CallKind::Agent)
-        ]
-    );
-    assert_eq!(
-        (calls[0].input_hash.as_str(), calls[1].input_hash.as_str()),
-        (
-            "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
-            "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
-        )
+        input.event,
+        Event::CallsEnd(vec![
+            call(
+                Some("c1"),
+                "Edit",
+                CallKind::Edit,
+                "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+            ),
+            call(
+                None,
+                "Agent",
+                CallKind::Agent,
+                "5041bf1f713df204784353e82f6a4a535931cb64f1f4b4a5aeaffcb720918b22"
+            ),
+        ])
     );
     assert_eq!(input.tool_path, ToolPath::None);
 }
@@ -145,7 +145,7 @@ fn parse__should_give_each_batch_call_its_kind_and_no_path() {
 #[test]
 fn parse__should_keep_the_title_and_new_folder() {
     // When
-    let input = must_parse(
+    let input = parse_fields(
         r#""hook_event_name":"CwdChanged","new_cwd":"/p/wt1","session_title":"Fix","tool_name":"Read","tool_input":{"file_path":"/p/f"}"#,
     );
 
@@ -179,7 +179,7 @@ fn parse__should_name_the_subagent_an_agent_call_started(
     #[case] expected: Option<(&str, &str)>,
 ) {
     // When
-    let input = must_parse(&format!(
+    let input = parse_fields(&format!(
         r#""hook_event_name":"{event}","tool_name":"{tool}","tool_use_id":"c1",{AGENT_INPUT},{response}"#
     ));
 
@@ -194,10 +194,10 @@ fn parse__should_name_the_subagent_an_agent_call_started(
 #[test]
 fn parse__should_name_no_subagent_without_a_description() {
     // When
-    let input = must_parse(
+    let input = parse_fields(
         r#""hook_event_name":"PostToolUse","tool_name":"Agent","tool_input":{"prompt":"p"},"tool_response":{"agentId":"a1"}"#,
     );
-    let without_input = must_parse(
+    let without_input = parse_fields(
         r#""hook_event_name":"PostToolUse","tool_name":"Agent","tool_response":{"agentId":"a1"}"#,
     );
 
@@ -208,7 +208,7 @@ fn parse__should_name_no_subagent_without_a_description() {
 #[test]
 fn parse__should_keep_the_transcript() {
     // When
-    let input = must_parse(r#""hook_event_name":"Stop","transcript_path":"/t/s1.jsonl""#);
+    let input = parse_fields(r#""hook_event_name":"Stop","transcript_path":"/t/s1.jsonl""#);
 
     // Then
     assert_eq!(input.transcript.as_deref(), Some("/t/s1.jsonl"));

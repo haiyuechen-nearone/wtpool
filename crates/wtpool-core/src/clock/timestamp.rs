@@ -1,10 +1,8 @@
-//! [`Timestamp`]: a UTC time in whole seconds, read and written as RFC 3339.
-
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Serialize, Serializer};
 
-/// A UTC time in whole seconds since the Unix epoch.
+/// A UTC time in whole seconds since the Unix epoch, read and written as RFC 3339.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Timestamp(i64);
 

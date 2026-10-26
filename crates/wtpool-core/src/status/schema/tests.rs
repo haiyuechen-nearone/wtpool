@@ -25,7 +25,7 @@ fn without_annotations(value: &Value) -> Value {
     }
 }
 
-/// Every `properties` map in `value`, with where it is.
+/// Pushes every `properties` map in `value` to `found`, with its JSON pointer below `at`.
 fn property_maps<'a>(value: &'a Value, at: &str, found: &mut Vec<(String, &'a Value)>) {
     match value {
         Value::Object(map) => {

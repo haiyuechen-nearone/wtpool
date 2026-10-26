@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// An actor's state, as the events set it (H11).
+/// An actor's state, as hook events set it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum State {
@@ -13,7 +13,7 @@ pub enum State {
     Ended,
 }
 
-/// How the actor came to its worktree: its first `cwd`, or a path it used (H10).
+/// The source of an actor's worktree: its first `cwd`, or a path it used.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PlacedBy {
@@ -21,7 +21,7 @@ pub enum PlacedBy {
     Path,
 }
 
-/// The cause of an actor's wait (H13).
+/// The cause of an actor's wait.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WaitReason {
@@ -31,11 +31,11 @@ pub enum WaitReason {
     Input,
 }
 
-/// What a call does, as the harness's adapter tells from its tool (H26).
+/// The kind of work a call does, as the harness's adapter tells from its tool.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CallKind {
-    /// Runs a shell command, which may edit files too.
+    /// Runs a shell command, and may edit files too.
     Shell,
     /// Edits a file.
     Edit,
@@ -55,8 +55,7 @@ impl WaitReason {
 }
 
 impl CallKind {
-    /// Whether the call may have changed files in its worktree: an edit, or a shell command
-    /// (W4).
+    /// `true` when the call may have changed files in its worktree.
     #[must_use]
     pub fn edits_files(self) -> bool {
         matches!(self, Self::Edit | Self::Shell)

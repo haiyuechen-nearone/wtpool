@@ -1,10 +1,9 @@
-//! The actor a record belongs to, and the file stem that names it (H17, H25).
+//! The actor a record belongs to, and the file stem that names it.
 
 use super::harness::Harness;
 use super::ids::ActorId;
 
-/// The longest head of a record stem. H25's `<harness>-` prefix counts against it, as the stem
-/// grammar of other harnesses is still open.
+/// The longest head of a record stem. A harness's [`Harness::stem_prefix`] counts against it.
 const MAX_HEAD: usize = 64;
 
 /// An actor of one harness: a session, or a subagent of one.
@@ -16,9 +15,9 @@ pub struct ActorKey {
     pub agent: Option<ActorId>,
 }
 
-/// A record file stem, `<head>` for a session or `<head>.<agent>` for a subagent of it (H17). The
-/// head is the session id after its harness's prefix (H25). The grammar names no harness, so the
-/// records of every harness read alike.
+/// A record file stem, `<head>` for a session or `<head>.<agent>` for a subagent of it. The head
+/// is the session id after its harness's prefix. The grammar names no harness, so the records of
+/// every harness read alike.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Stem<'a> {
     pub head: &'a str,

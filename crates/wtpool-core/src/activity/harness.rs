@@ -1,5 +1,3 @@
-//! The coding agent harness whose hooks write a record (H25).
-
 use std::fmt;
 use std::str::FromStr;
 
@@ -28,8 +26,8 @@ impl Harness {
         }
     }
 
-    /// The start of the file stem of each of the harness's records (H25): none for Claude Code,
-    /// `<harness>-` for every other harness.
+    /// The prefix of the file stem of each of the harness's records: none for Claude Code,
+    /// `<harness>-` for every other harness, so two harnesses never share a file.
     #[must_use]
     pub(super) fn stem_prefix(self) -> &'static str {
         match self {

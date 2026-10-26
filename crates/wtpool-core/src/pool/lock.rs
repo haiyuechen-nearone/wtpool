@@ -56,12 +56,11 @@ impl<V: ViewPr> Pool<V> {
             .open(&path)
             .map_err(lock_error)?;
         match file.try_lock() {
-            Ok(()) => {}
             Err(TryLockError::WouldBlock) => {
                 report.note("waiting for another wtpool command to finish");
                 file.lock().map_err(lock_error)?;
             }
-            Err(TryLockError::Error(source)) => return Err(lock_error(source)),
+            taken => taken.map_err(|error| lock_error(error.into()))?,
         }
         Ok(PoolLock {
             foreground,

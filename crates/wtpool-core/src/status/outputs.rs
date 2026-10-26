@@ -1,6 +1,4 @@
-//! The background tasks of a record (H27) and the outputs its actor lists (S13): the running
-//! tasks, newest first, then the one that ended last. wtpool lists where each task's output goes,
-//! never the output; a consumer reads the file on its own machine.
+//! The background tasks of a record and the outputs its actor lists.
 
 use std::path::Path;
 
@@ -33,7 +31,7 @@ pub struct Task {
 }
 
 /// The tasks of a record with an id, an absolute path of only normal components and times that
-/// parse; the others are skipped.
+/// parse. The others are skipped.
 #[must_use]
 pub fn tasks(fields: Vec<TaskFields>) -> Vec<Task> {
     fields
@@ -55,7 +53,7 @@ pub fn tasks(fields: Vec<TaskFields>) -> Vec<Task> {
         .collect()
 }
 
-/// What an actor lists (S13): its running tasks, newest start first, then the task that ended
+/// The outputs an actor lists: its running tasks, newest start first, then the task that ended
 /// last. Among equal times the later task of the record comes first.
 #[must_use]
 pub fn outputs(tasks: &[Task]) -> Vec<Output> {

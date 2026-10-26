@@ -1,4 +1,4 @@
-//! SHA 256 (FIPS 180-4), for the input hash of a wait (H13). The hook takes no crate for it.
+//! SHA 256 (FIPS 180-4), for the input hash of a wait. The hook takes no crate for it.
 
 const K: [u32; 64] = [
     0x428a_2f98,

@@ -1,5 +1,5 @@
-//! The pool state `wtpool status --watch` keeps up to date: what each change asks to read again,
-//! the git refresh after an edit tool or Bash call, and the timers of the actors.
+//! The pool state `wtpool status --watch` keeps up to date: the reads each change asks for, the
+//! git refresh after a call that edits files, and the timers of the actors.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -12,16 +12,16 @@ use super::watch::{Pending, Track};
 use crate::clock::ReadClock;
 use crate::processes::ListProcesses;
 
-/// The git facts of a worktree refresh after edits at most this often.
+/// The shortest time between two git refreshes of a worktree after edits.
 const EDIT_REFRESH: Duration = Duration::from_secs(1);
 
 /// A [`PoolState`] refreshed with the process table and clock of `sources`.
 pub struct Live<'a, C, P> {
     state: PoolState,
     sources: &'a Sources<C, P>,
-    /// When each worktree's git last refreshed after an edit.
+    /// The last git refresh of each worktree after an edit.
     edited: BTreeMap<PathBuf, Instant>,
-    /// Worktrees whose refresh after an edit waits until the time given.
+    /// The worktrees whose refresh after an edit waits, each with the time it is due.
     waiting: BTreeMap<PathBuf, Instant>,
 }
 
@@ -35,8 +35,8 @@ impl<'a, C, P> Live<'a, C, P> {
         }
     }
 
-    /// Refreshes the git facts of `worktree` after an edit at `now`, or schedules it a second
-    /// after the last such refresh.
+    /// Refreshes the git facts of `worktree` after an edit at `now`, or schedules the refresh
+    /// [`EDIT_REFRESH`] after the last one.
     fn edit(&mut self, worktree: PathBuf, now: Instant) {
         let next = self
             .edited
@@ -56,7 +56,7 @@ impl<'a, C, P> Live<'a, C, P> {
 }
 
 impl<C: ReadClock, P: ListProcesses> Track for Live<'_, C, P> {
-    /// A failed listing keeps what was known, and the next heartbeat tries again.
+    /// A failed listing keeps the state as it was, and the next heartbeat tries again.
     fn refresh_all(&mut self) {
         let _ = self.state.refresh_all(&self.sources.processes);
     }

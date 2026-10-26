@@ -1,5 +1,5 @@
-//! The actors of `wtpool status`: which records show, in which state (A1 to A3), with which
-//! label (H16), and when that state next changes on its own (W6).
+//! The actors of `wtpool status`: the records that show, their state and label, and the time
+//! that state next changes on its own.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -11,33 +11,32 @@ use crate::activity::{CallKind, WaitReason};
 use crate::clock::Timestamp;
 use crate::processes::{Liveness, RunningProcess};
 
-/// A working actor without an event for this long shows as quiet (A1).
+/// Seconds without an event before a working actor shows as quiet.
 const QUIET_AFTER: i64 = 120;
-/// A done subagent shows for this long (A2).
+/// Seconds a done subagent shows for.
 const DONE_FOR: i64 = 60;
-/// The tool of the action of a session that works on a build it started, so its line reads
-/// `build: <name>` as a row's build line does (A1, U1).
+/// The action tool of a session that works on a build it started, as in `build: cargo`.
 pub const BUILD_TOOL: &str = "build:";
-/// The tool of the action of an actor that works on a background task it started, so its line
-/// reads `background: <summary>` (A1, U1).
+/// The action tool of an actor that works on a background task it started, as in
+/// `background: <summary>`.
 pub const BACKGROUND_TOOL: &str = "background:";
 
-/// What the rules of A1 need besides the record itself.
+/// The facts besides the record that [`actor`] reads.
 pub struct Context<'a> {
     pub now: Timestamp,
     pub processes: &'a [RunningProcess],
     /// Every record that counts, for the subagents of a session.
     pub records: &'a [&'a Record],
-    /// Whether a build works in a worktree (S4).
+    /// True when a build works in the worktree at the path.
     pub building: &'a dyn Fn(&Path) -> bool,
     /// The sessions a newer main session of their process replaced, from [`superseded`].
     pub superseded: &'a BTreeSet<String>,
-    /// The outermost build below each process, by pid (A1), from
+    /// The outermost build below each process, by pid, from
     /// [`builds_below`](super::builds::builds_below).
     pub builds_below: &'a BTreeMap<u32, String>,
 }
 
-/// The actor `record` shows as, `None` when it is hidden (A1 to A3).
+/// The actor `record` shows as, `None` when it is hidden.
 #[must_use]
 pub fn actor(record: &Record, context: &Context<'_>) -> Option<Actor> {
     let state = shown_state(record, context)?;
@@ -45,15 +44,12 @@ pub fn actor(record: &Record, context: &Context<'_>) -> Option<Actor> {
     let build = matches!(state, ActorState::Idle | ActorState::Quiet)
         .then(|| own_build(record, context))
         .flatten();
-    // A turn that ended still works while a background task of the actor runs: the newest
-    // running task comes first in its outputs (A1, S13).
-    let background = (build.is_none()
-        && matches!(
-            state,
-            ActorState::Idle | ActorState::Quiet | ActorState::Done
-        ))
-    .then(|| outputs.first().filter(|output| output.running))
-    .flatten();
+    let turn_ended = matches!(
+        state,
+        ActorState::Idle | ActorState::Quiet | ActorState::Done
+    );
+    let newest_running_task = outputs.first().filter(|output| output.running);
+    let background = newest_running_task.filter(|_| turn_ended && build.is_none());
     let state = if build.is_some() || background.is_some() {
         ActorState::Working
     } else {
@@ -117,7 +113,6 @@ fn shown_state(record: &Record, context: &Context<'_>) -> Option<ActorState> {
     match record.state {
         RecordState::Waiting => Some(ActorState::Waiting),
         RecordState::Idle => Some(ActorState::Idle),
-        // A done subagent that waits on a background task shows past its minute (A1, A2).
         RecordState::Done => (age < DONE_FOR || runs_a_task(record)).then_some(ActorState::Done),
         RecordState::Working
             if age < QUIET_AFTER
@@ -130,8 +125,8 @@ fn shown_state(record: &Record, context: &Context<'_>) -> Option<ActorState> {
     }
 }
 
-/// The outermost build below the session's harness process, while it runs (A1). A subagent's
-/// record names the same process, so only its session works on the build.
+/// The outermost build below the session's harness process, while it runs. A subagent's record
+/// names the same process, so only its session works on the build.
 fn own_build<'a>(record: &Record, context: &Context<'a>) -> Option<&'a str> {
     if record.key.contains('.') {
         return None;
@@ -142,7 +137,7 @@ fn own_build<'a>(record: &Record, context: &Context<'a>) -> Option<&'a str> {
         .map(String::as_str)
 }
 
-/// A subagent's title from a record of its session, else the record's own label (H16).
+/// A subagent's title from a record of its session, else the record's own label.
 fn label_of(record: &Record, context: &Context<'_>) -> String {
     let Some((session, agent)) = record.key.split_once('.') else {
         return record.label.clone();
@@ -161,17 +156,14 @@ fn label_of(record: &Record, context: &Context<'_>) -> String {
         .map_or_else(|| record.label.clone(), |subagent| subagent.title.clone())
 }
 
-/// Whether a background task the actor started still runs: it has no `ended` yet (H27, S13).
 fn runs_a_task(record: &Record) -> bool {
     record.tasks.iter().any(|task| task.ended.is_none())
 }
 
-/// A shell call in flight while a build works in the actor's worktree.
 fn building_in_a_shell(record: &Record, context: &Context<'_>) -> bool {
     has_call(record, CallKind::Shell) && (context.building)(&record.worktree)
 }
 
-/// A call starting a subagent in flight while a live subagent of the session works or waits.
 fn waits_for_a_subagent(record: &Record, context: &Context<'_>) -> bool {
     let prefix = format!("{}.", record.key);
     has_call(record, CallKind::Agent)
@@ -182,7 +174,6 @@ fn waits_for_a_subagent(record: &Record, context: &Context<'_>) -> bool {
         })
 }
 
-/// Whether a call of `kind` is in flight (H26).
 fn has_call(record: &Record, kind: CallKind) -> bool {
     record.in_flight.iter().any(|call| call.kind == kind)
 }
@@ -197,8 +188,8 @@ fn wait_reason(reason: &str) -> Option<WaitReason> {
     }
 }
 
-/// The first time after `now` at which an actor of `records` changes state on its own: a
-/// working one turns quiet, a done one leaves (W6).
+/// The first time after `now` that an actor of `records` changes state on its own: a working one
+/// turns quiet, a done one leaves.
 #[must_use]
 pub fn next_change(records: &[&Record], now: Timestamp) -> Option<Timestamp> {
     records
@@ -215,10 +206,10 @@ pub fn next_change(records: &[&Record], now: Timestamp) -> Option<Timestamp> {
         .min()
 }
 
-/// The sessions that a newer main session in the same process replaced (H19): per process,
-/// by pid and start time, every session but the one with the newest event, by `updated` and
-/// then by the start of the hook that wrote it. A session whose
-/// process ended it, or whose record names no process, replaces none.
+/// The sessions that a newer main session of the same process replaced: per process, by pid
+/// and start time, every session but the one with the newest [`Record::updated`], then the
+/// newest [`Record::writer_started`]. A session that ended, or whose record names no process,
+/// replaces none.
 #[must_use]
 pub fn superseded(records: &[&Record]) -> BTreeSet<String> {
     let mut by_process: BTreeMap<(u32, Option<Timestamp>), Vec<&Record>> = BTreeMap::new();
@@ -251,7 +242,7 @@ pub fn superseded(records: &[&Record]) -> BTreeSet<String> {
         .collect()
 }
 
-/// Newest event first (R4), then by key.
+/// Sorts `actors` newest event first, then by key.
 pub fn sort(actors: &mut [Actor]) {
     actors.sort_by(|a, b| {
         b.updated
