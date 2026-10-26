@@ -1,5 +1,6 @@
 //! The worktree pool of one repository and its commands.
 
+mod agents;
 mod background;
 mod copy;
 mod foreground;
@@ -11,6 +12,7 @@ mod parking;
 mod refusals;
 mod slots;
 
+pub use agents::AgentGuard;
 pub(crate) use git::run_reported;
 
 use crate::config::Config;

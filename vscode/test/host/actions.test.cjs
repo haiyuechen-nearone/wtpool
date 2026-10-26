@@ -1,6 +1,6 @@
 // X12 in the extension host, with the fake wtpool (phase 3): `free` and `fg` ask in a modal dialog
-// naming worktree and branch, and run `wtpool free <worktree>` or `wtpool fg <branch>` only on
-// confirm; `free` refuses while an actor there works or waits, and warns for `idle`, and `fg`
+// naming worktree and branch, and run `wtpool free <worktree> --force` or `wtpool fg <branch> --force`
+// only on confirm; `free` refuses while an actor there works or waits, and warns for `idle`, and `fg`
 // does the same for the slot that holds the branch. The webview's messages come in through the
 // verify API's fromWebview, and the dialogs through wrapped `vscode.window.show*Message` calls,
 // so no dialog reaches the screen.
@@ -136,8 +136,8 @@ async function send(type, id = WT2) {
 
 describe('actions', () => {
   for (const [verb, argv] of [
-    ['free', ['free', 'wt2']],
-    ['fg', ['fg', BRANCH]],
+    ['free', ['free', 'wt2', '--force']],
+    ['fg', ['fg', BRANCH, '--force']],
   ]) {
     it(`actions__should_confirm_naming_the_worktree ${verb}_confirmed`, async () => {
       // Given
@@ -187,8 +187,8 @@ describe('actions', () => {
   // nothing else runs or asks.
   const STDERR = 'wtpool: wt2 has 2 uncommitted file(s) (wtpool-verify fake)';
   for (const [verb, argv] of [
-    ['free', ['free', 'wt2']],
-    ['fg', ['fg', BRANCH]],
+    ['free', ['free', 'wt2', '--force']],
+    ['fg', ['fg', BRANCH, '--force']],
   ]) {
     it(`actions__should_confirm_naming_the_worktree ${verb}_fails`, async () => {
       // Given
@@ -219,8 +219,8 @@ describe('actions', () => {
   // binary path. The user sees one error naming the command, nothing runs or asks again, and the
   // rows the tab shows stay (R8, X4, X12).
   for (const [verb, argv] of [
-    ['free', ['free', 'wt2']],
-    ['fg', ['fg', BRANCH]],
+    ['free', ['free', 'wt2', '--force']],
+    ['fg', ['fg', BRANCH, '--force']],
   ]) {
     it(`actions__should_confirm_naming_the_worktree ${verb}_spawn_throws`, async () => {
       // Given
@@ -312,12 +312,12 @@ describe('actions', () => {
     free: {
       refuse: (name) => `actions__should_refuse_free_with_a_working_actor ${name}`,
       warn: (name) => `actions__should_warn_free_with_an_idle_actor ${name}`,
-      argv: ['free', 'wt2'],
+      argv: ['free', 'wt2', '--force'],
     },
     fg: {
       refuse: (name) => `actions__should_guard_fg_by_the_holding_slot refuses_${name}`,
       warn: (name) => `actions__should_guard_fg_by_the_holding_slot warns_${name}`,
-      argv: ['fg', BRANCH],
+      argv: ['fg', BRANCH, '--force'],
     },
   };
   /** Every free or fg the extension started, whichever the user asked for. */
@@ -478,7 +478,7 @@ describe('workspace folder', () => {
 
     // Then
     const actions = starts().filter((s) => s.argv[0] !== 'status');
-    assert.deepEqual(actions.map((s) => s.argv.join(' ')), ['free wt2', `fg ${BRANCH}`], 'setup: free and fg did not each run once');
+    assert.deepEqual(actions.map((s) => s.argv.join(' ')), ['free wt2 --force', `fg ${BRANCH} --force`], 'setup: free and fg did not each run once');
     assert.deepEqual(actions.flatMap(wrong), [], 'the actions');
   });
 });

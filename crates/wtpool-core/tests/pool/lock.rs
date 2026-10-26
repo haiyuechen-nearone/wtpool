@@ -5,20 +5,20 @@ use std::process::Command;
 use std::time::Duration;
 
 use rstest::rstest;
-use wtpool_core::{Pool, SyncMode};
+use wtpool_core::{AgentGuard, Pool, SyncMode};
 
 use crate::support::{FakePr, Fixture, PoolCommand, Recorder, must_hold_pool_lock};
 
 #[rstest]
 #[case::fg(
     |pool: &Pool<FakePr>,
-    report: &mut Recorder| pool.foreground("feature", SyncMode::No, report).map(drop)
+    report: &mut Recorder| pool.foreground("feature", SyncMode::No, AgentGuard::Force, report).map(drop)
 )]
 #[case::bg(
     |pool: &Pool<FakePr>,
     report: &mut Recorder| pool.background("feature", SyncMode::No, report).map(drop)
 )]
-#[case::free(|pool: &Pool<FakePr>, report: &mut Recorder| pool.free("app-wt1", report))]
+#[case::free(|pool: &Pool<FakePr>, report: &mut Recorder| pool.free("app-wt1", AgentGuard::Force, report))]
 #[case::new(|pool: &Pool<FakePr>, report: &mut Recorder| pool.new_slot(None, report).map(drop))]
 #[case::rm(|pool: &Pool<FakePr>, report: &mut Recorder| pool.remove("app-wt1", report))]
 #[case::setup(|pool: &Pool<FakePr>, report: &mut Recorder| pool.setup(report).map(drop))]

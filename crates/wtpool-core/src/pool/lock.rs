@@ -1,7 +1,7 @@
 //! The pool lock, held by every command that changes the pool.
 
 use std::fs::{File, OpenOptions, TryLockError};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::activity::{self, ACTIVITY_DIR};
 use crate::error::Error;
@@ -18,6 +18,8 @@ use super::{Pool, git};
 #[must_use]
 pub(super) struct PoolLock {
     pub(super) foreground: Worktree,
+    /// The repository's common git directory, the parent of [`ACTIVITY_DIR`].
+    pub(super) common_dir: PathBuf,
     /// Closing the file releases the lock.
     _file: File,
 }
@@ -63,6 +65,7 @@ impl<V: ViewPr> Pool<V> {
         }
         Ok(PoolLock {
             foreground,
+            common_dir: common_dir.to_path_buf(),
             _file: file,
         })
     }

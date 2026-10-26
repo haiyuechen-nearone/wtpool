@@ -956,3 +956,19 @@ reason = "wtpool hook reads no path whose start may reach another host: a path w
 "xtask/tests/checks/hook_files.rs" = "ce0fa3b46c2c77ad12a0544bdcf38a43f1770ca6f44c7828be71c5f3091487aa"
 "xtask/tests/checks/hook_place.rs" = "abbb438a3b357b115e9cdfabcb29533254a92578214a99bcc26954b60a6874c0"
 "xtask/tests/checks/hook_wait.rs" = "774057cce2a53d69eeec16c91a7ef5aa95bf45187a75b94244b02e7f206b9d52"
+
+[[change]]
+id = "cli-agent-guard"
+reason = "X12 of status-panel.md gains the agent guard of the CLI itself: wtpool free and wtpool fg refuse while an actor works or waits in a worktree they would detach or repoint, the slot that free names and for fg the foreground and the slot that holds the branch, when wtpool status would show it there as working, waiting or quiet; idle and done never refuse. The refusal names the worktree, each such actor with its label and state, and --force, and exits 1 as the other refusals do; --force skips the guard, and every other output stays the same. The extension keeps its dialogs and refusals and runs wtpool free <worktree> --force or wtpool fg <branch> --force only after the user confirms, so actions.test.cjs expects --force at the end of the argv of every confirmed free and fg, and in the command its errors name. S12 gains a sentence: a new value in an existing closed enum (state, reason, kind, placed_by, activity) raises version, and harness adapters map onto these closed sets. Five int checks are new, in xtask/tests/checks/agent_guard.rs: free__should_name_an_agent_by_its_escaped_label_else_its_key (a label with C1 controls and a bidi override shows as \\u{XXXX} in the refusal, as in every error line of the CLI, and an empty label gives the key), free__should_refuse_while_an_agent_works_or_waits (working, waiting, quiet), fg__should_refuse_while_an_agent_works_or_waits (the holding slot and the foreground, each working and waiting), force__should_skip_the_agent_guard (free and fg past a working agent) and guard__should_never_refuse_for_idle_done_or_elsewhere_agents (idle, done, and a working agent in another worktree, for free and for fg). Each refusal case checks exit 1, an empty stdout, the worktree, label, state and --force on stderr, and that no worktree moved. verify/trace.toml names all five under X12; the trace list of verification.md is unchanged."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "000b51532b1cdad1f6a3aff31a4bd88faa7d0fa3be0072e00b131d1a926dabb6"
+"verify/trace.toml" = "888fbd22faf6e04dabf4ec74c52c9badb86005e9182b646cc1dddd3467b66ec9"
+"vscode/test/host/actions.test.cjs" = "d6aba85bbfc75975d45a7c934a512a1996ea4f80c789f41e53b6622be338152f"
+"xtask/tests/checks/agent_guard.rs" = "91875b3536ba952e50b66c2814b297e5ce8b5b78653f6c50b501d146b2960bb5"
+"xtask/tests/checks/mod.rs" = "c140fb957f9d0da6915640964f210e2c8d82f817f67543006c7e8a53c7de9113"
+
+[[change]]
+id = "merge-guard-hook"
+reason = "verify/trace.toml holds both the H18 record check of hook-hardening and the five X12 guard checks of cli-agent-guard; this pins the merged file."
+[change.files]
+"verify/trace.toml" = "b5cec949e783c79dd69e044874e1d82bfc690ce1a4330b4b73c92b9b25e2f613"

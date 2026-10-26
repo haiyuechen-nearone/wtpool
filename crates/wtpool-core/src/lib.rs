@@ -36,7 +36,7 @@ pub use names::{
     RemoteName, RepoSlug, SlotName, SlotPrefix,
 };
 pub use paths::AbsolutePath;
-pub use pool::Pool;
+pub use pool::{AgentGuard, Pool};
 pub use refs::{RefArgs, SyncMode, Target};
 pub use report::Report;
 pub use run::read_only_git;

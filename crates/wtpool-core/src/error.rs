@@ -65,6 +65,17 @@ pub enum Error {
     RemoveForeground,
     #[error("{slot} has {count} uncommitted file(s)")]
     SlotDirty { slot: String, count: usize },
+    /// Agents that work or wait in a worktree `free` or `fg` would detach or repoint, each as
+    /// `<label> (<state>)`.
+    #[error(
+        "{worktree} has {} agent(s) working or waiting: {}; wait until they are idle, or use --force",
+        .agents.len(),
+        .agents.join(", ")
+    )]
+    AgentsBusy {
+        worktree: String,
+        agents: Vec<String>,
+    },
     /// `git status` failed in this worktree, so it may hold uncommitted work.
     #[error("could not read the status of {0}; not touching it")]
     StatusUnknown(String),
@@ -307,6 +318,13 @@ mod tests {
 
     #[rstest]
     #[case::one_line(dirty("app-wt1"), &["app-wt1 has 1 uncommitted file(s)"])]
+    #[case::busy_agents(
+        Error::AgentsBusy {
+            worktree: "app-wt1".to_owned(),
+            agents: vec!["Fix login (working)".to_owned(), "Explore (waiting)".to_owned()],
+        },
+        &["app-wt1 has 2 agent(s) working or waiting: Fix login (working), Explore (waiting); wait until they are idle, or use --force"]
+    )]
     #[case::command_that_printed_its_own_error(
         Error::CommandFailed { program: "git".to_owned(), code: Some(128) },
         &[]

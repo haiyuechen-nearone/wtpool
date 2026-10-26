@@ -11,7 +11,7 @@ use crate::resolve::Unresolved;
 use crate::worktree::{self, Worktree};
 
 use super::refusals::{self, WorktreeState};
-use super::{Pool, git};
+use super::{AgentGuard, Pool, git};
 
 const FOREGROUND_NOT_CHANGED: &str = "foreground not changed";
 
@@ -24,11 +24,12 @@ impl<V: ViewPr> Pool<V> {
     ///
     /// Before any fetch or change, refuses work it could lose in the foreground or in the slot
     /// that holds the branch, and a branch an unmanaged worktree holds. Fails when git cannot
-    /// tell.
+    /// tell. `agents` sets the rule for an agent that works or waits in those two.
     pub fn foreground(
         &self,
         reference: &str,
         sync: SyncMode,
+        agents: AgentGuard<'_>,
         report: &mut impl Report,
     ) -> Result<PathBuf, Error> {
         let lock = self.lock(report)?;
@@ -41,7 +42,11 @@ impl<V: ViewPr> Pool<V> {
         let plan = self
             .refuse_unsafe_checkout(plan, sync)
             .map_err(not_changed)?;
-        self.refuse_unreleasable(plan.branch())
+        let released = self
+            .refuse_unreleasable(plan.branch())
+            .map_err(not_changed)?;
+        let moved: Vec<&Worktree> = std::iter::once(&lock.foreground).chain(&released).collect();
+        self.refuse_busy_agents(agents, &lock.common_dir, &moved)
             .map_err(not_changed)?;
         self.apply(&plan, report).map_err(unresolved)?;
         let branch = plan.branch();
@@ -75,13 +80,14 @@ impl<V: ViewPr> Pool<V> {
     }
 
     /// Refuses, before `fg` changes anything, a branch whose holder it would have to release but
-    /// must not.
-    fn refuse_unreleasable(&self, branch: &BranchName) -> Result<(), Error> {
+    /// must not. Gives the holder it would release.
+    fn refuse_unreleasable(&self, branch: &BranchName) -> Result<Option<Worktree>, Error> {
         match self.holder_of(branch)? {
             Some(holder) if !self.is_foreground(holder.path()) => {
-                self.refuse_release(branch, &holder)
+                self.refuse_release(branch, &holder)?;
+                Ok(Some(holder))
             }
-            _ => Ok(()),
+            _ => Ok(None),
         }
     }
 

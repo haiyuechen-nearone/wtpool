@@ -13,7 +13,7 @@ use crate::worktree::{self, Head};
 use crate::worktree_state::{Row, State, Upstream};
 
 use super::refusals::{self, WorktreeState};
-use super::{Pool, git, slots};
+use super::{AgentGuard, Pool, git, slots};
 
 impl<V: ViewPr> Pool<V> {
     /// `wtpool ls`: every worktree that exists on disk, in `git worktree list` order.
@@ -50,9 +50,14 @@ impl<V: ViewPr> Pool<V> {
     }
 
     /// `wtpool free`: detaches the worktree named by its path, its slot name or the branch it
-    /// holds.
-    pub fn free(&self, arg: &str, report: &mut impl Report) -> Result<(), Error> {
-        let _lock = self.lock(report)?;
+    /// holds. `agents` sets the rule for an agent that works or waits there.
+    pub fn free(
+        &self,
+        arg: &str,
+        agents: AgentGuard<'_>,
+        report: &mut impl Report,
+    ) -> Result<(), Error> {
+        let lock = self.lock(report)?;
         let worktrees = self.worktrees(&mut Discard)?;
         let found = match self.at_path_or_slot(&worktrees, arg) {
             Some(worktree) => Some(worktree.clone()),
@@ -70,6 +75,7 @@ impl<V: ViewPr> Pool<V> {
         }
         let state = WorktreeState::read(&worktree, &self.git())?;
         refusals::detach_refusal(&worktree.name(), &state).map_or(Ok(()), Err)?;
+        self.refuse_busy_agents(agents, &lock.common_dir, &[&worktree])?;
         git::run_reported(&worktree.git(), ["switch", "--detach", "--quiet"], report)?.check()?;
         report.info(&format!("{} released", worktree.name()));
         Ok(())

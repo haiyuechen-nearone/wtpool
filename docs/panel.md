@@ -114,8 +114,9 @@ the robot and the dial stand still.
 Row actions appear on hover and keyboard focus:
 
 - **Open in new window**, **Open terminal**, **Copy path**. A missing worktree offers only the copy.
-- **Free this worktree…** runs `wtpool free <slot>`. **Bring its branch to the foreground…** runs
-  `wtpool fg <branch>`. Both appear only on a slot that holds a branch.
+- **Free this worktree…** runs `wtpool free <slot> --force`. **Bring its branch to the
+  foreground…** runs `wtpool fg <branch> --force`. Both appear only on a slot that holds a branch.
+  They pass `--force` because the tab judges the agents there itself, as the next paragraph says.
 
 Free and fg always ask first, in a dialog that names the worktree and the branch. They refuse while
 an agent in that slot works or waits, and warn when one is idle. They check the slot again after

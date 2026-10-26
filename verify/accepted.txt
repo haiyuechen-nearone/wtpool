@@ -162,3 +162,7 @@ accept ts-webview 436ee842d55ad068edc6e224c2bbf737b4ba8fb4b183ec638b9ba1c90f7fb8
 accept scrub a2cb8d7d0c72b372f5d3cddb3d73a4b08b86cd00e435fae15ef35eea60fef8db
 # wtpool hook never reads a UNC-shaped, device or verbatim path, never writes a record it cannot read back and logs the skip, and hashes call input without building it; UNC-shaped placement cases, an every-kind input for the wait hash, and hook__should_keep_a_record_it_can_read (H18).
 accept hook-hardening d6fadfb9d77a914bf1cefb61f642112c4576374814828fe44dcdd71832c0c278
+# X12: wtpool free and fg refuse while an agent works or waits where they would detach or repoint, unless --force, and the extension passes --force once the user confirms; S12: a new value in a closed enum raises version; five int checks of the guard.
+accept cli-agent-guard af20038de504d21022708c044fd68cddfa1d81ee5421a0ee1bf8d2f9c6ea0adc
+# verify/trace.toml pinned after merging hook-hardening and cli-agent-guard, which both add trace rows.
+accept merge-guard-hook 8b15aee44feac6a6e394db4e3e7085dd1d78e8d03dc8d2c647c9f87c552e9897

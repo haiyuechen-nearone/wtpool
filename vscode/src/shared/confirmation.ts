@@ -81,7 +81,10 @@ export function changedText(asked: Worktree): string {
   return `${asked.name} changed while you were asked, so nothing ran.`;
 }
 
-/** Gives the arguments of the `wtpool` that `type` runs: `free <worktree>` or `fg <branch>`. */
+/**
+ * Gives the arguments of the `wtpool` that `type` runs once the user confirmed: `free <worktree>`
+ * or `fg <branch>`, with `--force`, as the dialog stands in for the agent guard of `wtpool` itself.
+ */
 export function wtpoolArgs(type: ConfirmedActionType, worktree: BranchSlot): string[] {
-  return type === 'free' ? ['free', worktree.name] : ['fg', worktree.branch];
+  return type === 'free' ? ['free', worktree.name, '--force'] : ['fg', worktree.branch, '--force'];
 }

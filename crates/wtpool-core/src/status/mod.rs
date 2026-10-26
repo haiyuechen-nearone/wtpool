@@ -16,7 +16,7 @@ mod state;
 mod time;
 mod watch;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub use crate::activity::{PlacedBy, WaitReason};
 pub use document::{
@@ -31,6 +31,7 @@ pub use watch::watch as watch_status;
 
 use crate::config::Config;
 use crate::error::Error;
+use crate::paths;
 use state::PoolState;
 
 /// Where `wtpool status` reads the time and the process table.
@@ -72,6 +73,33 @@ pub fn status_line(config: Config, common: PathBuf, sources: &Sources) -> Result
     let mut line = serde_json::to_string(&document).unwrap_or_default();
     line.push('\n');
     Ok(line)
+}
+
+/// Per path of `paths`, the actors of that worktree as the document of the pool of `config`,
+/// whose common git directory is `common`, shows them at the time of `sources`.
+pub(crate) fn actors_at(
+    config: Config,
+    common: PathBuf,
+    sources: &Sources,
+    paths: &[&Path],
+) -> Result<Vec<Vec<Actor>>, Error> {
+    let state = PoolState::load(config, common, sources.processes.as_ref())?;
+    let document = state.document(sources.clock.now());
+    let worktrees: Vec<WorktreeStatus> = document
+        .pools
+        .into_iter()
+        .flat_map(|pool| pool.worktrees)
+        .collect();
+    Ok(paths
+        .iter()
+        .map(|path| {
+            worktrees
+                .iter()
+                .filter(|worktree| paths::same_path(Path::new(&worktree.path), path))
+                .flat_map(|worktree| worktree.actors.iter().cloned())
+                .collect()
+        })
+        .collect())
 }
 
 #[cfg(test)]

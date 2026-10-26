@@ -4,7 +4,9 @@ use std::process::ExitCode;
 use clap::{Args, Parser, Subcommand};
 use terminal_size::Width;
 use wtpool_core::status::{self, Sources};
-use wtpool_core::{AbsolutePath, Config, Error, Pool, RefArgs, Report, Settings, SlotName};
+use wtpool_core::{
+    AbsolutePath, AgentGuard, Config, Error, Pool, RefArgs, Report, Settings, SlotName,
+};
 
 use table::Style;
 use text::{visible, visible_lines};
@@ -60,6 +62,9 @@ wtpool.toml may also set copy, files copied from the main worktree into each new
 slot when git ignores them, and on_new_slot, a command run there. wtpool config
 shows each value and its source.
 ";
+
+/// The flag that lets `fg` and `free` detach or move a worktree where an agent works or waits.
+const FORCE: &str = "--force";
 
 const RED: &str = "\x1b[31m";
 const YELLOW: &str = "\x1b[33m";
@@ -137,17 +142,29 @@ impl Rest {
         }
     }
 
-    /// The one argument, `None` when it is missing or empty. More than one is a usage error.
     fn at_most_one(&self, usage: &'static str) -> Result<Option<String>, Error> {
-        let mut args = self.raw().into_iter();
-        match (args.next(), args.next()) {
-            (_, Some(_)) => Err(Error::Usage(usage)),
-            (first, None) => Ok(first.filter(|arg| !arg.is_empty())),
-        }
+        at_most_one(self.raw(), usage)
     }
 
     fn required(&self, usage: &'static str) -> Result<String, Error> {
         self.at_most_one(usage)?.ok_or(Error::Usage(usage))
+    }
+
+    /// The arguments without [`FORCE`], and `true` when it was among them.
+    fn without_force(&self) -> (Vec<String>, bool) {
+        let (force, rest): (Vec<String>, Vec<String>) =
+            self.raw().into_iter().partition(|arg| arg == FORCE);
+        (rest, !force.is_empty())
+    }
+}
+
+/// The one argument of `args`, `None` when it is missing or empty. More than one is a usage
+/// error.
+fn at_most_one(args: Vec<String>, usage: &'static str) -> Result<Option<String>, Error> {
+    let mut args = args.into_iter();
+    match (args.next(), args.next()) {
+        (_, Some(_)) => Err(Error::Usage(usage)),
+        (first, None) => Ok(first.filter(|arg| !arg.is_empty())),
     }
 }
 
@@ -157,9 +174,9 @@ impl Rest {
 enum Action {
     Help,
     List,
-    Foreground(RefArgs),
+    Foreground { args: RefArgs, force: bool },
     Background(RefArgs),
-    Free(String),
+    Free { arg: String, force: bool },
     New(Option<SlotName>),
     Remove(String),
     Path(String),
@@ -197,15 +214,26 @@ impl Action {
                 rest.none("usage: wtpool ls")?;
                 Self::List
             }
-            Command::Fg(rest) => Self::Foreground(RefArgs::parse(
-                &rest.raw(),
-                "usage: wtpool fg <pr-number|pr-url|branch> [--refresh|--reset]",
-            )?),
+            Command::Fg(rest) => {
+                let (args, force) = rest.without_force();
+                let usage = "usage: wtpool fg <pr-number|pr-url|branch> [--refresh|--reset]";
+                Self::Foreground {
+                    args: RefArgs::parse(&args, usage)?,
+                    force,
+                }
+            }
             Command::Bg(rest) => Self::Background(RefArgs::parse(
                 &rest.raw(),
                 "usage: wtpool bg <pr-number|pr-url|branch> [--refresh|--reset]",
             )?),
-            Command::Free(rest) => Self::Free(rest.required("usage: wtpool free <slot|branch>")?),
+            Command::Free(rest) => {
+                let (args, force) = rest.without_force();
+                let usage = "usage: wtpool free <slot|branch>";
+                Self::Free {
+                    arg: at_most_one(args, usage)?.ok_or(Error::Usage(usage))?,
+                    force,
+                }
+            }
             Command::New(rest) => match rest.at_most_one("usage: wtpool new [name]")? {
                 Some(name) => match SlotName::try_new(&name) {
                     Ok(slot) => Self::New(Some(slot)),
@@ -406,15 +434,20 @@ fn run(terminal: &mut Terminal) -> Result<(), Failure> {
             let rows = pool.list(terminal)?;
             terminal.out(&table::render(&rows, table_style(terminal.colour)));
         }
-        Action::Foreground(args) => {
-            let foreground = pool.foreground(&args.reference, args.sync, terminal)?;
+        Action::Foreground { args, force } => {
+            let sources = status_sources();
+            let guard = agent_guard(force, &sources);
+            let foreground = pool.foreground(&args.reference, args.sync, guard, terminal)?;
             print_path(terminal, &foreground);
         }
         Action::Background(args) => {
             let slot = pool.background(&args.reference, args.sync, terminal)?;
             print_path(terminal, &slot);
         }
-        Action::Free(arg) => pool.free(&arg, terminal)?,
+        Action::Free { arg, force } => {
+            let sources = status_sources();
+            pool.free(&arg, agent_guard(force, &sources), terminal)?;
+        }
         Action::New(name) => {
             pool.new_slot(name, terminal)?;
         }
@@ -454,6 +487,15 @@ fn run_status(
             std::io::stdin(),
             &mut std::io::stdout(),
         ),
+    }
+}
+
+/// The agent guard of `fg` and `free`, read through `sources` unless `--force` skips it.
+fn agent_guard(force: bool, sources: &Sources) -> AgentGuard<'_> {
+    if force {
+        AgentGuard::Force
+    } else {
+        AgentGuard::Refuse(sources)
     }
 }
 

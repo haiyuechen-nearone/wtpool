@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use rstest::rstest;
-use wtpool_core::{Error, Pool, SyncMode};
+use wtpool_core::{AgentGuard, Error, Pool, SyncMode};
 
 use crate::support::{FakePr, Fixture, PoolCommand, PrAnswer, Recorder, Setup, must_git, pr_view};
 
@@ -341,16 +341,16 @@ fn must_lock(dir: &Path, file: &str) {
 
 #[rstest]
 #[case::fg_switching_the_foreground("app", "index", |pool: &Pool<FakePr>, report: &mut Recorder| {
-    pool.foreground("feature", SyncMode::No, report).map(drop)
+    pool.foreground("feature", SyncMode::No, AgentGuard::Force, report).map(drop)
 })]
 #[case::fg_releasing_the_holder("app-wt1", "HEAD", |pool: &Pool<FakePr>, report: &mut Recorder| {
-    pool.foreground("feature", SyncMode::No, report).map(drop)
+    pool.foreground("feature", SyncMode::No, AgentGuard::Force, report).map(drop)
 })]
 #[case::bg_switching_a_free_slot("app-wt2", "index", |pool: &Pool<FakePr>, report: &mut Recorder| {
     pool.background("other", SyncMode::No, report).map(drop)
 })]
 #[case::free_detaching_the_slot("app-wt1", "HEAD", |pool: &Pool<FakePr>, report: &mut Recorder| {
-    pool.free("app-wt1", report)
+    pool.free("app-wt1", AgentGuard::Force, report)
 })]
 fn pool_commands__should_stop_with_the_status_of_a_switch_git_refuses(
     #[case] worktree: &str,

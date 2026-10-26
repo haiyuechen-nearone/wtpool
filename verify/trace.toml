@@ -441,9 +441,21 @@ checks = ["lint__no_html_sinks", "render__should_escape_and_isolate_controls"]
 phase = 1
 checks = ["messages__should_ignore_everything_outside_the_set", "tail__should_never_read_an_unlisted_path"]
 
+# X12 holds for the CLI too: free and fg refuse while an agent works or waits where they would
+# detach or repoint, unless --force.
 [ids.X12]
 phase = 3
-checks = ["actions__should_confirm_naming_the_worktree", "actions__should_refuse_free_with_a_working_actor", "actions__should_warn_free_with_an_idle_actor", "actions__should_guard_fg_by_the_holding_slot"]
+checks = [
+  "actions__should_confirm_naming_the_worktree",
+  "actions__should_refuse_free_with_a_working_actor",
+  "actions__should_warn_free_with_an_idle_actor",
+  "actions__should_guard_fg_by_the_holding_slot",
+  "free__should_refuse_while_an_agent_works_or_waits",
+  "fg__should_refuse_while_an_agent_works_or_waits",
+  "force__should_skip_the_agent_guard",
+  "guard__should_never_refuse_for_idle_done_or_elsewhere_agents",
+  "free__should_name_an_agent_by_its_escaped_label_else_its_key",
+]
 
 [ids.X13]
 phase = 1

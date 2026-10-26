@@ -4,7 +4,7 @@ use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
 
 use rstest::rstest;
-use wtpool_core::{AbsolutePath, Config, Error, Pool};
+use wtpool_core::{AbsolutePath, AgentGuard, Config, Error, Pool};
 
 use crate::states::{must_break_status, must_hide_the_sequencer, must_stop_a_merge};
 use crate::support::{
@@ -24,7 +24,7 @@ fn free__should_detach_a_clean_slot(#[case] arg: &str) {
     let arg = arg.replace("{root}", &fixture.root.display().to_string());
 
     // When
-    pool.free(&arg, &mut report).unwrap();
+    pool.free(&arg, AgentGuard::Force, &mut report).unwrap();
 
     // Then
     assert_eq!(fixture.must_head_branch(&slot), None);
@@ -44,7 +44,7 @@ fn free__should_refuse_the_foreground_however_it_is_spelled(#[case] spelling: &s
     let spelling = spelling.replace("{root}", &fixture.root.display().to_string());
 
     // When
-    let result = pool.free(&spelling, &mut Recorder::default());
+    let result = pool.free(&spelling, AgentGuard::Force, &mut Recorder::default());
 
     // Then
     assert!(matches!(result, Err(Error::DetachForeground)), "{result:?}");
@@ -69,7 +69,7 @@ fn free__should_match_no_worktree(#[case] arg: &str) {
     let arg = arg.replace("{root}", &fixture.root.display().to_string());
 
     // When
-    let result = pool.free(&arg, &mut Recorder::default());
+    let result = pool.free(&arg, AgentGuard::Force, &mut Recorder::default());
 
     // Then
     assert_eq!(
@@ -164,7 +164,7 @@ fn free__should_refuse_a_slot_that_may_hold_work(#[case] setup: Setup, #[case] e
     let pool = fixture.pool(3);
 
     // When
-    let result = pool.free("app-wt1", &mut Recorder::default());
+    let result = pool.free("app-wt1", AgentGuard::Force, &mut Recorder::default());
 
     // Then
     assert_eq!(result.unwrap_err().to_string(), expected);
@@ -184,7 +184,7 @@ fn free__should_refuse_a_slot_whose_git_link_is_broken() {
     std::fs::remove_file(slot.join(".git")).unwrap();
 
     // When
-    let result = pool.free("app-wt1", &mut Recorder::default());
+    let result = pool.free("app-wt1", AgentGuard::Force, &mut Recorder::default());
 
     // Then
     assert_eq!(
@@ -223,7 +223,7 @@ fn free__should_refuse_a_worktree_whose_directory_is_gone(
     let pool = fixture.pool(3);
 
     // When
-    let result = pool.free(arg, &mut Recorder::default());
+    let result = pool.free(arg, AgentGuard::Force, &mut Recorder::default());
 
     // Then
     assert_eq!(result.unwrap_err().to_string(), expected);
@@ -278,7 +278,7 @@ fn free__should_refuse_a_pool_it_cannot_lock(
     );
 
     // When
-    let result = pool.free("app-wt1", &mut Recorder::default());
+    let result = pool.free("app-wt1", AgentGuard::Force, &mut Recorder::default());
 
     // Then
     assert_eq!(result.unwrap_err().to_string(), fixture.expand(expected));
@@ -295,7 +295,9 @@ fn free__should_warn_when_it_cannot_create_wtpool_activity() {
     let mut report = Recorder::default();
 
     // When
-    let result = fixture.pool(3).free("nothing-here", &mut report);
+    let result = fixture
+        .pool(3)
+        .free("nothing-here", AgentGuard::Force, &mut report);
 
     // Then
     std::fs::set_permissions(&common, Permissions::from_mode(0o755)).unwrap();

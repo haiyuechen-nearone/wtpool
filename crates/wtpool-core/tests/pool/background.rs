@@ -1,7 +1,7 @@
 //! `wtpool bg`: the slot a branch lands in.
 
 use rstest::rstest;
-use wtpool_core::SyncMode;
+use wtpool_core::{AgentGuard, SyncMode};
 
 use crate::states::{must_break_status, must_commit_on_no_branch, must_stop_a_rebase};
 use crate::support::{Fixture, Recorder, Setup, must_git, must_wait_for};
@@ -85,7 +85,8 @@ fn background__should_reuse_a_slot_freed_after_a_reset() {
     let pool = fixture.pool(1);
     pool.background("feature", SyncMode::No, &mut Recorder::default())
         .unwrap();
-    pool.free("feature", &mut Recorder::default()).unwrap();
+    pool.free("feature", AgentGuard::Force, &mut Recorder::default())
+        .unwrap();
     let mut report = Recorder::default();
 
     // When

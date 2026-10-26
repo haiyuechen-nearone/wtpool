@@ -1,7 +1,7 @@
 //! `wtpool fg`.
 
 use rstest::rstest;
-use wtpool_core::SyncMode;
+use wtpool_core::{AgentGuard, SyncMode};
 
 use crate::states::{must_commit_on_no_branch, must_stop_a_merge, must_stop_a_rebase};
 use crate::support::{Fixture, PrAnswer, Recorder, Setup, must_git, pr_view};
@@ -16,7 +16,7 @@ fn foreground__should_release_the_branch_from_its_slot() {
 
     // When
     let path = pool
-        .foreground("feature", SyncMode::No, &mut report)
+        .foreground("feature", SyncMode::No, AgentGuard::Force, &mut report)
         .unwrap();
 
     // Then
@@ -44,7 +44,9 @@ fn foreground__should_leave_a_branch_that_is_already_in_the_foreground() {
     let mut report = Recorder::default();
 
     // When
-    let path = pool.foreground("main", SyncMode::No, &mut report).unwrap();
+    let path = pool
+        .foreground("main", SyncMode::No, AgentGuard::Force, &mut report)
+        .unwrap();
 
     // Then
     assert_eq!(path, fixture.foreground);
@@ -65,7 +67,12 @@ fn foreground__should_report_both_errors_for_an_unknown_branch() {
     let pool = fixture.pool(3);
 
     // When
-    let result = pool.foreground("missing", SyncMode::No, &mut Recorder::default());
+    let result = pool.foreground(
+        "missing",
+        SyncMode::No,
+        AgentGuard::Force,
+        &mut Recorder::default(),
+    );
 
     // Then
     assert_eq!(
@@ -115,7 +122,12 @@ fn foreground__should_refuse_to_leave_work_in_the_foreground(
     let pool = fixture.pool(3);
 
     // When
-    let result = pool.foreground("feature", SyncMode::No, &mut Recorder::default());
+    let result = pool.foreground(
+        "feature",
+        SyncMode::No,
+        AgentGuard::Force,
+        &mut Recorder::default(),
+    );
 
     // Then
     assert_eq!(
@@ -162,7 +174,12 @@ fn foreground__should_refuse_a_busy_holder_before_changing_anything(
     let pool = fixture.pool(3);
 
     // When
-    let result = pool.foreground("feature", SyncMode::No, &mut Recorder::default());
+    let result = pool.foreground(
+        "feature",
+        SyncMode::No,
+        AgentGuard::Force,
+        &mut Recorder::default(),
+    );
 
     // Then
     assert_eq!(
@@ -196,7 +213,12 @@ fn foreground__should_check_the_holder_again_after_fetching() {
     ));
 
     // When
-    let result = pool.foreground("feature", SyncMode::Refresh, &mut Recorder::default());
+    let result = pool.foreground(
+        "feature",
+        SyncMode::Refresh,
+        AgentGuard::Force,
+        &mut Recorder::default(),
+    );
 
     // Then
     assert_eq!(
@@ -230,7 +252,7 @@ fn foreground__should_refuse_a_branch_an_unmanaged_worktree_holds(#[case] sync: 
     let mut report = Recorder::default();
 
     // When
-    let result = pool.foreground("feature", sync, &mut report);
+    let result = pool.foreground("feature", sync, AgentGuard::Force, &mut report);
 
     // Then
     assert_eq!(
@@ -271,7 +293,12 @@ fn foreground__should_not_sync_a_branch_an_unmanaged_worktree_takes_during_the_f
     let pool = fixture.pool(3);
 
     // When
-    let result = pool.foreground("feature", SyncMode::Refresh, &mut Recorder::default());
+    let result = pool.foreground(
+        "feature",
+        SyncMode::Refresh,
+        AgentGuard::Force,
+        &mut Recorder::default(),
+    );
 
     // Then
     assert_eq!(
@@ -323,7 +350,12 @@ fn foreground__should_refuse_a_branch_whose_worktree_directory_is_gone(
     let pool = fixture.pool(3);
 
     // When
-    let result = pool.foreground("feature", SyncMode::Reset, &mut Recorder::default());
+    let result = pool.foreground(
+        "feature",
+        SyncMode::Reset,
+        AgentGuard::Force,
+        &mut Recorder::default(),
+    );
 
     // Then
     assert_eq!(
@@ -363,7 +395,7 @@ fn foreground__should_not_set_an_upstream_when_it_refuses_to_refresh_a_diverged_
     let mut report = Recorder::default();
 
     // When
-    let result = pool.foreground(reference, SyncMode::Refresh, &mut report);
+    let result = pool.foreground(reference, SyncMode::Refresh, AgentGuard::Force, &mut report);
 
     // Then
     assert_eq!(
