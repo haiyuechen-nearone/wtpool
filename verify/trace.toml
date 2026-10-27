@@ -178,9 +178,12 @@ checks = ["stream__should_accept_unknown_properties"]
 
 # R12 (status-panel.md revision 20): the extension reads the tails of the selected row's
 # background tasks from the harness's own files.
+# R12 (resume): it reads the path the document gives, so the hook's path has to name the file a
+# resumed session's process writes.
 [ids.R12]
 phase = 3
 checks = [
+  "hook__should_record_a_resumed_sessions_task_where_claude_code_writes_it",
   "tail__should_read_only_the_selected_row",
   "tail__should_update_a_growing_file_within_a_second",
   "tail__should_refuse_symlinks_and_other_files",
@@ -322,9 +325,11 @@ checks = ["hook__should_give_each_call_its_kind", "status__should_read_kinds_onl
 # path of their output file, never the output.
 # H27 (task-end): a Stop or SubagentStop lists its whole session's work in flight, so it also ends
 # the old tasks it leaves out in the session's other records of the same process.
+# H27 (resume): a resumed session's outputs lie under the resuming process's own id, so the path
+# names the session folder that holds the file.
 [ids.H27]
 phase = 3
-checks = ["hook__should_record_background_tasks", "hook__should_end_a_task_through_its_session", "hook__should_end_no_task_of_a_record_it_cannot_lock"]
+checks = ["hook__should_record_background_tasks", "hook__should_end_a_task_through_its_session", "hook__should_end_no_task_of_a_record_it_cannot_lock", "hook__should_record_a_resumed_sessions_task_where_claude_code_writes_it"]
 
 # H28: the repository's Claude Code plugin installs the hooks of H1, and wtpool hook install counts
 # it as present.

@@ -227,6 +227,34 @@ fn task_file__should_name_the_file_in_the_sessions_task_folder() {
     assert_eq!(path, Some(expected.to_string_lossy().into_owned()));
 }
 
+#[test]
+fn task_file__should_find_the_file_a_resumed_session_wrote_under_its_own_id() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let project = dir
+        .path()
+        .canonicalize()
+        .unwrap()
+        .join("claude-501/-acme-app");
+    let older = project.join("s2/tasks/b1.output");
+    let newer = project.join("s3/tasks/b1.output");
+    let folder = project.join("s4/tasks/b1.output");
+    for path in [&older, &newer] {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, "").unwrap();
+    }
+    std::fs::create_dir_all(&folder).unwrap();
+    let file = std::fs::File::options().write(true).open(&older).unwrap();
+    file.set_modified(std::time::UNIX_EPOCH).unwrap();
+
+    // When
+    let transcript = "/home/me/.claude/projects/-acme-app/s1.jsonl";
+    let path = task_file(Some(dir.path()), 501, &input(Some(transcript)), &task("b1"));
+
+    // Then
+    assert_eq!(path, Some(newer.to_string_lossy().into_owned()));
+}
+
 #[cfg(unix)]
 #[test]
 fn task_file__should_resolve_a_symlinked_base() {

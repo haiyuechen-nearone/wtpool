@@ -266,3 +266,5 @@ accept rs-cli 9073d51a9b0c600e72d53165f59a1855a0e0f125824ce0d2db52b6f0422e507c
 accept idle-done-subagents 28b7278d8787c1af35d4e37e97ee57db187b24989f07652435e900bb3fa60e48
 # Scrub of two session titles in sample data.
 accept scrub-titles 321ef8089981d356128e7f6e69fecfc71fce48eca04908f3a617e43ea4bc2fd7
+# A resumed session's background task path names the session folder that holds its output file; one int check covers it.
+accept task-path-after-resume ccc6d5b1da2208f2ed8e4686774f3f8c994ce3f517f4dcd1b0853122b4a84a72

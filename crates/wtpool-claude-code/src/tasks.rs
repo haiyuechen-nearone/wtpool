@@ -1,16 +1,21 @@
 //! Claude Code's background tasks. A Bash call that runs in the background ends with a
-//! PostToolUse whose `tool_response` names the task (`backgroundTaskId`). Claude Code writes the
-//! task's output to `<base>/claude-<uid>/<project>/<session_id>/tasks/<id>.output`, with `<base>`
-//! `CLAUDE_CODE_TMPDIR`, else `/tmp`, its symlinks resolved, and `<project>` the folder of the
-//! session's transcript, `<config>/projects/<project>/<session_id>.jsonl`. A Stop or SubagentStop
-//! lists the tasks still in flight in the whole session (`background_tasks`), its subagents'
-//! included. TaskStop or KillShell stops one. The hook never opens an output file.
+//! PostToolUse whose `tool_response` names the task (`backgroundTaskId`) and nothing else about it.
+//! Claude Code writes the task's output to
+//! `<base>/claude-<uid>/<project>/<process>/tasks/<id>.output`, with `<base>` `CLAUDE_CODE_TMPDIR`,
+//! else `/tmp`, its symlinks resolved, `<project>` the folder of the session's transcript,
+//! `<config>/projects/<project>/<session_id>.jsonl`, and `<process>` the id of the process that
+//! runs the command: the `session_id` until the session is resumed, then the resuming process's
+//! own id, while the payloads and the transcript keep the first. A Stop or SubagentStop lists the
+//! tasks still in flight in the whole session (`background_tasks`), its subagents' included.
+//! TaskStop or KillShell stops one. The hook never opens an output file.
 
 use std::ffi::OsStr;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use serde_json::Value;
-use wtpool_core::activity::TaskId;
+use wtpool_core::activity::{ActorId, TaskId};
 use wtpool_core::hook::HookInput;
 use wtpool_core::hook::text;
 
@@ -97,8 +102,9 @@ fn project_of(transcript: &str, session: &str) -> Option<String> {
 }
 
 /// The output file of `task`, a task the call of `input` started, with `claude_tmp`, else `/tmp`,
-/// as `<base>`. `None` without the project folder or a base folder that resolves, or for a path
-/// that fails [`is_task_file`].
+/// as `<base>`: the file a session folder of the project holds, else the one the `session_id`
+/// folder would hold. `None` without the project folder or a base folder that resolves, or for a
+/// path that fails [`is_task_file`].
 #[must_use]
 pub fn task_file(
     claude_tmp: Option<&Path>,
@@ -109,16 +115,41 @@ pub fn task_file(
     let session = input.session_id.as_str();
     let project = project_of(input.transcript.as_deref()?, session)?;
     let base = claude_tmp.unwrap_or_else(|| Path::new("/tmp"));
-    let folder = base
+    let project_folder = base
         .canonicalize()
         .ok()?
         .join(format!("claude-{uid}"))
-        .join(project)
-        .join(session)
+        .join(project);
+    let name = format!("{task}.output");
+    let folder = holder_of(&project_folder, &name)
+        .unwrap_or_else(|| project_folder.join(session))
         .join("tasks");
-    let path = folder.join(format!("{task}.output"));
+    let path = folder.join(name);
     let text = path.to_str()?.to_owned();
     is_task_file(&path, &folder, task.as_str()).then_some(text)
+}
+
+/// The session folder under `project` whose `tasks` holds `name` as a regular file, the one whose
+/// file changed last when several do. Metadata only: the file stays unopened.
+fn holder_of(project: &Path, name: &str) -> Option<PathBuf> {
+    fs::read_dir(project)
+        .ok()?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .is_some_and(|session| ActorId::try_from(session).is_ok())
+        })
+        .filter_map(|entry| {
+            let folder = entry.path();
+            let meta = fs::symlink_metadata(folder.join("tasks").join(name)).ok()?;
+            let changed = meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+            meta.is_file().then_some((changed, folder))
+        })
+        .max_by_key(|(changed, _)| *changed)
+        .map(|(_, folder)| folder)
 }
 
 /// `true` when `path` is `<folder>/<id>.output`, absolute, without `.` or `..` components or

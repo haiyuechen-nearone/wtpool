@@ -1842,3 +1842,12 @@ reason = "Publication scrub, data only. The two session titles in the mockups of
 "vscode/test/render/agent-lines.test.mjs" = "bcc6862c22177549f7246e3ab761274a72e2a78c468e4af8a58fcf23f910d470"
 "vscode/test/render/jobs-heading.test.mjs" = "34f7e3c673519dcd397436b2ad8bf954445dc681ea63c42c0b28b4d05f7487a0"
 "vscode/test/support/jobs.mjs" = "71b69091c4fd259d4d5234b92304bf898df96b64f9799a91af9b55c45102538e"
+
+[[change]]
+id = "task-path-after-resume"
+reason = "The panel said the output file was gone for every background task of a resumed session. Claude Code 2.1.311 writes a task's output under the id of the process that runs the command: a session resumed with claude --resume keeps its first id in session_id and in its transcript, while the resuming process writes under its own id, so the path H27 derived from session_id named a folder that does not exist; the PostToolUse tool_response carries only backgroundTaskId, its backgroundOutputPath being an internal field sent only for a command another machine keeps. H27, status-panel.md revision 33: the session folder of the path is the one under the project folder, named as H17 accepts, whose tasks holds <id>.output as a regular file, the one whose file changed last when several do, else the session_id, learnt from metadata only, so the hook still never opens an output file. S13 and R12 are unchanged: the extension reads the path the document gives. New check hook__should_record_a_resumed_sessions_task_where_claude_code_writes_it (int, phase 3, traced under H27 and R12): the file under another session folder of the project, the recorded path naming it. The record JSON shape is unchanged."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "045508466bb066705ad0bc283150c5874217bb66cb522eb56ed454391cacc85c"
+"docs/design/status-panel/verification.md" = "e74092d3c024d6e247d9cf6ea753dfa644adf5be24c53649a4ae2d0dd456cf55"
+"verify/trace.toml" = "82805d039e6f1797246c1b694ab49213ee077a7f55c3ee720fc72df703a940ae"
+"xtask/tests/checks/hook_tasks.rs" = "a3c53946c00faaf9f9c074eecbd03bf09bd66146e8e6b83bd4f6d5403b14f9c9"

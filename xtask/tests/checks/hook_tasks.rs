@@ -289,6 +289,34 @@ fn hook__should_record_background_tasks() {
     subagent_task_under_tmp();
 }
 
+/// A resumed session keeps its first id in the hook payloads and its transcript, while Claude Code
+/// writes the outputs under the resuming process's own id.
+#[test]
+fn hook__should_record_a_resumed_sessions_task_where_claude_code_writes_it() {
+    // Given
+    let tasks = Tasks::must_new("hook-tasks-resumed");
+    let folder = tasks.folder(&tasks.tmp, "s9");
+    fs::create_dir_all(&folder).expect("setup: make the resuming process's task folder");
+    let file = folder.join("b1.output");
+    fs::write(&file, "building\n").expect("setup: write the output file");
+    tasks.send(&tasks.hooks.transcript_event("UserPromptSubmit", "s1", &[]));
+
+    // When
+    tasks.send(&tasks.background("s1", &json!("b1")));
+
+    // Then
+    let recorded = tasks.tasks("s1");
+    assert_eq!(
+        recorded,
+        vec![("b1".to_owned(), file.to_string_lossy().into_owned(), false)],
+        "the task's path names the file Claude Code writes"
+    );
+    for (_, path, _) in &recorded {
+        let present = Path::new(path).is_file();
+        assert!(present, "the recorded path exists: {path}");
+    }
+}
+
 /// Without `CLAUDE_CODE_TMPDIR` the task folder is under `/tmp`, and a subagent's task stays on
 /// its own record until its SubagentStop's list leaves it out.
 fn subagent_task_under_tmp() {
