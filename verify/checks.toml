@@ -242,7 +242,7 @@ fixtures__should_match_a_fresh_scrub = ["static"]
 # Phase 4, the panel side of heavy jobs (docs/design/jobs/jobs.md, "Verification plan") and
 # several agents in one row (U12, U13).
 # render: the webview's pattern check (J18), builds outside a job (A8, U14), the heading's machine
-# button and its counts (S14, U8, U10), the machine strip (U11, X20), the pattern editor (U15,
+# button and its counts (S14, U8, U10), the machine strip and the states of a save (U11, X20), the pattern editor (U15,
 # X22), each answer matched to its edit or save in order and none waited for forever (U15, X21),
 # the count of agent lines (U12) and the line icons (U13).
 pattern__should_match_the_cli_grammar = ["render"]
@@ -256,6 +256,7 @@ heavy_editor__should_show_each_scope = ["render"]
 heavy_editor__should_follow_the_keyboard = ["render"]
 heavy_editor__should_match_answers_in_order = ["render"]
 machine_strip__should_save_again_without_an_answer = ["render"]
+machine_strip__should_show_each_save_state = ["render"]
 count__should_follow_the_agent_lines = ["render"]
 line_icons__should_match_each_state = ["render"]
 agent_line__should_read_done_with_its_api_error = ["render"]

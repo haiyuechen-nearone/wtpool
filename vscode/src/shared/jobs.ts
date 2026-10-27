@@ -139,7 +139,7 @@ export function answerDue(message: JobSettingsMessage, nowMs: number, before: nu
 }
 
 /** Tells `jobs` already showing the settings or the list `message` asks for. */
-function jobsShow(jobs: Jobs, message: JobSettingsMessage): boolean {
+export function jobsShow(jobs: Jobs, message: JobSettingsMessage): boolean {
   if (message.heavy) return listShows(jobs, message.heavy);
   const limit =
     message.limit === undefined ||

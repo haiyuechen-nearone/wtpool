@@ -1851,3 +1851,14 @@ reason = "The panel said the output file was gone for every background task of a
 "docs/design/status-panel/verification.md" = "e74092d3c024d6e247d9cf6ea753dfa644adf5be24c53649a4ae2d0dd456cf55"
 "verify/trace.toml" = "82805d039e6f1797246c1b694ab49213ee077a7f55c3ee720fc72df703a940ae"
 "xtask/tests/checks/hook_tasks.rs" = "a3c53946c00faaf9f9c074eecbd03bf09bd66146e8e6b83bd4f6d5403b14f9c9"
+
+[[change]]
+id = "strip-save-feedback"
+reason = "A click on Save in the machine strip gave no visible feedback while the call ran, none when no answer came, and a stale Saved. from an earlier save stayed through later edits, so a later click looked like nothing happened. U11, status-panel.md: while a save waits for its answer Save is disabled and reads Saving…, Use defaults is disabled too; the answer shows after the buttons, Saved. in the description colour or the error in the problem colour, and stays until the next edit of the field or the menu; a save whose answer never comes reads No answer from wtpool in the problem colour once its wait ends, or Saved. when a document showed the settings it asked for in the meantime; the polite live region announces each. X20 and X21 are unchanged: the message flow, the one save in flight and the host's silence on a refused message stay as they are. New render check machine_strip__should_show_each_save_state (saving, saved, refused, no_answer, shown_without_answer), traced under U11 in trace.toml and listed in jobs.md's table; the strip shot check adds a saving and a refused state for clipping and AA in the four themes, the saving state's own ellipsis allowed."
+[change.files]
+"docs/design/jobs/jobs.md" = "14ac505dc25ef651bfee469a9d0d30c62696b89d5d08e17f95f93eed583a09d0"
+"docs/design/status-panel/status-panel.md" = "18c15d44ac30d3f727ccabf77725da61e97ec34f58abbfd09ca7eb2b4fca3675"
+"verify/checks.toml" = "7d8491ac4d3e9326f60e9be6e5c2ef9bee98abc2b133fd1fce3b922a2b3485ea"
+"verify/trace.toml" = "34cd81690cecdfc8254ef8baeaf33e21b361ab90177d1bfea9250a06bb44ebbb"
+"vscode/test/render/jobs-save.test.mjs" = "19e8bef21d7fdeec9be71574dad70970f1fdce41916c9b103cfcb87c5b9e19b1"
+"vscode/test/shot/jobs.spec.mjs" = "b0a1e1f37972114cb1a1b86643999f10343758d08de36a69c2128c83bb7c3acd"

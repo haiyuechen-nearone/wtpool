@@ -2,6 +2,7 @@ import type { Worktree } from '../generated/status';
 import { visible } from '../shared/invisible';
 import {
   answerDue,
+  jobsShow,
   POLICIES,
   waitEnds,
   type Awaiting,
@@ -100,6 +101,8 @@ export class MachineStrip {
   private readonly limitError = paragraph('limit-error');
   private readonly status = span('limit-status');
   private readonly over = paragraph('limit-over');
+  private readonly save = button('job-button job-save', 'Save');
+  private readonly defaults = button('job-button secondary job-default', 'Use defaults');
   private readonly saved = paragraph('limit-note');
   /** The parts of the saved note: its start, the config's path, and its end. */
   private readonly savedParts = [
@@ -162,8 +165,6 @@ export class MachineStrip {
       option.textContent = policy;
       this.enforce.append(option);
     }
-    const save = button('job-button job-save', 'Save');
-    const defaults = button('job-button secondary job-default', 'Use defaults');
     const fields = div('limit-row');
     fields.append(
       label('job-limit', 'Limit'),
@@ -173,7 +174,7 @@ export class MachineStrip {
       this.meaning,
     );
     const actions = div('limit-row');
-    actions.append(save, defaults, this.status);
+    actions.append(this.save, this.defaults, this.status);
     this.heading.append(document.createTextNode('Heavy jobs on '), this.machineName);
     this.saved.append(...this.savedParts);
     const heavyHeading = div('agents-heading heavy-heading');
@@ -194,21 +195,23 @@ export class MachineStrip {
     this.right.append(this.running.element, this.waiting.element, this.outside.element);
     this.limit.addEventListener('input', () => {
       this.edited.limit = true;
+      this.showStatus('', false);
       if (this.jobs) this.checkLimit(this.jobs);
     });
     this.enforce.addEventListener('change', () => {
       this.edited.enforce = true;
+      this.showStatus('', false);
       if (this.jobs) this.showMeaning(this.jobs);
     });
     const enter = (event: KeyboardEvent): void => {
       if (event.key !== 'Enter') return;
       event.preventDefault();
-      this.save();
+      this.saveEdits();
     };
     this.limit.addEventListener('keydown', enter);
     this.enforce.addEventListener('keydown', enter);
-    save.addEventListener('click', () => void this.save());
-    defaults.addEventListener(
+    this.save.addEventListener('click', () => void this.saveEdits());
+    this.defaults.addEventListener(
       'click',
       () => void this.send({ type: 'jobSettings', limit: null, enforce: null }),
     );
@@ -289,18 +292,34 @@ export class MachineStrip {
       this.editor.answer(answer, answer.scope);
       return;
     }
+    this.endSave(answer.ok, answer.ok ? 'Saved.' : visible(answer.error ?? ''));
+  }
+
+  /** Ends the wait for the last save's answer, says `said`, and frees the buttons. */
+  private endSave(ok: boolean, said: string): void {
     const sent = this.saving;
     this.saving = undefined;
-    const said = answer.ok ? 'Saved.' : visible(answer.error ?? '');
-    setText(this.status, said);
-    this.status.classList.toggle('failed', !answer.ok);
+    this.showBusy(false);
+    this.showStatus(said, !ok);
     // Edits made while the save was out stay the user's.
-    if (answer.ok && sent)
+    if (ok && sent)
       this.edited = {
         limit: this.limit.value !== sent.limit,
         enforce: this.enforce.value !== sent.enforce,
       };
     this.host.announce(said);
+  }
+
+  private showStatus(said: string, failed: boolean): void {
+    setText(this.status, said);
+    this.status.classList.toggle('failed', failed);
+  }
+
+  /** Disables the buttons while a save waits for its answer, Save reading so. */
+  private showBusy(busy: boolean): void {
+    this.save.disabled = busy;
+    this.defaults.disabled = busy;
+    setText(this.save, busy ? 'Saving…' : 'Save');
   }
 
   /** Gives the field's limit, else marks the field invalid with the reason under it. */
@@ -327,7 +346,7 @@ export class MachineStrip {
   }
 
   /** Sends the changed limit and policy, and nothing for an invalid limit. */
-  private save(): void {
+  private saveEdits(): void {
     if (!this.jobs) return;
     const limit = this.checkLimit(this.jobs);
     if (limit === undefined) return;
@@ -345,7 +364,8 @@ export class MachineStrip {
   /** Sends `message` unless a save waits for its answer. */
   private send(message: LimitMessage | PolicyMessage): void {
     if (this.saving) return;
-    setText(this.status, '');
+    this.showStatus('', false);
+    this.showBusy(true);
     this.saving = {
       limit: this.limit.value,
       enforce: this.enforce.value,
@@ -361,9 +381,14 @@ export class MachineStrip {
     return this.answersDue;
   }
 
-  /** Lets Save send again once the answer to the last save is overdue, or `jobs` has shown it a while. */
+  /**
+   * Lets Save send again once the answer to the last save is overdue, or `jobs` has shown it a
+   * while: a save the document shows counts as saved, any other says no answer came.
+   */
   private settleSave(jobs: Jobs | undefined): void {
-    if (this.saving && waitEnds(this.saving, this.saving.message, jobs, this.nowMs))
-      this.saving = undefined;
+    const sent = this.saving;
+    if (!sent || !waitEnds(sent, sent.message, jobs, this.nowMs)) return;
+    const shown = this.jobs !== undefined && jobsShow(this.jobs, sent.message);
+    this.endSave(shown, shown ? 'Saved.' : 'No answer from wtpool');
   }
 }

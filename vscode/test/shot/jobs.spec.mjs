@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
 import { mustValidate } from '../support/docs.mjs';
-import { busyDocument, firstOpenDocument, TEXT } from '../support/jobs.mjs';
+import { CONFIG, busyDocument, firstOpenDocument, TEXT } from '../support/jobs.mjs';
 import { buttonFacts, chipFacts, notQueuedDocument, openStrip, showView, stripFacts, stripStates, tabToButton } from '../support/jobs-shot.mjs';
 import { axeRun, clipping, ring, ringProblems, textContrast } from '../support/measure.mjs';
 import { THEME_NAMES, computedThemeColours } from '../support/page.mjs';
@@ -30,14 +30,42 @@ async function showOpen(page, doc, extra, at) {
   await settle(page);
 }
 
-/** The clipping issues and AA failures of the page, one line each, `at` naming the state. */
-async function looks(page, at) {
-  const { issues } = await page.evaluate(clipping, false);
+/**
+ * The clipping issues and AA failures of the page, one line each, `at` naming the state, and
+ * `sourceHasEllipsis` when the state's own text holds a `…`.
+ */
+async function looks(page, at, sourceHasEllipsis = false) {
+  const { issues } = await page.evaluate(clipping, sourceHasEllipsis);
   const low = await page.evaluate(textContrast);
   return [
     ...issues.map((i) => `${at}: ${i.kind} in the ${i.place ?? i.side} ${JSON.stringify(i)}`),
     ...low.map((f) => `${at}: ${f.key} ${f.ratio}:1 under ${f.need}:1, "${f.text}"`),
   ];
+}
+
+/**
+ * A save under way, then a refused one, in the busy document: Save reads Saving… while the answer
+ * is out, and the refusal shows next to it. Gives each state's looks and the strip's text.
+ */
+async function saveStates(page, width) {
+  const refusal = `wtpool: ${CONFIG} is a symlink to /Users/you/dotfiles/wtpool/machine.toml; edit that file instead`;
+  await showOpen(page, mustValidate(busyDocument()), undefined, `saving at ${width} px`);
+  await page.locator('tr.machine-detail input.job-limit').fill('6');
+  await page.locator('tr.machine-detail button.job-save').click();
+  await away(page);
+  await settle(page);
+  const states = [];
+  const take = async (name, expected) => {
+    const at = `${name} at ${width} px`;
+    states.push({ at, expected, problems: await looks(page, at, expected.includes('…')), text: (await page.evaluate(stripFacts)).text });
+  };
+  await take('saving', 'Saving…');
+  await page.evaluate((error) => {
+    window.dispatchEvent(new MessageEvent('message', { data: { type: 'jobSettings', version: 1, ok: false, error } }));
+  }, refusal);
+  await settle(page);
+  await take('refused', refusal);
+  return states;
 }
 
 /** The focused control's selector, else the focused element's tag and classes. */
@@ -80,6 +108,10 @@ for (const theme of THEME_NAMES) {
           const names = facts.controls.map((c) => c.el.split('.')[0]);
           if (!names.includes('input') || !names.includes('select')) problems.push(`${at}: the strip shows no Limit field and Policy menu: ${JSON.stringify(facts.controls)}`);
         }
+      }
+      for (const state of await saveStates(page, width)) {
+        problems.push(...state.problems);
+        if (!state.text.includes(state.expected)) problems.push(`${state.at}: the strip does not say "${state.expected}": ${state.text}`);
       }
       await context.close();
 

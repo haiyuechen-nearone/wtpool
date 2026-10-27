@@ -888,6 +888,7 @@ phase = 4
 checks = [
   "machine_strip__should_show_settings_patterns_and_jobs",
   "machine_strip__should_update_in_place",
+  "machine_strip__should_show_each_save_state",
   "machine_strip__should_clip_nothing_in_every_theme",
   "flow__jobs_open_from_heading",
   "flow__jobs_running_and_queued",

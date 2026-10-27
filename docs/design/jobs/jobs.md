@@ -343,7 +343,7 @@ U13): four working and one done in wt2 → wt2 `working` with `×5`, then `×4`.
 | S15 | `status__should_attribute_jobs` (through `WTPOOL_VERIFY_PROCS`; no file written) | | | |
 | W10 | `watch__should_see_jobs_within_a_second`, `watch__should_see_a_dead_job_within_a_heartbeat`, `watch__should_see_new_settings_within_a_second` | | | `jobs_change_settings` |
 | U8, U10 | | `heading__should_offer_the_machine_button` | the contrast and focus checks with the button | `jobs_open_from_heading` |
-| U11 | | `machine_strip__should_show_settings_patterns_and_jobs`, `machine_strip__should_update_in_place` | `machine_strip__should_clip_nothing_in_every_theme` (1100 and 600 px, axe) | `jobs_running_and_queued`, `jobs_old_wtpool`, `jobs_remote_window` |
+| U11 | | `machine_strip__should_show_settings_patterns_and_jobs`, `machine_strip__should_update_in_place`, `machine_strip__should_show_each_save_state` (Saving…, Saved., a refusal, no answer) | `machine_strip__should_clip_nothing_in_every_theme` (1100 and 600 px, axe) | `jobs_running_and_queued`, `jobs_old_wtpool`, `jobs_remote_window` |
 | U15 | | `heavy_editor__should_show_each_scope` (empty lists, the repository's, a `build_processes` tag, suggestions grouped by source, inline errors), `heavy_editor__should_match_answers_in_order` | `heavy_editor__should_clip_nothing_in_every_theme` (1100 and 600 px, axe, chip outlines at 3:1) | `jobs_edit_patterns` |
 | U12 | | `count__should_follow_the_agent_lines` | `count__should_keep_to_the_word_line` | `several_agents_in_one_row` |
 | U13 | | `line_icons__should_match_each_state` | `line_icons__should_align_and_share_one_size`, `line_icons__should_never_move` | `several_agents_in_one_row`, `reduced_motion` |

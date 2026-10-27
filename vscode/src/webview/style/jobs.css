@@ -125,6 +125,10 @@ body.vscode-high-contrast .machine-button:hover:not(:focus-visible) {
   cursor: pointer;
 }
 
+.job-button:disabled {
+  cursor: progress;
+}
+
 .job-button.secondary {
   border-color: var(--vscode-descriptionForeground);
   background-color: var(--vscode-button-secondaryBackground);
