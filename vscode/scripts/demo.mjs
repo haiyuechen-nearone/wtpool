@@ -86,6 +86,11 @@ async function pointOf(target, { window, frame, pathOf }) {
   if (target === 'rest') {
     return { x: WINDOW.width * 0.72, y: WINDOW.height * 0.86 };
   }
+  if (target === 'machine') {
+    const button = frame.locator('button.machine-button');
+    await button.waitFor({ state: 'visible', timeout: 5_000 });
+    return pointAcross(await button.boundingBox(), 0.5);
+  }
   const [kind, name, action] = target.split(':');
   if (kind === 'dialog') {
     const button = window
@@ -133,8 +138,11 @@ async function play(steps, context) {
     }
     if (step.waitFor) {
       const deadline = Date.now() + 5_000;
-      const wanted = JSON.stringify(step.waitFor);
-      while (!fakeStarts(dirs).some((argv) => JSON.stringify(argv) === wanted)) {
+      // The extension may add flags, such as `--force`, after the words the story names.
+      const wanted = step.waitFor;
+      while (
+        !fakeStarts(dirs).some((argv) => wanted.every((word, index) => argv[index] === word))
+      ) {
         if (Date.now() > deadline) {
           throw new Error(`demo: the extension never ran wtpool ${step.waitFor.join(' ')}`);
         }

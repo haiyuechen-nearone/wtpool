@@ -7,7 +7,7 @@ agents. A VS Code tab shows what each agent is doing. It works with any git repo
 own machine.
 
 <!-- hero -->
-![Animation of the Worktrees tab in VS Code: agents start working in their worktrees, one waits for permission, a detail strip streams a background test's output, and a worktree is freed through a confirm dialog](docs/images/demo.gif)
+![Animation of the Worktrees tab in VS Code: agents start working in their worktrees, one waits for permission, a detail strip streams a background test's output, a worktree runs several agents, the machine button opens a strip with a running and a queued heavy job and the policy, and a worktree is freed through a confirm dialog](docs/images/demo.gif)
 
 - **One foreground, a few slots.** Your editor keeps one worktree. `wtpool bg` parks a branch or
   PR in a background slot for an agent, and `wtpool fg` brings a branch to you.

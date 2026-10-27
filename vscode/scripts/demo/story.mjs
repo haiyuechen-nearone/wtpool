@@ -18,7 +18,7 @@ export const PLACEHOLDERS = {
 /** The local wall time the recording starts at, in the time zone VS Code runs in. */
 const START = { date: '2026-03-10', time: '09:41:00' };
 
-export const LENGTH_SECONDS = 18;
+export const LENGTH_SECONDS = 25;
 
 /**
  * The lines the background `cargo test` of slot 1 prints, one every {@link LOG_GAP} seconds from
@@ -91,7 +91,7 @@ const CLEAN_GIT = {
  * Returns the story for `features` in `timeZone`, with slot 1's test log at `logPath`, as
  * `{first, steps, pathOf}`. `first` is the document the fake prints at start. A step at `at`
  * seconds does one of these: `emit` a document, `log` a line, move the pointer `to` a target
- * (`row:<name>`, `action:<name>:<action>`, `dialog:<button>` or `rest`) over `ms` and maybe
+ * (`row:<name>`, `machine`, `action:<name>:<action>`, `dialog:<button>` or `rest`) over `ms` and maybe
  * `click`, or `waitFor` the fake's start with that argv before the next step.
  *
  * The documents list `outputs` whatever `features.outputs` says: an extension without that
@@ -181,13 +181,25 @@ export function story({ features, timeZone, logPath }) {
     }),
   );
   const deps = (fields) => session('9e4b7a31-deps', 'Bump dependencies', -29 * 60, fields);
+  // A second agent in slot 3 has run `cargo test` in the background for a while: its run time
+  // is 3 m 12 s at CARGO_READ seconds, when the machine strip is open (the tab shows `3 m`).
+  const CARGO_READ = 19;
+  const cargoTest = backgroundTask('c5m1x7', 'cargo test', CARGO_READ - (3 * 60 + 12));
+  const retry = () =>
+    session('d2a6f815-retry', 'Add retry', -9 * 60, {
+      state: features.background ? 'working' : 'idle',
+      action: features.background ? { tool: 'background:', target: 'cargo test' } : null,
+      since: at(-190),
+      updated: at(-12),
+      outputs: [cargoTest],
+    });
   rows.set(
     slot(3),
     worktree(slot(3), {
       ...onBranch('chore/bump-deps'),
       git: { ...CLEAN_GIT, ahead: 1 },
-      activity: 'idle',
-      actors: [deps({ state: 'idle', since: at(-130), updated: at(-130) })],
+      activity: features.background ? 'working' : 'idle',
+      actors: [deps({ state: 'idle', since: at(-130), updated: at(-130) }), retry()],
       last_event: at(-130),
       last_change: at(-150),
     }),
@@ -204,11 +216,45 @@ export function story({ features, timeZone, logPath }) {
     }),
   );
 
+  // The machine's heavy jobs: slot 3's `cargo test` runs, and from 9.4 s slot 1's agent waits.
+  const heavyJob = (id, summary, worktreeName, actor, since) => ({
+    id,
+    summary,
+    label: null,
+    worktree: pathOf(worktreeName),
+    actor,
+    since: at(since),
+  });
+  const jobs = {
+    limit: 1,
+    default: 4,
+    min: 1,
+    max: 64,
+    enforce: 'warn',
+    source: { limit: 'machine', enforce: 'machine' },
+    config: `${PLACEHOLDERS.parent.replace(/\/code$/, '')}/.config/wtpool/machine.toml`,
+    error: null,
+    heavy: [
+      { pattern: 'cargo build', source: 'repository' },
+      { pattern: 'cargo test', source: 'repository' },
+      { pattern: 'npm test', source: 'repository' },
+    ],
+    suggested: [],
+    running: [
+      heavyJob('4121a1b2c3', 'cargo test', slot(3), retry().key, CARGO_READ - (3 * 60 + 12)),
+    ],
+    waiting: [],
+    outside: [],
+  };
+
   const document = (seconds) => ({
     type: 'status',
     version: 1,
     generated: at(seconds),
-    machine: { name: PLACEHOLDERS.machine },
+    machine: {
+      name: PLACEHOLDERS.machine,
+      ...(features.jobs ? { jobs: structuredClone(jobs) } : {}),
+    },
     pools: [
       {
         common_dir: `${pathOf(repo)}/.git`,
@@ -307,6 +353,10 @@ export function story({ features, timeZone, logPath }) {
     }),
   );
   login(9.4, { tool: 'Edit', target: 'src/auth/session.rs' }, 2, true);
+  // Slot 1's agent asks for a place to run `cargo build`: the machine button reads `1 queued`.
+  change(9.4, () => {
+    jobs.waiting = [heavyJob('4122d4e5f6', 'cargo build', slot(1), 'a3f09c4e-login', 9.4)];
+  });
 
   // 6. Below the strip, slot 3's agent runs its tests in the background and ends its turn: it
   // still works, `background: npm test`, while they run.
@@ -321,6 +371,7 @@ export function story({ features, timeZone, logPath }) {
           since: at(8.4),
           updated: at(8.4),
         }),
+        retry(),
       ],
       last_event: at(8.4),
     }),
@@ -336,6 +387,7 @@ export function story({ features, timeZone, logPath }) {
           updated: at(9.0),
           outputs: [npmTest],
         }),
+        retry(),
       ],
       last_event: at(9.0),
     }),
@@ -361,7 +413,15 @@ export function story({ features, timeZone, logPath }) {
   );
   steps.push({ at: 16.1, to: 'rest', ms: 900 });
 
-  // 8. A pause until LENGTH_SECONDS, then the GIF loops.
+  // 8. The user opens the machine strip from the heading's machine button: the limit and the
+  // policy on the left, the running and the queued job on the right. It closes again.
+  if (features.jobs) {
+    steps.push({ at: 17.4, to: 'machine', ms: 700, click: true });
+    steps.push({ at: 22.4, to: 'machine', ms: 200, click: true });
+    steps.push({ at: 23.2, to: 'rest', ms: 900 });
+  }
+
+  // 9. A pause until LENGTH_SECONDS, then the GIF loops.
   changes.sort((a, b) => a.seconds - b.seconds);
   for (const { seconds, edit } of changes) {
     edit();
@@ -381,4 +441,6 @@ export const KEYFRAMES = [
   { at: 13.4, name: 'background-and-hover' },
   { at: 15.3, name: 'confirm-free' },
   { at: 17.6, name: 'slot-freed' },
+  { at: 19.6, name: 'machine-strip' },
+  { at: 24.4, name: 'strip-closed' },
 ];

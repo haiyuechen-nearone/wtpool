@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { REPO, VSCODE } from '../../test/support/paths.mjs';
 
-const FEATURE_NAMES = ['labels', 'outputs', 'background'];
+const FEATURE_NAMES = ['labels', 'outputs', 'background', 'jobs'];
 
 /** Detects the later features of this checkout that the story can show. */
 export function detectFeatures() {
@@ -18,6 +18,7 @@ export function detectFeatures() {
   return {
     labels: /the session's title/.test(specRow('H16')),
     outputs: Boolean(schema.$defs?.actor?.properties?.outputs),
+    jobs: Boolean(schema.properties?.machine?.properties?.jobs),
     background: specRow('A1').includes('the tool `background:`'),
   };
 }

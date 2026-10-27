@@ -272,16 +272,16 @@ is deleted at the end (`--keep` leaves it).
 
 - **The story** is in `vscode/scripts/demo/story.mjs`: the placeholders (`acme/app`, `my-mac`,
   the paths), each status document, the test log and the pointer's moves, on one timeline of
-  18 seconds. Every time a document holds comes from that timeline, and the webview's clock is
+  25 seconds. Every time a document holds comes from that timeline, and the webview's clock is
   shifted to it, so ages and clock times are the same on every run. The detail strip with its
   Output section is closed again before the pointer goes to the last row, so every step fits the
   600 px window.
-- **Later features.** Three parts of the story follow features that may be newer than your
+- **Later features.** Four parts of the story follow features that may be newer than your
   checkout: a session's title as its label (H16), a background task's live output in the detail
-  strip, and an agent whose turn ended working on while its background task runs (A1). The script
+  strip, and an agent whose turn ended working on while its background task runs (A1), and the heavy jobs of the machine button and its strip. The script
   reads from the spec and the generated schema whether this checkout has them, and records the
   story as this version shows it. `--features all`, `none` or a list such as
-  `labels,outputs,background` overrides that.
+  `labels,outputs,background,jobs` overrides that.
 - **The frames.** The window is 1000 × 600 in Dark Modern. Screenshots are taken at twice that
   size about 14 times a second, and gifski scales them to 1000 px wide at 10 frames a second.
   The pointer and the click ring are drawn into the window, because screenshots show no cursor.
