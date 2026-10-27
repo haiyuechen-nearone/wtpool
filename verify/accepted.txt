@@ -264,3 +264,5 @@ accept rs-sweep 91bfc6f16a08c5f43a7166ea27f7b42c2c9293f095ab75d39b43ff947356a0b7
 accept rs-cli 9073d51a9b0c600e72d53165f59a1855a0e0f125824ce0d2db52b6f0422e507c
 # A session's idle prompt writes only the subagent records it changes, so a done subagent keeps its updated and shows for no second minute; one int check covers it.
 accept idle-done-subagents 28b7278d8787c1af35d4e37e97ee57db187b24989f07652435e900bb3fa60e48
+# Scrub of two session titles in sample data.
+accept scrub-titles 321ef8089981d356128e7f6e69fecfc71fce48eca04908f3a617e43ea4bc2fd7

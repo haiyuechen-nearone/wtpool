@@ -60,29 +60,29 @@ test('flow__jobs_running_and_queued', async () => {
       await endCommand(session.dirs, oldest.pid);
       const moved = await poll(async () => {
         const lists = await jobLists(frame);
-        return lists.waiting.length === 1 && lists.running.some((line) => reads(line, ['cargo test', 'wt1', '·', 'Design jobs'])) ? lists : undefined;
+        return lists.waiting.length === 1 && lists.running.some((line) => reads(line, ['cargo test', 'wt1', '·', 'API cleanup'])) ? lists : undefined;
       }, WITHIN_A_SECOND_MS, 100);
       const after = moved ?? (await jobLists(frame));
       const rowAfter = await poll(async () => {
         const row = await agentLines(frame, session, 'wt1');
-        return row?.agent.includes('Design jobs · Bash cargo test') ? row : undefined;
+        return row?.agent.includes('API cleanup · Bash cargo test') ? row : undefined;
       }, WITHIN_A_SECOND_MS, 100) ?? (await agentLines(frame, session, 'wt1'));
 
       // Then
       assert.deepEqual(
         [
           ...listProblems('Running', before.running, [['cargo nextest', 'wt1'], ['npm run', 'wt3'], ['verify', 'outside this pool'], ['cargo build', 'outside this pool']]),
-          ...listProblems('Queued', before.waiting, [['1', 'cargo test', 'wt1', '·', 'Design jobs'], ['2', 'cargo clippy', 'fg']]),
+          ...listProblems('Queued', before.waiting, [['1', 'cargo test', 'wt1', '·', 'API cleanup'], ['2', 'cargo clippy', 'fg']]),
         ],
         [],
         'the strip\'s Running and Queued lists with 4 jobs running and 2 waiting (U11, S14, S15)',
       );
       assert.ok(reads(before.waiting[0] ?? '', ['1', 'cargo test']) && reads(before.waiting[1] ?? '', ['2', 'cargo clippy']), `Queued is not in queue order with positions: ${JSON.stringify(before.waiting)}`);
       assert.equal(rowBefore?.activity, 'working', 'wt1 does not show working while its agent\'s job waits (A8)');
-      assert.ok(rowBefore?.agent.includes('Design jobs · queued: cargo test'), `the waiting agent does not read "Design jobs · queued: cargo test" (A8): ${JSON.stringify(rowBefore)}`);
+      assert.ok(rowBefore?.agent.includes('API cleanup · queued: cargo test'), `the waiting agent does not read "API cleanup · queued: cargo test" (A8): ${JSON.stringify(rowBefore)}`);
       assert.ok(moved, `within 1 s of a running job's end queued job 1 does not move to Running: ${JSON.stringify(after)}`);
       assert.ok(reads(after.waiting[0] ?? '', ['1', 'cargo clippy', 'fg']), `cargo clippy is not queued job 1 now: ${JSON.stringify(after.waiting)}`);
-      assert.ok(rowAfter?.agent.includes('Design jobs · Bash cargo test'), `once its job runs, the agent line does not show its own action (A8): ${JSON.stringify(rowAfter)}`);
+      assert.ok(rowAfter?.agent.includes('API cleanup · Bash cargo test'), `once its job runs, the agent line does not show its own action (A8): ${JSON.stringify(rowAfter)}`);
       assert.equal(await focusKey(frame), focusBefore, 'focus moved when the jobs changed (X15)');
     } finally {
       await stopJobs(session);

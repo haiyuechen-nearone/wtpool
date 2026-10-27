@@ -26,8 +26,8 @@ function crowded(actors, activity = 'working') {
 
 const five = () => [
   actor({ key: 'a', label: 'Review the TS host', updated: ago(1), action: { tool: 'Read', target: 'vscode/src/host/panel.ts' } }),
-  actor({ key: 'b', label: 'Design jobs', updated: ago(8) }),
-  actor({ key: 'c', label: 'WT panel build', updated: ago(14), action: { tool: 'Agent', target: 'Fix the harness' } }),
+  actor({ key: 'b', label: 'API cleanup', updated: ago(8) }),
+  actor({ key: 'c', label: 'Release notes', updated: ago(14), action: { tool: 'Agent', target: 'Fix the harness' } }),
   actor({ key: 'd', label: 'Fix the harness', updated: ago(40), action: { tool: 'Edit', target: 'xtask/src/schedule.rs' } }),
   actor({ key: 'e', kind: 'subagent', label: 'Explore icons', state: 'done', updated: ago(50) }),
 ];
@@ -96,7 +96,7 @@ const STATES = [
   ['idle_error', { state: 'idle', action: null, error: 'rate_limit' }],
   ['done', { state: 'done', kind: 'subagent', label: 'Explore' }],
   ['done_error', { state: 'done', kind: 'subagent', label: 'Explore', action: null, error: 'server_error' }],
-  ['queued', { state: 'working', label: 'Design jobs', action: { tool: 'queued:', target: 'cargo test' } }],
+  ['queued', { state: 'working', label: 'API cleanup', action: { tool: 'queued:', target: 'cargo test' } }],
 ];
 
 /** The worktrees after those of {@link STATES}: one with a build line, one with no agent. */

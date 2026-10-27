@@ -225,7 +225,7 @@ export function agent(session, { id, title, cwd }) {
 /**
  * Four jobs running and two waiting under limit 4. Running: `cargo nextest` in wt1, `npm run build`
  * in wt3, `cargo xtask verify` labelled `verify` and `cargo build` outside the pool. Waiting:
- * `cargo test` in wt1, of the agent `Design jobs` when `withAgent`, else of no agent, then
+ * `cargo test` in wt1, of the agent `API cleanup` when `withAgent`, else of no agent, then
  * `cargo clippy` in fg.
  */
 export async function fourRunTwoWait(session, { withAgent = false } = {}) {
@@ -241,7 +241,7 @@ export async function fourRunTwoWait(session, { withAgent = false } = {}) {
   await assertRunning(session, 4, 'four jobs under limit 4');
   let designer = null;
   if (withAgent) {
-    designer = agent(session, { id: 'design', title: 'Design jobs', cwd: wt1 });
+    designer = agent(session, { id: 'design', title: 'API cleanup', cwd: wt1 });
     await designer.hook('UserPromptSubmit');
     await designer.bash(`cd ${wt1} && wtpool job -- cargo test`);
     await designer.job(['cargo', 'test'], { cwd: wt1 });

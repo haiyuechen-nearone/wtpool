@@ -269,8 +269,8 @@ test('not_queued__should_mark_builds_outside_jobs queued_actor', async () => {
   const [activity, , , , agents] = row.querySelectorAll(':scope > td');
   assert.equal(seen(webview.window, activity), WORDS.working, 'the worktree of a queued agent');
   assert.ok(
-    seenLines(webview.window, agents).includes(`Design jobs${DOT}queued: cargo test`),
-    `no line "Design jobs · queued: cargo test" (A8): ${seenLines(webview.window, agents)}`,
+    seenLines(webview.window, agents).includes(`API cleanup${DOT}queued: cargo test`),
+    `no line "API cleanup · queued: cargo test" (A8): ${seenLines(webview.window, agents)}`,
   );
   assert.equal(agents.querySelectorAll('.not-queued').length, 0, 'a queued job reads (not queued)');
 });

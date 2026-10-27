@@ -160,7 +160,7 @@ Each flow is an e2e flow of phase 4, `flow__<name>`.
 **`jobs_running_and_queued`** (S14, S15, A8, W10, U11, J10)
 1. Open the strip while 4 jobs run and 2 wait.
 2. Running lists 4 jobs, Queued 2 with their positions: summary or label, worktree and agent or `outside this pool`, and age.
-3. In the rows, the waiting agent reads `Design jobs · queued: cargo test`, and its worktree shows `working`.
+3. In the rows, the waiting agent reads `API cleanup · queued: cargo test`, and its worktree shows `working`.
 4. A running job ends: within 1 s queued job 1 moves to Running, and its agent line shows its own action. Focus stays.
 
 **`jobs_change_settings`** (J3, J6, J11, X11, X21, W10)

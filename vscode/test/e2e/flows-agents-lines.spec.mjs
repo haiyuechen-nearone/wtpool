@@ -43,7 +43,7 @@ test('flow__several_agents_in_one_row', async () => {
       await sleep(ACTOR_GAP_MS);
       await parent.hook('PreToolUse-Read', { tool_input: { file_path: file }, tool_use_id: 'toolu_lead_read' });
       sessions.push(parent);
-      for (const [id, title] of [['design', 'Design jobs'], ['panel', 'WT panel build'], ['harness', 'Fix the harness']]) {
+      for (const [id, title] of [['design', 'API cleanup'], ['panel', 'Release notes'], ['harness', 'Fix the harness']]) {
         await sleep(ACTOR_GAP_MS);
         const one = agent(session, { id, title, cwd: fg });
         await one.hook('UserPromptSubmit');

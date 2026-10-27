@@ -56,10 +56,10 @@ export function withJobs(status, value) {
 export function busyDocument() {
   const wt1 = withActor(
     'wt1',
-    { key: 's1', label: 'Design jobs', state: 'working', action: { tool: 'queued:', target: 'cargo test' } },
+    { key: 's1', label: 'API cleanup', state: 'working', action: { tool: 'queued:', target: 'cargo test' } },
     { branch: 'design-jobs' },
   );
-  wt1.actors.push({ ...wt1.actors[0], key: 's2', label: 'WT panel build', action: { tool: 'Bash', target: 'cargo nextest' }, updated: ago(40) });
+  wt1.actors.push({ ...wt1.actors[0], key: 's2', label: 'Release notes', action: { tool: 'Bash', target: 'cargo nextest' }, updated: ago(40) });
   const wt3 = withActor('wt3', { key: 's3', label: 'session 08:40', action: { tool: 'Bash', target: 'npm run' } }, { branch: 'review-ts' });
   const status = document([worktree('fg'), wt1, worktree('wt2'), wt3]);
   return withJobs(
