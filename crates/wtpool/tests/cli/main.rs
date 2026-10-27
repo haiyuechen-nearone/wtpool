@@ -5,6 +5,7 @@
 mod support;
 
 mod config;
+mod jobs;
 mod ls;
 mod refs;
 mod slots;

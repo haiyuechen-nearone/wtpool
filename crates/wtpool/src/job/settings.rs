@@ -10,7 +10,7 @@ use wtpool_core::jobs::{
 use super::listing::{
     enforce_line, heavy_lines, limit_line, setting_line, shown, suggested_json, suggested_lines,
 };
-use super::{JobCliError, cores, paths, repository_files, this_repository};
+use super::{JobCliError, cores, paths, repository_files, require_notes, this_repository};
 
 /// A settings command line, checked.
 #[derive(Debug, PartialEq, Eq)]
@@ -78,14 +78,23 @@ pub(super) fn run(command: Command) -> Result<Printed, JobCliError> {
             };
             Ok(out(vec![line]))
         }
-        Command::ShowEnforce => Ok(out(vec![enforce_line(&read_config()?)])),
+        Command::ShowEnforce => {
+            let config = read_config()?;
+            Ok(Printed {
+                notes: require_notes(config.enforce),
+                ..out(vec![enforce_line(&config)])
+            })
+        }
         Command::SetEnforce(enforce) => {
             jobs::set_enforce(&config_path()?, enforce)?;
-            let line = match enforce {
-                Some(enforce) => setting_line("enforce", enforce, ConfigSource::Machine),
-                None => setting_line("enforce", Enforce::default(), ConfigSource::Default),
+            let (enforce, source) = match enforce {
+                Some(enforce) => (enforce, ConfigSource::Machine),
+                None => (Enforce::default(), ConfigSource::Default),
             };
-            Ok(out(vec![line]))
+            Ok(Printed {
+                notes: require_notes(enforce),
+                ..out(vec![setting_line("enforce", enforce, source)])
+            })
         }
         Command::ShowHeavy => Ok(out(show_heavy()?)),
         Command::AddToMachine(patterns) => {

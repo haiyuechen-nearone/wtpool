@@ -236,6 +236,34 @@ fn shell_tools() -> String {
     format!("{} and {last}", rest.join(", "))
 }
 
+/// `true` when `settings` has Claude Code check shell calls: it enables the plugin, or an entry
+/// runs `wtpool hook policy` from any path.
+fn checks_shell_calls(settings: &Value) -> bool {
+    let plugin = settings
+        .get("enabledPlugins")
+        .and_then(|plugins| plugins.get(PLUGIN_ID))
+        .and_then(Value::as_bool);
+    plugin == Some(true)
+        || commands(settings, HookEvent::PreToolUse.name(), &json!(POLICY_ARGS))
+            .into_iter()
+            .any(is_wtpool)
+}
+
+/// The note for a policy of `require` while the settings file `shown`, with text `settings`,
+/// has Claude Code check no shell call. `None` once it does, or while the file is not valid
+/// JSON: `wtpool hook install` names that fault.
+#[must_use]
+pub(super) fn require_gap(shown: &str, settings: &str) -> Option<String> {
+    let parsed: Value = serde_json::from_str(settings).ok()?;
+    (!checks_shell_calls(&parsed)).then(|| {
+        format!(
+            "enforce = require refuses nothing in Claude Code yet: {shown} enables neither the \
+             plugin {PLUGIN_ID} nor a wtpool hook policy entry. Install the plugin, or merge the \
+             block of wtpool hook install."
+        )
+    })
+}
+
 /// A `hooks missing:` note: `lines`, then the ways to add the hooks.
 fn missing(shown: &str, lines: &[String]) -> String {
     let mut note = format!("hooks missing: {}\n", lines.join("\n"));
@@ -374,5 +402,40 @@ mod tests {
                 "hooks missing: ~/.claude/settings.json holds no wtpool hook for Stop.\n{HINT}"
             )
         );
+    }
+
+    #[rstest]
+    #[case::the_block(block(BIN).to_string(), None)]
+    #[case::the_plugin(plugin(true).to_string(), None)]
+    #[case::a_policy_entry_of_another_wtpool(
+        with(block("/other/wtpool"), |s| s["hooks"]["Stop"] = json!([])).to_string(),
+        None
+    )]
+    #[case::the_block_without_the_policy_entry(
+        with(block(BIN), |s| s["hooks"]["PreToolUse"].as_array_mut().unwrap().truncate(1)),
+        Some(
+            "enforce = require refuses nothing in Claude Code yet: ~/.claude/settings.json \
+             enables neither the plugin wtpool@wtpool nor a wtpool hook policy entry. Install \
+             the plugin, or merge the block of wtpool hook install."
+        )
+    )]
+    #[case::a_disabled_plugin_and_no_hooks(
+        plugin(false).to_string(),
+        Some(
+            "enforce = require refuses nothing in Claude Code yet: ~/.claude/settings.json \
+             enables neither the plugin wtpool@wtpool nor a wtpool hook policy entry. Install \
+             the plugin, or merge the block of wtpool hook install."
+        )
+    )]
+    #[case::not_json("{".to_owned(), None)]
+    fn require_gap__should_say_when_no_policy_check_runs(
+        #[case] settings: String,
+        #[case] expected: Option<&str>,
+    ) {
+        // When
+        let gap = require_gap(SHOWN, &settings);
+
+        // Then
+        assert_eq!(gap.as_deref(), expected);
     }
 }

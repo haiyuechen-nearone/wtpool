@@ -233,6 +233,8 @@ limit: 4 (default)
   fewer than the new limit run. A raised limit starts the first waiting jobs within a second.
 - `wtpool job enforce [off|warn|require|default]`: the policy for heavy commands outside a job,
   `warn` by default. [warn and require](heavy-jobs.md#warn-and-require) says what each does.
+  Under `require`, it and `wtpool job ls` note on stderr when Claude Code's `settings.json`
+  neither enables the plugin nor holds the `wtpool hook policy` entry, so nothing refuses yet.
 - `wtpool job heavy` prints the heavy patterns, each with its source: `machine`, `repository` or
   `build_processes`.
 - `wtpool job heavy add <pattern>…` adds patterns to this machine's list, used in every

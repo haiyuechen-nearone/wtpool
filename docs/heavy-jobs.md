@@ -126,6 +126,11 @@ characters it lists the heavy commands instead:
   IDE build, is never refused. It shows as not queued.
 
 Start with `warn` to see what runs outside the queue, then run `wtpool job enforce require`.
+`require` refuses commands only through the Claude Code hook below, so while your
+`settings.json` neither enables the plugin nor holds the policy entry, `wtpool job enforce
+require`, `wtpool job enforce` and `wtpool job ls` add a note on stderr:
+`enforce = require refuses nothing in Claude Code yet`. The note names the settings file; it
+never appears under `off` or `warn`, in `wtpool job ls --json`, or without a settings file.
 
 ## Claude Code and other agent tools
 
@@ -167,6 +172,8 @@ such as `AGENTS.md`.
   `my-mac · jobs` with a warning sign in the problem colour, and the strip names the fault.
 - **A heavy command was not refused.** Check that the hooks hold the policy entry, with
   `wtpool hook install > /dev/null`, and that the command matches a pattern in `wtpool job ls`.
+  `wtpool job ls` itself says `enforce = require refuses nothing in Claude Code yet` while the
+  entry is missing.
 - **A Gradle or Maven build does not show for long.** Its launcher script starts a JVM, which the
   process table names `java`, so the panel shows the build only while the `gradle` or `mvn` script
   itself runs. Add the pattern `java` to see more.

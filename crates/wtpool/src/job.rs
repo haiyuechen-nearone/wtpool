@@ -8,14 +8,16 @@ use std::ffi::OsString;
 use std::fmt;
 use std::io::{self, Write};
 use std::num::NonZeroUsize;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use wtpool_core::clock::{Clock, ReadClock as _};
 use wtpool_core::heavy::{InvalidPattern, Suggestions};
 use wtpool_core::jobs::{
-    EditError, InvalidEnforce, InvalidLimit, JOB_VARIABLE, JobCommand, JobContext, JobError,
-    JobListing, JobPaths, MachineConfigError, run_job,
+    EditError, Enforce, InvalidEnforce, InvalidLimit, JOB_VARIABLE, JobCommand, JobContext,
+    JobError, JobListing, JobPaths, MachineConfigError, run_job,
 };
+use wtpool_core::platform::dirs;
 use wtpool_core::processes::{ProcessTable, SystemProcesses};
 use wtpool_core::{Error, RepositoryFiles, RepositoryHeavy};
 
@@ -258,7 +260,24 @@ fn list(json: bool) -> Result<(), JobCliError> {
         listing::text(&listing, now)
     };
     out(&text);
+    if !json {
+        for note in require_notes(listing.config.enforce) {
+            fail(&note);
+        }
+    }
     Ok(())
+}
+
+/// The note that `enforce` refuses nothing in Claude Code while its hooks check no shell call:
+/// only under `require`, and only while the settings file says so.
+pub(crate) fn require_notes(enforce: Enforce) -> Vec<String> {
+    if enforce != Enforce::Require {
+        return Vec::new();
+    }
+    let config_dir = std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from);
+    wtpool_claude_code::require_gap(config_dir.as_deref(), dirs::home().as_deref())
+        .into_iter()
+        .collect()
 }
 
 /// The repository `WTPOOL_FOREGROUND` names, else the one holding the current folder, found

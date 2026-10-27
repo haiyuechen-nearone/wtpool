@@ -13,4 +13,4 @@ mod tools;
 mod transcript;
 
 pub use adapter::ClaudeCode;
-pub use install::plugin_hooks_file;
+pub use install::{plugin_hooks_file, require_gap};
