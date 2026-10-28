@@ -18,7 +18,8 @@ The first version. It is alpha: tested on macOS; Linux and Windows build but are
 - **Safety rules.** wtpool refuses to repoint, free or remove a worktree with uncommitted files,
   an operation in progress or commits that no ref holds, and refuses when git cannot tell. A lock
   keeps two agents from taking the same slot. `free` and `fg` also refuse while an agent works or
-  waits in a worktree they would detach or repoint, unless `--force`.
+  waits in a worktree they would detach or repoint, unless `--force`. The session that runs the
+  command and its subagents do not count, so a session may repoint the worktree it works in.
 - **Settings.** `wtpool.toml` in the git common directory and `WTPOOL_*` variables set the
   foreground, the slot folder, prefix and count, the remote and the repository's heavy commands.
   `copy` and `on_new_slot` set up each new slot.

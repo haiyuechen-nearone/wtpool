@@ -9,7 +9,6 @@ use std::time::Duration;
 
 use super::config::{Limit, MachineConfig};
 use super::folder::JobFolder;
-use super::heavy_table::MAX_ANCESTORS;
 use super::queue::{Place, Standing, Turn};
 use super::record::{JobDraft, JobId};
 use super::{JOB_VARIABLE, JobError, JobPaths};
@@ -95,23 +94,7 @@ pub fn inside_live_job(
     job.and_then(OsStr::to_str)
         .and_then(JobId::parse)
         .and_then(|id| folder.live_record(&id))
-        .is_some_and(|record| is_ancestor(record.pid, processes))
-}
-
-/// `true` when the process `pid` is the parent of this process, or a parent's parent and so on.
-fn is_ancestor(pid: u32, processes: &impl ListProcesses) -> bool {
-    let parent_of = |child: &u32| {
-        let pids = [*child];
-        processes
-            .list(&ProcessQuery::only(&pids).with_parent())
-            .into_iter()
-            .find(|process| process.pid == *child)?
-            .parent
-    };
-    let parent = processes.this_process().and_then(|this| this.parent);
-    std::iter::successors(parent, parent_of)
-        .take(MAX_ANCESTORS)
-        .any(|ancestor| ancestor == pid)
+        .is_some_and(|record| processes.ancestors().contains(&record.pid))
 }
 
 /// The exit code of a job that ended as `ending` says, else, for an ending by a signal, no

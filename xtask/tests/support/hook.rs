@@ -197,12 +197,8 @@ impl Hooks {
         ]
     }
 
-    /// The command of one hook run, not yet started. Each run gets its own copy of the table, as
-    /// [`WRAPPER`] appends to it.
+    /// The command of one hook run, not yet started.
     pub fn command(&self, payload: &Value, options: &RunOptions) -> Command {
-        let number = RUNS.fetch_add(1, Ordering::SeqCst);
-        let copy = self.sandbox.root.join(format!("procs-run-{number}.jsonl"));
-        fs::copy(&self.table, &copy).expect("setup: copy the process table");
         let cwd = options.cwd.clone().unwrap_or_else(|| {
             payload["cwd"]
                 .as_str()
@@ -213,23 +209,35 @@ impl Hooks {
         } else {
             self.pool.fg.clone()
         };
-        let parent = options.parent.unwrap_or(CLAUDE).to_string();
-        let mut command = self.sandbox.command(Path::new("/bin/sh"), &cwd);
-        command
-            .arg(&self.wrapper)
-            .arg(&copy)
-            .arg(&parent)
-            .arg(now_micros())
-            .arg(must_wtpool_bin())
-            .arg("hook")
-            .args(&options.args)
-            .env("WTPOOL_VERIFY_CLOCK", &self.clock);
+        let args: Vec<&str> = std::iter::once("hook")
+            .chain(options.args.iter().map(String::as_str))
+            .collect();
+        let mut command = self.command_from(options.parent.unwrap_or(CLAUDE), &cwd, &args);
         for (key, value) in &options.envs {
             command.env(key, value);
         }
         for key in &options.remove {
             command.env_remove(key);
         }
+        command
+    }
+
+    /// The command `wtpool <args>` in `cwd` as a child of the fake process `parent`, with this
+    /// sandbox's clock, not yet started. Each run gets its own copy of the table, as [`WRAPPER`]
+    /// appends to it.
+    pub fn command_from(&self, parent: u32, cwd: &Path, args: &[&str]) -> Command {
+        let number = RUNS.fetch_add(1, Ordering::SeqCst);
+        let copy = self.sandbox.root.join(format!("procs-run-{number}.jsonl"));
+        fs::copy(&self.table, &copy).expect("setup: copy the process table");
+        let mut command = self.sandbox.command(Path::new("/bin/sh"), cwd);
+        command
+            .arg(&self.wrapper)
+            .arg(&copy)
+            .arg(parent.to_string())
+            .arg(now_micros())
+            .arg(must_wtpool_bin())
+            .args(args)
+            .env("WTPOOL_VERIFY_CLOCK", &self.clock);
         command
     }
 

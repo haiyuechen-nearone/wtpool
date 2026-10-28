@@ -5,10 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::record::JobRecord;
 use crate::heavy::{CommandWords, HeavyList};
-use crate::processes::RunningProcess;
-
-/// The ancestors followed from a process. A deeper one, or a loop, ends the walk.
-pub(super) const MAX_ANCESTORS: usize = 128;
+use crate::processes::{MAX_ANCESTORS, RunningProcess};
 
 /// The name a heavy pattern gives a process.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -16,6 +16,9 @@ pub use system::SystemProcesses;
 use crate::clock::Timestamp;
 pub use crate::platform::machine::host_name;
 
+/// The ancestors followed from a process. A deeper one, or a loop, ends the walk.
+pub const MAX_ANCESTORS: usize = 128;
+
 /// Lists the processes that run now.
 pub trait ListProcesses: Send + Sync {
     /// The processes `query` names, with the facts it asks for, in no set order.
@@ -29,6 +32,22 @@ pub trait ListProcesses: Send + Sync {
         self.list(&query)
             .into_iter()
             .rfind(|process| pids.contains(&process.pid))
+    }
+
+    /// The pids of this process's ancestors, the parent first, through at most
+    /// [`MAX_ANCESTORS`]. Empty when the table does not list this process or its parent.
+    fn ancestors(&self) -> Vec<u32> {
+        let parent_of = |child: &u32| {
+            let pids = [*child];
+            self.list(&ProcessQuery::only(&pids).with_parent())
+                .into_iter()
+                .find(|process| process.pid == *child)?
+                .parent
+        };
+        let parent = self.this_process().and_then(|this| this.parent);
+        std::iter::successors(parent, parent_of)
+            .take(MAX_ANCESTORS)
+            .collect()
     }
 }
 
@@ -242,6 +261,33 @@ mod tests {
         };
         assert_eq!(query, expected);
         assert_eq!(ProcessQuery::all().pids, None);
+    }
+
+    #[rstest]
+    #[case::two_parents(r#"{"pid":7,"ppid":8}
+{"pid":8}"#, vec![7, 8])]
+    #[case::a_loop_of_parents(r#"{"pid":7,"ppid":8}
+{"pid":8,"ppid":7}"#, [7, 8].repeat(MAX_ANCESTORS / 2))]
+    #[case::an_unlisted_parent("", vec![7])]
+    fn ancestors__should_follow_the_parents_of_this_process(
+        #[case] others: &str,
+        #[case] expected: Vec<u32>,
+    ) {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("procs.jsonl");
+        let own = format!(r#"{{"pid":{},"ppid":7}}"#, std::process::id());
+        std::fs::write(&path, format!("{own}\n{others}")).unwrap();
+        let listed = ProcessTable::from_file(Some(path.clone()));
+        std::fs::write(dir.path().join("none.jsonl"), others).unwrap();
+        let unlisted = ProcessTable::from_file(Some(dir.path().join("none.jsonl")));
+
+        // When
+        let ancestors = listed.ancestors();
+
+        // Then
+        assert_eq!(ancestors, expected);
+        assert_eq!(unlisted.ancestors(), Vec::<u32>::new());
     }
 
     #[test]

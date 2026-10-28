@@ -3,9 +3,10 @@
 use super::*;
 
 /// Writes the record `key` of a live `claude` placed in `worktree`, its pid 7001 plus the
-/// number in the key.
+/// number of the session in the key.
 fn live_record(fixture: &crate::status::fixture::Fixture, key: &str, worktree: &str, state: &str) {
-    let pid = 7000 + key.trim_start_matches('s').parse::<u32>().unwrap();
+    let session = key.split('.').next().unwrap().trim_start_matches('s');
+    let pid = 7000 + session.parse::<u32>().unwrap();
     let text = format!(
         r#"{{"version":1,"worktree":"{}","state":"{state}","label":"{key}","updated":"2026-10-20T12:00:00Z","process":{{"pid":{pid},"started":"2026-10-20T11:00:00Z"}}}}"#,
         fixture.root.join(worktree).display()
@@ -203,7 +204,7 @@ fn pool_actors_at__should_give_the_document_actors_without_reading_git_facts() {
         &sources,
     )
     .unwrap();
-    let found = actors.at(&[&wt1, &x, &fixture.root], now);
+    let found = actors.at(&[&wt1, &x, &fixture.root], now, &[]);
 
     // Then
     assert_eq!(
@@ -229,4 +230,35 @@ fn pool_actors_at__should_give_the_document_actors_without_reading_git_facts() {
             .all(|tracked| tracked.last_change.is_none())
     );
     assert_eq!(state.repository.name, "");
+}
+
+#[test]
+fn pool_actors_at__should_leave_out_the_actors_of_the_skipped_processes() {
+    // Given
+    let fixture = must_fixture();
+    live_record(&fixture, "s1", "wt1", "working");
+    live_record(&fixture, "s1.a1", "wt1", "working");
+    live_record(&fixture, "s2", "wt1", "working");
+    let processes = vec![claude_at(7001), claude_at(7002)];
+    let now = Timestamp::parse("2026-10-20T12:00:10Z").unwrap();
+    let sources = fixed_sources(FixedClock, FixedProcesses::new(processes), None);
+    let wt1 = fixture.root.join("wt1");
+
+    // When
+    let actors = PoolActors::load(
+        GitMode::ReadOnly,
+        fixture.config(),
+        fixture.common.clone(),
+        &sources,
+    )
+    .unwrap();
+    let left = actors.at(&[&wt1], now, &[7001]);
+    let all = actors.at(&[&wt1], now, &[]);
+
+    // Then
+    let keys = |found: &[Vec<crate::status::document::Actor>]| -> Vec<String> {
+        found[0].iter().map(|actor| actor.key.clone()).collect()
+    };
+    assert_eq!(keys(&left), vec!["s2"]);
+    assert_eq!(keys(&all), vec!["s1", "s1.a1", "s2"]);
 }

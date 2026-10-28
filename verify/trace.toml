@@ -549,6 +549,7 @@ checks = [
   "force__should_skip_the_agent_guard",
   "guard__should_never_refuse_for_idle_done_or_elsewhere_agents",
   "free__should_name_an_agent_by_its_escaped_label_else_its_key",
+  "guard__should_skip_only_the_agents_of_the_calling_session",
 ]
 
 [ids.X13]

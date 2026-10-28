@@ -270,3 +270,5 @@ accept scrub-titles 321ef8089981d356128e7f6e69fecfc71fce48eca04908f3a617e43ea4bc
 accept task-path-after-resume ccc6d5b1da2208f2ed8e4686774f3f8c994ce3f517f4dcd1b0853122b4a84a72
 # The machine strip shows each state of a save: Saving…, Saved., the refusal and no answer; one render check and two shot states cover it.
 accept strip-save-feedback a13eeabf347db750cff64569a3afc256179394e68982275cab30f65c978212a1
+# The session that runs fg or free, and its subagents, are left out of the agent guard, so a session may repoint the worktree it works in; one int check covers it.
+accept fg-own-session d437ee073e820e54f44c0241301cdad981178caa0523caee913c08fc831ec203

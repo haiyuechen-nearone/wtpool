@@ -1,5 +1,6 @@
 //! The agent guard of `wtpool free` and `wtpool fg`: each refuses while an agent works or waits
-//! in a worktree it would detach or repoint, and `--force` skips it.
+//! in a worktree it would detach or repoint, unless the agent belongs to the session that runs
+//! the command, and `--force` skips it.
 
 use std::ffi::OsStr;
 use std::fs;
@@ -9,11 +10,16 @@ use rstest::rstest;
 use serde_json::{Value, json};
 use xtask::pool::{PoolSpec, WorktreeSpec};
 
-use crate::support::hook::{Hooks, START, add_seconds, catalog_spec, event, with};
+use crate::support::hook::{
+    CLAUDE, CLAUDE_STARTED, Hooks, RunOptions, START, add_seconds, catalog_spec, event, with,
+};
 use crate::support::{must_wtpool_bin, worktree};
 
 /// The branch wt1 holds and `fg` brings to the foreground.
 const BRANCH: &str = "feature-a";
+
+/// The pid of a second fake `claude`, the harness of another session.
+const OTHER_CLAUDE: u32 = 7002;
 
 /// A label with an OSC 52 clipboard write in its C1 form and a bidi override.
 const HOSTILE_LABEL: &str = "fix\u{9d}52;c;aGk=\u{9c} \u{202e}txt.exe";
@@ -93,6 +99,37 @@ fn agent(hooks: &Hooks, name: &str, state: &str) -> &'static str {
     "s1"
 }
 
+/// Leaves the subagent `s1.a1` working in the worktree `name`, with its session `s1` working in
+/// fg, and returns its key.
+fn working_subagent(hooks: &Hooks, name: &str) -> &'static str {
+    send(hooks, "UserPromptSubmit", "s1", &[]);
+    send(hooks, "PreToolUse-Agent", "s1", &[]);
+    send(hooks, "SubagentStart", "s1", &subagent(&[]));
+    let read = read_in(hooks, name, "toolu_sub_read");
+    send(hooks, "PreToolUse-Read-subagent", "s1", &subagent(&read));
+    "s1.a1"
+}
+
+/// Leaves the session `s2` of the second `claude`, [`OTHER_CLAUDE`], working in fg, and returns
+/// its key.
+fn other_session_working(hooks: &mut Hooks) -> &'static str {
+    let fg = hooks.pool.fg.clone();
+    hooks.start(OTHER_CLAUDE, "claude", &fg, CLAUDE_STARTED);
+    let options = RunOptions {
+        parent: Some(OTHER_CLAUDE),
+        ..RunOptions::default()
+    };
+    let read = read_in(hooks, "fg", "toolu_read_s2");
+    for payload in [
+        hooks.event("UserPromptSubmit", "s2", &[]),
+        hooks.event("PreToolUse-Read", "s2", &read),
+    ] {
+        let run = hooks.run_with(&payload, &options);
+        assert_eq!(run.code(), Some(0), "setup: {}", run.describe());
+    }
+    "s2"
+}
+
 /// The actor `key` of the worktree `name` in a fresh `wtpool status --json`.
 fn must_actor(hooks: &Hooks, name: &str, key: &str) -> Value {
     let document = hooks.status();
@@ -109,6 +146,14 @@ fn wtpool(hooks: &Hooks, args: &[&str]) -> Output {
     hooks
         .sandbox
         .run_in(&must_wtpool_bin(), args, &hooks.pool.fg, &envs)
+}
+
+/// `wtpool args` as a shell call of the session of [`CLAUDE`] runs it: a child of that process.
+fn wtpool_from_claude(hooks: &Hooks, args: &[&str]) -> Output {
+    hooks
+        .command_from(CLAUDE, &hooks.pool.fg, args)
+        .output()
+        .expect("setup: start wtpool")
 }
 
 /// The branch the worktree `name` has checked out, `None` when detached.
@@ -311,6 +356,58 @@ fn guard__should_never_refuse_for_idle_done_or_elsewhere_agents(
 
     // Then
     let case = format!("{verb} with {key} {state} in {name}");
+    assert!(output.status.success(), "{case}: {}", describe(&output));
+    assert_eq!(
+        branch_of(&hooks, "wt1"),
+        None,
+        "{case}: wt1 kept its branch"
+    );
+    let foreground = if verb == "fg" { BRANCH } else { "main" };
+    assert_eq!(
+        branch_of(&hooks, "fg").as_deref(),
+        Some(foreground),
+        "{case}: the foreground"
+    );
+}
+
+#[rstest]
+#[case::fg_past_its_own_session("fg", "fg", "session", false)]
+#[case::fg_past_its_own_subagent("fg", "fg", "subagent", false)]
+#[case::free_past_its_own_subagent("free", "wt1", "subagent", false)]
+#[case::fg_refused_for_another_session("fg", "fg", "other", true)]
+fn guard__should_skip_only_the_agents_of_the_calling_session(
+    #[case] verb: &str,
+    #[case] name: &str,
+    #[case] actor: &str,
+    #[case] refused: bool,
+) {
+    // Given
+    let mut hooks = Hooks::must_with("guard-caller", &spec());
+    let key = match actor {
+        "session" => agent(&hooks, name, "working"),
+        "subagent" => working_subagent(&hooks, name),
+        _ => other_session_working(&mut hooks),
+    };
+    let shown = must_actor(&hooks, name, key);
+    assert_eq!(
+        shown["state"], "working",
+        "setup: the state of {key} in {name}"
+    );
+    let args = if verb == "free" {
+        ["free", "wt1"]
+    } else {
+        ["fg", BRANCH]
+    };
+
+    // When
+    let output = wtpool_from_claude(&hooks, &args);
+
+    // Then
+    let case = format!("{verb} from the session of claude {CLAUDE} with {key} working in {name}");
+    if refused {
+        assert_refused(&hooks, &output, name, &shown, &case);
+        return;
+    }
     assert!(output.status.success(), "{case}: {}", describe(&output));
     assert_eq!(
         branch_of(&hooks, "wt1"),

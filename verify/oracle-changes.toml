@@ -1862,3 +1862,13 @@ reason = "A click on Save in the machine strip gave no visible feedback while th
 "verify/trace.toml" = "34cd81690cecdfc8254ef8baeaf33e21b361ab90177d1bfea9250a06bb44ebbb"
 "vscode/test/render/jobs-save.test.mjs" = "19e8bef21d7fdeec9be71574dad70970f1fdce41916c9b103cfcb87c5b9e19b1"
 "vscode/test/shot/jobs.spec.mjs" = "b0a1e1f37972114cb1a1b86643999f10343758d08de36a69c2128c83bb7c3acd"
+
+[[change]]
+id = "fg-own-session"
+reason = "The main agent of a session could not bring a PR into the foreground it works in and then review it there with a subagent: the hook records its in-flight wtpool fg call in the foreground, so X12's guard saw the caller itself as a working actor and refused, leaving --force as the only way. X12, status-panel.md revision 35: the calling session does not count: an actor whose harness process (process.pid on its record, H19) is an ancestor of the wtpool process that runs fg or free, and every subagent of that session, which shares that process, are left out of the check, so a session may repoint or detach the worktree it works in itself; the agents of other sessions refuse as before, with the same text; when the ancestry cannot be read, without a process table or for a record without a process, nothing is left out, as before. The extension's dialogs and their --force are unchanged. New int check guard__should_skip_only_the_agents_of_the_calling_session (fg past the caller's own working session in fg, fg past its own subagent in fg, free of a slot where only its own subagent works, and fg refused as today for a working session of another harness process), traced under X12 in trace.toml and verification.md; the hook fixture gains command_from, which runs any wtpool command as a child of a fake claude through the wrapper that the hook runs use."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "c34bc7c362d4753be2a6038e07e59bf66ed94356f018581c2d8bc930e1e8319a"
+"docs/design/status-panel/verification.md" = "77e6d3c60f9a2dc038321a4d7acf56a16fe75579e359a464ecb7ed176c1341a9"
+"verify/trace.toml" = "a83f00b942f1fdb0b70a6567f89e9c81f049d1e1665205ef9cdf0625b2b657f6"
+"xtask/tests/checks/agent_guard.rs" = "c7d9e402c896f782f2d03bcff18837527713ff061210d4bec7e43f298e8a43dd"
+"xtask/tests/support/hook.rs" = "1f7a777fa9ec872aaa535c0f7bf27edd3d641df7b4667ca09b64190abb242f1b"

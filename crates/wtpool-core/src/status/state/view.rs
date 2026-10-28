@@ -72,14 +72,15 @@ impl PoolActors {
         PoolState::read(Reach::Actors, git_mode, config, common, sources).map(Self)
     }
 
-    /// The actors of each worktree of `paths` at `now`, as the document shows them.
+    /// The actors of each worktree of `paths` at `now`, as the document shows them, but for
+    /// those whose harness process is among `skipped`.
     #[must_use]
-    pub fn at(&self, paths: &[&Path], now: Timestamp) -> Vec<Vec<Actor>> {
+    pub fn at(&self, paths: &[&Path], now: Timestamp, skipped: &[u32]) -> Vec<Vec<Actor>> {
         let state = &self.0;
         let counted = state.counted();
         let lists = state.job_lists();
         let work = state.work(&counted, &lists);
-        let actors = state.actors(now, &counted, &work);
+        let actors = state.actors(now, &counted, &work, skipped);
         paths
             .iter()
             .map(|path| {
@@ -208,8 +209,15 @@ impl PoolState {
         }
     }
 
-    /// The sorted actors of each worktree, in the order of the state's worktrees.
-    fn actors(&self, now: Timestamp, counted: &Counted<'_>, work: &Work<'_>) -> Vec<Vec<Actor>> {
+    /// The sorted actors of each worktree, in the order of the state's worktrees, but for those
+    /// whose harness process is among `skipped`.
+    fn actors(
+        &self,
+        now: Timestamp,
+        counted: &Counted<'_>,
+        work: &Work<'_>,
+        skipped: &[u32],
+    ) -> Vec<Vec<Actor>> {
         let building = |path: &Path, key: &str| {
             self.worktrees
                 .iter()
@@ -234,8 +242,14 @@ impl PoolState {
             .placed
             .iter()
             .map(|placed| {
+                let skipped = |record: &&&ActorRecord| {
+                    record
+                        .process
+                        .is_some_and(|process| skipped.contains(&process.pid))
+                };
                 let mut actors: Vec<Actor> = placed
                     .iter()
+                    .filter(|record| !skipped(record))
                     .filter_map(|record| agents::actor(record, &context))
                     .collect();
                 agents::sort(&mut actors);
@@ -250,7 +264,7 @@ impl PoolState {
         counted: &Counted<'_>,
         work: &Work<'_>,
     ) -> Vec<WorktreeStatus> {
-        let actors = self.actors(now, counted, work);
+        let actors = self.actors(now, counted, work, &[]);
         self.worktrees
             .iter()
             .zip(&work.builds)

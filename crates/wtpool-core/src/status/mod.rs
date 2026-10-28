@@ -53,16 +53,18 @@ pub fn status_line<C: ReadClock, P: ListProcesses>(
 }
 
 /// The actors of each worktree of `paths`, as the document of the pool of `config` shows them at
-/// the time of `sources`, read without the git facts the document also shows.
+/// the time of `sources`, read without the git facts the document also shows, but for those
+/// whose harness process is among `skipped`.
 pub(crate) fn actors_at(
     config: &Config,
     common: &Path,
     sources: &Sources,
     paths: &[&Path],
     git_mode: GitMode,
+    skipped: &[u32],
 ) -> Result<Vec<Vec<Actor>>, Error> {
     let actors = PoolActors::load(git_mode, config.clone(), common.to_path_buf(), sources)?;
-    Ok(actors.at(paths, sources.clock.now()))
+    Ok(actors.at(paths, sources.clock.now(), skipped))
 }
 
 #[cfg(test)]

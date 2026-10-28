@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use crate::error::{Error, Refusal};
+use crate::processes::ListProcesses;
 use crate::status::{self, Actor, ActorState, Sources};
 use crate::worktree::Worktree;
 
@@ -12,14 +13,14 @@ use super::Pool;
 #[derive(Clone, Copy)]
 pub enum AgentGuard<'a> {
     /// Refuse while an agent there works, waits or is quiet, as `wtpool status` reads it from
-    /// these [`Sources`].
+    /// these [`Sources`], unless it belongs to the session that runs the command.
     Refuse(&'a Sources),
     /// Go ahead whatever the agents there do, as `--force` asks.
     Force,
 }
 
 impl<F> Pool<F> {
-    /// Refuses the first of `worktrees` with a busy agent, unless `guard` is
+    /// Refuses the first of `worktrees` with a busy agent of another session, unless `guard` is
     /// [`AgentGuard::Force`].
     pub(super) fn refuse_busy_agents(
         &self,
@@ -35,7 +36,17 @@ impl<F> Pool<F> {
             .map(|worktree| worktree.path().as_path())
             .collect();
         let git_mode = self.git().mode();
-        let actors = status::actors_at(&self.config, common_dir, sources, &paths, git_mode)?;
+        // The session that runs this command, and its subagents, share the harness process that
+        // this one descends from, so a session may repoint or detach the worktree it works in.
+        let own_session = sources.processes.ancestors();
+        let actors = status::actors_at(
+            &self.config,
+            common_dir,
+            sources,
+            &paths,
+            git_mode,
+            &own_session,
+        )?;
         for (worktree, actors) in worktrees.iter().zip(actors) {
             let agents: Vec<String> = actors.iter().filter_map(busy).collect();
             if !agents.is_empty() {

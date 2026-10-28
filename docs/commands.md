@@ -354,7 +354,10 @@ Each name in `build_processes` counts as a one-word pattern of the repository, a
   and `rm` also refuse unreferenced commits. `fg` and `bg` check before any fetch or change.
 - `free` and `fg` also refuse while an agent works or waits in a worktree they would detach or
   move: the slot `free` names, and for `fg` the foreground and the slot that holds the branch. An
-  agent that went quiet while working counts, an idle or done one does not. The refusal names
+  agent that went quiet while working counts, an idle or done one does not. The session that runs
+  the command does not count: when the `wtpool` process descends from an agent's harness process,
+  that agent and the subagents of its session are left out, so a session may bring a branch into
+  the foreground it works in itself. Agents of other sessions refuse as before. The refusal names
   the worktree and each such agent there. `--force` skips this check.
 - A failed git command means unknown, and unknown means refuse.
 - `wtpool` reads `git status` without optional locks, so it never takes `index.lock` from an agent's
