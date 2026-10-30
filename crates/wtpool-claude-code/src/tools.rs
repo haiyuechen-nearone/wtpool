@@ -48,10 +48,11 @@ pub fn tool_path(tool: &str, input: &CallInput) -> ToolPath {
 mod tests {
     use rstest::rstest;
     use serde_json::json;
-    use wtpool_core::activity::Harness;
     use wtpool_core::activity::legacy_kind;
+    use wtpool_core::hook::Adapter;
 
     use super::*;
+    use crate::ClaudeCode;
 
     #[rstest]
     #[case::bash("Bash", CallKind::Shell)]
@@ -70,7 +71,7 @@ mod tests {
 
         // Then
         assert_eq!(kind, expected);
-        assert_eq!(legacy_kind(Harness::ClaudeCode, tool), expected);
+        assert_eq!(legacy_kind(&ClaudeCode::HARNESS, tool), expected);
     }
 
     #[rstest]

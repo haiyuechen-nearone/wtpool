@@ -253,16 +253,21 @@ impl Expiry {
         }
     }
 
-    /// `true` for an `ended` or dead record a week old, and for a `done` subagent a quarter hour
-    /// old that is not its worktree's newest.
+    /// `true` for an `ended` or dead record a week old, for a record of a shared process a week
+    /// old even while that process runs, as it runs other sessions, and for a `done` subagent a
+    /// quarter hour old that is not its worktree's newest.
     fn expired(&self, stem: &str, record: &Record) -> bool {
         let age = self.now.seconds_since(record.updated);
         let process = record.process.as_ref().map(recorded);
         let gone = record.state == State::Ended || !Liveness::SameStart.runs(process, &self.living);
+        let shared = record
+            .process
+            .as_ref()
+            .is_some_and(|process| process.shared);
         let newest = self.newest_done.get(&record.worktree).map(String::as_str) == Some(stem);
         let stale_done =
             record.is_subagent() && record.state == State::Done && age > QUARTER_HOUR && !newest;
-        (gone && age > WEEK) || stale_done
+        ((gone || shared) && age > WEEK) || stale_done
     }
 }
 

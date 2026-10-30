@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from '@playwright/test';
 
 import { everyActivity, mustValidate } from '../support/docs.mjs';
+import { rowOrder } from '../support/grammar.mjs';
 import { actionBoxes, boundaries, iconBoxes, stripBoundary, textContrast } from '../support/measure.mjs';
 import { THEME_NAMES } from '../support/page.mjs';
 import { changedPixels, inkBounds, pixelHelper } from '../support/pixels.mjs';
 import { away, clickRow, hoverActions, hoverRow, inViewport, rowIds, settle, short, showPlain, visualPanel } from '../support/states.mjs';
-import { bigCounts, stateDocuments, visualDocuments } from '../support/visual-docs.mjs';
+import { bigCounts, sliceOf, stateDocuments, visualDocuments } from '../support/visual-docs.mjs';
 
 /**
  * The most, in CSS px, an activity icon's longer ink side may differ from the median icon's. Glyph
@@ -17,47 +18,86 @@ const ICON_PX = 1;
 const ROW_CHANGE = 0.01;
 /** Share of a hovered action's pixels, with 3 px around it, that must change. */
 const ACTION_CHANGE = 0.02;
+/**
+ * The slices of the documents and of each state document's rows that one contrast test measures.
+ * The whole state loop in one test took about 40 s, so a slice keeps a test under about 20 s.
+ */
+const SLICES = 8;
+
+/** The worktrees a state document shows as rows, in the panel's order. */
+const rowsOf = (doc) => doc.pools.flatMap((pool) => rowOrder(pool.worktrees));
 
 test.describe.configure({ mode: 'parallel' });
 
 for (const theme of THEME_NAMES) {
-  test(`contrast__should_meet_aa_in_every_theme ${theme}`, async ({ page }) => {
-    // Given
-    const panel = await visualPanel(page, { theme, extraBodyClass: 'vscode-reduce-motion' });
-    const found = new Map();
-    let states = 0;
-    const measure = async (at) => {
-      states += 1;
-      for (const f of await page.evaluate(textContrast)) if (!found.has(f.key)) found.set(f.key, { ...f, at });
-    };
+  for (let k = 1; k <= SLICES; k += 1) {
+    test(`contrast__should_meet_aa_in_every_theme ${theme} ${k}/${SLICES}`, async ({ page }) => {
+      // Given
+      const panel = await visualPanel(page, { theme, extraBodyClass: 'vscode-reduce-motion' });
+      const documents = sliceOf(visualDocuments(), k, SLICES);
+      const found = new Map();
+      let states = 0;
+      let rows = 0;
+      const measure = async (at) => {
+        states += 1;
+        for (const f of await page.evaluate(textContrast)) if (!found.has(f.key)) found.set(f.key, { ...f, at });
+      };
 
-    // When
-    for (const item of visualDocuments()) {
-      await showPlain(page, panel, item.doc, { options: item.options, ms: 0 });
-      await measure(`${item.name} plain`);
-    }
-    for (const { name, doc } of stateDocuments()) {
-      await showPlain(page, panel, doc);
-      for (const id of await rowIds(page)) {
-        await hoverRow(page, id);
-        await measure(`${name} ${short(id)} hovered`);
-        await clickRow(page, id);
-        await measure(`${name} ${short(id)} selected and hovered`);
-        await away(page);
-        await settle(page);
-        await measure(`${name} ${short(id)} selected`);
-        await clickRow(page, id);
-        await away(page);
+      // When
+      for (const item of documents) {
+        await showPlain(page, panel, item.doc, { options: item.options, ms: 0 });
+        await measure(`${item.name} plain`);
       }
-    }
+      for (const { name, doc } of stateDocuments()) {
+        await showPlain(page, panel, doc);
+        const ids = await rowIds(page);
+        assert.equal(ids.length, rowsOf(doc).length, `setup: ${name} shows ${ids.length} of its ${rowsOf(doc).length} rows`);
+        for (const id of sliceOf(ids, k, SLICES)) {
+          await hoverRow(page, id);
+          await measure(`${name} ${short(id)} hovered`);
+          await clickRow(page, id);
+          await measure(`${name} ${short(id)} selected and hovered`);
+          await away(page);
+          await settle(page);
+          await measure(`${name} ${short(id)} selected`);
+          await clickRow(page, id);
+          await away(page);
+          rows += 1;
+        }
+      }
 
-    // Then
-    assert.ok(states > 100, `setup: only ${states} states measured`);
-    const low = [...found.values()].map((f) => `${f.key}: ${f.ratio}:1 under ${f.need}:1, first "${f.text}" at ${f.at}`);
-    assert.deepEqual(low, [], `text under WCAG AA contrast in ${theme}`);
-    assert.deepEqual(panel.errors, [], 'page errors');
-  });
+      // Then
+      const low = [...found.values()].map((f) => `${f.key}: ${f.ratio}:1 under ${f.need}:1, first "${f.text}" at ${f.at}`);
+      assert.deepEqual(low, [], `text under WCAG AA contrast in ${theme}`);
+      assert.deepEqual(panel.errors, [], 'page errors');
+      console.log(`contrast__should_meet_aa_in_every_theme ${theme} ${k}/${SLICES}: measured ${states} states, ${rows} rows`);
+    });
+  }
+}
 
+test('contrast__should_meet_aa_in_every_theme slices cover every document and row exactly once', async () => {
+  // Given
+  const documentNames = visualDocuments().map((d) => d.name);
+  const rowNames = stateDocuments().flatMap(({ name, doc }) => rowsOf(doc).map((w) => `${name} ${w.path}`));
+
+  // When
+  const slices = (names) => Array.from({ length: SLICES }, (_, i) => sliceOf(names, i + 1, SLICES));
+  const states = documentNames.length + 3 * rowNames.length;
+
+  // Then
+  assert.ok(states > 100, `setup: only ${states} states measured`);
+  for (const [what, names] of [
+    ['document', documentNames],
+    ['row', rowNames],
+  ]) {
+    const measured = slices(names).flat();
+    assert.equal(measured.length, names.length, `setup: the slices hold ${measured.length} ${what}s, not ${names.length}`);
+    assert.equal(new Set(measured).size, measured.length, `setup: a ${what} is in two slices`);
+    assert.deepEqual([...measured].sort(), [...names].sort(), `setup: the slices leave out a ${what}`);
+  }
+});
+
+for (const theme of THEME_NAMES) {
   test(`hover__should_show_in_every_theme ${theme}`, async ({ page, browser }) => {
     // Given
     const helper = await pixelHelper(browser);

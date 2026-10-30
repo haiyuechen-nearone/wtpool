@@ -166,12 +166,7 @@ pub fn edit_repository_heavy(
         if build_processes_changed {
             let base = edited.as_deref().unwrap_or(text);
             let rendered = build_processes.render()?;
-            edited = Some(set_value(
-                base,
-                TableName::Root,
-                BUILD_PROCESSES,
-                &rendered,
-            )?);
+            edited = set_value(base, TableName::Root, BUILD_PROCESSES, &rendered).map(Some)?;
         }
         Ok(edited)
     })?;

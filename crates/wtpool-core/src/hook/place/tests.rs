@@ -130,3 +130,24 @@ fn absolute__should_resolve_against_the_base(
     // Then
     assert_eq!(resolved, PathBuf::from(expected));
 }
+
+#[rstest]
+#[case::missing_parent("{root}/missing/../e.txt", "e.txt")]
+#[case::inside("{root}/wt1/a/b.txt", "a/b.txt")]
+#[case::other_spelling("{root}/fg/../wt1/c.txt", "c.txt")]
+#[case::outside("/elsewhere/d.txt", "d.txt")]
+#[case::unc_shaped("/{root}/wt1/a/b.txt", "b.txt")]
+fn file_target__should_name_the_path_inside_the_worktree(
+    #[case] text: &str,
+    #[case] expected: &str,
+) {
+    // Given
+    let (_dir, root) = must_pool();
+    let text = text.replace("{root}", &root.to_string_lossy());
+
+    // When
+    let target = file_target(&text, Path::new(&text), &root.join("wt1"));
+
+    // Then
+    assert_eq!(target, expected);
+}

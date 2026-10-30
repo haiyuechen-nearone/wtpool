@@ -1,0 +1,4 @@
+{"line":60,"t":1793302535439,"payload":{"v":1,"kind":"event","name":"session.execution.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76d6e3abffeZXdoqG1Kr30yWA"}}}
+{"line":82,"t":1793302535457,"payload":{"v":1,"kind":"event","name":"session.renamed","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76d6e3abffeZXdoqG1Kr30yWA","title":"Stub title err401"}}}
+{"line":84,"t":1793302535477,"payload":{"v":1,"kind":"event","name":"session.step.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76d6e3abffeZXdoqG1Kr30yWA","model":{"id":"scripted","providerID":"stub"}}}}
+{"line":86,"t":1793302535485,"payload":{"v":1,"kind":"event","name":"session.execution.failed","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76d6e3abffeZXdoqG1Kr30yWA","error":{"type":"provider.auth"}}}}

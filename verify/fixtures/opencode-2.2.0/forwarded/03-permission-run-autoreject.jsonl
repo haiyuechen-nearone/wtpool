@@ -1,0 +1,9 @@
+{"line":60,"t":1793302694076,"payload":{"v":1,"kind":"event","name":"session.execution.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76d477ffffe3nvsdQd2rRLbXV"}}}
+{"line":80,"t":1793302694089,"payload":{"v":1,"kind":"event","name":"session.renamed","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76d477ffffe3nvsdQd2rRLbXV","title":"Stub title s3a"}}}
+{"line":82,"t":1793302694110,"payload":{"v":1,"kind":"event","name":"session.step.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76d477ffffe3nvsdQd2rRLbXV","model":{"id":"scripted","providerID":"stub"}}}}
+{"line":87,"t":1793302694111,"payload":{"v":1,"kind":"hook","name":"tool.execute.before","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76d477ffffe3nvsdQd2rRLbXV","id":"call_s3a_0_0","tool":"shell","input":{"command":"echo held-permission-probe"}}}}
+{"line":94,"t":1793302694119,"payload":{"v":1,"kind":"event","name":"permission.asked","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76d477ffffe3nvsdQd2rRLbXV","id":"per_1892b88e7001QuFiZECZxzftG8","source":{"id":"call_s3a_0_0"}}}}
+{"line":97,"t":1793302694121,"payload":{"v":1,"kind":"event","name":"permission.replied","directory":"/sandbox/repo/fg","call":"call_s3a_0_0","data":{"sessionID":"ses_e76d477ffffe3nvsdQd2rRLbXV","requestID":"per_1892b88e7001QuFiZECZxzftG8","reply":"reject"}}}
+{"line":98,"t":1793302694121,"payload":{"v":1,"kind":"event","name":"session.tool.failed","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76d477ffffe3nvsdQd2rRLbXV","id":"call_s3a_0_0"}}}
+{"line":111,"t":1793302694143,"payload":{"v":1,"kind":"event","name":"session.text.delta","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76d477ffffe3nvsdQd2rRLbXV"}}}
+{"line":116,"t":1793302694152,"payload":{"v":1,"kind":"event","name":"session.execution.succeeded","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76d477ffffe3nvsdQd2rRLbXV"}}}

@@ -32,6 +32,7 @@ mod repository;
 mod resolve;
 mod run;
 mod settings;
+mod sha256;
 mod shell;
 pub mod status;
 #[cfg(test)]

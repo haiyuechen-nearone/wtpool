@@ -54,7 +54,8 @@ limit per machine, so they take turns.
    ```
 
    The plugin also gives Claude Code a skill that says the same, as
-   [Claude Code and other agent tools](#claude-code-and-other-agent-tools) says.
+   [Claude Code, OpenCode and other agent tools](#claude-code-opencode-and-other-agent-tools)
+   says. For OpenCode, give it the same line in its own instructions file, such as `AGENTS.md`.
 
 4. **Check.** `wtpool job ls` prints the limit, the policy, the heavy commands and the form to run
    them in, then the jobs. The panel's heading reads `acme/app · my-mac · jobs 2/6`. Click the
@@ -101,7 +102,7 @@ and do nothing else: they never queue, flag or refuse a command.
 |---|---|
 | `off` | Nothing is flagged. |
 | `warn`, the default | A heavy process outside a job reads `build: make (not queued)` in the panel, the heading counts it as `· 1 not queued`, and `wtpool job ls` lists it under `not queued`. |
-| `require` | As `warn`. Also, Claude Code refuses an agent's heavy shell command that no job wraps, before it runs, and names the wrapped command to run instead. |
+| `require` | As `warn`. Also, Claude Code refuses an agent's heavy shell command that no job wraps, before it runs, and names the wrapped command to run instead. OpenCode does the same when its plugin was printed with `--policy`. |
 
 Under `require`, an agent that runs `cd ~/code/app-wt1 && cargo test` through Bash gets this
 refusal, and nothing runs:
@@ -126,13 +127,19 @@ characters it lists the heavy commands instead:
   IDE build, is never refused. It shows as not queued.
 
 Start with `warn` to see what runs outside the queue, then run `wtpool job enforce require`.
-`require` refuses commands only through the Claude Code hook below, so while your
-`settings.json` neither enables the plugin nor holds the policy entry, `wtpool job enforce
-require`, `wtpool job enforce` and `wtpool job ls` add a note on stderr:
-`enforce = require refuses nothing in Claude Code yet`. The note names the settings file; it
-never appears under `off` or `warn`, in `wtpool job ls --json`, or without a settings file.
+`require` refuses commands only through the hooks below, so while nothing holds the policy,
+`wtpool job enforce require`, `wtpool job enforce` and `wtpool job ls` add a note on stderr for
+each harness that refuses nothing yet:
 
-## Claude Code and other agent tools
+- Claude Code: `enforce = require refuses nothing in Claude Code yet`, while your `settings.json`
+  neither enables the plugin nor holds the policy entry. The note names the settings file, and
+  never appears without one.
+- OpenCode: a note while the plugin file exists but was printed without `--policy`. It says how to
+  print the plugin with the policy and load it again. Without a plugin file there is no note.
+
+No note appears under `off` or `warn`, or in `wtpool job ls --json`.
+
+## Claude Code, OpenCode and other agent tools
 
 **Claude Code.** The refusal comes from `wtpool hook policy`, a sync `PreToolUse` hook for Bash,
 PowerShell and Monitor calls, with a 2 s timeout. It runs on every such call, under every policy,
@@ -155,10 +162,33 @@ says.
   before lacks it, and `wtpool hook install > /dev/null` then says `hooks missing:`. Merge the new
   entry as [Status and hook](status-and-hook.md#the-settings-block) says.
 
-**Other agent tools.** wtpool's policy has an adapter for Claude Code only. For any other tool,
-`require` acts as `warn`: its heavy commands outside a job show as not queued, and nothing refuses
-them. Give that tool the same instruction as the `CLAUDE.md` line, in its own instructions file,
-such as `AGENTS.md`.
+**OpenCode.** The refusal comes from the plugin, and only when you print it with the policy:
+
+```sh
+wtpool hook install --harness opencode --policy > ~/.config/opencode/plugins/wtpool/index.ts
+opencode service restart       # stops the sessions the service runs
+```
+
+Before each `shell` call the plugin runs `wtpool hook policy --harness opencode` and waits for it
+for at most 2 s. When `wtpool` prints one deny line, the plugin refuses the call with that reason,
+which OpenCode gives the model as the call's result, and the turn goes on. The reason is the one
+Claude Code gets, such as `wtpool: cargo test is heavy on this machine (enforce = require). Run
+it as: …`.
+
+- Anything else lets the call run: no output, a crash, a missing `wtpool`, or the 2 s passing.
+  The check fails open as Claude Code's does.
+- The policy judges the command as a POSIX shell command that does not run in the background.
+  OpenCode 2.2.0 sends no background flag, so the refusal of unbounded background waits that
+  Claude Code gets does not apply to OpenCode.
+- **Without `--policy`, `require` only warns for OpenCode:** its heavy commands outside a job show
+  as not queued, and nothing refuses them.
+- A plugin file printed without the policy stays as it is until you save a new one: updating
+  wtpool does not change it.
+
+**Other agent tools.** wtpool's policy has adapters for Claude Code and OpenCode. For any other
+tool, `require` acts as `warn`: its heavy commands outside a job show as not queued, and nothing
+refuses them. Give that tool the same instruction as the `CLAUDE.md` line, in its own
+instructions file, such as `AGENTS.md`.
 
 **Scripts and CI.** Put `wtpool job --` before the command, with a label if you like:
 `wtpool job --label nightly -- make test`. A wrapper script that other tools call can end in
@@ -173,7 +203,9 @@ such as `AGENTS.md`.
 - **A heavy command was not refused.** Check that the hooks hold the policy entry, with
   `wtpool hook install > /dev/null`, and that the command matches a pattern in `wtpool job ls`.
   `wtpool job ls` itself says `enforce = require refuses nothing in Claude Code yet` while the
-  entry is missing.
+  entry is missing. For OpenCode, check the plugin with `wtpool hook install --harness opencode
+  --policy > /dev/null`: its note must start `hooks present:` and say the policy is on, and the
+  service must have been restarted since you saved the plugin.
 - **A Gradle or Maven build does not show for long.** Its launcher script starts a JVM, which the
   process table names `java`, so the panel shows the build only while the `gradle` or `mvn` script
   itself runs. Add the pattern `java` to see more.

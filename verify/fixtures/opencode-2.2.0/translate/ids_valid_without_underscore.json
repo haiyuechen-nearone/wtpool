@@ -1,0 +1,42 @@
+{
+  "before": null,
+  "payload": {
+    "v": 1,
+    "kind": "event",
+    "name": "session.execution.started",
+    "directory": "{pool}/fg",
+    "data": {
+      "sessionID": "abc-123"
+    }
+  },
+  "after": {
+    "version": 1,
+    "harness": "opencode",
+    "session_id": "abc-123",
+    "agent_id": null,
+    "agent_type": null,
+    "label": "opencode 12:00",
+    "worktree": "{pool}/fg",
+    "placed_by": "cwd",
+    "state": "working",
+    "waiting": null,
+    "action": null,
+    "in_flight": [],
+    "done_ids": [],
+    "error": null,
+    "since": "2026-10-20T12:00:00Z",
+    "updated": "2026-10-20T12:00:00Z",
+    "process": {
+      "pid": 7101,
+      "started": "2026-10-20T11:00:00Z",
+      "shared": true
+    },
+    "first_cwd": "{pool}/fg",
+    "ended": null,
+    "title": null,
+    "transcript_offset": 0,
+    "subagents": [],
+    "tasks": []
+  },
+  "log": 0
+}

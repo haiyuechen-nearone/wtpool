@@ -9,6 +9,9 @@ use crate::clock::{Clock, SystemClock};
 use crate::jobs::JobPaths;
 use crate::processes::{self, ProcessTable, SystemProcesses};
 
+/// The variable that names the record stem of the session that runs a command.
+const SESSION_VAR: &str = "WTPOOL_SESSION";
+
 /// Where `wtpool status` reads the time, the process table, the machine's name, this user's
 /// heavy jobs and the name of the repository on its forge.
 pub struct Sources<C = Clock, P = ProcessTable> {
@@ -18,6 +21,9 @@ pub struct Sources<C = Clock, P = ProcessTable> {
     /// The repository a remote's URL names on the forge, as
     /// [`Forge::repository`](crate::Forge::repository) reads it.
     pub forge_repository: fn(&str) -> Option<String>,
+    /// The record stem of the session that runs this command, as `WTPOOL_SESSION` names it. A
+    /// harness that runs many sessions in one process sets it for the commands of each.
+    pub named_session: Option<String>,
 }
 
 /// The machine a document describes, and where this user's heavy jobs are on it.
@@ -47,8 +53,8 @@ impl Host {
 }
 
 impl Sources {
-    /// The system clock and process table, the [`Host::system`] of `var`, and the forge's names
-    /// of `forge_repository`.
+    /// The system clock and process table, the [`Host::system`] and the named session of `var`,
+    /// and the forge's names of `forge_repository`.
     #[must_use]
     pub fn system(
         var: impl Fn(&str) -> Option<OsString>,
@@ -57,6 +63,7 @@ impl Sources {
         Self {
             clock: Clock::System(SystemClock),
             processes: ProcessTable::System(SystemProcesses),
+            named_session: var(SESSION_VAR).and_then(|stem| stem.into_string().ok()),
             host: Host::system(var),
             forge_repository,
         }
@@ -113,6 +120,7 @@ mod tests {
         let pid = std::process::id();
         assert!(system.processes.list(&query).iter().any(|p| p.pid == pid));
         assert_eq!(system.host, files.host);
+        assert_eq!((files.named_session, system.named_session), (None, None));
         assert_eq!(
             (files.forge_repository)("acme/app").as_deref(),
             Some("acme/app")
@@ -135,5 +143,17 @@ mod tests {
         assert_eq!(host.jobs, JobPaths::from_env(var).ok());
         assert!(host.jobs.is_some_and(|jobs| jobs.config.starts_with(&home)));
         assert!(host.cores >= 1);
+    }
+
+    #[test]
+    fn system__should_name_the_session_of_wtpool_session() {
+        // Given
+        let var = |name: &str| (name == "WTPOOL_SESSION").then(|| "opencode-ses-a".into());
+
+        // When
+        let sources = Sources::system(var, |_| None);
+
+        // Then
+        assert_eq!(sources.named_session.as_deref(), Some("opencode-ses-a"));
     }
 }

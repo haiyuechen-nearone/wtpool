@@ -8,6 +8,29 @@ const WITH_SUBCOMMAND: [&str; 8] = [
     "git", "cargo", "gh", "nix", "npm", "wtpool", "docker", "kubectl",
 ];
 
+/// Programs that start a coding agent: a call that runs one moves its caller nowhere, as that
+/// agent works where it is told while its caller stays where it is.
+pub(crate) const AGENT_PROGRAMS: [&str; 18] = [
+    "claude",
+    "codex",
+    "copilot",
+    "cursor-agent",
+    "gemini",
+    "qwen",
+    "opencode",
+    "goose",
+    "amp",
+    "cline",
+    "droid",
+    "kiro-cli",
+    "junie",
+    "devin",
+    "auggie",
+    "crush",
+    "cn",
+    "aider",
+];
+
 /// Shells whose script, after an option word that holds `c`, is a command line of its own.
 pub(crate) const SHELLS: [&str; 4] = ["sh", "bash", "zsh", "dash"];
 
@@ -202,12 +225,14 @@ pub(super) fn shell_script(args: &[String]) -> Option<usize> {
     let mut command = false;
     let mut index: usize = 0;
     while let Some(arg) = args.get(index) {
-        if SHELL_VALUED.contains(&arg.as_str()) {
+        let valued = SHELL_VALUED.contains(&arg.as_str());
+        if !valued && !arg.starts_with(['-', '+']) {
+            return command.then_some(index);
+        }
+        if valued {
             index = index.saturating_add(1);
         } else if arg.starts_with('-') && !arg.starts_with("--") {
             command |= arg.contains('c');
-        } else if !arg.starts_with(['-', '+']) {
-            return command.then_some(index);
         }
         index = index.saturating_add(1);
     }

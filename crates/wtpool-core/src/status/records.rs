@@ -12,7 +12,8 @@ use super::outputs::{self, RecordedTask, TaskFields};
 use super::record_time::RecordTime;
 pub use crate::activity::State as RecordState;
 use crate::activity::{
-    CallKind, Harness, PlacedBy, RECORD_VERSION, Stem, WaitReason, legacy_kind, read_record_file,
+    CallKind, HarnessName, PlacedBy, RECORD_VERSION, Stem, WaitReason, legacy_kind,
+    read_record_file,
 };
 use crate::clock::Timestamp;
 use crate::platform::fs::{self, FileId};
@@ -68,6 +69,10 @@ pub struct ActorRecord {
     /// within a second.
     pub writer_started: i64,
     pub process: Option<RecordedProcess>,
+    /// The process runs many sessions at once, so no session of it replaces another.
+    pub shared: bool,
+    /// The newest model the actor used, as its harness names it.
+    pub model: Option<String>,
     /// A session's titles of its subagents by agent id, the newest last.
     pub subagents: Vec<SubagentTitle>,
     /// The background tasks the actor started.
@@ -161,6 +166,8 @@ struct RecordFields {
     subagents: Vec<SubagentTitle>,
     #[serde(default)]
     tasks: Vec<TaskFields>,
+    #[serde(default)]
+    model: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -168,6 +175,8 @@ struct ProcessFields {
     pid: u32,
     #[serde(default)]
     started: Option<String>,
+    #[serde(default)]
+    shared: bool,
 }
 
 impl RecordKey {
@@ -375,7 +384,10 @@ fn record_of(stem: &str, fields: RecordFields) -> Option<ActorRecord> {
     let harness = fields
         .harness
         .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| Harness::default().to_string());
+        .unwrap_or_else(|| HarnessName::LEGACY.to_string());
+    if !stem_of_harness(stem, &harness) {
+        return None;
+    }
     let call = |call: CallFields| call_of(&harness, call);
     Some(ActorRecord {
         in_flight: fields.in_flight.into_iter().map(call).collect(),
@@ -392,22 +404,35 @@ fn record_of(stem: &str, fields: RecordFields) -> Option<ActorRecord> {
         since,
         updated,
         writer_started: fields.writer_started,
+        shared: fields
+            .process
+            .as_ref()
+            .is_some_and(|process| process.shared),
         process: fields.process.map(|process| RecordedProcess {
             pid: process.pid,
             started: process.started.as_deref().and_then(Timestamp::parse),
         }),
         subagents: fields.subagents,
         tasks: outputs::tasks(fields.tasks),
+        model: fields.model.filter(|model| !model.is_empty()),
     })
 }
 
+/// `true` when `stem` is reserved for `harness`: any stem for [`HarnessName::LEGACY`], else one
+/// that starts with the name and `-`, so no record of one harness poses as another's.
+fn stem_of_harness(stem: &str, harness: &str) -> bool {
+    harness == HarnessName::LEGACY.as_str()
+        || stem
+            .strip_prefix(harness)
+            .is_some_and(|rest| rest.starts_with('-'))
+}
+
 /// A call with its kind. One without, as an older wtpool wrote it, takes the kind
-/// [`legacy_kind`] gives its tool, or [`CallKind::Other`] for a harness this wtpool does not know.
+/// [`legacy_kind`] gives its tool, or [`CallKind::Other`] when `harness` is no harness name.
 fn call_of(harness: &str, call: CallFields) -> RecordedCall {
     let kind = call.kind.unwrap_or_else(|| {
-        harness
-            .parse::<Harness>()
-            .map_or(CallKind::Other, |harness| legacy_kind(harness, &call.tool))
+        HarnessName::try_from(harness)
+            .map_or(CallKind::Other, |harness| legacy_kind(&harness, &call.tool))
     });
     RecordedCall { id: call.id, kind }
 }

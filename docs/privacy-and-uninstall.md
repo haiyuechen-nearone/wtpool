@@ -11,9 +11,10 @@ git common directory, which `git rev-parse --git-common-dir` prints, is `~/code/
 | What | Where | Who writes it |
 |---|---|---|
 | The binary | `~/.cargo/bin/wtpool`, or `$CARGO_HOME/bin/wtpool` | you, with `cargo install` |
-| The hooks, as the plugin | Claude Code's plugin folders, the marketplace `wtpool`, and `"wtpool@wtpool": true` under `enabledPlugins` in `~/.claude/settings.json`. The plugin also holds the skill `heavy-jobs` | Claude Code, when you install the plugin |
+| The hooks, as the plugin | Claude Code's plugin folders, the marketplace `wtpool`, and `"wtpool@wtpool": true` under `enabledPlugins` in `~/.claude/settings.json`. The plugin also holds the skills `heavy-jobs` and `delegate-agents` | Claude Code, when you install the plugin |
 | The hooks, by hand | the entries you merged into the `hooks` of `~/.claude/settings.json`, or of `settings.json` in `$CLAUDE_CONFIG_DIR`: one for each of 14 events, and the policy entry of heavy jobs | you. wtpool never writes that file |
-| Activity records | `~/code/app/.git/wtpool-activity/`: `<session_id>.json` per session and `<session_id>.<agent_id>.json` per subagent, each with a `.lock` file | `wtpool hook`. `wtpool setup` and every command that changes the pool create the folder |
+| The hooks, for OpenCode | `plugins/wtpool/index.ts` in OpenCode's config folder: `~/.config/opencode`, or `$XDG_CONFIG_HOME/opencode`, or `$OPENCODE_CONFIG_DIR` | you, by saving what `wtpool hook install --harness opencode` prints. wtpool never writes that file |
+| Activity records | `~/code/app/.git/wtpool-activity/`: `<session_id>.json` per Claude Code session and `<session_id>.<agent_id>.json` per subagent, `opencode-<session id>.json` and `opencode-<session id>.<child id>.json` for OpenCode, each with a `.lock` file | `wtpool hook`. `wtpool setup` and every command that changes the pool create the folder |
 | The gc stamp | `~/code/app/.git/wtpool-activity/gc.stamp`: one line, the time the last gc of old records began | `wtpool hook` after a session ends, at most once a day, and `wtpool hook gc` |
 | Settings | `~/code/app/.git/wtpool.toml` | you. `wtpool job heavy --repo`, which the panel's pattern editor runs, edits its `heavy` list in place. wtpool writes nothing else there |
 | The pool lock | `~/code/app/.git/wtpool.lock`, an empty file | every command that changes the pool, and `wtpool job heavy --repo` |
@@ -44,8 +45,10 @@ of ended calls, then the oldest calls in flight. A record that still does not fi
 written: the record on disk stays as it was, and the hook's log notes the skipped event. wtpool
 ignores a record that is larger. It holds:
 
-- the session and agent ids, the agent type, and the harness (`claude-code`);
-- the label: the session's title, or `session HH:MM`. A subagent's label is its agent type;
+- the session and agent ids, the agent type, and the harness (`claude-code` or `opencode`);
+- the label: the session's title, or `session HH:MM` (`opencode HH:MM` for OpenCode). A Claude Code
+  subagent's label is its agent type, an OpenCode subagent's the title of its session;
+- the newest model the agent used, such as `claude-opus-5-5` or `opencode/glm-5.3-flash-free`;
 - the worktree it works in, how it was placed there, and the folder it started in;
 - its state, what it waits for (`permission`, `question`, `plan approval`, `input`), and the
   error text of a failed turn, cut to 80 characters;
@@ -55,7 +58,8 @@ ignores a record that is larger. It holds:
 - a SHA 256 hash of the input of each call in flight and of a waiting call, which ties a
   permission prompt to its call. A hash does not show the input, but it can confirm a guess of a
   short one;
-- the pid and start time of the Claude Code process;
+- the pid and start time of the harness process, with `shared` for a process that runs many
+  sessions, such as OpenCode's server;
 - the titles of the newest 16 subagents: the description of the Agent call that started each,
   which the panel shows as its label;
 - how far the hook has read the transcript (a byte offset);
@@ -64,7 +68,8 @@ ignores a record that is larger. It holds:
 - timestamps.
 
 A record never holds prompt text, replies, command lines, command output, file contents or
-environment variables. Of a Bash command it keeps only the program name and that one subcommand
+environment variables. It does not hold `launched_by` either: `wtpool status` works that out from
+the process table each time. Of a Bash command it keeps only the program name and that one subcommand
 word, never another argument or anything inside `$(…)` or backquotes.
 
 Every stored string loses control, bidi and zero width characters and is cut to 80 characters,
@@ -78,12 +83,36 @@ labels to 40, with two exceptions:
 The full list of fields is in the spec,
 [status-panel.md](design/status-panel/status-panel.md#activity-records-any-harness).
 
-Session titles can reflect prompt content. Claude Code generates a title from your conversation,
-and the label keeps its first 40 characters.
+Session titles can reflect prompt content. Claude Code and OpenCode generate a title from your
+conversation, and the label keeps its first 40 characters.
 
 The panel shows the last lines of a background task's output. The extension reads them from the
 file Claude Code writes, on this machine, for the selected row only. Neither wtpool nor the
 extension copies that output anywhere.
+
+## What the OpenCode plugin sends
+
+The plugin is one TypeScript file that you save, from the text `wtpool hook install --harness
+opencode` prints. It runs inside OpenCode's server, with the permissions of that server, which are
+yours. For each hook and event of its list it starts `wtpool hook --harness opencode` and gives it
+one JSON payload on stdin. The payload holds only these fields:
+
+- the session's id, its root session's id for a subagent, and the folder of the plugin instance;
+- for a tool call: its id, the tool's name, and the call's `path`, `command` or `agent` input;
+- for a permission or a question: its id, the call it belongs to, and the reply;
+- the model's name and provider, a session's title, and the type of an error.
+
+It never sends a prompt, a message, a tool's output, a form's answer, a diff, a header, a
+credential or the environment, and it sends no payload over 1 MiB. A call's command and paths
+reach `wtpool`, as Claude Code's do, and the record keeps from them only what
+[a record holds](#what-a-record-holds) says. With `--policy`, the plugin also gives
+`wtpool hook policy --harness opencode` the command of each shell call.
+
+The plugin opens no socket, reads and writes no file and logs nothing, and it starts `wtpool` by
+argument list with no shell. `wtpool` opens no network connection either. OpenCode itself and its
+model provider talk to the network as they did before; wtpool takes no part in that. The plugin
+adds one variable to the environment of a session's shell calls, `WTPOOL_SESSION`, the stem of the
+session's record.
 
 ## What a job records
 
@@ -128,8 +157,8 @@ Only `git` and `gh` use the network on purpose, for PR and remote branch feature
 - A PR number or URL also runs `gh pr view`, which asks github.com for the PR's head.
 - The `on_new_slot` command you set may use the network. wtpool does not look at what it does.
 
-`wtpool hook`, `wtpool status`, `wtpool job` and the extension open no network connection
-themselves. Heavy jobs share the machine through lock files only, with no socket and no daemon.
+`wtpool hook`, `wtpool status`, `wtpool job`, the OpenCode plugin and the extension open no
+network connection themselves. Heavy jobs share the machine through lock files only, with no socket and no daemon.
 The lints `lint__no_socket_apis` and `lint__no_network_modules` enforce that in the code.
 
 The hook resolves the paths that the model writes in tool calls, before you approve the call. On
@@ -178,11 +207,16 @@ Do the steps in this order: the first one needs the `wtpool` binary, which the l
    git for-each-ref --format='delete %(refname)' refs/wtpool-backup/ | git update-ref --stdin
    ```
 
-4. **Remove the hooks.** For the plugin, run `/plugin uninstall wtpool@wtpool` and
+4. **Remove the hooks.** For the Claude Code plugin, run `/plugin uninstall wtpool@wtpool` and
    `/plugin marketplace remove wtpool` in Claude Code, or `claude plugin uninstall wtpool@wtpool`
    and `claude plugin marketplace remove wtpool` in a shell. This also removes the plugin's
-   `heavy-jobs` skill. For the block, delete from `~/.claude/settings.json` each hook entry whose
-   `command` is your `wtpool` and whose `args` are `["hook"]` or `["hook", "policy"]`.
+   `heavy-jobs` and `delegate-agents` skills. For the block, delete from
+   `~/.claude/settings.json` each hook entry whose `command` is your `wtpool` and whose `args` are
+   `["hook"]` or `["hook", "policy"]`. For OpenCode, delete the folder you saved the plugin in,
+   such as `rm -r ~/.config/opencode/plugins/wtpool`, and a copy in a project's
+   `.opencode/plugins/` if you made one. A running server keeps the plugin until it restarts:
+   `opencode service restart` unloads it, and stops the sessions the service runs. A plugin left
+   behind after you remove the binary does no harm: its calls to a missing `wtpool` change nothing.
 
 5. **Remove a daily job, if you made one.** wtpool needs none: the hook runs gc itself. An
    earlier wtpool asked for a cron or launchd job that runs `wtpool hook gc`. Delete its line
@@ -203,8 +237,8 @@ Do the steps in this order: the first one needs the `wtpool` binary, which the l
    Or `$XDG_STATE_HOME/wtpool` and `$XDG_CONFIG_HOME/wtpool`, when you set those variables.
 
 8. **Remove `wtpool job` from your instructions and scripts.** Delete the line about
-   `wtpool job ls` from your `CLAUDE.md`, or another agent's instructions file, if you added it,
-   and the `wtpool job --` before commands in your scripts.
+   `wtpool job ls` from your `CLAUDE.md`, or another agent's instructions file such as
+   OpenCode's, if you added it, and the `wtpool job --` before commands in your scripts.
 
 9. **Remove the binary:** `cargo uninstall wtpool`.
 

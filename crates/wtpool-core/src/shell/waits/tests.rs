@@ -64,6 +64,7 @@ fn found(command: &str) -> Option<Vec<(bool, bool)>> {
 #[case::for_loop("for i in 1 2 3; do sleep 10; curl -s localhost; done", &[])]
 #[case::arithmetic_for("for ((i = 0; i < 3; i++)); do sleep 1; done", &[])]
 #[case::sleep_alone("sleep 60", &[])]
+#[case::esac_after_a_word_of_an_item("case x in a) b; esac", &[])]
 #[case::quoted_loop("echo 'while :; do sleep 1; done'", &[])]
 #[case::keywords_as_arguments("echo while do sleep done", &[])]
 #[case::heredoc_body("cat <<EOF\nwhile :; do sleep 1; done\nEOF", &[])]
@@ -89,6 +90,12 @@ fn waits__should_find_each_loop_that_sleeps(
 #[case::stray_close("while :; do sleep 1; done )")]
 #[case::open_case("case x in a) sleep 1;;")]
 #[case::open_inner_script("sh -c 'while :; do sleep 1'")]
+#[case::close_of_a_for("for i in 1; do sleep 1; )")]
+#[case::item_end_outside_case("while :; do sleep 1;; done")]
+#[case::done_of_a_subshell("( done )")]
+#[case::done_of_a_case("case x in a) done;; esac")]
+#[case::esac_of_a_loop("while :; do esac; done")]
+#[case::esac_of_a_subshell("( esac )")]
 fn waits__should_read_nothing_of_a_line_it_cannot_read(#[case] command: &str) {
     // When
     let waits = found(command);

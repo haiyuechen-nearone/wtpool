@@ -88,7 +88,11 @@ fn harness_process(table: &impl ListProcesses, pid: u32) -> Option<HarnessProces
     let listed = table.list(&ProcessQuery::only(&pids).with_started());
     let parent = listed.into_iter().rfind(|process| process.pid == pid)?;
     let started = parent.started?.second().to_rfc3339();
-    Some(HarnessProcess { pid, started })
+    Some(HarnessProcess {
+        pid,
+        started,
+        shared: false,
+    })
 }
 
 #[cfg(test)]
@@ -131,6 +135,7 @@ mod tests {
         let expected = parent.map(|pid| HarnessProcess {
             pid,
             started: "2026-10-20T11:00:00Z".to_owned(),
+            shared: false,
         });
         assert_eq!(me.parent, expected);
     }

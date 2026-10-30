@@ -12,7 +12,8 @@ export default defineConfig({
   timeout: 180_000,
   // freeze sets WTPOOL_VERIFY_RETRIES=0, as it only needs each new check to fail once.
   retries: Number(process.env.WTPOOL_VERIFY_RETRIES ?? 2),
-  workers: 4,
+  // Every check opens its own page, so 8 of them, or WTPOOL_VERIFY_SHOT_WORKERS, run at once.
+  workers: Number(process.env.WTPOOL_VERIFY_SHOT_WORKERS ?? 8),
   fullyParallel: true,
   snapshotPathTemplate: path.join(here, '..', '..', '..', 'verify', 'shots', 'approved', '{arg}{ext}'),
   outputDir: path.join(runDir, 'shot', 'artifacts'),

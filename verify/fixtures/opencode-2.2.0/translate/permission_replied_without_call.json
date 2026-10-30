@@ -1,0 +1,103 @@
+{
+  "before": {
+    "version": 1,
+    "harness": "opencode",
+    "session_id": "ses-e76df7aa0ffe3vdlGbn0I4xCYq",
+    "agent_id": null,
+    "agent_type": null,
+    "label": "opencode 11:59",
+    "worktree": "{pool}/fg",
+    "placed_by": "cwd",
+    "state": "waiting",
+    "waiting": {
+      "reason": "permission",
+      "tool": "shell",
+      "target": "echo held-permission-probe",
+      "match": "3ae95ba3ae2fe491c527c52ecc919c1ee8e636be0da8ba8946d572e38cd2ce06",
+      "call": "call_s3a_0_0"
+    },
+    "action": {
+      "tool": "shell",
+      "target": "echo held-permission-probe"
+    },
+    "in_flight": [
+      {
+        "id": "call_s3a_0_0",
+        "tool": "shell",
+        "kind": "shell",
+        "target": "echo held-permission-probe",
+        "since": "2026-10-20T11:59:00Z",
+        "match": "3ae95ba3ae2fe491c527c52ecc919c1ee8e636be0da8ba8946d572e38cd2ce06"
+      }
+    ],
+    "done_ids": [],
+    "error": null,
+    "since": "2026-10-20T11:59:00Z",
+    "updated": "2026-10-20T11:59:00Z",
+    "writer_started": 1792495740000000,
+    "process": {
+      "pid": 7101,
+      "started": "2026-10-20T11:00:00Z",
+      "shared": true
+    },
+    "first_cwd": "{pool}/fg",
+    "ended": null,
+    "title": null,
+    "transcript_offset": 0,
+    "subagents": [],
+    "tasks": []
+  },
+  "payload": {
+    "v": 1,
+    "kind": "event",
+    "name": "permission.replied",
+    "directory": "{pool}/fg",
+    "data": {
+      "sessionID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq",
+      "requestID": "per_18920db44001utTTFFbMsF23PS",
+      "reply": "once"
+    }
+  },
+  "after": {
+    "version": 1,
+    "harness": "opencode",
+    "session_id": "ses-e76df7aa0ffe3vdlGbn0I4xCYq",
+    "agent_id": null,
+    "agent_type": null,
+    "label": "opencode 11:59",
+    "worktree": "{pool}/fg",
+    "placed_by": "cwd",
+    "state": "working",
+    "waiting": null,
+    "action": {
+      "tool": "shell",
+      "target": "echo held-permission-probe"
+    },
+    "in_flight": [
+      {
+        "id": "call_s3a_0_0",
+        "tool": "shell",
+        "kind": "shell",
+        "target": "echo held-permission-probe",
+        "since": "2026-10-20T11:59:00Z",
+        "match": "3ae95ba3ae2fe491c527c52ecc919c1ee8e636be0da8ba8946d572e38cd2ce06"
+      }
+    ],
+    "done_ids": [],
+    "error": null,
+    "since": "2026-10-20T12:00:00Z",
+    "updated": "2026-10-20T12:00:00Z",
+    "process": {
+      "pid": 7101,
+      "started": "2026-10-20T11:00:00Z",
+      "shared": true
+    },
+    "first_cwd": "{pool}/fg",
+    "ended": null,
+    "title": null,
+    "transcript_offset": 0,
+    "subagents": [],
+    "tasks": []
+  },
+  "log": 0
+}

@@ -8,7 +8,9 @@ use std::path::{Path, PathBuf};
 use super::Wanted;
 use super::builds::release_wtpool;
 use super::focus;
-use super::js::{PlaywrightRun, ResultsFile, every_wanted, playwright, run_config};
+use super::js::{
+    PlaywrightRun, ResultsFile, every_wanted, playwright, remove_short_links, run_config,
+};
 use crate::parts::Ctx;
 use crate::results::CheckResult;
 use crate::web::Format;
@@ -83,6 +85,7 @@ pub(super) fn e2e(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
         "vscode/test/e2e/playwright.config.mjs",
         &parallel,
     );
+    remove_short_links(ctx, "e2e");
     // Next, the checks that need webview focus to themselves, one at a time.
     let mut found = playwright(
         ctx,
@@ -109,6 +112,7 @@ pub(super) fn e2e(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
             ..parallel
         },
     );
+    remove_short_links(ctx, "e2e");
     found.extend(guard.finish());
     found.extend(focus::side_effects(ctx, "e2e"));
     found

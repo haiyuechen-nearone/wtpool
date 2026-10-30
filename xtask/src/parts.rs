@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::isolation::{self, Invocation, Places};
 use crate::results::{CheckResult, Reused, store_part};
+use crate::web::Registry;
 
 pub const NEXTEST_CONFIG: &str = "verify/nextest.toml";
 const VERSION_CHECK: &str = "version__should_list_version_commit_and_features";
@@ -56,7 +57,7 @@ impl Contract {
 }
 
 /// Every part that `--part` names.
-pub const PARTS: [&str; 5] = ["quick", "int", "ui", "bench", "cc"];
+pub const PARTS: [&str; 7] = ["quick", "int", "shot", "ui", "bench", "cc", "oc"];
 
 /// Runs `part` in `ctx` and stores its results in the run folder. A whole part copies an earlier
 /// passing result of the same inputs instead, unless `fresh` or a live `contract` asks for a run.
@@ -67,6 +68,7 @@ pub fn run_part(
     fresh: bool,
 ) -> Result<Vec<CheckResult>, String> {
     contract.check_parts(&[part])?;
+    check_only_part(ctx, part)?;
     let hash = if ctx.only.is_none() {
         Some(crate::reuse::input_hash(&ctx.root, ctx.phase, part)?)
     } else {
@@ -115,9 +117,11 @@ pub fn run_part(
             results
         }
         "int" => int::int(ctx),
+        "shot" => crate::layers::shot(ctx),
         "ui" => crate::layers::ui(ctx),
         "bench" => crate::layers::bench(ctx),
         "cc" => crate::layers::cc(ctx, contract.live(), contract.recorded()),
+        "oc" => crate::layers::oc(ctx),
         other => return Err(format!("unknown part {other}; parts: {}", PARTS.join(", "))),
     };
     let after = isolation::snapshot(&places, &ctx.run_dir);
@@ -132,6 +136,38 @@ pub fn run_part(
         None,
     )?;
     Ok(results)
+}
+
+/// Refuses an `--only` check that belongs to another part, which would otherwise run that part's
+/// layers with nothing to report.
+fn check_only_part(ctx: &Ctx, part: &str) -> Result<(), String> {
+    let Some(check) = ctx.only.as_deref() else {
+        return Ok(());
+    };
+    let Ok(registry) = Registry::load(&ctx.root) else {
+        return Ok(());
+    };
+    match only_part_problem(check, part, &registry.parts(check)) {
+        Some(problem) => Err(problem),
+        None => Ok(()),
+    }
+}
+
+/// The refusal of `check` for `part` when `owners`, the parts that run `check`, is not empty and
+/// does not hold `part`.
+fn only_part_problem(
+    check: &str,
+    part: &str,
+    owners: &std::collections::BTreeSet<&'static str>,
+) -> Option<String> {
+    if owners.is_empty() || owners.contains(part) {
+        return None;
+    }
+    let owners: Vec<&str> = owners.iter().copied().collect();
+    Some(format!(
+        "--only {check} runs in the {} part, not {part}",
+        owners.join(" or ")
+    ))
 }
 
 fn record_invocation(
@@ -193,5 +229,31 @@ mod tests {
 
         // Then
         assert_eq!(found.is_ok(), fits, "{found:?}");
+    }
+
+    #[rstest]
+    #[case::own_part("ui", &["ui"], None)]
+    #[case::a_shot_check_in_ui("ui", &["shot"], Some("the shot part"))]
+    #[case::an_e2e_check_in_shot("shot", &["ui"], Some("the ui part"))]
+    #[case::a_quick_check_in_shot("shot", &["quick"], Some("the quick part"))]
+    #[case::two_parts("bench", &["shot", "ui"], Some("the shot or ui part"))]
+    #[case::no_registered_part("shot", &[], None)]
+    fn only_part_problem__should_name_the_part_that_runs_the_check(
+        #[case] part: &str,
+        #[case] owners: &[&'static str],
+        #[case] mentions: Option<&str>,
+    ) {
+        // Given
+        let owners = owners.iter().copied().collect();
+
+        // When
+        let found = only_part_problem("a_check", part, &owners);
+
+        // Then
+        match (found, mentions) {
+            (None, None) => {}
+            (Some(message), Some(mentions)) => assert!(message.contains(mentions), "{message}"),
+            (found, mentions) => panic!("{found:?}, expected {mentions:?}"),
+        }
     }
 }

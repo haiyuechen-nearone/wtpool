@@ -6,8 +6,8 @@ use std::io;
 use serde::{Deserialize, Serialize};
 
 use crate::activity::{
-    ActorId, CallId, CallKind, Harness, MAX_RECORD_BYTES, PlacedBy, RECORD_VERSION, State, TaskId,
-    WaitReason, legacy_kind,
+    ActorId, CallId, CallKind, HarnessName, MAX_RECORD_BYTES, PlacedBy, RECORD_VERSION, State,
+    TaskId, WaitReason, legacy_kind,
 };
 use crate::clock::Timestamp;
 
@@ -23,8 +23,8 @@ pub const MAX_SUBAGENTS: usize = 16;
 pub struct Record {
     pub version: u32,
     /// The harness whose hooks write the record.
-    #[serde(default)]
-    pub harness: Harness,
+    #[serde(default = "legacy_harness")]
+    pub harness: HarnessName,
     pub session_id: ActorId,
     pub agent_id: Option<ActorId>,
     pub agent_type: Option<String>,
@@ -64,6 +64,9 @@ pub struct Record {
     /// [`MAX_TASKS`](super::tasks::MAX_TASKS).
     #[serde(default)]
     pub tasks: Vec<Task>,
+    /// The newest model the harness names for the actor, `None` while it names none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
 }
 
 /// A session's title and who gave it.
@@ -137,6 +140,12 @@ impl Wait {
         }
     }
 
+    /// `true` for a wait that names no call, as a notification sets one.
+    #[must_use]
+    pub fn is_notified(&self) -> bool {
+        self.tool.is_none() && self.call.is_none()
+    }
+
     /// A wait on a call of `tool` at `target` whose input hashes to `input_hash`, bound to the
     /// call `id` once known.
     #[must_use]
@@ -182,6 +191,22 @@ pub struct Call {
 pub struct HarnessProcess {
     pub pid: u32,
     pub started: String,
+    /// The process runs many sessions at once
+    /// ([`ProcessMode::Shared`](super::adapter::ProcessMode::Shared)).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub shared: bool,
+}
+
+impl HarnessProcess {
+    /// `true` when `other` names the same process, whatever each says of its sessions.
+    #[must_use]
+    pub fn is(&self, other: &Self) -> bool {
+        self.pid == other.pid && self.started == other.started
+    }
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 impl Record {
@@ -213,7 +238,7 @@ impl Record {
     #[must_use]
     pub fn from_json(bytes: &[u8]) -> Option<Self> {
         let mut record: Self = serde_json::from_slice(bytes).ok()?;
-        let harness = record.harness;
+        let harness = &record.harness;
         for call in &mut record.in_flight {
             call.kind
                 .get_or_insert_with(|| legacy_kind(harness, &call.tool));
@@ -230,6 +255,10 @@ impl Record {
     pub fn is_subagent(&self) -> bool {
         self.agent_id.is_some()
     }
+}
+
+fn legacy_harness() -> HarnessName {
+    HarnessName::LEGACY
 }
 
 /// Appends `item` to `items`, then drops the oldest past `cap`.
@@ -413,7 +442,7 @@ mod tests {
         let parsed = Record::from_json(older.to_string().as_bytes()).unwrap();
 
         // Then
-        assert_eq!(parsed.harness, Harness::ClaudeCode);
+        assert_eq!(parsed.harness, HarnessName::LEGACY);
         let kinds: Vec<Option<CallKind>> = parsed.in_flight.iter().map(|c| c.kind).collect();
         assert_eq!(
             kinds,
@@ -471,6 +500,19 @@ mod tests {
         assert_eq!(record.updated, fixture::later(3));
     }
 
+    #[test]
+    fn from_json__should_read_a_record_of_any_harness() {
+        // Given
+        let text = WRITTEN.replace(r#""harness":"claude-code""#, r#""harness":"other-harness""#);
+
+        // When
+        let record = Record::from_json(text.as_bytes()).unwrap();
+
+        // Then
+        assert_eq!(record.harness.as_str(), "other-harness");
+        assert_eq!(String::from_utf8(record.to_json().unwrap()).unwrap(), text);
+    }
+
     #[rstest]
     #[case::session_id(r#""session_id":"s1""#, r#""session_id":"../s1""#)]
     #[case::done_id(r#""done_ids":["toolu_1"]"#, r#""done_ids":["a b"]"#)]
@@ -478,7 +520,9 @@ mod tests {
     #[case::subagent_id(r#""agent_id":"a2""#, r#""agent_id":"a_2""#)]
     #[case::updated(r#""updated":"2026-10-20T12:00:03Z""#, r#""updated":"noon""#)]
     #[case::task_end(r#""ended":"2026-10-20T12:00:04Z""#, r#""ended":"2026-10-20""#)]
-    fn from_json__should_refuse_an_id_or_time_outside_its_pattern(
+    #[case::harness(r#""harness":"claude-code""#, r#""harness":"Claude""#)]
+    #[case::empty_harness(r#""harness":"claude-code""#, r#""harness":"""#)]
+    fn from_json__should_refuse_a_value_outside_its_pattern(
         #[case] field: &str,
         #[case] replaced: &str,
     ) {

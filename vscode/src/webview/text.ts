@@ -248,6 +248,31 @@ export function actorFacts(actor: Actor): Piece[] {
   ];
 }
 
+/** Gives the label of every actor of `worktrees`, by key, for the launcher a session names. */
+export function actorLabels(worktrees: Worktree[]): ReadonlyMap<string, string> {
+  return new Map(
+    worktrees.flatMap((worktree) =>
+      worktree.actors.map((actor): [string, string] => [actor.key, actor.label]),
+    ),
+  );
+}
+
+/**
+ * Gives an actor's third line in the detail strip: its harness, its model when it names one and,
+ * for a launched session, the label of its launcher, else the launcher's key.
+ */
+export function harnessFacts(actor: Actor, labels: ReadonlyMap<string, string>): Piece[] {
+  const pieces = [theirs(actor.harness)];
+  if (actor.model) pieces.push(own(DOT), theirs(actor.model));
+  if (actor.launched_by) {
+    pieces.push(
+      own(`${DOT}launched by `),
+      theirs(labels.get(actor.launched_by) ?? actor.launched_by),
+    );
+  }
+  return pieces;
+}
+
 /** Gives the text of the live region for worktrees that started to wait. */
 export function waitAnnouncement(worktrees: Worktree[]): string {
   return worktrees.map((w) => `${visible(w.name)} is waiting`).join(', ');

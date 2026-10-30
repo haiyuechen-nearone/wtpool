@@ -1,6 +1,7 @@
 //! The actors of each worktree, read from the records and the process table.
 
 use super::*;
+use crate::status::launch::Caller;
 
 /// Writes the record `key` of a live `claude` placed in `worktree`, its pid 7001 plus the
 /// number of the session in the key.
@@ -152,7 +153,7 @@ fn document__should_keep_an_actor_working_by_the_kind_of_its_call() {
     );
     write("s3", 7003, r#""in_flight":[{"id":"t1","tool":"Bash"}],"#);
     write(
-        "s4",
+        "other-harness-s4",
         7004,
         r#""harness":"other-harness","in_flight":[{"id":"t1","tool":"Bash"}],"#,
     );
@@ -172,10 +173,10 @@ fn document__should_keep_an_actor_working_by_the_kind_of_its_call() {
     assert_eq!(
         actors,
         vec![
+            ("other-harness-s4", ActorState::Quiet, "other-harness"),
             ("s1", ActorState::Working, "claude-code"),
             ("s2", ActorState::Quiet, "claude-code"),
             ("s3", ActorState::Working, "claude-code"),
-            ("s4", ActorState::Quiet, "other-harness"),
         ]
     );
 }
@@ -204,7 +205,7 @@ fn pool_actors_at__should_give_the_document_actors_without_reading_git_facts() {
         &sources,
     )
     .unwrap();
-    let found = actors.at(&[&wt1, &x, &fixture.root], now, &[]);
+    let found = actors.at(&[&wt1, &x, &fixture.root], now, &Caller::default());
 
     // Then
     assert_eq!(
@@ -233,7 +234,7 @@ fn pool_actors_at__should_give_the_document_actors_without_reading_git_facts() {
 }
 
 #[test]
-fn pool_actors_at__should_leave_out_the_actors_of_the_skipped_processes() {
+fn pool_actors_at__should_leave_out_the_actors_of_the_calling_session() {
     // Given
     let fixture = must_fixture();
     live_record(&fixture, "s1", "wt1", "working");
@@ -252,8 +253,12 @@ fn pool_actors_at__should_leave_out_the_actors_of_the_skipped_processes() {
         &sources,
     )
     .unwrap();
-    let left = actors.at(&[&wt1], now, &[7001]);
-    let all = actors.at(&[&wt1], now, &[]);
+    let caller = Caller {
+        ancestors: &[7101, 7001, 1],
+        named_session: None,
+    };
+    let left = actors.at(&[&wt1], now, &caller);
+    let all = actors.at(&[&wt1], now, &Caller::default());
 
     // Then
     let keys = |found: &[Vec<crate::status::document::Actor>]| -> Vec<String> {
@@ -261,4 +266,133 @@ fn pool_actors_at__should_leave_out_the_actors_of_the_skipped_processes() {
     };
     assert_eq!(keys(&left), vec!["s2"]);
     assert_eq!(keys(&all), vec!["s1", "s1.a1", "s2"]);
+}
+
+/// Writes the `idle` record `key` of a shared process `pid` placed in `worktree`.
+fn shared_record(fixture: &crate::status::fixture::Fixture, key: &str, pid: u32, worktree: &str) {
+    let text = format!(
+        r#"{{"version":1,"harness":"opencode","worktree":"{}","state":"idle","label":"{key}","updated":"2026-10-20T12:00:00Z","process":{{"pid":{pid},"started":"2026-10-20T11:00:00Z","shared":true}},"model":"opencode/m"}}"#,
+        fixture.root.join(worktree).display()
+    );
+    std::fs::write(
+        fixture
+            .common
+            .join(ACTIVITY_DIR)
+            .join(format!("{key}.json")),
+        text,
+    )
+    .unwrap();
+}
+
+/// `claude` 7001 with the record `s1` in main, a shell 7101 under it, and under that an OpenCode
+/// server 8001 with the records `opencode-a` and `opencode-b` in wt1, and `make` under the server.
+fn launched_fixture() -> (crate::status::fixture::Fixture, Vec<RunningProcess>) {
+    let fixture = must_fixture();
+    live_record(&fixture, "s1", "main", "idle");
+    shared_record(&fixture, "opencode-a", 8001, "wt1");
+    shared_record(&fixture, "opencode-b", 8001, "x");
+    let child = |pid: u32, parent: u32, name: &str| RunningProcess {
+        parent: Some(parent),
+        started: StartTime::parse("2026-10-20T11:00:00Z"),
+        ..fixture.process(pid, name, "wt1")
+    };
+    let processes = vec![
+        claude_at(7001),
+        child(7101, 7001, "zsh"),
+        child(8001, 7101, "opencode"),
+        child(9, 8001, "make"),
+    ];
+    (fixture, processes)
+}
+
+#[test]
+fn document__should_link_a_launched_session_and_keep_its_build_from_the_launcher() {
+    // Given
+    let (fixture, processes) = launched_fixture();
+    let now = Timestamp::parse("2026-10-20T12:00:10Z").unwrap();
+
+    // When
+    let document = fixture.must_load(processes).document(now);
+
+    // Then
+    let wt1 = worktree(&document, "wt1");
+    let launched: Vec<(&str, Option<&str>, Option<&str>, ActorState)> = wt1
+        .actors
+        .iter()
+        .chain(&worktree(&document, "x").actors)
+        .map(|actor| {
+            (
+                actor.key.as_str(),
+                actor.launched_by.as_deref(),
+                actor.model.as_deref(),
+                actor.state,
+            )
+        })
+        .collect();
+    assert_eq!(
+        launched,
+        vec![
+            (
+                "opencode-a",
+                Some("s1"),
+                Some("opencode/m"),
+                ActorState::Idle
+            ),
+            (
+                "opencode-b",
+                Some("s1"),
+                Some("opencode/m"),
+                ActorState::Idle
+            ),
+        ]
+    );
+    assert_eq!(wt1.activity, Activity::Building);
+    let coordinator = &worktree(&document, "main").actors[0];
+    assert_eq!(
+        (
+            coordinator.state,
+            &coordinator.action,
+            &coordinator.launched_by
+        ),
+        (ActorState::Idle, &None, &None)
+    );
+}
+
+#[test]
+fn pool_actors_at__should_leave_out_the_sessions_the_caller_launched() {
+    // Given
+    let (fixture, processes) = launched_fixture();
+    let now = Timestamp::parse("2026-10-20T12:00:10Z").unwrap();
+    let sources = fixed_sources(FixedClock, FixedProcesses::new(processes), None);
+    let paths = [fixture.root.join("main"), fixture.root.join("wt1")];
+    let paths: Vec<&Path> = paths.iter().map(PathBuf::as_path).collect();
+    let actors = PoolActors::load(
+        GitMode::ReadOnly,
+        fixture.config(),
+        fixture.common.clone(),
+        &sources,
+    )
+    .unwrap();
+    let keys = |caller: &Caller<'_>| -> Vec<Vec<String>> {
+        actors
+            .at(&paths, now, caller)
+            .iter()
+            .map(|actors| actors.iter().map(|actor| actor.key.clone()).collect())
+            .collect()
+    };
+
+    // When
+    let coordinator = keys(&Caller {
+        ancestors: &[7102, 7001, 1],
+        named_session: None,
+    });
+    let launched = keys(&Caller {
+        ancestors: &[8101, 8001, 7101, 7001, 1],
+        named_session: Some("opencode-a"),
+    });
+
+    // Then
+    let none: Vec<String> = Vec::new();
+    assert_eq!(coordinator, vec![none.clone(), none.clone()]);
+    assert_eq!(launched, vec![vec!["s1".to_owned()], none]);
 }

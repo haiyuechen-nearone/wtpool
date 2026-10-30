@@ -35,12 +35,23 @@ enum Failure {
     UnknownCommand(String),
     /// `wtpool hook install` run from a binary the hooks cannot run.
     Refused(String),
+    /// `wtpool hook install --harness` with a name this binary does not register.
+    UnknownHarness(String),
     Job(JobCliError),
 }
 
 impl From<Error> for Failure {
     fn from(error: Error) -> Self {
         Self::Core(error)
+    }
+}
+
+impl From<hook::InstallError> for Failure {
+    fn from(error: hook::InstallError) -> Self {
+        match error {
+            hook::InstallError::Unknown(name) => Self::UnknownHarness(name),
+            hook::InstallError::Refused(message) => Self::Refused(message),
+        }
     }
 }
 
@@ -60,6 +71,10 @@ impl Failure {
                 vec![format!("unknown command '{command}'; try: wtpool help")]
             }
             Self::Refused(message) => vec![message.clone()],
+            Self::UnknownHarness(name) => vec![format!(
+                "unknown harness '{name}'; usage: wtpool hook install [--harness {}] [--policy]",
+                hook::Harness::names()
+            )],
             Self::Job(error) => vec![error.to_string()],
         }
     }
@@ -140,10 +155,10 @@ fn run(argv: &[OsString], terminal: &mut Terminal) -> Result<(), Failure> {
     match args::parse(argv)? {
         Action::Help => terminal.out(HELP),
         Action::Version => terminal.out(&version_text(&BUILD)),
-        Action::HookEvent => hook::run_hook(),
-        Action::HookPolicy => hook::run_policy(),
-        Action::HookInstall => {
-            let printed = hook::install_text().map_err(Failure::Refused)?;
+        Action::HookEvent { harness } => hook::run_hook(harness.as_deref()),
+        Action::HookPolicy { harness } => hook::run_policy(harness.as_deref()),
+        Action::HookInstall { harness, policy } => {
+            let printed = hook::install_text(harness.as_deref(), policy)?;
             terminal.out(&printed.stdout);
             terminal.err(&visible_lines(&printed.stderr));
         }
@@ -314,4 +329,23 @@ fn terminal_width() -> Option<usize> {
     }
     let (Width(width), _) = terminal_size::terminal_size_of(std::io::stdout())?;
     Some(usize::from(width)).filter(|&width| width > 0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::job::JobCliError;
+
+    #[test]
+    fn failure__should_print_the_job_error_as_wtpool_job_does() {
+        // Given
+        let failure = Failure::from(JobCliError::Usage);
+
+        // When
+        let messages = failure.messages();
+
+        // Then
+        assert_eq!(messages, vec![job::USAGE.to_owned()]);
+        assert_eq!(failure.exit_code(), 1);
+    }
 }

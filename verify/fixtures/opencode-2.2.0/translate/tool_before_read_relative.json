@@ -1,0 +1,90 @@
+{
+  "before": {
+    "version": 1,
+    "harness": "opencode",
+    "session_id": "ses-e76df7aa0ffe3vdlGbn0I4xCYq",
+    "agent_id": null,
+    "agent_type": null,
+    "label": "opencode 11:59",
+    "worktree": "{pool}/fg",
+    "placed_by": "cwd",
+    "state": "working",
+    "waiting": null,
+    "action": null,
+    "in_flight": [],
+    "done_ids": [],
+    "error": null,
+    "since": "2026-10-20T11:59:00Z",
+    "updated": "2026-10-20T11:59:00Z",
+    "writer_started": 1792495740000000,
+    "process": {
+      "pid": 7101,
+      "started": "2026-10-20T11:00:00Z",
+      "shared": true
+    },
+    "first_cwd": "{pool}/fg",
+    "ended": null,
+    "title": null,
+    "transcript_offset": 0,
+    "subagents": [],
+    "tasks": [],
+    "model": "stub/scripted"
+  },
+  "payload": {
+    "v": 1,
+    "kind": "hook",
+    "name": "tool.execute.before",
+    "directory": "{pool}/fg",
+    "data": {
+      "sessionID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq",
+      "id": "call_s1_0_0",
+      "tool": "read",
+      "input": {
+        "path": "../wt1/notes.txt"
+      }
+    }
+  },
+  "after": {
+    "version": 1,
+    "harness": "opencode",
+    "session_id": "ses-e76df7aa0ffe3vdlGbn0I4xCYq",
+    "agent_id": null,
+    "agent_type": null,
+    "label": "opencode 11:59",
+    "worktree": "{pool}/wt1",
+    "placed_by": "path",
+    "state": "working",
+    "waiting": null,
+    "action": {
+      "tool": "read",
+      "target": "notes.txt"
+    },
+    "in_flight": [
+      {
+        "id": "call_s1_0_0",
+        "tool": "read",
+        "kind": "other",
+        "target": "notes.txt",
+        "since": "2026-10-20T12:00:00Z",
+        "match": "{any}"
+      }
+    ],
+    "done_ids": [],
+    "error": null,
+    "since": "2026-10-20T11:59:00Z",
+    "updated": "2026-10-20T12:00:00Z",
+    "process": {
+      "pid": 7101,
+      "started": "2026-10-20T11:00:00Z",
+      "shared": true
+    },
+    "first_cwd": "{pool}/fg",
+    "ended": null,
+    "title": null,
+    "transcript_offset": 0,
+    "subagents": [],
+    "tasks": [],
+    "model": "stub/scripted"
+  },
+  "log": 0
+}

@@ -10,7 +10,8 @@ import { sleep } from './vscode.mjs';
 
 /** A line icon's box and the gap after it, in px. */
 const ICON_BOX = 14;
-const ICON_GAP = 5;
+/** The text starts after the state icon, the mark's box and the 5 px after each. */
+const ICON_GAP = 5 + ICON_BOX + 5;
 /** Agents of different records write a little over a second apart, so `updated` orders them. */
 const ACTOR_GAP_MS = 1100;
 
@@ -79,12 +80,12 @@ test('flow__several_agents_in_one_row', async () => {
       assert.equal(five.sameLine, true, 'the ×5 is not on the word\'s line, after it (U12)');
       assert.equal(five.activityHidden.trim(), ', 5 agents', `the cell does not read "<word>, 5 agents" to screen readers: ${JSON.stringify(five.activityHidden)} (U12)`);
       assert.deepEqual(others.filter((row) => row.count !== null).map((row) => row.id), [], 'a row with one agent line or none shows a count (U12)');
-      const prefixes = five.lines.map((line) => line.hidden.trimEnd());
+      const prefixes = five.lines.map((line) => line.hidden.match(/^[a-z]+(?:, API error)?:/)?.[0] ?? line.hidden.trimEnd());
       assert.deepEqual([...prefixes].sort(), ['done:', 'working:', 'working:', 'working:', 'working:'], `the agent lines do not start with their state for screen readers: ${JSON.stringify(prefixes)} (U13)`);
       for (const [index, line] of five.lines.entries()) {
         assert.ok(line.icon, `agent line ${index + 1} has no .line-icon (U13)`);
         assert.ok(Math.abs(line.icon.width - ICON_BOX) <= 0.5 && Math.abs(line.icon.height - ICON_BOX) <= 0.5, `agent line ${index + 1}'s icon box is ${line.icon.width}×${line.icon.height}, not 14 px (U13)`);
-        assert.ok(line.textLeft !== null && Math.abs(line.textLeft - line.icon.right - ICON_GAP) <= 1, `agent line ${index + 1}'s text starts ${line.textLeft - line.icon.right} px after its icon, not 5 (U13)`);
+        assert.ok(line.textLeft !== null && Math.abs(line.textLeft - line.icon.right - ICON_GAP) <= 1, `agent line ${index + 1}'s text starts ${line.textLeft - line.icon.right} px after its icon, not ${ICON_GAP} (U13)`);
         assert.equal(line.icon.skipped, true, `screen readers read agent line ${index + 1}'s icon (U13)`);
       }
       const done = five.lines.find((line) => line.hidden.startsWith('done'));

@@ -1,7 +1,7 @@
 use rstest::rstest;
 
 use super::*;
-use crate::activity::CallKind;
+use crate::activity::{CallId, CallKind};
 use crate::hook::fixture::later;
 
 fn at(text: &str) -> Timestamp {
@@ -13,6 +13,7 @@ fn call_id(id: &str) -> CallId {
 }
 
 mod merge;
+mod neutral;
 mod titles;
 
 /// The tools of a harness that wait for the user: `ask` for an answer, `plan` for a plan's
@@ -38,13 +39,14 @@ fn change(now: &str) -> Change {
 fn change_at(now: Timestamp) -> Change {
     Change {
         writer: Writer {
-            harness: Harness::ClaudeCode,
+            harness: HarnessName::LEGACY,
             waiting_tools: WAITING,
             now,
             started_micros: 10,
             process: Some(HarnessProcess {
                 pid: 7001,
                 started: "2026-10-20T11:00:00Z".to_owned(),
+                shared: false,
             }),
         },
         fresh: Fresh {
@@ -83,10 +85,13 @@ fn permission_wait() -> Vec<Event> {
     vec![
         Event::TurnStart,
         Event::CallStart(call("c1", "run", "h")),
-        Event::PermissionAsked(CallFacts {
-            id: None,
-            ..call("", "run", "h")
-        }),
+        Event::Wait(
+            WaitReason::Permission,
+            CallRef::Facts(CallFacts {
+                id: None,
+                ..call("", "run", "h")
+            }),
+        ),
     ]
 }
 
@@ -111,12 +116,12 @@ fn subagent(agent: &str, title: &str) -> SubagentTitle {
     Some(WaitReason::Permission)
 )]
 #[case::other_call_ends(
-    with(permission_wait(), &[Event::CallEnd(call("c9", "read", "r"))]),
+    with(permission_wait(), &[Event::CallEnd(CallRef::Facts(call("c9", "read", "r")))]),
     State::Waiting,
     Some(WaitReason::Permission)
 )]
 #[case::bound_call_ends(
-    with(permission_wait(), &[Event::CallEnd(call("c1", "run", "h"))]),
+    with(permission_wait(), &[Event::CallEnd(CallRef::Facts(call("c1", "run", "h")))]),
     State::Working,
     None
 )]
@@ -133,9 +138,9 @@ fn subagent(agent: &str, title: &str) -> SubagentTitle {
 #[case::request_before_pre(
     vec![
         Event::TurnStart,
-        Event::PermissionAsked(CallFacts { id: None, ..call("", "run", "h") }),
+        Event::Wait(WaitReason::Permission, CallRef::Facts(CallFacts { id: None, ..call("", "run", "h") })),
         Event::CallStart(call("c1", "run", "h")),
-        Event::CallEnd(call("c1", "run", "changed")),
+        Event::CallEnd(CallRef::Facts(call("c1", "run", "changed"))),
     ],
     State::Working,
     None
@@ -143,7 +148,7 @@ fn subagent(agent: &str, title: &str) -> SubagentTitle {
 #[case::unbound_wait_ends_by_batch_hash(
     vec![
         Event::TurnStart,
-        Event::PermissionAsked(CallFacts { id: None, ..call("", "run", "h") }),
+        Event::Wait(WaitReason::Permission, CallRef::Facts(CallFacts { id: None, ..call("", "run", "h") })),
         Event::CallsEnd(vec![CallFacts { id: None, ..call("", "run", "h") }]),
     ],
     State::Working,
@@ -153,7 +158,7 @@ fn subagent(agent: &str, title: &str) -> SubagentTitle {
 #[case::plan(vec![Event::CallStart(call("p", "plan", "h"))], State::Waiting, Some(WaitReason::Plan))]
 #[case::notified(vec![Event::Notified(WaitReason::Input)], State::Waiting, Some(WaitReason::Input))]
 #[case::notified_wait_ends_on_a_call_end(
-    vec![Event::Notified(WaitReason::Permission), Event::CallEnd(call("c", "read", "r"))],
+    vec![Event::Notified(WaitReason::Permission), Event::CallEnd(CallRef::Facts(call("c", "read", "r")))],
     State::Working,
     None
 )]
@@ -170,21 +175,30 @@ fn subagent(agent: &str, title: &str) -> SubagentTitle {
 #[case::request_replaces_a_notified_wait(
     vec![
         Event::Notified(WaitReason::Input),
-        Event::PermissionAsked(CallFacts { id: None, ..call("", "run", "h") }),
+        Event::Wait(WaitReason::Permission, CallRef::Facts(CallFacts { id: None, ..call("", "run", "h") })),
     ],
     State::Waiting,
     Some(WaitReason::Permission)
 )]
 #[case::second_request_keeps_the_first(
-    with(permission_wait(), &[Event::PermissionAsked(CallFacts { id: None, ..call("", "change", "e") })]),
+    with(permission_wait(), &[Event::Wait(WaitReason::Permission, CallRef::Facts(CallFacts { id: None, ..call("", "change", "e") }))]),
     State::Waiting,
     Some(WaitReason::Permission)
 )]
-#[case::idle_prompt(with(permission_wait(), &[Event::Idle]), State::Idle, None)]
-#[case::stop(with(permission_wait(), &[Event::TurnEnd(None)]), State::Idle, None)]
+#[case::idle_prompt(with(permission_wait(), &[Event::TurnEnd {
+        error: None,
+        subagents_done: true,
+    }]), State::Idle, None)]
+#[case::stop(with(permission_wait(), &[Event::TurnEnd {
+        error: None,
+        subagents_done: false,
+    }]), State::Idle, None)]
 #[case::subagent_start(vec![Event::SubagentStart], State::Working, None)]
 #[case::subagent_stop(vec![Event::SubagentStart, Event::SubagentEnd], State::Done, None)]
-#[case::cwd_changed(vec![Event::TurnEnd(None), Event::CwdChange], State::Idle, None)]
+#[case::cwd_changed(vec![Event::TurnEnd {
+        error: None,
+        subagents_done: false,
+    }, Event::CwdChange], State::Idle, None)]
 #[case::session_end(vec![Event::SessionEnd], State::Ended, None)]
 fn apply__should_follow_the_event_table(
     #[case] events: Vec<Event>,
@@ -200,8 +214,8 @@ fn apply__should_follow_the_event_table(
 }
 
 #[rstest]
-#[case::never_in_flight(vec![Event::CallEnd(call("c1", "change", "w"))])]
-#[case::after_its_pre(vec![Event::CallStart(call("c1", "change", "w")), Event::CallEnd(call("c1", "change", "w"))])]
+#[case::never_in_flight(vec![Event::CallEnd(CallRef::Facts(call("c1", "change", "w")))])]
+#[case::after_its_pre(vec![Event::CallStart(call("c1", "change", "w")), Event::CallEnd(CallRef::Facts(call("c1", "change", "w")))])]
 fn apply__should_name_the_ended_call(#[case] events: Vec<Event>) {
     // When
     let record = run(&events);
@@ -216,6 +230,27 @@ fn apply__should_name_the_ended_call(#[case] events: Vec<Event>) {
         })
     );
     assert_eq!(record.done_ids, vec![call_id("c1")]);
+}
+
+#[test]
+fn apply__should_name_no_ended_call_without_an_id() {
+    // Given
+    let started = run(&[Event::CallStart(call("c1", "change", "w"))]);
+
+    // When
+    let record = run(&[
+        Event::CallStart(call("c1", "change", "w")),
+        Event::CallEnd(CallRef::Facts(CallFacts {
+            id: None,
+            ..call("", "change", "w")
+        })),
+    ]);
+
+    // Then
+    assert_eq!(started.ended, None);
+    assert_eq!(record.ended, None);
+    assert_eq!(record.in_flight.len(), 1);
+    assert!(record.done_ids.is_empty());
 }
 
 #[test]
@@ -244,7 +279,10 @@ fn apply__should_finish_a_subagent_whose_turn_failed() {
     // When
     let failed = apply(
         Some(&subagent),
-        &Event::TurnEnd(Some("server_error".to_owned())),
+        &Event::TurnEnd {
+            error: Some("server_error".to_owned()),
+            subagents_done: false,
+        },
         &change("2026-10-20T12:00:05Z"),
     );
 
@@ -262,9 +300,15 @@ fn apply__should_finish_a_subagent_whose_turn_failed() {
 #[test]
 fn apply__should_keep_the_error_of_a_stop_failure() {
     // When
-    let failed = run(&[Event::TurnEnd(Some("rate_limit".to_owned()))]);
+    let failed = run(&[Event::TurnEnd {
+        error: Some("rate_limit".to_owned()),
+        subagents_done: false,
+    }]);
     let prompted = run(&[
-        Event::TurnEnd(Some("rate_limit".to_owned())),
+        Event::TurnEnd {
+            error: Some("rate_limit".to_owned()),
+            subagents_done: false,
+        },
         Event::TurnStart,
     ]);
 
@@ -279,7 +323,9 @@ fn apply__should_keep_32_calls_and_64_ended_ids() {
     let mut events: Vec<Event> = (0..40)
         .map(|n| Event::CallStart(call(&format!("p{n}"), "read", "r")))
         .collect();
-    events.extend((0..70).map(|n| Event::CallEnd(call(&format!("q{n}"), "read", "r"))));
+    events.extend(
+        (0..70).map(|n| Event::CallEnd(CallRef::Facts(call(&format!("q{n}"), "read", "r")))),
+    );
     events.push(Event::CallStart(call("q69", "read", "r")));
 
     // When
@@ -299,7 +345,10 @@ fn apply__should_time_since_from_the_state_change() {
     let record = run(&[
         Event::TurnStart,
         Event::CallStart(call("c", "read", "r")),
-        Event::TurnEnd(None),
+        Event::TurnEnd {
+            error: None,
+            subagents_done: false,
+        },
     ]);
     let working = run(&[Event::TurnStart, Event::CallStart(call("c", "read", "r"))]);
 
@@ -352,14 +401,14 @@ fn apply__should_move_only_to_another_worktree(
 #[case::question_during_a_permission_wait_then_its_post(
     with(
         permission_wait(),
-        &[Event::CallStart(call("q", "ask", "a")), Event::CallEnd(call("q", "ask", "a"))]
+        &[Event::CallStart(call("q", "ask", "a")), Event::CallEnd(CallRef::Facts(call("q", "ask", "a")))]
     ),
     State::Waiting,
     Some(WaitReason::Permission),
     Some("c1")
 )]
 #[case::late_question(
-    vec![Event::CallEnd(call("q", "ask", "a")), Event::CallStart(call("q", "ask", "a"))],
+    vec![Event::CallEnd(CallRef::Facts(call("q", "ask", "a"))), Event::CallStart(call("q", "ask", "a"))],
     State::Working,
     None,
     None
@@ -371,7 +420,7 @@ fn apply__should_move_only_to_another_worktree(
     None
 )]
 #[case::standing_call_ends_while_the_question_flies(
-    with(permission_wait(), &[Event::CallStart(call("q", "ask", "a")), Event::CallEnd(call("c1", "run", "h"))]),
+    with(permission_wait(), &[Event::CallStart(call("q", "ask", "a")), Event::CallEnd(CallRef::Facts(call("c1", "run", "h")))]),
     State::Waiting,
     Some(WaitReason::Question),
     Some("q")
@@ -387,14 +436,14 @@ fn apply__should_move_only_to_another_worktree(
         Event::CallStart(call("r", "read", "r")),
         Event::Notified(WaitReason::Permission),
         Event::CallStart(call("q", "ask", "a")),
-        Event::CallEnd(call("r", "read", "r")),
+        Event::CallEnd(CallRef::Facts(call("r", "read", "r"))),
     ],
     State::Waiting,
     Some(WaitReason::Question),
     Some("q")
 )]
 #[case::plan_after_its_post(
-    vec![Event::CallEnd(call("p", "plan", "a")), Event::CallStart(call("p", "plan", "a"))],
+    vec![Event::CallEnd(CallRef::Facts(call("p", "plan", "a"))), Event::CallStart(call("p", "plan", "a"))],
     State::Working,
     None,
     None

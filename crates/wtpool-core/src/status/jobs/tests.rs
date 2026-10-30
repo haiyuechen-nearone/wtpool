@@ -46,6 +46,8 @@ fn record(key: &str, harness: u32, target: Option<&str>, since: i64) -> ActorRec
         }),
         subagents: Vec::new(),
         tasks: Vec::new(),
+        shared: false,
+        model: None,
     }
 }
 
@@ -111,6 +113,39 @@ fn harnesses_actor_of__should_take_the_nearest_harness_and_its_call_on_the_summa
             None
         ]
     );
+}
+
+#[test]
+fn harnesses_actor_of__should_attribute_a_shared_process_job_by_its_call_only() {
+    // Given
+    let table = [
+        process(100, 1, &["claude"]),
+        process(110, 100, &["zsh"]),
+        process(120, 110, &["opencode", "serve"]),
+        process(121, 120, &["wtpool", "job", "--", "cargo", "test"]),
+        process(122, 120, &["wtpool", "job", "--", "cargo", "build"]),
+    ];
+    let shared = |key: &str, target: Option<&str>, since: i64| ActorRecord {
+        shared: true,
+        ..record(key, 120, target, since)
+    };
+    let records = [
+        record("s1", 100, Some("cargo build"), 0),
+        shared("opencode-a", Some("cargo test"), 10),
+        shared("opencode-b", None, 20),
+    ];
+    let records: Vec<&ActorRecord> = records.iter().collect();
+    let heavy = HeavyTable::new(&table, &HeavyList::default(), &HeavyList::default(), &[]);
+    let harnesses = Harnesses::new(&records);
+
+    // When
+    let actors = [
+        harnesses.actor_of(121, "cargo test", &heavy),
+        harnesses.actor_of(122, "cargo build", &heavy),
+    ];
+
+    // Then
+    assert_eq!(actors, [Some("opencode-a".to_owned()), None]);
 }
 
 #[test]
@@ -195,6 +230,105 @@ fn pool_folders_worktree_of__should_take_the_deepest_worktree() {
             None
         ]
     );
+}
+
+#[test]
+fn jobs_state_refresh_machine_config__should_read_the_config_again() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let config = dir.path().join("config/wtpool/machine.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    std::fs::write(&config, "[jobs]\nlimit = 2\n").unwrap();
+    let paths = JobPaths {
+        config,
+        folder: dir.path().join("state/wtpool/jobs"),
+    };
+    let mut state = JobsState {
+        machine: Some(MachineJobs::read(paths, 16)),
+        repository: RepositoryPatterns::default(),
+        suggested: Vec::new(),
+        markers: dir.path().to_path_buf(),
+    };
+    std::fs::write(
+        dir.path().join("config/wtpool/machine.toml"),
+        "[jobs]\nlimit = 5\n",
+    )
+    .unwrap();
+
+    // When
+    state.refresh_machine_config();
+    let mut without = JobsState {
+        machine: None,
+        ..state.clone()
+    };
+    without.refresh_machine_config();
+
+    // Then
+    assert_eq!(state.machine.as_ref().and_then(MachineJobs::limit), Some(5));
+    assert!(without.machine.is_none());
+}
+
+#[test]
+fn jobs_state_refresh_jobs__should_read_all_or_the_named_jobs() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let paths = JobPaths {
+        config: root.join("config/wtpool/machine.toml"),
+        folder: root.join("state/wtpool/jobs"),
+    };
+    let folder = crate::jobs::JobFolder::create(paths.folder.clone()).unwrap();
+    let (first, second, third) = (JobId::new(1), JobId::new(2), JobId::new(3));
+    let _held: Vec<_> = [&first, &second, &third]
+        .into_iter()
+        .map(|id| folder.create_lock(id).unwrap())
+        .collect();
+    let write = |id: &JobId, ticket| {
+        let record = JobRecord {
+            id: id.clone(),
+            ticket,
+            ..JobRecord::sample(9)
+        };
+        std::fs::write(
+            paths.folder.join(format!("{id}.json")),
+            serde_json::to_vec(&record).unwrap(),
+        )
+        .unwrap();
+    };
+    write(&first, 1);
+    write(&second, 2);
+    let mut state = JobsState {
+        machine: Some(MachineJobs::read(paths.clone(), 16)),
+        repository: RepositoryPatterns::default(),
+        suggested: Vec::new(),
+        markers: root.to_path_buf(),
+    };
+    std::fs::remove_file(paths.folder.join(format!("{second}.json"))).unwrap();
+    write(&third, 3);
+    let ids = BTreeSet::from([second.clone()]);
+
+    // When
+    state.refresh_jobs(&ids, false);
+    let one = state
+        .machine
+        .as_ref()
+        .map(|machine| machine.records().len())
+        .unwrap_or_default();
+    state.refresh_jobs(&BTreeSet::new(), true);
+    let all = state
+        .machine
+        .as_ref()
+        .map(|machine| machine.records().len())
+        .unwrap_or_default();
+    let mut without = JobsState {
+        machine: None,
+        ..state
+    };
+    without.refresh_jobs(&ids, true);
+
+    // Then
+    assert_eq!((one, all), (1, 2));
+    assert!(without.machine.is_none());
 }
 
 #[test]

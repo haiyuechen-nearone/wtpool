@@ -8,6 +8,7 @@ use rstest::rstest;
 
 use super::*;
 use crate::clock::Timestamp;
+use crate::jobs::JobPaths;
 use crate::status::document::GitStatus;
 use crate::status::fixture::{
     FixedClock, FixedProcesses, fixed_sources, https_path, must_fixture, must_git,
@@ -286,6 +287,82 @@ fn dirty(live: &Live<'_, FixedClock, FixedProcesses>) -> Option<u64> {
         .iter()
         .find(|w| w.name == "wt1")
         .and_then(|w| w.git.dirty)
+}
+
+#[test]
+fn live_refresh__should_read_a_made_folder_once_it_waits_for_one() {
+    // Given
+    let fixture = must_fixture();
+    let processes = FixedProcesses::default();
+    let paths = JobPaths {
+        config: fixture.root.join("home/.config/wtpool/machine.toml"),
+        folder: fixture.root.join("home/.state/wtpool/jobs"),
+    };
+    let sources = fixed_sources(FixedClock, processes.clone(), Some(paths.clone()));
+    let state = PoolState::load(fixture.config(), fixture.common.clone(), &sources).unwrap();
+    let (sender, _events) = std::sync::mpsc::channel();
+    let watcher =
+        notify::recommended_watcher(move |event| drop(sender.send(message_of(event)))).unwrap();
+    let mut live = Live::new(state, &sources).with_folders(JobFolders::new(watcher, Some(&paths)));
+    live.folders.as_mut().unwrap().watch_new();
+    let mut pending = Pending::default();
+    pending.machine_config = true;
+    pending.records.insert(OsString::from("none.json"));
+
+    // When
+    live.refresh(&pending, Instant::now());
+    let document = live.document();
+    let waited = live.folders.as_ref().is_some_and(JobFolders::waits);
+    std::fs::create_dir_all(&paths.folder).unwrap();
+    std::fs::create_dir_all(paths.config.parent().unwrap()).unwrap();
+    let mut jobs = Pending::default();
+    jobs.jobs.insert(crate::jobs::JobId::new(1));
+    live.refresh(&jobs, Instant::now());
+
+    // Then
+    assert!(document.machine.jobs.is_some());
+    assert!(waited);
+    assert!(!live.folders.as_ref().is_some_and(JobFolders::waits));
+}
+
+#[test]
+fn live_refresh__should_read_the_repository_config_and_the_jobs_again() {
+    // Given
+    let fixture = must_fixture();
+    let processes = FixedProcesses::default();
+    let paths = JobPaths {
+        config: fixture.root.join("home/.config/wtpool/machine.toml"),
+        folder: fixture.root.join("home/.state/wtpool/jobs"),
+    };
+    let sources = fixed_sources(FixedClock, processes.clone(), Some(paths.clone()));
+    let state = PoolState::load(fixture.config(), fixture.common.clone(), &sources).unwrap();
+    let mut live = Live::new(state, &sources);
+    std::fs::write(fixture.common.join("wtpool.toml"), "heavy = [\"just\"]\n").unwrap();
+    let mut pending = Pending::default();
+    pending.repository_config = true;
+    pending.all_jobs = true;
+
+    // When
+    live.refresh(&pending, Instant::now());
+
+    // Then
+    let document = live.document();
+    let jobs = document.machine.jobs.unwrap_or_else(|| panic!("no jobs"));
+    assert_eq!(
+        jobs.heavy
+            .iter()
+            .map(|entry| entry.pattern.as_str())
+            .collect::<Vec<_>>(),
+        ["just"]
+    );
+    assert_eq!(
+        document.pools[0]
+            .worktrees
+            .iter()
+            .flat_map(|worktree| worktree.builds.iter())
+            .count(),
+        0
+    );
 }
 
 fn records(name: &str) -> Pending {

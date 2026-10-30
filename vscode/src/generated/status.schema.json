@@ -56,6 +56,16 @@
           "description": "The session title, `session HH:MM`, or the subagent's type (H16).",
           "type": "string"
         },
+        "launched_by": {
+          "description": "The `key` of the session of another agent whose harness process this session's harness process descends from, read from the process table; absent without one (S17).",
+          "minLength": 1,
+          "type": "string"
+        },
+        "model": {
+          "description": "The newest model the actor used, as its harness names it, such as `claude-opus-5-5`; absent when unknown (S11, H32).",
+          "minLength": 1,
+          "type": "string"
+        },
         "outputs": {
           "description": "The actor's running background tasks, newest first, then the one that ended last; absent when it has none (S13).",
           "items": {

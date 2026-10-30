@@ -1,12 +1,15 @@
 //! The int checks, run in sandbox pools: `wtpool status` and the scenarios of the catalog,
 //! `wtpool hook` and its subcommands, `wtpool setup`, agents in `wtpool status`, the agent guard of
 //! `wtpool free` and `wtpool fg`, the strings of git the CLI prints, the PR lookup of `wtpool bg`,
-//! heavy jobs and `wtpool job`. Only the bench part runs the Rust budgets of [`bench`].
+//! heavy jobs and `wtpool job`, and the OpenCode adapter beside Claude Code's. Only the bench part
+//! runs the Rust budgets of [`bench`].
 
 mod agent_guard;
 mod bench;
 mod bg_pr;
 mod budget_size;
+mod cc_identical;
+mod cc_model;
 mod cli_text;
 mod hook_files;
 mod hook_gc;
@@ -32,10 +35,18 @@ mod jobs_signals;
 mod jobs_status;
 mod jobs_suggest;
 mod jobs_watch;
+mod launched_agents;
+mod oc_events;
+mod oc_install;
+mod oc_policy;
+mod oc_records;
 mod pr_lookup;
 mod scenarios;
 mod scenarios_agents;
 mod scenarios_jobs;
+mod shared_guard;
+mod shared_records;
+mod shared_status;
 mod status;
 mod status_agents;
 mod status_builds;

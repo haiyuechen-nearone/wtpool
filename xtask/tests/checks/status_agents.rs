@@ -584,7 +584,7 @@ fn status__should_read_the_kind_of_an_older_call() {
     other["harness"] = json!("other-harness");
     let records = [
         ("s1", older(&template, "s1", 7101, &["Bash"])),
-        ("s2", other),
+        ("other-harness-s2", other),
         ("s3", older(&template, "s3", 7103, &["Write", "Read"])),
         ("s4", older(&template, "s4", 7104, &["Agent"])),
         ("s4.a1", older(&template, "s4.a1", 7104, &[])),
@@ -599,7 +599,7 @@ fn status__should_read_the_kind_of_an_older_call() {
     let document = hooks.status();
 
     // Then
-    let seen: Vec<(&str, Option<String>)> = ["s1", "s2", "s3", "s4"]
+    let seen: Vec<(&str, Option<String>)> = ["s1", "other-harness-s2", "s3", "s4"]
         .into_iter()
         .map(|key| (key, state_of(&document, key)))
         .collect();
@@ -609,7 +609,7 @@ fn status__should_read_the_kind_of_an_older_call() {
         seen,
         vec![
             ("s1", working()),
-            ("s2", quiet()),
+            ("other-harness-s2", quiet()),
             ("s3", quiet()),
             ("s4", working())
         ],
@@ -618,7 +618,7 @@ fn status__should_read_the_kind_of_an_older_call() {
     );
     let harness = |key: &str| actor(&document, key).map(|(_, a)| a["harness"].clone());
     assert_eq!(
-        (harness("s1"), harness("s2")),
+        (harness("s1"), harness("other-harness-s2")),
         (Some(json!("claude-code")), Some(json!("other-harness"))),
         "the harness of each actor"
     );

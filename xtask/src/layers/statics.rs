@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use super::Wanted;
 use super::builds::{oracle_js, vscode};
+use super::oc_static;
 use crate::cmd::Ran;
 use crate::parts::Ctx;
 use crate::results::CheckResult;
@@ -230,9 +231,10 @@ fn html_sink(line: &str) -> Option<String> {
 }
 
 /// The static layer's checks that verify/checks.toml does not list. `--only` still names them.
-pub(super) const UNREGISTERED: [&str; 4] = [
+pub(super) const UNREGISTERED: [&str; 5] = [
     "static:ascii_bundles",
     "static:eslint",
+    "static:plugin_types",
     "static:prettier",
     "static:stylelint",
 ];
@@ -269,28 +271,32 @@ pub(super) fn static_checks(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
         results.push(super::product::schema_current(ctx));
     }
     if wanted.check("static:eslint") {
-        results.push(
-            ctx.command_check(
-                "static:eslint",
-                "static",
-                ctx.command("npx")
-                    .current_dir(vscode(ctx))
-                    .args(["eslint", "."]),
-                STATIC_LIMIT,
-            ),
+        let extension = ctx.command_check(
+            "static:eslint",
+            "static",
+            ctx.command("npx")
+                .current_dir(vscode(ctx))
+                .args(["eslint", "."]),
+            STATIC_LIMIT,
         );
+        results.push(oc_static::and_plugin(ctx, extension));
     }
     if wanted.check("static:prettier") {
-        results.push(
-            ctx.command_check(
-                "static:prettier",
-                "static",
-                ctx.command("npm")
-                    .current_dir(vscode(ctx))
-                    .args(["run", "format:check"]),
-                STATIC_LIMIT,
-            ),
+        let extension = ctx.command_check(
+            "static:prettier",
+            "static",
+            ctx.command("npm")
+                .current_dir(vscode(ctx))
+                .args(["run", "format:check"]),
+            STATIC_LIMIT,
         );
+        results.push(oc_static::and_plugin(ctx, extension));
+    }
+    if ctx.phase >= oc_static::PHASE && wanted.check(oc_static::PLUGIN_TYPES) {
+        results.push(oc_static::plugin_types(ctx));
+    }
+    if ctx.phase >= oc_static::PHASE && wanted.check(oc_static::MARKS) {
+        results.push(oc_static::marks(ctx));
     }
     if wanted.check("static:stylelint") {
         results.push(ctx.command_check(

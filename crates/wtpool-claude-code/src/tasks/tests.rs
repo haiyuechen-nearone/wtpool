@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use rstest::rstest;
 use serde_json::json;
 use wtpool_core::activity::ActorId;
-use wtpool_core::hook::{Event, ToolPath};
+use wtpool_core::hook::Event;
 
 use super::*;
 
@@ -28,19 +28,12 @@ fn background(id: serde_json::Value) -> serde_json::Value {
 /// A hook input of session `s1` whose transcript is `transcript`.
 fn input(transcript: Option<&str>) -> HookInput {
     HookInput {
-        event: Event::TurnStart,
-        session_id: ActorId::try_from("s1").unwrap(),
-        agent_id: None,
-        agent_type: None,
-        session_title: None,
         transcript: transcript.map(str::to_owned),
-        spawned: None,
-        cwd: "/p".to_owned(),
-        new_cwd: None,
-        tool_path: ToolPath::None,
-        task_start: None,
-        tasks_running: None,
-        task_stopped: None,
+        ..HookInput::new(
+            Event::TurnStart,
+            ActorId::try_from("s1").unwrap(),
+            "/p".to_owned(),
+        )
     }
 }
 

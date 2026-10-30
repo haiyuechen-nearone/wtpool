@@ -19,14 +19,14 @@ pub(super) enum TableName {
 }
 
 /// The form of a table in the text: those whose keys can be added or removed by lines, and the
-/// rest.
+/// rest, each with its name for the refusal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Form {
     Root,
     /// A `[name]` header, ending at this byte.
     Header(usize),
-    Dotted,
-    Inline,
+    Dotted(&'static str),
+    Inline(&'static str),
 }
 
 /// The strings of an array, each with its own text, and the layout of the array.
@@ -127,12 +127,14 @@ pub(super) fn set_value(
     value: &str,
 ) -> Result<String, EditFault> {
     let root = parse(text)?;
-    let (found, form) = match (find_table(&root, table, text)?, table) {
-        (Some(found), _) => found,
-        (None, TableName::Named(name)) => {
-            return insert_lines(text, text.len(), &format!("[{name}]\n{key} = {value}\n"));
-        }
-        (None, TableName::Root) => (&root, Form::Root),
+    let (found, form) = match table {
+        TableName::Root => (&root, Form::Root),
+        TableName::Named(name) => match find_table(&root, name, text)? {
+            Some(found) => found,
+            None => {
+                return insert_lines(text, text.len(), &format!("[{name}]\n{key} = {value}\n"));
+            }
+        },
     };
     if let Some((_, old)) = entry(found, key) {
         return splice(text, old.span(), value);
@@ -144,7 +146,7 @@ pub(super) fn set_value(
         Form::Header(header_end) => {
             key_lines_end(found, text).unwrap_or_else(|| line_end(text, header_end))
         }
-        Form::Dotted | Form::Inline => return Err(EditFault::NotAHeaderTable(table_name(table))),
+        Form::Dotted(name) | Form::Inline(name) => return Err(EditFault::NotAHeaderTable(name)),
     };
     insert_lines(text, at, &format!("{key} = {value}\n"))
 }
@@ -157,14 +159,14 @@ pub(super) fn remove_key(
     key: &str,
 ) -> Result<Option<String>, EditFault> {
     let root = parse(text)?;
-    let Some((found, form)) = find_table(&root, table, text)? else {
+    let Some((found, form)) = named_table(&root, table, text)? else {
         return Ok(None);
     };
     let Some((name, value)) = entry(found, key) else {
         return Ok(None);
     };
-    if form == Form::Inline {
-        return Err(EditFault::NotAHeaderTable(table_name(table)));
+    if let Form::Inline(name) = form {
+        return Err(EditFault::NotAHeaderTable(name));
     }
     let lines = line_start(text, name.span().start)..line_end(text, value.span().end);
     splice(text, lines, "").map(Some)
@@ -183,7 +185,8 @@ pub(super) fn string_list(
         layout: Layout::OneLine,
         comment: None,
     };
-    let Some((_, value)) = find_table(&root, table, text)?.and_then(|(found, _)| entry(found, key))
+    let Some((_, value)) =
+        named_table(&root, table, text)?.and_then(|(found, _)| entry(found, key))
     else {
         return Ok(list);
     };
@@ -229,15 +232,12 @@ fn parse(text: &str) -> Result<DeTable<'_>, EditFault> {
         })
 }
 
-/// The table `table` of `root` and its form, `None` when the text has no such table.
+/// The named table `name` of `root` and its form, `None` when the text has no such table.
 fn find_table<'d, 'i>(
     root: &'d DeTable<'i>,
-    table: TableName,
+    name: &'static str,
     text: &str,
 ) -> Result<Option<(&'d DeTable<'i>, Form)>, EditFault> {
-    let TableName::Named(name) = table else {
-        return Ok(Some((root, Form::Root)));
-    };
     let Some((_, value)) = entry(root, name) else {
         return Ok(None);
     };
@@ -247,10 +247,22 @@ fn find_table<'d, 'i>(
     let start = value.span().start;
     let form = match text.get(start..).and_then(|rest| rest.chars().next()) {
         Some('[') => Form::Header(value.span().end),
-        Some('{') => Form::Inline,
-        _ => Form::Dotted,
+        Some('{') => Form::Inline(name),
+        _ => Form::Dotted(name),
     };
     Ok(Some((found, form)))
+}
+
+/// `find_table` of a named table, the root with [`Form::Root`] as itself.
+fn named_table<'d, 'i>(
+    root: &'d DeTable<'i>,
+    table: TableName,
+    text: &str,
+) -> Result<Option<(&'d DeTable<'i>, Form)>, EditFault> {
+    match table {
+        TableName::Root => Ok(Some((root, Form::Root))),
+        TableName::Named(name) => find_table(root, name, text),
+    }
 }
 
 fn entry<'d, 'i>(table: &'d DeTable<'i>, key: &str) -> Option<Entry<'d, 'i>> {
@@ -281,13 +293,6 @@ fn is_header_line(text: &str, at: usize) -> bool {
     let start = line_start(text, at);
     text.get(start..)
         .is_some_and(|line| line.trim_start_matches([' ', '\t']).starts_with('['))
-}
-
-fn table_name(table: TableName) -> &'static str {
-    match table {
-        TableName::Root => "the top level",
-        TableName::Named(name) => name,
-    }
 }
 
 fn line_start(text: &str, at: usize) -> usize {

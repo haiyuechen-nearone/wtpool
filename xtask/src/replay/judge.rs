@@ -27,7 +27,7 @@ fn is_subagent(payload: &Value) -> bool {
     payload.get("agent_id").is_some_and(|a| !a.is_null())
 }
 
-fn actors(status: &Value) -> Vec<(String, Value)> {
+pub(super) fn actors(status: &Value) -> Vec<(String, Value)> {
     status
         .get("pools")
         .and_then(|pools| pools.get(0))
@@ -73,7 +73,7 @@ fn before_end(states: &[ReplayState]) -> Option<&ReplayState> {
         .last()
 }
 
-fn expect(condition: bool, message: impl Into<String>) -> Result<(), String> {
+pub(super) fn expect(condition: bool, message: impl Into<String>) -> Result<(), String> {
     if condition {
         Ok(())
     } else {

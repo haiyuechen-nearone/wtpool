@@ -21,6 +21,7 @@ import { installedVSCode } from '../test/support/vscode-app.mjs';
 import { close, env, launch, panelFrame, runCommand, sleep } from '../test/e2e/vscode.mjs';
 import {
   clickPointer,
+  focusPointer,
   installPointer,
   movePointer,
   record,
@@ -92,6 +93,11 @@ async function pointOf(target, { window, frame, pathOf }) {
     return pointAcross(await button.boundingBox(), 0.5);
   }
   const [kind, name, action] = target.split(':');
+  if (kind === 'mark') {
+    const mark = frame.locator(`tr[data-row-id="${pathOf(name)}"] .line-mark`).first();
+    await mark.waitFor({ state: 'visible', timeout: 5_000 });
+    return pointAcross(await mark.boundingBox(), 0.5);
+  }
   if (kind === 'dialog') {
     const button = window
       .locator('.monaco-dialog-box .monaco-button')
@@ -131,7 +137,11 @@ async function play(steps, context) {
       writeFileSync(context.logPath, `${step.log}\n`, { flag: 'a' });
     }
     if (step.to) {
+      await focusPointer(window, false);
       pointer = await movePointer(window, pointer, await pointOf(step.to, context), step.ms);
+      if (step.focus) {
+        await focusPointer(window, true);
+      }
       if (step.click) {
         await clickPointer(window, pointer);
       }

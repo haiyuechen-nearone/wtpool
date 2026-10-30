@@ -13,6 +13,7 @@ use crate::status::records::{RecordKey, RecordedCall, SubagentTitle, ToolTarget,
 mod background;
 mod builds;
 mod sessions;
+mod shared;
 
 const START: i64 = 1_792_497_600;
 const CLAUDE: u32 = 7001;
@@ -43,6 +44,8 @@ fn record(key: &str, state: RecordState) -> ActorRecord {
         }),
         subagents: Vec::new(),
         tasks: Vec::new(),
+        shared: false,
+        model: None,
     }
 }
 
@@ -273,6 +276,8 @@ fn actor__should_copy_the_record() {
             since: at(-5),
             updated: at(0),
             harness: "claude-code".to_owned(),
+            model: None,
+            launched_by: None,
             outputs: Vec::new(),
         }
     );

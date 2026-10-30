@@ -1,13 +1,14 @@
-//! The path words, `cd` targets and program summary of a shell command.
+//! The path words, `cd` targets, program summary and agent programs of a shell command.
 //!
 //! A `cd` in a subshell `( … )` joins [`Command::cds`], as one after `sh -c` does, though the
 //! subshell's folder ends at its `)`. A substitution's command moves no shell: its path words
-//! and `cd` targets join [`Command::paths`], and its words never reach the summary.
+//! and `cd` targets join [`Command::paths`], and its words never reach the summary or
+//! [`Command::starts_agent`].
 
 use std::path::{Path, PathBuf};
 
 use super::lex;
-use super::program::{SHELLS, is_program, program_start, shell_script, summary};
+use super::program::{AGENT_PROGRAMS, SHELLS, is_program, program_start, shell_script, summary};
 use super::simple::{Boundary, Simple, simples};
 use super::{MAX_PATH_DEPTH, basename, has_substitution};
 use crate::hook::place::absolute;
@@ -21,6 +22,9 @@ pub struct Command {
     pub paths: Vec<PathBuf>,
     /// The program's basename plus, for a listed program, its next word.
     pub summary: String,
+    /// A simple command of the line, or of a subshell or `sh -c` script in it, runs one of the
+    /// [`AGENT_PROGRAMS`].
+    pub starts_agent: bool,
 }
 
 /// Reads `command`, run in `cwd` with `home` as `HOME`.
@@ -126,6 +130,7 @@ fn simple_command(
         }
         return;
     }
+    out.starts_agent |= AGENT_PROGRAMS.contains(&name.as_str());
     if out.summary.is_empty() && depth == 0 && is_program(program) {
         out.summary = summary(&name, args.first().map(String::as_str));
     }

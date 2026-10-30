@@ -18,10 +18,12 @@ wtpool config [--json]                 print each setting and where it came from
 wtpool status --json                   print the pool as one JSON document
 wtpool status --watch                  print it again on each change, until stdin closes
 wtpool status --schema                 print the JSON schema of that document
-wtpool hook                            record one Claude Code hook event from stdin
-wtpool hook install                    print the hook block for $CLAUDE_CONFIG_DIR/settings.json
+wtpool hook [--harness <name>]         record one hook event from stdin (Claude Code by default)
+wtpool hook install [--harness <name>] [--policy]
+                                       print the hooks to merge into $CLAUDE_CONFIG_DIR/settings.json,
+                                       or with --harness opencode the OpenCode plugin to save
 wtpool hook gc                         delete old activity records
-wtpool hook policy                     judge one Claude Code shell call against the heavy job policy
+wtpool hook policy [--harness <name>]  judge one shell call against the heavy job policy
 wtpool job [--label <l>] [--quiet] -- <command>…
                                        run a heavy command once fewer jobs than the limit run
 wtpool job ls [--json]                 print the limit, the policy, the heavy commands and the jobs
@@ -128,6 +130,26 @@ app-wt3     (detached)  slot        clean
 
 A slot is free only when it is detached and shows none of these.
 
+## `hook` and its `--harness`
+
+`wtpool hook` and `wtpool hook policy` read one event from stdin. `wtpool hook install` prints
+what a harness needs to call them. The harnesses wtpool knows are `claude-code`, the default, and
+`opencode`.
+
+| Command | `--harness claude-code`, or none | `--harness opencode` |
+|---|---|---|
+| `wtpool hook` | records a Claude Code hook event | records what the OpenCode plugin forwards |
+| `wtpool hook policy` | judges a Bash, PowerShell or Monitor call | judges the shell call the plugin asks about |
+| `wtpool hook install` | prints the settings block | prints the plugin, to save as `plugins/wtpool/index.ts` in OpenCode's config folder |
+
+- `wtpool hook` and `wtpool hook policy` with a name the binary does not register exit 0, print
+  nothing and leave one line in `hook.log`. `wtpool hook install` with such a name is a usage
+  error that lists `claude-code` and `opencode`.
+- `--policy` belongs to `wtpool hook install --harness opencode`. It turns on the plugin's deny
+  of a heavy command that skips the queue. The Claude Code block always holds its policy entry.
+- `wtpool hook install` writes no file. Its stdout is the text to save; its stderr says whether
+  the hooks are present, as [Status and hook](status-and-hook.md#turning-it-on) describes.
+
 ## Heavy jobs: `wtpool job`
 
 `wtpool job` runs builds, test suites and other heavy commands under one limit per user and
@@ -233,8 +255,9 @@ limit: 4 (default)
   fewer than the new limit run. A raised limit starts the first waiting jobs within a second.
 - `wtpool job enforce [off|warn|require|default]`: the policy for heavy commands outside a job,
   `warn` by default. [warn and require](heavy-jobs.md#warn-and-require) says what each does.
-  Under `require`, it and `wtpool job ls` note on stderr when Claude Code's `settings.json`
-  neither enables the plugin nor holds the `wtpool hook policy` entry, so nothing refuses yet.
+  Under `require`, it and `wtpool job ls` note on stderr, once per harness, when nothing refuses
+  yet: when Claude Code's `settings.json` neither enables the plugin nor holds the `wtpool hook
+  policy` entry, and when the OpenCode plugin file exists but was printed without `--policy`.
 - `wtpool job heavy` prints the heavy patterns, each with its source: `machine`, `repository` or
   `build_processes`.
 - `wtpool job heavy add <pattern>…` adds patterns to this machine's list, used in every
@@ -357,8 +380,13 @@ Each name in `build_processes` counts as a one-word pattern of the repository, a
   agent that went quiet while working counts, an idle or done one does not. The session that runs
   the command does not count: when the `wtpool` process descends from an agent's harness process,
   that agent and the subagents of its session are left out, so a session may bring a branch into
-  the foreground it works in itself. Agents of other sessions refuse as before. The refusal names
-  the worktree and each such agent there. `--force` skips this check.
+  the foreground it works in itself. Sessions the calling session started itself, such as an
+  OpenCode agent that a Claude Code coordinator launched with `opencode run --standalone`, are left
+  out too, with their subagents. Agents of other sessions refuse as before. A launched agent's own
+  command leaves out nothing of its launcher. Several sessions can share one harness process, as
+  OpenCode's do: then only the session that `WTPOOL_SESSION` names is the caller, and without that
+  variable none is left out. The refusal names the worktree and each such agent there. `--force`
+  skips this check.
 - A failed git command means unknown, and unknown means refuse.
 - `wtpool` reads `git status` without optional locks, so it never takes `index.lock` from an agent's
   git in the same worktree.

@@ -1,0 +1,79 @@
+{
+  "before": null,
+  "payload": {
+    "v": 1,
+    "kind": "event",
+    "name": "session.created",
+    "directory": "{pool}/fg",
+    "parent": "ses_e76df7aa0ffe3vdlGbn0I4xCYq",
+    "data": {
+      "sessionID": "ses_e76df7772ffedONBqViK0NwG6Y",
+      "parentID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq",
+      "title": "Read slot two notes",
+      "agent": "explore"
+    }
+  },
+  "after": {
+    "version": 1,
+    "harness": "opencode",
+    "session_id": "ses-e76df7aa0ffe3vdlGbn0I4xCYq",
+    "agent_id": "ses-e76df7772ffedONBqViK0NwG6Y",
+    "agent_type": "explore",
+    "label": "Read slot two notes",
+    "worktree": "{pool}/wt1",
+    "placed_by": "path",
+    "state": "working",
+    "waiting": null,
+    "action": null,
+    "in_flight": [],
+    "done_ids": [],
+    "error": null,
+    "since": "2026-10-20T12:00:00Z",
+    "updated": "2026-10-20T12:00:00Z",
+    "process": {
+      "pid": 7101,
+      "started": "2026-10-20T11:00:00Z",
+      "shared": true
+    },
+    "first_cwd": "{pool}/fg",
+    "ended": null,
+    "title": "{any}",
+    "transcript_offset": 0,
+    "subagents": [],
+    "tasks": []
+  },
+  "log": 0,
+  "others": [
+    {
+      "version": 1,
+      "harness": "opencode",
+      "session_id": "ses-e76df7aa0ffe3vdlGbn0I4xCYq",
+      "agent_id": null,
+      "agent_type": null,
+      "label": "opencode 11:59",
+      "worktree": "{pool}/wt1",
+      "placed_by": "path",
+      "state": "working",
+      "waiting": null,
+      "action": null,
+      "in_flight": [],
+      "done_ids": [],
+      "error": null,
+      "since": "2026-10-20T11:59:00Z",
+      "updated": "2026-10-20T11:59:00Z",
+      "writer_started": 1792495740000000,
+      "process": {
+        "pid": 7101,
+        "started": "2026-10-20T11:00:00Z",
+        "shared": true
+      },
+      "first_cwd": "{pool}/fg",
+      "ended": null,
+      "title": null,
+      "transcript_offset": 0,
+      "subagents": [],
+      "tasks": [],
+      "model": "stub/scripted"
+    }
+  ]
+}

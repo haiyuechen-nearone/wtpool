@@ -16,6 +16,9 @@ use crate::processes::{Liveness, RunningProcess};
 const QUIET_AFTER: i64 = 120;
 /// Seconds a done subagent shows for.
 const DONE_FOR: i64 = 60;
+/// Seconds without an event before an idle or quiet actor of a shared process hides: such a
+/// process runs many sessions and outlives them, and its sessions send no end of their own.
+const SHARED_HIDE_AFTER: i64 = 3600;
 /// The action tool of a session that works on a build it started, as in `build: cargo`.
 pub const BUILD_TOOL: &str = "build:";
 /// The action tool of an actor that works on a background task it started, as in
@@ -72,11 +75,11 @@ pub fn actor(record: &ActorRecord, context: &Context<'_>) -> Option<Actor> {
     let newest_running_task = outputs.first().filter(|output| output.running);
     let background =
         newest_running_task.filter(|_| turn_ended && queued.is_none() && build.is_none());
-    let state = if queued.is_some() || build.is_some() || background.is_some() {
-        ActorState::Working
-    } else {
-        state
-    };
+    let busy = queued.is_some() || build.is_some() || background.is_some();
+    if !busy && hidden_while_shared(record, state, context) {
+        return None;
+    }
+    let state = if busy { ActorState::Working } else { state };
     let waiting = record
         .waiting
         .as_ref()
@@ -123,6 +126,8 @@ pub fn actor(record: &ActorRecord, context: &Context<'_>) -> Option<Actor> {
         since: record.since.clone(),
         updated: record.updated.clone(),
         harness: record.harness.clone(),
+        model: record.model.clone(),
+        launched_by: None,
         outputs,
     })
 }
@@ -156,9 +161,9 @@ fn shown_state(record: &ActorRecord, context: &Context<'_>) -> Option<ActorState
 
 /// The outermost build below the session's harness process that no job of another actor holds,
 /// while it runs. A subagent's record names the same process, so only its session works on
-/// the build.
+/// the build, and a shared process runs other sessions, so none of them does.
 fn own_build<'a>(record: &ActorRecord, context: &Context<'a>) -> Option<&'a str> {
-    if record.key.is_subagent() {
+    if record.key.is_subagent() || record.shared {
         return None;
     }
     context
@@ -172,6 +177,46 @@ fn own_build<'a>(record: &ActorRecord, context: &Context<'a>) -> Option<&'a str>
                 .is_none_or(|owner| owner == record.key.as_str())
         })
         .map(|build| build.name.as_str())
+}
+
+/// `true` for an actor of a shared process that would show `state`, `idle` or `quiet`, when it
+/// had no event for [`SHARED_HIDE_AFTER`], or when it is an `idle` main session and a newer main
+/// session of its process is placed in its worktree.
+fn hidden_while_shared(record: &ActorRecord, state: ActorState, context: &Context<'_>) -> bool {
+    if !record.shared || !matches!(state, ActorState::Idle | ActorState::Quiet) {
+        return false;
+    }
+    let age = context
+        .now
+        .seconds()
+        .saturating_sub(record.updated.at().seconds());
+    age >= SHARED_HIDE_AFTER
+        || (record.state == RecordState::Idle
+            && !record.key.is_subagent()
+            && context
+                .records
+                .iter()
+                .any(|other| is_newer_beside(other, record)))
+}
+
+/// `true` when `other` is a main session of `record`'s process in its worktree, newer by the
+/// order of [`superseded`].
+fn is_newer_beside(other: &ActorRecord, record: &ActorRecord) -> bool {
+    !other.key.is_subagent()
+        && other.key != record.key
+        && other.process.is_some()
+        && other.process == record.process
+        && other.worktree == record.worktree
+        && newest_first(other, record).is_lt()
+}
+
+/// The order of main sessions, the newest event first, then the newest writer, then by key.
+fn newest_first(a: &ActorRecord, b: &ActorRecord) -> std::cmp::Ordering {
+    b.updated
+        .at()
+        .cmp(&a.updated.at())
+        .then_with(|| b.writer_started.cmp(&a.writer_started))
+        .then_with(|| a.key.cmp(&b.key))
 }
 
 /// `true` while a job of the actor's own runs.
@@ -224,33 +269,41 @@ fn has_call(record: &ActorRecord, kind: CallKind) -> bool {
 }
 
 /// The first time after `now` that an actor of `records` changes state on its own: a working one
-/// turns quiet, a done one leaves.
+/// turns quiet, a done one leaves, and an idle or quiet one of a shared process hides.
 #[must_use]
 pub fn next_change(records: &[&ActorRecord], now: Timestamp) -> Option<Timestamp> {
     records
         .iter()
-        .filter_map(|record| {
-            let after = match record.state {
-                RecordState::Working => QUIET_AFTER,
-                RecordState::Done => DONE_FOR,
-                RecordState::Waiting | RecordState::Idle | RecordState::Ended => return None,
+        .flat_map(|record| {
+            let own = match record.state {
+                RecordState::Working => Some(QUIET_AFTER),
+                RecordState::Done => Some(DONE_FOR),
+                RecordState::Waiting | RecordState::Idle | RecordState::Ended => None,
             };
-            let at = record.updated.at().seconds().saturating_add(after);
-            (at > now.seconds()).then(|| Timestamp::from_seconds(at))
+            let shared = (record.shared
+                && matches!(record.state, RecordState::Working | RecordState::Idle))
+            .then_some(SHARED_HIDE_AFTER);
+            [own, shared]
+                .into_iter()
+                .flatten()
+                .map(|after| record.updated.at().seconds().saturating_add(after))
         })
+        .filter(|at| *at > now.seconds())
         .min()
+        .map(Timestamp::from_seconds)
 }
 
 /// The sessions that a newer main session of the same process replaced: per process, by pid
 /// and start time, every session but the one with the newest [`ActorRecord::updated`], then the
-/// newest [`ActorRecord::writer_started`]. A session that ended, or whose record names no process,
-/// replaces none.
+/// newest [`ActorRecord::writer_started`]. A session that ended, whose record names no process, or
+/// whose process is shared, replaces none and is replaced by none.
 #[must_use]
 pub fn superseded(records: &[&ActorRecord]) -> BTreeSet<String> {
     let mut by_process: BTreeMap<(u32, Option<Timestamp>), Vec<&ActorRecord>> = BTreeMap::new();
     for record in records {
         if let Some(process) = record.process
             && !record.key.is_subagent()
+            && !record.shared
             && record.state != RecordState::Ended
         {
             let sessions = by_process
@@ -262,13 +315,7 @@ pub fn superseded(records: &[&ActorRecord]) -> BTreeSet<String> {
     by_process
         .into_values()
         .flat_map(|mut sessions| {
-            sessions.sort_by(|a, b| {
-                b.updated
-                    .at()
-                    .cmp(&a.updated.at())
-                    .then_with(|| b.writer_started.cmp(&a.writer_started))
-                    .then_with(|| a.key.cmp(&b.key))
-            });
+            sessions.sort_by(|a, b| newest_first(a, b));
             sessions
                 .into_iter()
                 .skip(1)

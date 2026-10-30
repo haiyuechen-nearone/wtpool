@@ -272,3 +272,55 @@ accept task-path-after-resume ccc6d5b1da2208f2ed8e4686774f3f8c994ce3f517f4dcd1b0
 accept strip-save-feedback a13eeabf347db750cff64569a3afc256179394e68982275cab30f65c978212a1
 # The session that runs fg or free, and its subagents, are left out of the agent guard, so a session may repoint the worktree it works in; one int check covers it.
 accept fg-own-session d437ee073e820e54f44c0241301cdad981178caa0523caee913c08fc831ec203
+# The design of phase 5a: OpenCode 2.2.0 and agents of one harness that start agents of another, in a new opencode.md and the rows of status-panel.md, harnesses.md and verification.md it changes; no check changes.
+accept oc-spec 26aaa5031546cbef83df58322ab4812d6de152082b95ba74ef5dbea0d592bcac
+# The Status lines of status-panel.md, harnesses.md and verification.md name the phase 5a design.
+accept phase-5a-status-lines 30fe99a3c15f3b3cf8ad5a1fdc6184957d4ca6ead1cb22fce4c7e8ff681ba606
+# The mark shows beside the state icon; every maker has a mark; the coordinator action is opencode.
+accept marks-beside-state fbefe6bfef0ed8fd56aa76be7d293ef3733638e9c3d096a35dc2e91536c9c150
+# Int checks of phase 5a for records of a process that runs many sessions and for launched agents.
+accept oc-o2 a82884405769b1925606dd711a6f46e32700e813b7f44e91ca0c16cdae4bd765
+# The launch chains keep clear of the server pid; the older-call check names its harness prefix.
+accept oc-o2-fixes ec351b2100d35da49a34597c239eb0a0a1fc092dc06ed01738c55f6869fc8090
+# U18 takes the measured geometry of the marks and badges.
+accept marks-geometry 939fd2eeee13d52ae4dd33260fbfe00cbdf1264507cadd99482980947b457f8b
+# The workspace gains the OpenCode adapter crate, which the binary registers.
+accept oc-b3 ab5e928ff7cd83fc0ad152f544e4dbb833f3bafacccc9cbec9a2efc8b62b83c2
+# Each agent line ends with its model and harness as text.
+accept marks-text 570f5deb1e4a9084e1672a07b0f3c88c11b31c615511a8b81b70aa7ddcfd2f1f
+# Hovering a mark shows a floating label with the model and harness.
+accept marks-hover 6d9cb40eff0060d9c09b80c31ee535d3398fc0d931971d0cd635cdd648f3b398
+# The oracle of the OpenCode adapter: fixtures, replays and translation cases by harness, its int checks, Claude Code goldens, and phase 5a in the trace.
+accept oc-o1 2a5c3974814ebb5c4b1001d4af0cfa691d9d5b452cb8ba0a24fd161b78da93d2
+# The OpenCode plugin's js layer, its static gates, the marks' notices and the live oc part.
+accept oc-o3 26c528ac3ed7a91c00dd66d56cac9229a732682e4960ba0115f8939e676b9d9d
+# Every heavy command of an agent goes through the queue: queue shims, the agent folder's patterns, and the panel's outside this pool, via and hover label.
+accept jobs-scope 081247b368bc7ab8875f86d6ddb48b47edfacaed361992c392ce8c2f1e1e9fd4
+# The Status lines name the phase 5b design.
+accept phase-5b-status-lines 741627cf13e4d207446b03db3f2e349d89e0c1c05a8fa4ca033d274db4d0d634
+# The OpenCode scenarios, the agent mark checks and the coordinator flow of phase 5a, the schema's model and launched_by, the hover colours of the themes, and the existing checks that U13 and U18 made stale.
+accept oc-o4 ecfeacaca7d614e7fa7760df7cbf6696b1154f805780b4162e699cd6662de086
+# The extension manifest and its lock file carry version 0.2.0.
+accept readme 0ffd2b1832de2ef645c689d7bfcb316c21dcece6a3a8b482ae915149a8568cf8
+# The trace list and verification.md's harness checks name the phase 4 check of the JS sandboxes' earlier builds.
+accept trace-earlier-builds a46706b5bdcaebcb7699e97e600752b687b9bf38d5a62cce76b84d4a7bb15825
+# The shot part runs the screenshot checks in the wave beside quick, and ui keeps only e2e.
+accept speed-sched 0ea65623cba91eb5d3645cce6c61a7708880094381385eec41b8f3a5d9d0c6b4
+# The e2e layer runs six workers, and the scenario runner waits between actors only where a row lists them side by side.
+accept speed-e2e d05efb5e59ebdc6921c58143008ba2d6783d57a748879d57366ab092c973a0d2
+# The plugin looks up a session it first sees without its title, as run --title names a session before the folder's plugin instance reads events; the spec rows, the 06-title-given stream and its replay, two translation cases, a js check and the live session oc_run_title follow.
+accept oc-title 9f1785b5c4c4f856935b489cc65a8490ab73f60343b3247a8210211796554158
+# The owner approved the seven baselines with the agent mark box.
+accept shots-0.2 c7f60870adef739cd6864bee3e8e1f5f441fe4bc36f47a14c12e99cc15ad4ba7
+# The merge of round speed: spec Status lines, the owner's 5b decisions, and the merged checks.toml.
+accept round-speed-merge d351dc2007fc052b36182d5dfec4e856e60932b58ae7fd4bb7040d3e73f0f5a1
+# The shot layer runs more checks at once and in slices, so no single check runs long.
+accept speed-shot f20fda22934bb49807b3fec8308bd8b908cf40b6b528acd8a513268ceda7d355
+# Tests for the lines outside wtpool-core that no test reached: the hover label, the paused header's error, the malformed jobSettings answers, the PATHEXT search and the OpenCode panic name.
+accept cover-rest 557ec4b9224ce63142eec31d886a3598b83374f8184f3356f0c6c2dc63ad0aa5
+# The hover label shot check stops the page clock before each hover, so a slow hover cannot fire the 300 ms timer.
+accept label-clock c95d236a2da4768d4b6ecc7e00c32b6a2465ee9e2ea4f22c91fe2c5f5360204f
+# Fixes from the round speed review: own-folder short links, a turn for the web build, the restored contrast and layout guards, the lookup after a deletion.
+accept review-fix 96f9a87b524c1f891fe7747a20ec5c41bbc55c61c27a9052e143e66899434790
+# Four more baselines of the approved mark box change (several_agents_one_worktree, four themes); the lead accepted them, the owner confirms.
+accept shots-0.2b 3b7718879a46de069e66d6b30fc75b918955b0127ad20faafca14a8fbdf7b49e

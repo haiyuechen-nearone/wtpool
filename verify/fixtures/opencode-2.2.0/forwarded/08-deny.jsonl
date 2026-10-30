@@ -1,0 +1,7 @@
+{"line":60,"t":1793301993438,"payload":{"v":1,"kind":"event","name":"session.execution.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df28ddffeJxexaUsOVbU9Tc"}}}
+{"line":80,"t":1793301993452,"payload":{"v":1,"kind":"event","name":"session.renamed","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df28ddffeJxexaUsOVbU9Tc","title":"Stub title s8"}}}
+{"line":82,"t":1793301993473,"payload":{"v":1,"kind":"event","name":"session.step.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df28ddffeJxexaUsOVbU9Tc","model":{"id":"scripted","providerID":"stub"}}}}
+{"line":87,"t":1793301993474,"payload":{"v":1,"kind":"hook","name":"tool.execute.before","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df28ddffeJxexaUsOVbU9Tc","id":"call_s8_0_0","tool":"shell","input":{"command":"echo WTPOOL_DENY_PROBE > deny-probe.txt"}}}}
+{"line":90,"t":1793301993475,"payload":{"v":1,"kind":"event","name":"session.tool.failed","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df28ddffeJxexaUsOVbU9Tc","id":"call_s8_0_0"}}}
+{"line":103,"t":1793301993496,"payload":{"v":1,"kind":"event","name":"session.text.delta","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df28ddffeJxexaUsOVbU9Tc"}}}
+{"line":108,"t":1793301993504,"payload":{"v":1,"kind":"event","name":"session.execution.succeeded","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df28ddffeJxexaUsOVbU9Tc"}}}

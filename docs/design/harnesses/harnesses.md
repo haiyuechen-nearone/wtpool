@@ -1,6 +1,6 @@
 # Coding agent harnesses
 
-**Status:** approved, planned for phase 5, revision 2 (2026-10-26: approved with every recommendation; Q1 to Q16 resolved as recommended; §11's rows go into status-panel.md when phase 5 is built; revision 1: first design)
+**Status:** approved, planned for phase 5, revision 4 (2026-10-30: OpenCode's `session.created` row says a missed creation starts the session at its first event and its title is looked up (opencode.md revision 5); revision 3, 2026-10-29: phase 5a builds OpenCode first ([opencode.md](opencode.md)); HR2, HR5 (`session_start`, `wait_end`, `info`, `progress`, a wait bound by call id first), HR7, HR9, HR13, HR15, HR16, HR17, HR25, HR28 and HR30 say what 5a builds; HR19 and §10: the plugin forwards OpenCode's own events, which the adapter translates; §6, §7 and §10 take the recorded 2.2.0 facts (a plugin folder, the v2 API only, `session.execution.*` turns, `session.tool.*` call ends, `session.text.delta`, `shell` and `subagent`, no `session.status`, `session.idle` or `session.updated`); §11, §12, §13 and §15 note 5a; revision 2, 2026-10-26: approved with every recommendation; Q1 to Q16 resolved as recommended; §11's rows go into status-panel.md when phase 5 is built; revision 1: first design)
 
 wtpool's live agent view comes from a harness's hooks, today Claude Code's only
 ([status-panel.md](../status-panel/status-panel.md), §1). This design lets any coding agent
@@ -73,6 +73,7 @@ produce. Envelope, on every event:
 | `cwd` | string | absolute: the working folder of the event (HR6) |
 | `agent_type` | string or null | the subagent's type, a label fallback (H16) |
 | `title` | object or null | `text` (string) and `by` (`user` or `harness`) (HR7) |
+| `model` | string or null | the model the actor uses, as the harness names it (status-panel.md H32); from phase 5a |
 
 The call object, in `call` and in `calls`:
 
@@ -90,12 +91,12 @@ The call object, in `call` and in `calls`:
 | ID | Behaviour |
 |---|---|
 | HR1 | Version: an event is one JSON object of at most 1 MiB with `v` 1. A reader ignores fields it does not know, and an event name it does not know writes nothing and is no error, so newer glue degrades on an older wtpool. Within `v` 1 changes only add optional fields and event names. A removal, a rename, a new meaning or a new value of a closed set (`kind`, `asks`, `shell`, `reason`, `by`) raises `v`; wtpool reads every `v` it knows, and an unknown one writes nothing and leaves one H23 log line. A wrong type or a missing required field writes nothing (H5). |
-| HR2 | Ids: `session` and `agent` follow H17's actor pattern, a call's `id` H17's call pattern. The Claude Code adapter keeps H17: an id outside its pattern writes nothing. Every other adapter replaces such an id by `h` and the first 40 hex digits of its SHA 256, so `thr_123` or `20260512_3` [CX-H][GO-H] still name one actor, and no id carries `.`, `/` or a control character. |
+| HR2 | Ids: `session` and `agent` follow H17's actor pattern, a call's `id` H17's call pattern. The Claude Code adapter keeps H17: an id outside its pattern writes nothing. Every other adapter replaces such an id by `h` and the first 40 hex digits of its SHA 256, so `thr_123` or `20260512_3` [CX-H][GO-H] still name one actor, and no id carries `.`, `/` or a control character. Built in phase 5a, where OpenCode's own id form takes a readable form instead ([opencode.md](opencode.md), OC14). |
 | HR3 | One run reads one event. A payload that ends several calls at once uses `calls_end`, at most 64 calls. |
 | HR4 | Calls without ids: a `call_start` without `id` gets `n` and its event's microseconds (H24's clock). A `call_end` without `id` ends the oldest call in flight with its tool and input hash, else the oldest with its tool, else nothing. Waits bind as H13 says, by tool and hash. |
-| HR5 | Events set the record as this table says, which generalises H11's table; each adapter maps its own events onto it (§9, §10). An event with `agent` applies to that subagent's record. |
+| HR5 | Events set the record as this table says, which generalises H11's table; each adapter maps its own events onto it (§9, §10). An event with `agent` applies to that subagent's record. Phase 5a builds the events as core's own types, not yet this JSON form (HR20): `session_start`, `wait_end`, `info` and `progress` are new, `wait` binds by call id first, and `turn_end` may carry `error` and `subagents_done` together ([opencode.md](opencode.md)). |
 | HR6 | Placement: the `cwd` of an actor's first event places it (H10, `placed_by` `cwd`); a call's `path` or `command` (H7, H9) and `cwd_change` move it (`path`), and a change back to the first `cwd` moves nothing. A first event without an absolute `cwd` writes nothing. An adapter whose harness sends no `cwd` derives one: the workspace root that holds the event's path, else the first root (Cursor's `workspace_roots` [CU-H], Cline's `workspaceRoots` [CL-1]), else the hook's own working folder. |
-| HR7 | Labels: `title` follows H16's ranks, a given title over a generated one. A session without a title is `session HH:MM` for Claude Code, as today, and `<harness> HH:MM` for every other harness, the `x-` of HR17 dropped, as in `codex 14:02`. A subagent's label is the `title` of its `subagent_start`, else `agent_type`, else `subagent`. |
+| HR7 | Labels: `title` follows H16's ranks, a given title over a generated one. A session without a title is `session HH:MM` for Claude Code, as today, and `<harness> HH:MM` for every other harness, the `x-` of HR17 dropped, as in `codex 14:02`. A subagent's label is the `title` of its `subagent_start`, else `agent_type`, else `subagent`. Built in phase 5a: each adapter declares its noun, `session` for Claude Code and `opencode` for OpenCode. |
 | HR8 | Tasks: a `call_end` may carry `task` (`id`, `output`), and `turn_end`, `subagent_end`, `task_end` and `session_end` end tasks as H27 says. The adapter vouches for `output` when the hook writes the task (arch F14): it keeps the path only when its harness writes that task's output there, by that harness's documented layout (H27 for Claude Code), and else drops it, keeping the task. Status keeps its neutral check (S13) and knows no layout. |
 
 | Event | Fields besides the envelope | Effect |
@@ -103,8 +104,8 @@ The call object, in `call` and in `calls`:
 | `session_start` | | a new session record, `idle`, placed by `cwd`; nothing for a known one |
 | `turn_start` | | `working`; ends a wait, clears `error` and `in_flight` (H12, H13) |
 | `call_start` | `call` | adds the call in flight (H12), sets the action (H14); `working` unless waiting; a call with `asks` makes the actor wait on it (H13) |
-| `wait` | `reason` (`permission`, `question`, `plan`, `input`), `call` (optional) | `waiting`; with a call it binds to that call (H13), else it waits for the session if none of its actors waits, until the session's next call end |
-| `wait_end` | `call` (optional) | ends the wait, or the wait on that call; `working` |
+| `wait` | `reason` (`permission`, `question`, `plan`, `input`), `call` (optional) | `waiting`; with a call it binds to the call in flight with that id, else as H13 says, else it waits for the session if none of its actors waits, until the session's next call end |
+| `wait_end` | `call` (optional) | ends the wait bound to that call, or without a call any wait of the actor; `working`; nothing for an actor without a record |
 | `call_end` | `call`, `started_agent` (`agent`, `title`), `task` (`id`, `output`), `stops_task` (id), all but `call` optional | ends the call (H12, HR4) and a wait bound to it; `working` unless waiting on another call; may move the actor (HR6); `started_agent` titles a subagent (H16), `task` starts one (HR8), `stops_task` ends one |
 | `calls_end` | `calls` (1 to 64) | as `call_end` for each call; ends a wait it lists (H13) |
 | `turn_end` | `error` (string), `subagents_done` (bool), `tasks_running` (ids), all optional | `idle`, with `error`; clears `in_flight` and waits; `subagents_done` makes its subagents `done`; `tasks_running` ends the tasks it leaves out (H27) |
@@ -114,16 +115,17 @@ The call object, in `call` and in `calls`:
 | `task_end` | `task` (id) | ends that task (H27) |
 | `session_end` | | `ended`, its subagent records deleted, its tasks ended (H20, H27), then the day's gc (H21) |
 | `progress` | | the model generates: on a `working` record, `updated` refreshed and the action `generating` (HR30) |
+| `info` | | sets the envelope's `title` and `model` only: state, `since` and `updated` unchanged; an unknown session is first made as `session_start` makes it, an unknown subagent gets nothing |
 
 ## 2. Capabilities and tiers
 
 | ID | Behaviour |
 |---|---|
-| HR9 | Each adapter declares what its harness reports, `reports`, a list of capability names: `turn_start`, `turn_end`, `calls` (call start and end, with a path or command), `waits` (permission prompts, questions), `subagents` (start and end, with ids), `outputs` (task output files), `titles`, `session_end`, `decide` (a pre-execution deny) and `generating` (a sign between events, HR29). It also declares `process`: `own` when one harness process runs one session at a time, else `shared` (HR16). The tier is a summary: 0 without `turn_end` and `calls`, 1 with `turn_end`, 2 with `turn_start`, `turn_end` and `calls`, 3 with tier 2 and `decide`. |
+| HR9 | Each adapter declares what its harness reports, `reports`, a list of capability names: `turn_start`, `turn_end`, `calls` (call start and end, with a path or command), `waits` (permission prompts, questions), `subagents` (start and end, with ids), `outputs` (task output files), `titles`, `session_end`, `decide` (a pre-execution deny) and `generating` (a sign between events, HR29). It also declares `process`: `own` when one harness process runs one session at a time, else `shared` (HR16). The tier is a summary: 0 without `turn_end` and `calls`, 1 with `turn_end`, 2 with `turn_start`, `turn_end` and `calls`, 3 with tier 2 and `decide`. Built in phase 5a: `process` only, declared by each adapter; `reports` and the tiers stay planned. |
 | HR10 | A record of a harness other than Claude Code holds `reports`: its adapter's list, the list the generic adapter's glue declares (HR20), and each capability an event of the actor showed, as a first `wait` shows `waits`. A Claude Code record holds none and reads as every capability, so its bytes stay as they are (G5). |
 | HR11 | Closed sets (arch F3, C2): the generated schema closes `state`, `reason`, `kind`, `placed_by` and `activity`, and a deployed extension takes a new value for a schema error and restarts (X5), so a new value is no addition. Adapters map every harness onto the sets as they are: a detected or launched agent is `idle`, an unknown wait reason is `input`, an unknown tool `other`, every placement `cwd` or `path`. New facts go into new properties or open lists: `reports` is a list of strings each matching `^[a-z][a-z0-9_]{0,23}$`, so a new capability adds, and a consumer ignores names it does not know. S12 gains the rule that a new value of an existing enum raises `version` (§11). |
 | HR12 | The panel shows only what an actor's `reports` hold, and says so where it matters, as this table says (U16). |
-| HR13 | The jobs policy: `require` (J21) refuses only for actors whose adapter reports `decide`, with its policy entry installed (HR28). For every other actor `require` acts as `warn`: its heavy processes outside a job show `(not queued)` (A8). `enforce` stays one machine value (J4); the jobs strip names the harnesses of live actors that only warn (U11). |
+| HR13 | The jobs policy: `require` (J21) refuses only for actors whose adapter reports `decide`, with its policy entry installed (HR28). For every other actor `require` acts as `warn`: its heavy processes outside a job show `(not queued)` (A8). `enforce` stays one machine value (J4); the jobs strip names the harnesses of live actors that only warn (U11). Phase 5a builds only a note per adapter in `wtpool job enforce` and `wtpool job ls` under `require` ([opencode.md](opencode.md), OC23). |
 
 | Feature | Needs | Without it the panel shows | U16 says |
 |---|---|---|---|
@@ -155,11 +157,11 @@ Amp have `generating` by events, the others by CPU or not at all (§7).
 | ID | Behaviour |
 |---|---|
 | HR14 | An adapter gives core: its name (HR17), `reports` and `process` (HR9), one function from a payload and its own environment variables to one neutral event, the titles of its transcript (H16) if any, the vouched output path of a task (HR8), the decision request and the encoding of a deny (HR15), the foreign markers it refuses (HR18), and its install text and presence check (HR28). Its event table is one piece of data, from which its parser, its install text and any plugin hook file are generated, so the table exists once (hook F2). Claude Code's variable `CLAUDE_CODE_TMPDIR` is read by its adapter, not by core (hook F2). |
-| HR15 | Decisions: `wtpool hook policy --harness <name>` (H29 for every harness). The adapter turns a pre-execution payload into a policy call (`session`, `cwd`, `command`, `shell`), J21 answers a deny with its reason or nothing, and the adapter encodes the deny in its harness's form (§10). No decision is silence: no stdout and exit 0, never an `allow`, which in several harnesses skips their own prompt. An error is no decision. An adapter whose harness takes a deny only as an exit code exits 2 with the reason on stderr (Kiro [KR], Cascade [WS-H]); every other path exits 0. Copilot denies a call when a `preToolUse` command crashes or exits non-zero [GH-R], and Kiro blocks on any non-zero exit [KR], so their adapters exit non-zero only to deny. |
-| HR16 | Process: an actor's `process` (H19) is the hook's nearest ancestor, at most 4 levels up, that is not a shell or wrapper (`sh`, `bash`, `zsh`, `dash`, `ksh`, `fish`, `pwsh`, `powershell`, `cmd`, `env`), else the parent. So a harness that runs hooks through `sh -c` [GO-H][WS-H] still names itself. For an adapter with `process` `shared`, H19's "a newer main session in one process ends the older ones" does not apply, and its sessions never work on a build (A1): the build shows as the worktree's `building`. |
-| HR17 | Names and stems (H25, arch C5): a harness name matches `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, at most 24 characters. Names of built-in adapters and detection patterns are reserved, as is `run`; a name that starts `x-` belongs to the generic adapter. Claude Code keeps `<session>` and `<session>.<agent>` (H17); every other harness writes `<harness>-<session>` and `<harness>-<session>.<agent>`, and the launcher `run-<16 hex digits>`. Core's `activity` module holds the grammar as a pattern, not an enum: a record name is `<first>[.<agent>].json`, `<first>` 1 to 89 characters of `[A-Za-z0-9-]` (a prefix of up to 25, then H17's 64), `<agent>` 1 to 64. Status and gc need no adapter registry: they read the harness from the record, and skip as S6 does a record not named `claude-code` whose stem starts neither with its harness and `-` nor with `run-`. |
+| HR15 | Decisions: `wtpool hook policy --harness <name>` (H29 for every harness). The adapter turns a pre-execution payload into a policy call (`session`, `cwd`, `command`, `shell`), J21 answers a deny with its reason or nothing, and the adapter encodes the deny in its harness's form (§10). No decision is silence: no stdout and exit 0, never an `allow`, which in several harnesses skips their own prompt. An error is no decision. An adapter whose harness takes a deny only as an exit code exits 2 with the reason on stderr (Kiro [KR], Cascade [WS-H]); every other path exits 0. Copilot denies a call when a `preToolUse` command crashes or exits non-zero [GH-R], and Kiro blocks on any non-zero exit [KR], so their adapters exit non-zero only to deny. Built in phase 5a for OpenCode: a deny on stdout, `{"decision":"deny","reason":<text>}`, which its plugin throws (opencode.md, OC12, OC22); the exit 2 form stays planned. |
+| HR16 | Process: an actor's `process` (H19) is the hook's nearest ancestor, at most 4 levels up, that is not a shell or wrapper (`sh`, `bash`, `zsh`, `dash`, `ksh`, `fish`, `pwsh`, `powershell`, `cmd`, `env`), else the parent. So a harness that runs hooks through `sh -c` [GO-H][WS-H] still names itself. For an adapter with `process` `shared`, H19's "a newer main session in one process ends the older ones" does not apply, and its sessions never work on a build (A1): the build shows as the worktree's `building`. Built in phase 5a: the adapter declares `shared`, the record says `process.shared`, and status applies one set of rules to every shared record (status-panel.md H19, H21, A1, X12, S15; opencode.md, OC20). The walk past shells stays planned: OpenCode's plugin starts the hook by argv, so its parent is the server. |
+| HR17 | Names and stems (H25, arch C5): a harness name matches `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, at most 24 characters. Names of built-in adapters and detection patterns are reserved, as is `run`; a name that starts `x-` belongs to the generic adapter. Claude Code keeps `<session>` and `<session>.<agent>` (H17); every other harness writes `<harness>-<session>` and `<harness>-<session>.<agent>`, and the launcher `run-<16 hex digits>`. Core's `activity` module holds the grammar as a pattern, not an enum: a record name is `<first>[.<agent>].json`, `<first>` 1 to 89 characters of `[A-Za-z0-9-]` (a prefix of up to 25, then H17's 64), `<agent>` 1 to 64. Status and gc need no adapter registry: they read the harness from the record, and skip as S6 does a record not named `claude-code` whose stem starts neither with its harness and `-` nor with `run-`. Built in phase 5a: the open name, the prefix, the 89 character first segment and the prefix check, and the hook never writes over a record of another harness (status-panel.md H25); the binary's registry holds the names it accepts. `x-` names and `run-` stems stay planned. |
 | HR18 | Foreign payloads: Cursor, Devin and Copilot run Claude Code's hooks [CU-3P][DV-H][GH-R], and their payload format there is undocumented [CU-3P]. The Claude Code adapter writes nothing for a payload that carries another harness's documented marker (`cursor_version`, `conversation_id` [CU-H]; `prompt_id` [DV-LH]), and logs one H23 line. The harness process's name cannot tell: Claude Code's native CLI runs as its version file, as `2.1.310`, and the VS Code extension's as `claude` (seen on 2026-10-26). Once a recording shows such a payload and that harness's adapter is built, the binary hands the payload to it instead. |
-| HR19 | The Claude family: one parser serves Claude Code and every harness that copies its format, with one dialect table each: its event names, field aliases, tools with their kind and path field (H8, H26), its id rule (HR2), async support, deny form and foreign markers. Claude Code is the dialect `claude-code`, unchanged (G5). Bespoke formats (Cursor, Gemini) get adapters of their own; plugin harnesses (OpenCode, Amp) get a plugin that wtpool ships, which sends neutral events under its built-in name. |
+| HR19 | The Claude family: one parser serves Claude Code and every harness that copies its format, with one dialect table each: its event names, field aliases, tools with their kind and path field (H8, H26), its id rule (HR2), async support, deny form and foreign markers. Claude Code is the dialect `claude-code`, unchanged (G5). Bespoke formats (Cursor, Gemini) get adapters of their own; plugin harnesses (OpenCode, Amp) get a plugin that wtpool ships. OpenCode's, built in phase 5a, forwards OpenCode's own hooks and events, trimmed, and its adapter translates them, so the plugin needs no knowledge of the neutral events (opencode.md). |
 
 ## 4. Generic adapter
 
@@ -229,7 +231,7 @@ policy entry is one more `PreToolUse` command,
 |---|---|
 | HR23 | `wtpool run [--harness <name>] [--label <text>] -- <program> [<arg>…]` runs the agent as `wtpool job` runs a command (J13, J14: no shell, streams, exit status and signals passed through) and keeps a session record for its life: stem `run-<16 hex digits>`, `harness` the given name, else `x-` and the program's basename in lower case without characters outside `[a-z0-9-]`, else `x-agent`; `process` the child, so liveness is exact; `idle`, placed by its folder (H7); label `--label`, else HR7's. Without a usable `wtpool-activity/` (H6) it runs the agent and keeps no record. A failure of its own never stops the agent: the agent runs, and the failure goes to stderr. |
 | HR24 | When the child exits, the launcher marks its record `ended`, and each record that names the child as its `process` too, as a session end does (H20). A harness whose session end comes late or not at all, as Codex's after 30 idle minutes [CX-H], Gemini's unawaited one [GM-R] or Amp's missing one [AM-A], still ends on time. |
-| HR25 | The launcher gives the agent `WTPOOL_SESSION=<stem>` and `WTPOOL_HARNESS=<name>`. A hook whose payload names no session (HR20) takes that session only when its record's `process` is an ancestor of the hook, at most 16 levels up, so a leaked or forged variable binds nothing; `wtpool job` attributes a job (S15) by the same rule. While hook records name the launcher's process, its record hides (H19: they are newer), and it shows again once they end and the process lives. |
+| HR25 | The launcher gives the agent `WTPOOL_SESSION=<stem>` and `WTPOOL_HARNESS=<name>`. A hook whose payload names no session (HR20) takes that session only when its record's `process` is an ancestor of the hook, at most 16 levels up, so a leaked or forged variable binds nothing; `wtpool job` attributes a job (S15) by the same rule. While hook records name the launcher's process, its record hides (H19: they are newer), and it shows again once they end and the process lives. From phase 5a OpenCode's plugin sets `WTPOOL_SESSION` for its shell calls, which X12 reads for shared records (opencode.md, OC11, OC21); the launcher and its use by `wtpool job` stay planned. |
 | HR26 | Detection, tier 0 without a launcher: `wtpool status` shows each process whose words (J19) match an agent pattern (J18), working in a worktree of the pool, as a session actor: key `proc-<pid>`, `harness` the pattern's, label `<harness> HH:MM` of the process start, `idle`, `placed_by` `cwd`, `reports` `[]`, builds under it (A1). It skips a process that a live record names (H19), and one that descends from such a process or from another match. The patterns are `agent_processes` in `wtpool.toml`, a list of `{pattern, harness}`, `[]` to turn detection off; the default: `claude` (claude-code), `codex`, `copilot`, `cursor-agent` (cursor), `gemini`, `qwen`, `opencode`, `goose`, `amp`, `cline`, `droid`, `kiro-cli` (kiro), `junie`, `devin`, `auggie`, `crush`, `cn` (continue), `aider`. It reads the process table that S4 reads, with arguments (arch F10), keeps only the matched words, and writes no file (S2). |
 | HR27 | A detected actor of a harness with a built adapter adds U16's hint `wtpool hook install --harness <name>`. |
 
@@ -237,14 +239,14 @@ policy entry is one more `PreToolUse` command,
 
 | ID | Behaviour |
 |---|---|
-| HR28 | `wtpool hook install --harness <name> [--policy]` prints on stdout the config for that harness's user level file, with the absolute path of this wtpool (H1 refuses one under `target`), and on stderr a note: the file it goes into, whether the entries are there (as H22), the harness's trust step (Codex: review in `/hooks` [CX-H]; Gemini: a trusted folder [GM-T]; Cursor: a trusted workspace [CU-H]; Copilot: workspace admission [GH-R]), the capabilities its harness reports, and the harness versions its fixtures come from. `--policy` adds the pre-execution entry (H29) where the adapter reports `decide`. It never writes a file and never prints a project level file. Without `--harness` it prints Claude Code's block, as today (G5). For a plugin harness it prints the plugin's source, to save as one file in the user's plugin folder. `wtpool hook install --list` prints each adapter with its tier and `reports`. |
+| HR28 | `wtpool hook install --harness <name> [--policy]` prints on stdout the config for that harness's user level file, with the absolute path of this wtpool (H1 refuses one under `target`), and on stderr a note: the file it goes into, whether the entries are there (as H22), the harness's trust step (Codex: review in `/hooks` [CX-H]; Gemini: a trusted folder [GM-T]; Cursor: a trusted workspace [CU-H]; Copilot: workspace admission [GH-R]), the capabilities its harness reports, and the harness versions its fixtures come from. `--policy` adds the pre-execution entry (H29) where the adapter reports `decide`. It never writes a file and never prints a project level file. Without `--harness` it prints Claude Code's block, as today (G5). For a plugin harness it prints the plugin's source, to save as one file in the user's plugin folder. `wtpool hook install --list` prints each adapter with its tier and `reports`. Built in phase 5a for OpenCode (opencode.md, OC24, OC25); `--list` stays planned. |
 
 | Harness | User level file | Entries |
 |---|---|---|
 | codex | `~/.codex/hooks.json` [CX-H] | SessionStart, SessionEnd, UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse, SubagentStart, SubagentStop, Stop, Interrupt; `"async": true` on the tool events; `["hook", "--harness", "codex"]` |
 | copilot | `~/.copilot/hooks/wtpool.json` [GH-R] | the PascalCase events of §10, exec form (`exec`, `args`, CLI only [GH-R]) |
 | cursor | `~/.cursor/hooks.json` [CU-H] | sessionStart, sessionEnd, beforeSubmitPrompt, preToolUse, postToolUse, postToolUseFailure, subagentStart, subagentStop, stop; `beforeShellExecution` with `--policy` |
-| opencode | `~/.config/opencode/plugins/wtpool.ts` [OC-P] | a plugin with `event`, `tool.execute.before` and `tool.execute.after` |
+| opencode | `<config>/plugins/wtpool/index.ts`, `<config>` being `$OPENCODE_CONFIG_DIR`, else `$XDG_CONFIG_HOME/opencode`, else `~/.config/opencode`: a plugin folder, as recorded with 2.2.0 (opencode.md, fact 1) | a plugin with `tool.execute.before`, `shell.create.before` and the events of opencode.md §3; built in phase 5a |
 | others | as §10 names | on request, with their adapters |
 
 ## 7. Liveness while the model generates
@@ -292,7 +294,7 @@ auto-update off (Claude Code: `DISABLE_AUTOUPDATER=1`). The shared install stays
 | Qwen Code | per record [QW-CR] | none found | `cpu` |
 | Cursor | written asynchronously, may lag `stop` [CU-FT] | `afterAgentThought` per completed thinking block, `afterAgentResponse` per completed message [CU-H] | `event` from both; `cpu` in the CLI |
 | Copilot CLI and VS Code | `events.jsonl` per completed message or tool event [GH-SE]; VS Code's own session file up to a minute late [VS-ST] | none per model call [GH-R] | `cpu` in the CLI |
-| OpenCode | SQLite per part start and end [OC-PR] | the plugin's `event` gets every `message.part.delta` and `session.status` `busy` [OC-PL] | `event` from the shipped plugin |
+| OpenCode 2.2.0 | not measured | the plugin gets `session.text.delta` about every 120 ms while text streams (opencode.md, fact 15) | `event` from the shipped plugin, built in phase 5a |
 | Amp | no local file [AM-H] | `PluginThread.state` `running` [AM-A] | `event` from the shipped plugin |
 | Goose | `sessions.db` per complete message [GO-SM] | none | `cpu` |
 | Cline | per completed message [CL-T] | SDK plugins `beforeModel`, CLI only [CL-3] | `cpu` in the CLI |
@@ -302,7 +304,7 @@ auto-update off (Claude Code: `DISABLE_AUTOUPDATER=1`). The shared install stays
 | ID | Behaviour |
 |---|---|
 | HR29 | `generating` is a capability (HR9): the adapter supplies a sign that the agent is busy between events, by one of three means it declares: `event` (HR30), `file` (HR31) or `cpu` (HR32). |
-| HR30 | `progress` is a neutral event with the envelope only (HR5). On a `working` record it refreshes `updated`, so A1's 120 s start again, and sets the action to the tool `generating` with no target unless a call is in flight. On any other state it writes nothing: a late progress never wakes an `idle`, `done`, `waiting` or `ended` actor. A progress within 10 s of the record's `updated` writes nothing, and adapters and shipped plugins send at most one per actor per 10 s, so a hook at chunk rate costs one read. Sources: Codex's `PreModelRequest`, async; Gemini's `BeforeModel`, not `AfterModel`, which is synchronous and would start a process per chunk; Cursor's `afterAgentThought` and `afterAgentResponse`; the OpenCode plugin on `message.part.delta` and `session.status` `busy`; the Amp plugin while `PluginThread.state` is `running`. |
+| HR30 | `progress` is a neutral event with the envelope only (HR5). On a `working` record it refreshes `updated`, so A1's 120 s start again, and sets the action to the tool `generating` with no target unless a call is in flight. On any other state it writes nothing: a late progress never wakes an `idle`, `done`, `waiting` or `ended` actor. A progress within 10 s of the record's `updated` writes nothing, and adapters and shipped plugins send at most one per actor per 10 s, so a hook at chunk rate costs one read. Sources: Codex's `PreModelRequest`, async; Gemini's `BeforeModel`, not `AfterModel`, which is synchronous and would start a process per chunk; Cursor's `afterAgentThought` and `afterAgentResponse`; the OpenCode plugin on `session.text.delta`, `session.reasoning.delta` and `session.tool.input.delta`, built in phase 5a (opencode.md, OC9); the Amp plugin while `PluginThread.state` is `running`. |
 | HR31 | `file`: an adapter may vouch, as HR8 does, for a file its harness appends to while it generates; the record keeps its path as `live_file`. On each heartbeat (W7) `wtpool status --watch` reads its size and modification time through `lstat`, never its content, and only for a regular file; a change in the last 30 s is a sign. No adapter uses it today: every file above grows per completed item, which the hooks already report. |
 | HR32 | `cpu`: for an adapter with `process` `own`, `wtpool status --watch` reads the CPU time of the harness process itself (H19), not of its children, so builds and MCP servers count for nothing, through the process port (sysinfo), on each heartbeat. A rate above the adapter's floor since the reading before, at least 5 s earlier, is a sign. Claude Code's floor is 1.5 % of one core: over its measured idle (0.3 to 0.7) and under its measured terminal UI generation (2.9 to 4.8). `wtpool status --json` reads once, so it has no CPU sign. A shared process gives none. |
 | HR33 | A `working` record that A1 would show as `quiet`, its last event 120 s or more ago, shows `working` while a sign is under 30 s old: with the action `generating` for an `event` or `file` sign, and `busy` for a `cpu` sign, as the CPU shows only that the process works, not that a model makes progress. A sign never changes `waiting`, `idle`, `done` or `ended`, so a CPU sign on an idle session, such as the auto-update above, shows nothing. With no sign for 30 s the record shows as A1 says. |
@@ -442,26 +444,29 @@ Claude Code's hooks from `~/.claude/settings.json` by default [CU-3P] (HR18). Co
 | Crush | PreToolUse only | subagent calls are not hooked | 0 with `decide`: the policy only; exit 2 | [CR] |
 | Continue CLI | "Claude Code-compatible", reads `.claude` | merged 2026-03-04, absent from the docs | unclear | [CN] |
 
-### OpenCode: 1.19.4, and the v2 line 2.1.4 [OC-P][OC-T][OC-E][OC-V2]
+### OpenCode 2.2.0, recorded on 2026-10-29: built in phase 5a [OC-P][OC-V2]
 
-wtpool ships the plugin, which sends neutral events as `--harness opencode` (HR19).
+[opencode.md](opencode.md) holds the design, built in phase 5a; its §1 lists the recorded facts and
+what they corrected here. wtpool ships the plugin, which forwards OpenCode's own hooks and events,
+trimmed, to `wtpool hook --harness opencode`, where the adapter translates them.
 
-| OpenCode | Neutral | Note |
+| OpenCode 2.2.0 | Neutral | Note |
 |---|---|---|
-| `session.created` | `session_start` | `info.directory` is `cwd`; a child session (`parentID`) is `subagent_start` of its parent [OC-S] |
-| `session.status` `busy`, `session.idle` | `turn_start`, `turn_end` | |
-| `tool.execute.before`, `tool.execute.after` | `call_start`, `call_end` | `callID`, `tool`, `args` [OC-T] |
-| `permission.asked`, `permission.replied` | `wait` `permission`, `wait_end` | `tool.callID` binds [OC-E] |
-| `session.updated` | `title` by `harness` | `info.title` |
-| `session.error`, `session.deleted` | `turn_end` with `error`, `session_end` | |
-| `message.part.delta` | `progress` | at most one per session per 10 s (HR30) |
+| `session.created` | `session_start`, or `subagent_start` of its parent for a child session (`parentID`) | a folder's instance can miss a session's creation, which comes before it listens: any first event starts the session, and the instance looks up its title ([opencode.md](opencode.md) OC5) |
+| `session.execution.started`, `.succeeded`, `.interrupted`, `.failed` | `turn_start`, `turn_end` (with `error` after `.failed`) | `session.status` and `session.idle` are never sent |
+| hook `tool.execute.before`; `session.tool.success`, `session.tool.failed` | `call_start`; `call_end` | `id`, `tool`, `input`; `tool.execute.after` misses rejects, denies and interrupts |
+| `permission.asked`, `permission.replied`; `form.created`, `form.replied` | `wait` (`permission`, `question`, `input`), `wait_end` | bound by `source.id` or `form.metadata.tool.id` |
+| `session.renamed`, `session.step.started` | `info` (title, model) | no `session.updated` exists |
+| `session.text.delta` and the other deltas | `progress` | at most one per session per 10 s from the plugin (HR30) |
+| `session.deleted` | `session_end` | the only end of a session |
 
-Tier 3: throwing in `tool.execute.before` blocks the call [OC-P]. `reports`: turn_start, turn_end,
-calls, waits, subagents, titles, decide, generating. `process` `shared`. Whether hooks fire inside
-subagents is disputed [OC-I]. No session end but deletion: the launcher or process death ends it.
-Project plugins load with no trust step [OC-P]. The v2 plugin API differs [OC-V2], so two plugin
-sources. Kilo Code, now built on OpenCode, has the same hooks [KI]. Contract:
-`opencode run --format json` [OC-C].
+Tier 3: a throw in `tool.execute.before` blocks the call, under `--policy`. Tool names are `shell`
+and `subagent`, no longer `bash` and `task`. Hooks fire inside subagents with the child's id.
+`process` is `shared` in every mode: the background service, `opencode serve`, and the private
+server of `run --standalone` each run many sessions. Project plugins load with no trust step
+[OC-P]. Only the v2 plugin API of 2.2.0 is supported; 1.x is out of scope. Kilo Code, built on
+OpenCode, may share the hooks [KI], unrecorded. Contract: the `oc` part, on a scripted local model
+and on a free model of OpenCode's own provider, in a sandbox (opencode.md §13).
 
 ### Gemini CLI 0.65.0, and Antigravity CLI [GM-REL][GM-AG]
 
@@ -541,6 +546,13 @@ client protocol: wtpool would have to start and drive the agent, which R8 and th
 These rows change when phase 5 is built. Several of them amend rows that jobs.md's phase 4 also
 changed (R7, H1 to H4, H22, A1, S4, S11), so each amendment applies to that phase 4 text.
 
+Phase 5a, which builds OpenCode first ([opencode.md](opencode.md)), changes the §1 intro, H11, H17,
+H19 (`shared` only), H25 and S11 below, A1's rule that a shared session works on no build, and the
+Phases table, and adds rows this table does not list: H9's agent programs, H16's noun and Claude
+Code's model, H21's gc of shared records, H32 (`model`), A1's hiding of shared records, S15, S17
+(`launched_by`), X12's calling session for shared and launched sessions, U5, U13 and U18 (the
+agent marks). The other rows stay planned.
+
 | Row | Change |
 |---|---|
 | D6 | new: The core sees a harness only through its adapter, which turns its payloads into the neutral events of harnesses.md (HR1 to HR8). Replaces the stale `(D3)` citations of `hook/mod.rs` and `hook/event.rs`. |
@@ -569,7 +581,8 @@ changed (R7, H1 to H4, H22, A1, S4, S11), so each amendment applies to that phas
 ## 12. Verification plan
 
 Every HR ID is phase 5. They stay out of `verify/trace.toml` until the phase 5 oracle author adds
-them in one change entry, and verification.md takes this section.
+them in one change entry, and verification.md takes this section. Phase 5a's checks, for the rows it builds, are
+in [opencode.md](opencode.md) §13.
 
 1. **Neutral scenarios.** Scenario steps gain `event`, a neutral event fed to
    `wtpool hook --harness x-verify`, so the core's rules (HR1 to HR8, HR16) are judged with no
@@ -627,7 +640,8 @@ finding F2 of the hook review, which lists the leaks; "arch" names the architect
 | 9 | the shell dialect of a command | arch F17 |
 | 10 | the jobs policy hook through the adapter's decision request and encoder | H29 |
 
-Then phase 5 builds the generic adapter, the launcher and detection, then the adapters of §15.
+Then phase 5 builds the generic adapter, the launcher and detection, then the adapters of §15. At the owner's request phase 5a
+built OpenCode first, with the parts of steps 1 to 7 and 10 it needs ([opencode.md](opencode.md)).
 
 ## 14. Open questions
 
@@ -660,7 +674,7 @@ Then phase 5 builds the generic adapter, the launcher and detection, then the ad
 | 3 | Copilot, CLI and VS Code | a dialect through PascalCase names; tier 3 with waits and subagents; the largest IDE user base; needs care: synchronous hooks, fail closed |
 | 4 | Cursor | a bespoke format and no waits, but a large user base, and it already runs the Claude Code block (HR18) |
 | 5 | Qwen Code, Factory Droid, Devin, Kiro, Junie, Auggie | dialect tables, each on request with its recording |
-| 6 | OpenCode | a shipped plugin with waits, subagents and titles; its v1 and v2 lines differ |
+| 6 | OpenCode | a shipped plugin with waits, subagents and titles; built first, as phase 5a, at the owner's request ([opencode.md](opencode.md)) |
 | 7 | Goose | glue first (Example B), a dialect later |
 | 8 | Gemini CLI | moved to Antigravity CLI for individuals |
 | 9 | Amp, Cline | plugin APIs still moving; no waits or no `cwd` |

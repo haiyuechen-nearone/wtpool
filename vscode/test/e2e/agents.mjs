@@ -1,5 +1,6 @@
 // The `claude` processes of a scenario in the e2e layer are stubs that run the release
-// `wtpool hook` (claude-stub.mjs), so hooks see a live parent and the real clock.
+// `wtpool hook` (claude-stub.mjs), so hooks see a live parent and the real clock. The server of
+// another harness is a stub of the same kind that a `claude` stub starts, so it descends from it.
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { readdirSync } from 'node:fs';
@@ -13,9 +14,22 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const STUB = path.join(here, 'claude-stub.mjs');
 /**
  * Hook steps of different actors run this far apart, so `updated` orders them as the int clock
- * does.
+ * does. A row that lists one actor at a time shows no order, so only a scenario that lists two
+ * actors in one row pays the wait.
  */
 const ACTOR_GAP_MS = 1100;
+
+/** The documents a scenario asserts: each `expect` step, then the final one. */
+function documentsOf(scenario) {
+  return [...scenario.steps.filter((step) => step.expect).map((step) => step.expect), scenario.expect];
+}
+
+/** Tells a scenario whose documents ever show one row with two actors at once. */
+function rowsShareActors(scenario) {
+  return documentsOf(scenario).some((document) =>
+    document.pools.some((pool) => pool.worktrees.some((worktree) => worktree.actors.length > 1)),
+  );
+}
 
 /** A running stub: send(request) resolves with the hook's reply. */
 export function startStub() {
@@ -32,7 +46,7 @@ export function startStub() {
     }
   });
   const exited = new Promise((resolve) => child.on('exit', resolve));
-  return {
+  const stub = {
     child,
     exited,
     send(request) {
@@ -45,7 +59,41 @@ export function startStub() {
       child.stdin.write(`${JSON.stringify({ ...request, id })}\n`);
       return reply;
     },
+    /**
+     * Starts a stub of the same kind as a child of this one, in `cwd`. Gives its `send`, which
+     * has the stub run the request, and `child.kill` and `exited` for its process.
+     */
+    async spawnChild({ cwd, env: variables }) {
+      const started = await stub.send({ spawn: true, cwd, env: variables });
+      if (!started.pid) throw new Error(`setup: the stub could not start a child stub: ${started.stderr}`);
+      const gone = new Promise((resolve) => {
+        const timer = setInterval(() => {
+          try {
+            process.kill(started.pid, 0);
+          } catch {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 50);
+        timer.unref();
+      });
+      return {
+        pid: started.pid,
+        child: {
+          kill(signal) {
+            try {
+              process.kill(started.pid, signal);
+            } catch {
+              // Already gone, as it is once its parent stub stopped.
+            }
+          },
+        },
+        exited: gone,
+        send: (request) => stub.send({ ...request, to: started.id }),
+      };
+    },
   };
+  return stub;
 }
 
 /** The payload of hook step `index` of `scenario` for the pool the harness built. */
@@ -90,6 +138,7 @@ export class AgentSteps {
     this.scenario = scenario;
     this.stubs = new Map();
     this.lastActor = null;
+    this.gapActors = rowsShareActors(scenario);
     this.problems = [];
     this.documentIndex = 0;
   }
@@ -99,10 +148,14 @@ export class AgentSteps {
     for (let index = from; index < to; index += 1) {
       const step = this.scenario.steps[index];
       if (step.process?.start) {
-        const { pid, name } = step.process.start;
+        const { pid, name, parent } = step.process.start;
         assert.ok(!step.process.start.started, 'setup: e2e cannot reuse a pid');
         if (name === 'claude') this.stubs.set(pid, startStub());
-        else throw new Error(`setup: e2e scenario ${this.name} starts ${name}`);
+        else if (name === 'opencode') {
+          const launcher = this.stubs.get(parent);
+          assert.ok(launcher, `setup: ${this.name} starts opencode ${pid} under ${parent}, which no step started`);
+          this.stubs.set(pid, await launcher.spawnChild({ cwd: folder(step.process.start.in, poolInfo), env: env(dirs, poolInfo) }));
+        } else throw new Error(`setup: e2e scenario ${this.name} starts ${name}`);
       }
       if (step.process?.stop !== undefined) {
         const stub = this.stubs.get(step.process.stop);
@@ -130,8 +183,9 @@ export class AgentSteps {
 
   async hook(step, index) {
     const { dirs, pool: poolInfo } = this.session;
-    const actor = `${step.session}/${step.agent ?? ''}`;
-    if (this.lastActor !== null && this.lastActor !== actor) await sleep(ACTOR_GAP_MS);
+    const other = step.harness !== undefined && step.harness !== 'claude-code';
+    const actor = other ? `${step.payload.data.sessionID}/` : `${step.session}/${step.agent ?? ''}`;
+    if (this.gapActors && this.lastActor !== null && this.lastActor !== actor) await sleep(ACTOR_GAP_MS);
     this.lastActor = actor;
     const stub = this.stubs.get(step.process);
     assert.ok(stub, `setup: step ${index} runs from claude ${step.process}, which no step started`);
@@ -139,13 +193,14 @@ export class AgentSteps {
     if (step.home) variables.HOME = folder(step.home, poolInfo);
     const reply = await stub.send({
       binary: releaseWtpool(),
+      ...(other ? { args: ['hook', '--harness', step.harness] } : {}),
       payload: payloadOf(this.name, index, poolInfo),
       cwd: folder(step.cwd, poolInfo),
       env: variables,
     });
     if (reply.code !== 0 || reply.stdout) {
       this.problems.push(
-        `step ${index}: wtpool hook for ${step.fixture} exited ${reply.code ?? reply.signal}, stdout ${JSON.stringify(reply.stdout)}, stderr ${JSON.stringify(reply.stderr)}`,
+        `step ${index}: wtpool hook for ${step.fixture ?? step.payload?.name} exited ${reply.code ?? reply.signal}, stdout ${JSON.stringify(reply.stdout)}, stderr ${JSON.stringify(reply.stderr)}`,
       );
     }
   }

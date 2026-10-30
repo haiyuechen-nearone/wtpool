@@ -3,6 +3,8 @@
 @import url("style/header.css");
 @import url("style/table.css");
 @import url("style/rows.css");
+@import url("style/marks.css");
+@import url("style/float.css");
 @import url("style/actions.css");
 @import url("style/detail.css");
 @import url("style/outputs.css");

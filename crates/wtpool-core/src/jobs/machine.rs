@@ -192,6 +192,65 @@ mod tests {
         assert_eq!((jobs.limit(), jobs.error()), (Some(4), None));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn machine_jobs__should_name_the_folder_it_cannot_use() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let real = dir.path().join("real");
+        std::fs::create_dir(&real).unwrap();
+        let mut paths = paths(dir.path());
+        paths.folder = dir.path().join("jobs");
+        std::os::unix::fs::symlink(&real, &paths.folder).unwrap();
+
+        // When
+        let jobs = MachineJobs::read(paths, 16);
+        let error = jobs.error().unwrap_or_default();
+
+        // Then
+        assert!(jobs.records().is_empty());
+        assert!(error.contains("it is a symlink"), "{error}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn machine_jobs_read_job__should_read_every_job_when_the_folder_is_refused() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let folder = JobFolder::create(dir.path().join("jobs")).unwrap();
+        let id = JobId::new(3);
+        let _lock = folder.create_lock(&id).unwrap();
+        folder
+            .write_record(&record(&id, 1, JobState::Running))
+            .unwrap();
+        let mut jobs = MachineJobs::read(paths(dir.path()), 16);
+        let before = jobs.records().len();
+        std::fs::rename(dir.path().join("jobs"), dir.path().join("real")).unwrap();
+        std::os::unix::fs::symlink(dir.path().join("real"), dir.path().join("jobs")).unwrap();
+
+        // When
+        jobs.read_job(&id);
+
+        // Then
+        let error = jobs.error().unwrap_or_default();
+        assert_eq!(before, 1);
+        assert!(jobs.records().is_empty());
+        assert!(error.contains("it is a symlink"), "{error}");
+    }
+
+    #[test]
+    fn machine_jobs__should_name_the_paths_it_read() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let paths = paths(dir.path());
+
+        // When
+        let jobs = MachineJobs::read(paths.clone(), 16);
+
+        // Then
+        assert_eq!(jobs.paths(), &paths);
+    }
+
     #[test]
     fn machine_jobs__should_keep_the_defaults_and_name_a_bad_config() {
         // Given

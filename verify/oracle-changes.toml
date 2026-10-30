@@ -1872,3 +1872,423 @@ reason = "The main agent of a session could not bring a PR into the foreground i
 "verify/trace.toml" = "a83f00b942f1fdb0b70a6567f89e9c81f049d1e1665205ef9cdf0625b2b657f6"
 "xtask/tests/checks/agent_guard.rs" = "c7d9e402c896f782f2d03bcff18837527713ff061210d4bec7e43f298e8a43dd"
 "xtask/tests/support/hook.rs" = "1f7a777fa9ec872aaa535c0f7bf27edd3d641df7b4667ca09b64190abb242f1b"
+
+[[change]]
+id = "oc-spec"
+reason = "Design of phase 5a, the OpenCode 2.2.0 integration and agents of one harness that start agents of another, before its oracle and build. New docs/design/harnesses/opencode.md, revision 1, pending review: the recorded 2.2.0 facts and the corrections they make to harnesses.md section 10; the plugin that wtpool hook install --harness opencode prints, generated from the adapter's event table, which forwards each event once per process with its folder, keeps only listed fields, sends one progress per session per 10 s, never awaits or throws on the record path, sets WTPOOL_SESSION for its shell calls and denies under --policy; the event table, ids, titles, waits, subagents, the shared process, policy, install and presence, security, limits, the checks of the int, js, static, render, shot, e2e and oc layers, and the decisions table OC rows OC1 to OC32. status-panel.md, revision 36 pending: section 1's --harness, H9 agent programs place nothing, H11, H16 label noun and Claude Code's model from the transcript, H17 hashed ids, H19 process.shared, H21 gc of shared records, H25 open harness names, the 89 character stem and no write over another harness's record, new H32 model, A1 rules for shared records and launched agents' builds, S11, S15, new S17 launched_by, X12 calling session for shared and launched sessions, U5, U13, new U18 agent marks, and phase 5a. harnesses.md, revision 3 pending: HR2, HR5 with session_start, wait_end, info and progress, HR7, HR9, HR13, HR15, HR16, HR17, HR19, HR25, HR28 and HR30 say what phase 5a builds; sections 6, 7 and 10 take the recorded facts; sections 11, 12, 13 and 15 note phase 5a. verification.md: the phase 5 scenarios 37 to 42, the flow coordinator_launches_opencode, the js layer and the oc part. No check changes."
+[change.files]
+"docs/design/harnesses/harnesses.md" = "a04d0c693173265ca89419150040b3f22a61bb8170cb033f23cacfef78ad30e7"
+"docs/design/harnesses/opencode.md" = "255a9e0c46f65fb708e2b61102ea45d9b130d5e6a8f7ca7dd4ca643bdbd7c0bd"
+"docs/design/status-panel/status-panel.md" = "8320847f1038683dd27c415a2d2a2cfd0626716559ffe7b040451134585cf0a3"
+"docs/design/status-panel/verification.md" = "f4252e29e5c8bd30f443f8f9c770b025392810c8a83ef8fce93822f0cf27ecec"
+
+[[change]]
+id = "phase-5a-status-lines"
+reason = "The Status lines of status-panel.md (revision 36), harnesses.md (revision 3) and verification.md (revision 28) name the phase 5a design of opencode.md. No row or check changes."
+[change.files]
+"docs/design/harnesses/harnesses.md" = "540037d489fd9fa5d25886e61ae75dc59eae9eb88f9e76412a0b7ebfb3d43dd1"
+"docs/design/status-panel/status-panel.md" = "926a7fd35b274b577ee4fce787da555fcdff960bc68b9e84129b3639808ec66e"
+"docs/design/status-panel/verification.md" = "051f1e6e5feb1ea1207ebf4a412b271936eee7b5ad52ca46401262e2bdc0a478"
+
+[[change]]
+id = "marks-beside-state"
+reason = "The owner's decision: an agent line keeps its state icon and shows the model maker's mark in a second box beside it, in the colour of the line's text (U13, U18, OC31; status-panel.md revision 37, opencode.md revision 2); every maker of U18's table has a mark, drawn for wtpool where no source exists. The oc_coordinator session expects the coordinator's action `opencode`, as H14 names it."
+[change.files]
+"docs/design/harnesses/opencode.md" = "1cce9bf9f813413287af44d780dfce5bece0b41984daba7055f8b1899bc89809"
+"docs/design/status-panel/status-panel.md" = "1dd2262b892b43c4c706922d82cdbd5d8833de716eb03809c8dccb9ccea2dddc"
+
+[[change]]
+id = "oc-o2"
+reason = "New int checks of phase 5a for records of a process that runs many sessions and for agents that start agents: no supersede, no build of their own, hidden after an hour idle or quiet or behind a newer idle session of the same process, gc by age, the agent guard by WTPOOL_SESSION and by launch, the launching session in the document, job attribution by shell call only, and no placement by a shell call that starts an agent. Their helpers live in a new support module; the two module lists name the new files."
+[change.files]
+"xtask/tests/checks/launched_agents.rs" = "f9d879c629067f46cd4d9200c037e99d42f6bba0d7c5642800fb8c98df6d1891"
+"xtask/tests/checks/mod.rs" = "33316ae2eb4067b82a67576238a444b64751610373efb764f25b97c15346e937"
+"xtask/tests/checks/shared_guard.rs" = "e2389c9ad32f642aa99b7b22143e10868f0d72515034b1b2cc7aa7405a669eae"
+"xtask/tests/checks/shared_records.rs" = "42c7c8de6596182c75a3332f43f7ab4b1b5c744274bd97949213592e72b97400"
+"xtask/tests/checks/shared_status.rs" = "15fb36a22d202a7c4e481710be43d0926703b715e706ca8adc1d6dc1a8f57cd4"
+"xtask/tests/support/mod.rs" = "19599397723af97268d19f77119e833d63029d021cee7ffeacc8fcaead157a54"
+"xtask/tests/support/shared.rs" = "a94cd24487cc0b7d39b048780454e916c3d980eb848871aaa5e28a0ebea11984"
+
+[[change]]
+id = "oc-o2-fixes"
+reason = "Two oracle fixes. The shells between a launched server and its launcher in launch__should_name_the_launching_session take a pid range clear of the server's own pid, which the 16 and 17 level chains overwrote, so both cases test the 16 level limit; a guard in the helper refuses a shell pid that a harness process holds. status__should_read_the_kind_of_an_older_call writes the record of the harness without an adapter as other-harness-s2.json, the stem with its harness prefix that status now requires, so it still reads the kind of that harness's older call; the record keeps its harness."
+[change.files]
+"xtask/tests/checks/launched_agents.rs" = "d83cdeb62640b48e48f3e0411e834d7c8a8c3eb4f6e47b0328dcddf3ce173ac3"
+"xtask/tests/checks/status_agents.rs" = "30389b635b1a12e7da637efcf688f9a5026b86880302a35a9ccc16f978d8c244"
+"xtask/tests/support/shared.rs" = "645419313a889c37a75fdf121dc4d59e2ac8dd5935adbc7dd2e71237d347fc67"
+
+[[change]]
+id = "marks-geometry"
+reason = "U18 takes the measured geometry of the built marks: an unbadged mark 12 px and centred; on a badged line the maker's mark 10 px in the upper left and a 7 px badge glyph on a 1 px ring flush in the lower right, so no ink overlaps; a second, dimmer tone only where the maker's own mark has one (OpenCode's). status-panel.md revision 38."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "685c1f2d324d23bc9e9648243ea67bf91585fd8fea765a1b45cd2d3e9d02ab55"
+
+[[change]]
+id = "oc-b3"
+reason = "The workspace gains the crate crates/wtpool-opencode, the OpenCode adapter of phase 5a with its plugin, which the binary registers. No check changes."
+[change.files]
+"Cargo.toml:workspace.members" = "5214bfb94540e392474453517ffdeceb792d96e0fc4f441ec2fc7a0cd97d912c"
+
+[[change]]
+id = "marks-text"
+reason = "The owner's decision: each agent line ends with its model and harness as text, the last part of the model and the harness's display name, muted, 12 px after the action, giving way first when the column is narrow (U18, status-panel.md revision 39)."
+[change.files]
+"docs/design/status-panel/status-panel.md" = "d5f7d6c75c1b0a314e02d23d765a558d17167820401faa71eba2942a177e47d3"
+
+[[change]]
+id = "marks-hover"
+reason = "The owner meant a label on hover, not text on the line: hovering a mark shows a floating label, drawn by the webview in VS Code's hover colours, with the model and harness as text; the line keeps no title (U18 as revision 39 now reads; OC31, its render check, a new shot check agent_mark__should_show_its_label_on_hover, the user flow; opencode.md revision 3, verification.md revision 29)."
+[change.files]
+"docs/design/harnesses/opencode.md" = "21a8c23631aa1da44700e0e623110c8b44dd8e1e9ef73c149feb4a2ead95c959"
+"docs/design/status-panel/status-panel.md" = "ee4256e8be8740c4b515d86f0df9bb93391c8f4b3feeab090df787b87cc7b0b6"
+"docs/design/status-panel/verification.md" = "ff8a655bad269478cd5f68281df0e1c90c6d961799ae8cd2d950b3cdd15813ba"
+
+[[change]]
+id = "oc-o1"
+reason = "The oracle of the OpenCode adapter, phase 5a. Fixtures: OpenCode 2.2.0's scrubbed recording, the frozen streams its plugin must forward, the folders of the served instances, and the translation cases. The replay runs each harness's recordings by its folder prefix, event name, arguments and process, Claude Code's as before, and adds oc_replay and oc_translate, which the int part runs from their phase; the hook corpus and the scrub check read each harness's folder, and the scrub check reads OpenCode's recordings for personal data. New int checks of the adapter, its install, presence, policy and notes, the neutral events, ids, stems and labels, Claude Code's model, and Claude Code's outputs against goldens the base build made; budget B1 also over the forwarded corpus. The trace gains every OC row, H32, S17 and U18 at phase 5 and the new checks of the changed rows from phase 5, and its file test counts them."
+[change.files]
+"verify/fixtures/opencode-2.2.0/README.md" = "412c48a607b4b630978be37cca265f51638a18cdeb21a8d2dac1f7f5be57d2bf"
+"verify/fixtures/opencode-2.2.0/forwarded/00-provider-error-401.jsonl" = "11e8fdc271852b254ffd2f8a347c10c4e1a164a8c2d1c95ceaa617213f52de9a"
+"verify/fixtures/opencode-2.2.0/forwarded/00-serve-shutdown.jsonl" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+"verify/fixtures/opencode-2.2.0/forwarded/01-run-read-edit-shell.jsonl" = "11fcc9ca5365c75d457e04e1590ff73fe6a6ee382b5fd0b64e2f868821d68d79"
+"verify/fixtures/opencode-2.2.0/forwarded/02-subagent.jsonl" = "fd0291f67bff5001008a17e610661138188226fb317ae0f08e82b601914156e3"
+"verify/fixtures/opencode-2.2.0/forwarded/03-permission-approve-reject.jsonl" = "cf2f1660aca6988d7d8b05da2fee927aa903e2d32fdcdbf07e279ea9e136385c"
+"verify/fixtures/opencode-2.2.0/forwarded/03-permission-run-autoreject.jsonl" = "cdd5cebaf7380969d157ac3b6cc71e5e01e022d468393dd528726652a61e8e4c"
+"verify/fixtures/opencode-2.2.0/forwarded/04-question.jsonl" = "1e0845595154a98f3785dd40be75a7f326e21e6d0ce33fa0d795f2585bd0ab78"
+"verify/fixtures/opencode-2.2.0/forwarded/05-interrupt.jsonl" = "7ecb90e43eb7713a42b5d67404bc8ccb3af383f0f7fb8038a4fcb3be02f41896"
+"verify/fixtures/opencode-2.2.0/forwarded/06-title-given.jsonl" = "6a936963766e8ae4b88329dae665fba60635cb562288465c6854693e66494dea"
+"verify/fixtures/opencode-2.2.0/forwarded/07-long-answer.jsonl" = "218fc4ea913bd55e653061cc04f85f44b48d74c8f29c7bdafcd36bae6d0cdc3c"
+"verify/fixtures/opencode-2.2.0/forwarded/08-deny.jsonl" = "0e3ae9560aebc64a0675882696dcc6a782b10ef701e18c9b1dc58e28a9a44cb0"
+"verify/fixtures/opencode-2.2.0/forwarded/09-delete-api.jsonl" = "186a2477ec83af50ab701b29ecf6aebc120e2f5921bd6aa20edbcd5c9f69e059"
+"verify/fixtures/opencode-2.2.0/forwarded/10-two-folders.jsonl" = "01c9e71e6cce63f6c494f5feefd6e746626fa594c33f2ebe84babb76e39637be"
+"verify/fixtures/opencode-2.2.0/instances.json" = "cb13639f3af21e4bb1df7b5285922a0ab421a37ec700713d6cc713d70fefbd2f"
+"verify/fixtures/opencode-2.2.0/raw/00-provider-error-401.hooks.jsonl" = "d5a9808d03078710a9bd7c746be85346e0cef7fb15fd03dbf6925b40b4eca282"
+"verify/fixtures/opencode-2.2.0/raw/00-provider-error-401.stream.jsonl" = "4a68a4e9a823789eba7262c516c5812e212436df745edcd6e4758d036137bca0"
+"verify/fixtures/opencode-2.2.0/raw/00-serve-shutdown.hooks.jsonl" = "b7d550c2bc7807d31f753efbc17c27b76b989dcf5281b7eb8ba0c14be696fad4"
+"verify/fixtures/opencode-2.2.0/raw/01-run-read-edit-shell.hooks.jsonl" = "a20419fd2d29c6893f5eeda261931179f814db678a37dd810bda0dcca7f63aa7"
+"verify/fixtures/opencode-2.2.0/raw/01-run-read-edit-shell.stream.jsonl" = "cdf4b592d276bd72919b5328b754d50289ad0bb1c38d33cb072e37f6bf6d22f7"
+"verify/fixtures/opencode-2.2.0/raw/02-subagent.hooks.jsonl" = "30ed880953c0d4d6942bf16d51ba75ab8ad994266bb99d5c7bf92c63fe38ce5f"
+"verify/fixtures/opencode-2.2.0/raw/02-subagent.stream.jsonl" = "46687728ad28d7c30845e6744e7feb845694161ffd93141e9ad61a952e31e67d"
+"verify/fixtures/opencode-2.2.0/raw/03-permission-approve-reject.driver.jsonl" = "453d3115a959f79594035c0040f5679410888156c4e57cf3ae3fb5f23ad7c4e6"
+"verify/fixtures/opencode-2.2.0/raw/03-permission-approve-reject.hooks.jsonl" = "54ec8a914600b5f4e1ae7efd1ce3c6adc1f93c8c9db145efe5112dc97ad49414"
+"verify/fixtures/opencode-2.2.0/raw/03-permission-approve-reject.sse.jsonl" = "66cd9bb66911ecacaa813dcaa95ae63d8db86870e48b421a20dcb612eb597276"
+"verify/fixtures/opencode-2.2.0/raw/03-permission-run-autoreject.hooks.jsonl" = "35935f75bf8c3a614c883ca70c9213f9c38affcc5ab20613c6d8f34354bcaf1e"
+"verify/fixtures/opencode-2.2.0/raw/03-permission-run-autoreject.stream.jsonl" = "d8aac1c757a008c6712bcf76ea6f63937704adbca7ebaeaa8cdd11080dd4cd4e"
+"verify/fixtures/opencode-2.2.0/raw/04-question.driver.jsonl" = "04af208443d22da12544d3cb78ef2f78424787c92ffb24b4d52f0426b55212e1"
+"verify/fixtures/opencode-2.2.0/raw/04-question.hooks.jsonl" = "208dc6d2cf641acac7be5c4b4a425eef2dc28e9e4af4b80e19ea6108d786accd"
+"verify/fixtures/opencode-2.2.0/raw/04-question.sse.jsonl" = "cbbf40b9325a56c97bfcd9c5ee8e3fa9fae72ab9fabe399eccc5c570ad830524"
+"verify/fixtures/opencode-2.2.0/raw/05-interrupt.driver.jsonl" = "973723f64b7cdf7b1ff5968b45a4be3438226d08865ef172c6fc9199e372f907"
+"verify/fixtures/opencode-2.2.0/raw/05-interrupt.hooks.jsonl" = "8e8257f070e10fa0f8e5c1b834d4659905e7713e8adc71dee753b8d80993e8b4"
+"verify/fixtures/opencode-2.2.0/raw/05-interrupt.sse.jsonl" = "efffbc50738e0cc8fddaf520cc934c57ca4ab0a72868a93df4898635967771d8"
+"verify/fixtures/opencode-2.2.0/raw/06-title-given.hooks.jsonl" = "fe3247d46537d7141aeb4626abbfe004daee245db1b9744f9fb2a66b8c0b9d84"
+"verify/fixtures/opencode-2.2.0/raw/06-title-given.stream.jsonl" = "ae8d9c1e83bc0ad264d6349165df6eb12d7e3c356ab7e3e89b7f907436a3ef4a"
+"verify/fixtures/opencode-2.2.0/raw/07-long-answer.hooks.jsonl" = "e6a229ebc5b612b1dd20ba3f0b7c1ab4c3a9581fcb06bd5d3d89f0cfa9248568"
+"verify/fixtures/opencode-2.2.0/raw/07-long-answer.stream.jsonl" = "9161b33d3775690d2be149097ada61be3b4e16437853b83f7048805ad5b8a32c"
+"verify/fixtures/opencode-2.2.0/raw/08-deny.hooks.jsonl" = "b2e67383e9ee8e2ebc26f1fe7f32b9d416faddd29ae03dd7ab0746694ff02dd6"
+"verify/fixtures/opencode-2.2.0/raw/08-deny.model-input.jsonl" = "b6b734a28088caf312068560eb8abea11012a3e099285a7a4b6e16af04148864"
+"verify/fixtures/opencode-2.2.0/raw/08-deny.stream.jsonl" = "a03920fcc994792782ad2c3bc08d033513739fff0c8fc829a2c308f9aa6cfcd5"
+"verify/fixtures/opencode-2.2.0/raw/09-delete-api.driver.jsonl" = "ad1fa688147b3145f6f3a304562e57eda3604ee27c533bc9e575f5f539d52358"
+"verify/fixtures/opencode-2.2.0/raw/09-delete-api.hooks.jsonl" = "17d8e0f78eb093f372921a8f6ba309be23fb47376e8648a1c775b87292b58ee2"
+"verify/fixtures/opencode-2.2.0/raw/09-delete-api.sse.jsonl" = "ab14871c2df2c7d5af52c14dea8b52bee6b78bb7910d7b32fa66a6feecc6f385"
+"verify/fixtures/opencode-2.2.0/raw/10-two-folders.driver.jsonl" = "ce04f2b337f08822635d5dc939f1827e5e68466bd7c4592aa0359bc5b4f95eb8"
+"verify/fixtures/opencode-2.2.0/raw/10-two-folders.hooks.jsonl" = "2a2da3e2a342f7e17c31aef9d43801c14f9816a9a05d8a03b04a843f3392c6d2"
+"verify/fixtures/opencode-2.2.0/raw/10-two-folders.sse.jsonl" = "a2d89e47e2aaebf250172d5fb92299546b50d46196b40b84dfe1a6e0b1cd06eb"
+"verify/fixtures/opencode-2.2.0/raw/11-process.jsonl" = "52bb7a40c518975fdc134bd4e172eea8f7a5683c58b3d691478475fe319559e3"
+"verify/fixtures/opencode-2.2.0/translate/call_id_hashed.json" = "ebb8173e9031bbbff76989757bc001390b6594d5290832a3c92b24d308cf7385"
+"verify/fixtures/opencode-2.2.0/translate/execution_failed.json" = "1cd834c073f70a9b26ff28488ab09c4047789cd841f09ef8de3a50bbb6f7dfb7"
+"verify/fixtures/opencode-2.2.0/translate/execution_failed_child.json" = "998a9386bbb1b41136e55e33cd6e5c00b1bccd656c930a48bdb2f2afb6be33e5"
+"verify/fixtures/opencode-2.2.0/translate/execution_interrupted_shutdown.json" = "3301e4efe464633ed7b29a5874e04e8bdc400b5b2ea0b8d29c362a9c378e0233"
+"verify/fixtures/opencode-2.2.0/translate/execution_interrupted_user.json" = "073e3f10977362d426f2d9f7ddaf3523dab74db03c60505640a3f3a1669a3302"
+"verify/fixtures/opencode-2.2.0/translate/execution_started.json" = "a600fb7ab1f70d6c10410b4a57189a608c1dd50e34e2ffc5e1f1db32a184e5b0"
+"verify/fixtures/opencode-2.2.0/translate/execution_started_child.json" = "456a3d5bd540cf2c01376d06bf573613d56eb3989e4c36720e44733d26f896db"
+"verify/fixtures/opencode-2.2.0/translate/execution_succeeded.json" = "3bf84406014fec6312f6bff0b60c214f37930b490fab8e4ac263b0983d4eb67d"
+"verify/fixtures/opencode-2.2.0/translate/execution_succeeded_child.json" = "e275ec3cee836230d14002300c1dea9e99160bd7a723245405f3f474473aa817"
+"verify/fixtures/opencode-2.2.0/translate/first_event_unknown_session.json" = "0f7601e0dc893165c7a8f1a22ed7769463a8645aa6991c8f628cac9f38fbaad2"
+"verify/fixtures/opencode-2.2.0/translate/form_created_input.json" = "a57bdbd0d1323cce5a47c3ee1eb85a73a701840fab9673c9956fd5120cce9af8"
+"verify/fixtures/opencode-2.2.0/translate/form_created_question.json" = "c5b3811fd3344d1fd60c0830cd8391e7e262f8683e95cdcde0d877a11468a478"
+"verify/fixtures/opencode-2.2.0/translate/form_replied.json" = "b9f631ea959584db6b93ab396e3217c43743aae417c47ba8e9b11e995e9743b8"
+"verify/fixtures/opencode-2.2.0/translate/ids_hashed.json" = "a3ce58f4ef51d8278d88202e772aa2395b216f46824f45dd5260084858b33adc"
+"verify/fixtures/opencode-2.2.0/translate/ids_readable.json" = "0f7601e0dc893165c7a8f1a22ed7769463a8645aa6991c8f628cac9f38fbaad2"
+"verify/fixtures/opencode-2.2.0/translate/ids_too_long.json" = "1002665d311bac0581ff2acee3a9ab8a06e59c8c924f59c0058a0b22847e256b"
+"verify/fixtures/opencode-2.2.0/translate/ids_valid_without_underscore.json" = "9e6365ddab7172e9c328d70887fddff04c01cdc3662b7fdf1666e79890d9c633"
+"verify/fixtures/opencode-2.2.0/translate/missing_field.json" = "1ca360e8496f2756986778bb913a41a0b22215ac8dafe9d93a878a7fc104d752"
+"verify/fixtures/opencode-2.2.0/translate/other_harness_record.json" = "5d78208ac7c0fb7edb15d73cc3e52412f8b6acfe93af4686a525506c5c06c833"
+"verify/fixtures/opencode-2.2.0/translate/permission_asked.json" = "79b4a0a974a16be7a2dc2d6f47cc3ef28117d2a7de59ef2c5f925303aed9c931"
+"verify/fixtures/opencode-2.2.0/translate/permission_asked_unknown_call.json" = "f3f8cbbe7059bbbb456444b9fb41a58bb6caeb9fd23bdb6a2c80f94107534c0a"
+"verify/fixtures/opencode-2.2.0/translate/permission_replied_once.json" = "7c9bdff358c472690024eeafe580b3b7dbf0ac7d0497f0585d4f786288c349b6"
+"verify/fixtures/opencode-2.2.0/translate/permission_replied_reject.json" = "cf021eb49c9def12554c4c5f57426c1d6c4dbd81f9ab5d04d3d568ff3f13f8bc"
+"verify/fixtures/opencode-2.2.0/translate/permission_replied_without_call.json" = "0f4e846fefc7ac0515e9a426c91f7d189fe7de23a77a91c6d83a81f759766c21"
+"verify/fixtures/opencode-2.2.0/translate/reasoning_delta.json" = "08737ff9650208cb0a39c5ce67b6614595642e326be2938de0f1c26f0e933678"
+"verify/fixtures/opencode-2.2.0/translate/relative_directory.json" = "7be031d916fcae9cccb3067e0852414e85ae9c940cec14ceb0997b158e74a8a5"
+"verify/fixtures/opencode-2.2.0/translate/session_created.json" = "6ac3e7fb6f9ce609b3a2208c1d8a8111d830e14ec1e5e5f808d9c64063319cb0"
+"verify/fixtures/opencode-2.2.0/translate/session_created_child.json" = "0f347ff9db12f07f3eb87eaaf9f1401cd8411425893c964e4ccd2cc7ff2de0d7"
+"verify/fixtures/opencode-2.2.0/translate/session_created_titled.json" = "911c9a1e7e3ed2d52b77f956a3caaf37f41ad8873bfa33c9e057a699238b2699"
+"verify/fixtures/opencode-2.2.0/translate/session_deleted.json" = "35999fc151f985e20a53519a1cf1e1f82a07b16a8dfba1c6bf852c98d77e0f8f"
+"verify/fixtures/opencode-2.2.0/translate/session_deleted_child.json" = "22f16d71ab18b7d22b586657fc9c747dd8a73bd92c118b8974a3698e31fca96f"
+"verify/fixtures/opencode-2.2.0/translate/session_renamed.json" = "ceb429902a93b06d55e5b49f57bb7623d90a1c2515bc4b529e8077af1d22881f"
+"verify/fixtures/opencode-2.2.0/translate/session_renamed_child.json" = "5777f590ec16b7b58fa694ff6dd386d176c8209efb9db4f126b8ff598753bb84"
+"verify/fixtures/opencode-2.2.0/translate/session_renamed_unknown_session.json" = "aa8c38c3a80b6e86e575ec64cf6cfee93f59eb50ed322c6b6bd774ede22655ee"
+"verify/fixtures/opencode-2.2.0/translate/step_started_child.json" = "bbf3647293a929866efe5d1aa935f7a8e3514d79ec67d654d17113e582077e75"
+"verify/fixtures/opencode-2.2.0/translate/step_started_model.json" = "d23cf3e276f86fc9e1b16aab5e67c9baf60aaf1776f72dab67d2cff286a55126"
+"verify/fixtures/opencode-2.2.0/translate/text_delta_idle.json" = "8b37d11ed5e340940401945cec07280d1fb749b340854168bd695163574f0af3"
+"verify/fixtures/opencode-2.2.0/translate/text_delta_working.json" = "1e6d5ccdb60be051e9b593548eecdeba6da1a2cf84a6dbf31ad50bf5cb33789d"
+"verify/fixtures/opencode-2.2.0/translate/title_blank.json" = "1fd9216f0e3bd6b2acc6058dee04cd4e7d2b989a66130df7757b33efe7fdb300"
+"verify/fixtures/opencode-2.2.0/translate/title_null.json" = "0d7bec5d48666a8ef1583be11adb49fd4ea03b973722685dba43dfeb060c42b2"
+"verify/fixtures/opencode-2.2.0/translate/title_placeholder.json" = "1a2cec52be57f249ff037394167075a418cdb1aad236d0642b83792b59c1688c"
+"verify/fixtures/opencode-2.2.0/translate/tool_before_child.json" = "0bb7a63eb72cec1e89a22f5f9b70c670c0b513e5a5a485a1d1871728b9817744"
+"verify/fixtures/opencode-2.2.0/translate/tool_before_edit.json" = "fb7d930e5cd6b5a053e2c7fd925ed24f7e15488b73fda5f50fce44711087dade"
+"verify/fixtures/opencode-2.2.0/translate/tool_before_question.json" = "fdbbff9a9857cb2db8c21e40a76602878093c4cc0f88cbe09c0960444f3dacfb"
+"verify/fixtures/opencode-2.2.0/translate/tool_before_read_relative.json" = "cc97bc6bbc45cbb7debe2e52a30254a26565e4d32a6a27f43b75cee9f9a50e82"
+"verify/fixtures/opencode-2.2.0/translate/tool_before_shell.json" = "2fb04420f3b6b03fc5b4fc4fb0275acf8a6367c34c6cded3617d4bc9e84db003"
+"verify/fixtures/opencode-2.2.0/translate/tool_before_shell_cd_slot.json" = "da76be0b25311e18f4bdb63075ccb901f26035fee288684b358706e735a5c70f"
+"verify/fixtures/opencode-2.2.0/translate/tool_before_subagent.json" = "f27b942b7774b81d4d2d09f90bbaafb1ca47d8943f9bab281e2adb3a8708cd77"
+"verify/fixtures/opencode-2.2.0/translate/tool_before_write.json" = "de84375983dcc60aac07adaa19cad0d80da4ae7bdbc40cb55777fd90e6d80137"
+"verify/fixtures/opencode-2.2.0/translate/tool_failed_aborted.json" = "30c7b5f0fc7e2ad58cf07ddde60757d8b35f60059bb8bd4f4585628695764d7c"
+"verify/fixtures/opencode-2.2.0/translate/tool_failed_denied.json" = "13d4c8161f2bb6009f69a116f0cfde5b1e0810af575dc0a78531a69a60af7687"
+"verify/fixtures/opencode-2.2.0/translate/tool_failed_permission_rejected.json" = "1a336e486d3dc83c886149ea7e863e43dc3279427b67eac9157ab317955711d3"
+"verify/fixtures/opencode-2.2.0/translate/tool_input_delta.json" = "39239a747f6eefa3a2753369e56b21dc660f476adf9db238271639f5bd4b165c"
+"verify/fixtures/opencode-2.2.0/translate/tool_success.json" = "14031233ac94ddc3d1b00d4e6ae01a0fcf6d7863c8fc34d5998b4b196641c821"
+"verify/fixtures/opencode-2.2.0/translate/unknown_name.json" = "efa2411e339fa9e6741038ffbbf0e6681ffb4d5e84e5c50952e96361a9312a6c"
+"verify/fixtures/opencode-2.2.0/translate/unknown_v.json" = "181db944041d2f36f5e03ac04b1e4ae21a587fa1ca239057c18e635ed022d99e"
+"verify/goldens/claude-code-0.1.0/fixtures.jsonl" = "d5a976e2494b25a88363580e4820814b7048763082207a7b0c7206e3604c9bad"
+"verify/goldens/claude-code-0.1.0/install.jsonl" = "8152f8170af425d0e223d714eef8eb98ee99a1e5e42d46ba1977401663edb979"
+"verify/goldens/claude-code-0.1.0/recordings.jsonl" = "f93affa3f4823eec56db81deb98df8e1a3e44e882e172533fe462b00a207e158"
+"verify/goldens/claude-code-0.1.0/scenarios.jsonl" = "67927ba8b9bcb93cda97565fa4ad4e05f95cc092fd8567a591ae5f41ba4f13cb"
+"verify/trace.toml" = "74743f50e4feb54190e7e9147523ae6c0b165e32a3f2231a0b4af883ea6b6ecd"
+"xtask/src/hooks.rs" = "418fb001753505cedc08f7adb735d982f39beb65aa8c7240d26cd0d896934f56"
+"xtask/src/parts/int.rs" = "b769c9628609f02bc18ab836dca1a36c7b70260d428e485f4c403b48bc18f769"
+"xtask/src/replay.rs" = "492730dad1e7bfabc1b1721b47dbfac70158e2f068591e4b54bdfeac55f347a4"
+"xtask/src/replay/judge.rs" = "47c022a9efecd8b9ce87a4f97b5153ab1303778964bb36de84a29e3e68136fe9"
+"xtask/src/replay/oc_judge.rs" = "d7a43001ab5fec038266622e8ed0d1ecec549e37f33c279d71dd107bb1af1685"
+"xtask/src/replay/opencode.rs" = "dfa75db061668df6c7b1e198b209981acf2a53e9bf4936fe1f7888f8236f5671"
+"xtask/src/replay/translate.rs" = "014390845cb465acc75e65f7b56b66c89d15bc7cafd0e109ad53330f0671a0a1"
+"xtask/src/scrub.rs" = "9590b95b559d8d28b0c10683e9ed0bd47b790ddf15448d3bea516e6b155773dd"
+"xtask/src/scrub/personal.rs" = "025d76d457ce999fecda4913f1f960309b3ac419bf37b563940209a89678e3be"
+"xtask/src/trace.rs" = "5afb7e1bc8943bcfd812050709c58c75c10237ccbc011c102b778c61feaa3905"
+"xtask/tests/checks/bench/agents.rs" = "430e17f7819ee98d6bc52668e3b04567454323eaf0371286706cfd10f76ba0d2"
+"xtask/tests/checks/cc_identical.rs" = "332418bf13736b64b6976c2bbdc5d0450e4ea3e3398b5a80ec9ebd388887a226"
+"xtask/tests/checks/cc_model.rs" = "1237f92a6f4ffb264db70f7df4514e3702b6298def02f04e8613d8d1685ab1e6"
+"xtask/tests/checks/mod.rs" = "354756c6c0500f56b31be41a6b4f3172bece20232622322a63335ddbfd042dd3"
+"xtask/tests/checks/oc_events.rs" = "1deb9921bf9c6f2fcb11fadc66a31b507251f2d02cd069dddfba1dccd584cd00"
+"xtask/tests/checks/oc_install.rs" = "0e782685465dc3b4846a6f907586a36b27e4d3f91e6e23b1014f9a5185933fe0"
+"xtask/tests/checks/oc_policy.rs" = "2ccf6866477118ecfba1285140fe8522ec8510bb60eea17a6851c932169f67b7"
+"xtask/tests/checks/oc_records.rs" = "99e0af97105e0429cea691155e1272d99be838b5822a4aa4b0ae0a07a6154b8a"
+"xtask/tests/support/hook.rs" = "26fde5d795422569032c23df43ff99417c57096582687fddcdd41ae4e9986185"
+"xtask/tests/support/hook/opencode.rs" = "c01e2c2a4d2bac192fa8f5e0e53715a5b437ef139345dd5ccc74256418294b5d"
+
+[[change]]
+id = "oc-o3"
+reason = "Phase 5 oracle for the OpenCode plugin and the live part: the js layer of the quick part (Node's own test runner on vscode/test/opencode/, the plugin with a test CONFIG, a fake ctx, Bun and clock, fed the recorded 2.2.0 streams); static:eslint and static:prettier also over crates/wtpool-opencode/plugin/, static:plugin_types and marks__should_name_their_licence; the oc part (xtask/src/layers/oc*.rs, vscode/test/oc/) running the installed opencode with the release wtpool and the printed plugin in a sandbox, on a scripted local model and one free model of OpenCode's provider, counted by replay where no opencode is installed; oc in the part list, the schedule, the reuse inputs, the verdict of phase 5 and the report; the non-int checks of opencode.md section 13 registered in verify/checks.toml."
+[change.files]
+"verify/checks.toml" = "0f545a3ebccd3b311b8df78b990283305b57945f14aab68fda7a83712e2b65e6"
+"vscode/test/oc/network.mjs" = "a2028097d0f296798fe61f74563f656e6e275d3bcdd6112971d6cf1d6eb9355e"
+"vscode/test/oc/opencode.mjs" = "47d04ae7a099cbb3a6e10510ed31e4cef81efe8f396f697302208b0618890916"
+"vscode/test/oc/recorder.ts" = "43c377eae559bbd0362742d79b47feb4058a53bd54ffc502b54a7f255d35c381"
+"vscode/test/oc/run.mjs" = "e98b2aa6d9a7c768460d73f7e86b8ce3c905eaea7ef1de2862089ab9b9d300af"
+"vscode/test/oc/sandbox.mjs" = "268bb971e6c66152efddf75b334d8a7760cd3cfba7349f8ebecfb40d18680e6e"
+"vscode/test/oc/sessions-coordinator.mjs" = "6a4387c1206b09887e3a8e018820179fc45572a833939a84595289f06edf13ec"
+"vscode/test/oc/sessions-run.mjs" = "23e24e52e349104d6c165acc65b25c0c8494f069a8a4ad8d3a56637043732fb5"
+"vscode/test/oc/sessions-serve.mjs" = "5473139bb43381e52ec465e79c4cf8cb08dfc0582112a6d7d3ace5d5c2ba2888"
+"vscode/test/oc/stub-model.mjs" = "53988215b543244dc5c8b88a086e63394e416c26b33eb0cb32f8247cc53a8894"
+"vscode/test/opencode/fakes.mjs" = "3b18a5eb19c873330944a35fa1859ee5c28415eeedac7c7f7224034ddf69e04f"
+"vscode/test/opencode/forward.test.mjs" = "4a3a07f2e7814bd6b9c4b9eee63e5b078ba6c8c941fefaa1089580cffde6c53e"
+"vscode/test/opencode/maps.test.mjs" = "964b6174f95a3bd143d53391fe6f5c992e388d8df6cf7ccb6d1e0f0a4b166334"
+"vscode/test/opencode/plugin.mjs" = "1d91a8272a67f1e47e4dd542fa583ab237e685cfaf01adee8a293a145d48a712"
+"vscode/test/opencode/reporter.mjs" = "08eb433542b528e026e8160b945e836a40f4a65e92678b4a5a31f038948ab8f4"
+"vscode/test/opencode/shape.test.mjs" = "3071654cfd0976fcffe42edbac632caf7b1d179694cbc367f889b28f3da8efaa"
+"vscode/test/opencode/spawn.test.mjs" = "5584b733da7a9a31d11a12a3cc55ffd16132c50e13a909ef7ad45b9b1a735cbe"
+"xtask/src/layers.rs" = "05f72f1d74725f90c78438eaed4bcfa24c714be60d96560061554992643932ea"
+"xtask/src/layers/js.rs" = "3f4cb290cd29df5de6a33dc3f9c04bce48550a8797c40d3aa837180d957d6124"
+"xtask/src/layers/oc.rs" = "d1be0b05707d0bba6e6a00ed48e793170b07ae1491006f4967090365d9581e14"
+"xtask/src/layers/oc_judge.rs" = "3b9415bacfadfdb8f76f39f717eb0a451848c9b1014730e9b37304d1b451448d"
+"xtask/src/layers/oc_plugin.rs" = "205579915621e823a23693a0dfa67ccba2263ad103526e6d80fb3a96c26f2d87"
+"xtask/src/layers/oc_static.rs" = "732003009dd390ebc36804df6562f1f343642854bad59b9e492c75e8130c517c"
+"xtask/src/layers/statics.rs" = "62c139ebed03b700bda1aacf4c2614dad2f9d9d40475fa61ddf40fed9fffebf0"
+"xtask/src/parts.rs" = "9996f4f6d7e84e10e81e595e05e97d5abee0c7d0df185212a80d1a4e696466ac"
+"xtask/src/report/verdict.rs" = "5c34b0f60ec6243bbe9528691a37ca06d5cea2d0b9110e0dd903a47370f1bf78"
+"xtask/src/report/write.rs" = "856d2789eedc9ce46f2f0b35ea12e03270ccea7001c07fa725a86458668227ee"
+"xtask/src/reuse.rs" = "e1468f64661cc34394937e614ea8bc04b968dd693a2c6bd85fbb37ee20c5f711"
+"xtask/src/schedule.rs" = "0e416d7c6db0b446e23cf44bd18ceaa66f4dbd6cfea96d2d9c6e8ae570990c77"
+"xtask/src/web/registry.rs" = "3cadef3864239ee14237031e8976aec007b9dc038e07b145c64408d863de538a"
+
+[[change]]
+id = "jobs-scope"
+reason = "Phase 5b: under require every heavy command of an agent goes through the queue, wherever it runs and whatever starts it. Queue shims on the agents' PATH (JR8, J25 to J30); the patterns of the agent's folder and of the command's folder, and a hook that decides in any folder (J20, J21, H29, OC22); wtpool hook shims at SessionStart (H1, H22, H33); OpenCode's plugin putting the shim folder on its shell calls under --policy (G4, OC4, OC11, OC23); processes placed by H7 and each job and heavy process with its folder, program and the programs it came through (S4, S14, S15); outside this pool beside the agent, via, and a floating label with the folder and program in the panel (A8, U11, U14, U19); a phase 5b row in Phases; pausing escaped processes left open (Q19)."
+[change.files]
+"docs/design/harnesses/opencode.md" = "37ff3177918c54c36916e45d50f13a3660c4620c272f5101d532c1f04811d64b"
+"docs/design/jobs/jobs.md" = "5176ff02eb74f629446b4d2fe3127a8335d2159bfb0dc4fb8e6799536ed94574"
+"docs/design/status-panel/status-panel.md" = "ff4cadc212042f0c97244e9d8d4890ff24ab45824b5ec9dac87b5dbbc81a06c7"
+
+[[change]]
+id = "phase-5b-status-lines"
+reason = "The Status lines of jobs.md (revision 8), status-panel.md (revision 40) and opencode.md (revision 4) name the phase 5b design, the queue managing every heavy command of the pool's agents. No row or check changes."
+[change.files]
+"docs/design/harnesses/opencode.md" = "1398891b7d71f72e3fe131adecc80cadb70a8577912322f4eeaebce937b14809"
+"docs/design/jobs/jobs.md" = "6b6f6b72d9ad246453f30ce2b3d49ae51951e7f2d15c0265a4a9e82436bc199a"
+"docs/design/status-panel/status-panel.md" = "5fa266ce2f10d1b22cb8c02035691a3f489c52460030713d48c57915eb3d88dd"
+
+[[change]]
+id = "oc-o4"
+reason = "Oracle checks of phase 5a for the scenarios, the agent marks and the flow where an agent starts agents of another harness. The six scenario files 37 to 42 of the catalog; the scenario hook step takes a harness and an inline payload, the int runner passes --harness for it, and the payload printed for e2e is the inline one, with the six scenarios as int checks. The e2e stubs: a claude stub can start a child stub that stands for the OpenCode server and relays requests to it, and the scenario runner starts such a stub for a process named opencode. New render check agent_mark__should_follow_model_and_harness (every maker of U18's table, the badge rule, the harness's mark without a model, the empty box, the hover label's text 300 ms after the pointer enters a mark and none after it leaves, no title on the line, the text for screen readers, the detail strip's harness and model and launcher); new shot checks agent_mark__should_meet_contrast_and_size (3:1, sizes and place of a mark and its badge, both boxes, the text start, in the four themes on plain, hovered and selected rows) and agent_mark__should_show_its_label_on_hover (text, place, no row moved, colours and 3:1 in the four themes), which compare no pixels; new flow flow__coordinator_launches_opencode. The oracle's status schemas list the optional actor properties model and launched_by. The four theme files gain the three hover widget colours, which VS Code gives a webview. Existing checks that U13 and U18 made stale follow the spec: the text of an agent line starts after the state icon, the mark's box and 5 px after each, and the hidden text of an agent line starts with its state and then reads the mark's label."
+[change.files]
+"verify/scenarios/coordinator_launches_opencode.json" = "189867ed41f4c7732831630674590118dec9b90914c0b1a8e55ce7d0f0671e0f"
+"verify/scenarios/opencode_build_under_shared_process.json" = "5b31765d34e14af9e68a7d3423c0f12531cda2dadfa7ee706b5c238b2854de55"
+"verify/scenarios/opencode_long_answer.json" = "1a1f85d4748ac07456ba4b30f3dc596c313de4e7510e6d4a1be50fd0e2a11d54"
+"verify/scenarios/opencode_older_idle_hidden.json" = "4c434039a61504923e2bbd2318dd7a63b63b490b263a17a18c1d199bf4851c74"
+"verify/scenarios/opencode_permission_replied.json" = "b15f11fce168f9fc91082251b1dc4bf939f19e7dc405d7e0b40260565d31570b"
+"verify/scenarios/opencode_two_sessions_one_process.json" = "03c78e820f68c038549b283129ae35057e57c2286379078000ee9e370d4fd933"
+"verify/schema/status.phase-4.schema.json" = "6237a3b73463480d042fc73cf1dd6a88d795ce90d50f143666a6007a89370e16"
+"verify/schema/status.schema.json" = "047ce70d0b4d4a18efcb5ea3e81c8fe611e9b7eff68debd19ed3dc397347ee37"
+"verify/themes/dark.json" = "678039c06e1c33b1437134a86920c4e03f13462b5e3e8132e0e431cf7ddb3023"
+"verify/themes/high-contrast-light.json" = "f682a7c2210a9d2acb962f31ad0be91bc9bfd559132be4cbaf73b54131b72411"
+"verify/themes/high-contrast.json" = "4ef15e80f8ad329905c0a4a1bf14c94197dff8bdcc2b1b0602902c6d018deda7"
+"verify/themes/light.json" = "5ca59d2d5bea6e42da08b7ba687574ff2eef77dff9f402f6ff246d37eecff580"
+"vscode/test/e2e/agents.mjs" = "699dd134c2c3577d47293cd838657eb34f698a9902f2faf87d506d192ed5510a"
+"vscode/test/e2e/claude-stub.mjs" = "5680516d5bd0c263676a9da2691bc149e8282ed0ab571dff934d15a9b3ef9d97"
+"vscode/test/e2e/flows-agents-lines.spec.mjs" = "f6c697e877f22d3e7cc8b1e78048aaac3ed69a2e338a7f25a3e688203a81ffc9"
+"vscode/test/e2e/flows-opencode.spec.mjs" = "b96b49172ba4937967640c8aacc5e9327965b27f666e97497ee9d899718f59e0"
+"vscode/test/e2e/rows.mjs" = "252ca96214ac5f5c0e9d4c8672eb6bb022ab11a43bee231085899b9af52a4cd4"
+"vscode/test/render/agent-mark.test.mjs" = "199847fcbc9dfa8c2da87f840cae2c3e61b572730da9740b60a9775c5c0afe25"
+"vscode/test/shot/lines.spec.mjs" = "f402c38a14484835c912e0e2ecf4717d7341f9725216e4ed0802d492f6122b1f"
+"vscode/test/shot/mark-label.spec.mjs" = "00d9b0b6d3978a5b42b47845cccf3838dcd66a235734e4de341a19259a45f772"
+"vscode/test/shot/marks.spec.mjs" = "117be86ebb08d690628f677066312e338fa618253ce0ec30aa488b16858414da"
+"xtask/src/hooks.rs" = "ed7b42961acc5cfaac785fc443f1196ac2f8e923c3947aee958f300d0fc76fa8"
+"xtask/src/scenario.rs" = "09aba2424065777b7571c197a55828fd703fd3a01228ca250c95d70ec2342730"
+"xtask/tests/checks/scenarios.rs" = "7e69baf119377df548c5436dcfaf82525bcec7711302b784c4dd8c1e9a4d7397"
+
+[[change]]
+id = "readme"
+reason = "The version 0.2.0 in the extension's manifest and its lock file."
+[change.files]
+"vscode/package-lock.json" = "879d624fc7dd627d9a42501aa10313d82578f4efc0e18e20b46690ceb4599e0c"
+"vscode/package.json" = "2ff8e2fd0c9bee75eeb9a252cb578e21bf3515b5a7e50ac8cba6f6c14a62182f"
+
+[[change]]
+id = "trace-earlier-builds"
+reason = "The trace list names the harness check earlier_builds__should_be_the_machine_config_of_the_js_sandboxes, from phase 4, which the hx-jobs refactor added without a trace entry; verification.md's list of harness checks names it too (revision 30). No check changes."
+[change.files]
+"docs/design/status-panel/verification.md" = "17a8b723535636b95ab40cc51157dec5ab47a942b8e3a37e90d2ac9281df0ec0"
+"verify/trace.toml" = "7e573d9e7fe9c75d9e6873d57399167e6ffa898aec5033bf44912257a664a76d"
+
+[[change]]
+id = "speed-sched"
+reason = "The screenshot checks run in a part of their own, `shot`, in the wave beside `quick`, and the `ui` part keeps only `e2e`. A run asks for either part by name; the report requires `shot` wherever it required `ui`, and `--only` names the part that runs the check. Every check keeps its assertion and the shot and e2e runners are unchanged."
+[change.files]
+"docs/design/status-panel/verification.md" = "922c8749e7dcddfd136eb5e24a7e61d6d35ad64ebcb4e5d9fe34ac762238c7dd"
+"verify/checks.toml" = "c6dbef4230664c91952420d83f61a5d8cb8ded40bca7e36e45300ef049cc11fe"
+"xtask/src/clone.rs" = "53d87fbcf7d6eec0101c2c09a062ba51e5956b797e55c575eb32c75d4b435a43"
+"xtask/src/layers.rs" = "8f51f592ae26ca95651147eedeafc910694a415331de2db0fb896cc955ea8eee"
+"xtask/src/layers/js.rs" = "a0f85e8b2c9276080f7d1435887769faef36bdf088ec3a46377bbbc8baf61005"
+"xtask/src/main.rs" = "d202aba780a6fbb8878dacb5de0ae618a4d66ca27837fa6d3d5901768fdd0f66"
+"xtask/src/parts.rs" = "e634b3b8666278db250469910e37cba1e54bc1e01b70a104ed965a624d95e56e"
+"xtask/src/report/verdict.rs" = "ae3e9be949032c47680d0f0eea72f1207f77cd3d1c226703f38e961b6e79187d"
+"xtask/src/reuse.rs" = "b223877b47851e28a3763e0c149eb52204e561e6711943359af4662244a458b3"
+"xtask/src/schedule.rs" = "a57a5c67b4fe8a947b2c6b27522514b0da802b7e178e7dcc27f2ff6f995ad537"
+"xtask/src/web/registry.rs" = "39229b86f361367443bc417b8488dded55c6a1886cdbf7dbab9b0752f3d60265"
+
+
+[[change]]
+id = "speed-e2e"
+reason = "The e2e layer runs its parallel checks on six workers instead of four, so more VS Code windows share the machine and the layer's wall time drops; the environment variable still overrides the count. The scenario runner's 1.1 s wait between hook steps of two actors only keeps the order of the actors a row lists side by side, and that wait was 39 serialized seconds of bash_attribution, whose documents never show two actors in one row; a scenario that does list them keeps the wait, and every document of bash_attribution is asserted exactly as before."
+[change.files]
+"vscode/test/e2e/agents.mjs" = "e0b02f20031d27c1de53c10d880bee382491d87e3e8b1e1c437e8078993e4d06"
+"vscode/test/e2e/playwright.config.mjs" = "be4ce097653cb5280effec5ed67755dcb6c3cc3e9be38ffbf723a89827041972"
+
+
+[[change]]
+id = "oc-title"
+reason = "OpenCode 2.2.0 often sends the session.created of a folder's first session, and the session.renamed by which run --title names it, before the folder's plugin instance reads events, so the given title never reached the record. The plugin now looks up a session it first sees in an event or hook that keeps no title with ctx.session.get and forwards a titled answer as the lookup session.get, which the crate reads as info. opencode.md states it in facts 6 and 14, OC4, OC5, OC6, OC10, OC13, the event table, the limits and the checks; the 06-title-given stream forwards the lookup from the new lookups.json and its replay wants the given title; two translation cases, a js check and the live session oc_run_title cover it."
+[change.files]
+"docs/design/harnesses/opencode.md" = "ec7f509b7278b4c6426253f747c419e380e0311f4599f16ef345d0efd57463e6"
+"verify/checks.toml" = "359801460d819fd0b58794b90904c76a0ee9c656d622ab45e622d84028d56885"
+"verify/fixtures/opencode-2.2.0/README.md" = "630ea0e2af3971fa0600386ebe467c305f227771f2a094be5be7badece441bbe"
+"verify/fixtures/opencode-2.2.0/forwarded/06-title-given.jsonl" = "e99e3cf55bdb522f9636580f5b6ee969b01584d6ba2205dbc5b150cd7677b677"
+"verify/fixtures/opencode-2.2.0/lookups.json" = "8ba826245676775b27377e2c40444d7b2c4117ca62b7596fcfe86626c9e1624d"
+"verify/fixtures/opencode-2.2.0/translate/lookup_title.json" = "790ecc542558507ffffa60e1301e2c0b06095a82172fb2ad6ae24204cf08cf8f"
+"verify/fixtures/opencode-2.2.0/translate/lookup_title_working.json" = "9aab1ea245a1c2e28c8076afc3f9d66ae1d283e7b2e68f3f47a040dc2d878145"
+"verify/trace.toml" = "4220ed6a55ac87314e65524f2a332eb213c516f2a8448bb38a5b4c15b7c1ec4a"
+"vscode/test/oc/sessions-run.mjs" = "0af60588719e627c3f90d002240813aa1b9865d1e425410cb7d897d626a9dde2"
+"vscode/test/opencode/fakes.mjs" = "2a764ae92df3da7721648d3d8fb02d3557331258dcda19a792709d503ca2fc1a"
+"vscode/test/opencode/forward.test.mjs" = "ec7537b6b7bf17951a3cbddc7c7a30cdcfcac0d3d2f97357e826278b8c628cbf"
+"vscode/test/opencode/lookup.test.mjs" = "de5278df154f4089c56a8d9e08f973eeadf02746e15f88b401ad023b9e475c97"
+"vscode/test/opencode/plugin.mjs" = "acc8c64d80964ae1f0c9800287068090f9ebf79034fe56b9fc6f5838c677367b"
+"xtask/src/layers/oc_judge.rs" = "b17288be14fda8d4f361198198a3af8182b3509ebbea06b5efddc1a1073f87be"
+"xtask/src/replay/oc_judge.rs" = "8d04fd62267b332ec52b6db3dfdaaf1c46fea17a06db90b230fa23deb81f227b"
+"xtask/src/replay/translate.rs" = "3d4d779698c631653c2f57f2db7eb46f9946807e6f3394f5222d474e55b84959"
+
+
+[[change]]
+id = "shots-0.2"
+reason = "The owner approved seven new baselines in which an agent line has the mark box after its state icon and a line without an agent keeps that box empty: every_activity_focused_slot dark at 1100 and 600 px, permission_wait_and_answer in the four themes at 1100 px and dark at 600 px. They are the renders of the full phase 5 run before the merge. No check changes."
+[change.files]
+"verify/shots/approved/dark-every_activity_focused_slot-1100.png" = "34bbe4504c423091fb69f85722fb1c600525c4b04c603ea0fb0598a89be7eaef"
+"verify/shots/approved/dark-every_activity_focused_slot-600.png" = "f387b347879e77a8fde69b636ad2a0c484fc361a9f1a190cf26855e43a9a368d"
+"verify/shots/approved/dark-permission_wait_and_answer-1100.png" = "7f84bf2c2385e7cfaeb2093b86c20f67fdd0065f404b1a903466e0b0f790a26a"
+"verify/shots/approved/dark-permission_wait_and_answer-600.png" = "ef7394465aaa3daf7b36e5d2d95db9dea811837b0f3a95b4a74da455a1528a35"
+"verify/shots/approved/high-contrast-light-permission_wait_and_answer-1100.png" = "f97ea3cbd609287c05b527697471f7169ecf573d0d8d0c97004d23d7071592f2"
+"verify/shots/approved/high-contrast-permission_wait_and_answer-1100.png" = "c13d7b37a64ca6d5ef29cb4af7eb89861400adf95b5ddbabe74417bd1745ede0"
+"verify/shots/approved/light-permission_wait_and_answer-1100.png" = "e9179465a113991b8fa098d91df6d78051a21a306083288648d8005ce8934d6c"
+
+[[change]]
+id = "round-speed-merge"
+reason = "The merge of round speed: verification.md revision 31 names the shot part; opencode.md revision 5 records the title lookup; jobs.md revision 9 records the owner's decisions on Q19, Q20 and J30 and makes cargo xtask verify heavy for this repository; harnesses.md revision 4 corrects the OpenCode session.created row; checks.toml holds both the shot part comment and the title checks of the merged branches. No check changes."
+[change.files]
+"docs/design/harnesses/harnesses.md" = "f00d2e099fb458f5abee994db4c31fe1cd3f962cc2f05d9248ccf3fab34cd8a4"
+"docs/design/harnesses/opencode.md" = "31333680d1ab1355f4b6891c31c632bf98ca0f238f5f51957d38b9a32d5fecb5"
+"docs/design/jobs/jobs.md" = "01ddad384c37eb2243307486db760c0bf171919eab56a982fb4ce3da93d5d78a"
+"docs/design/status-panel/verification.md" = "da02f5f9a04878d58f8f380539afe048359af1f25ad3d459e226f0b81a0a32bb"
+"verify/checks.toml" = "f7af3142f155107fe1878d236fee6dcf5e8acbd5dd457baf76693ab8c3df28f8"
+
+
+[[change]]
+id = "speed-shot"
+reason = "The shot layer's checks each run in a slice, so no single check runs much longer than 20 s: layout__should_clip_no_text, contrast__should_meet_aa_in_every_theme and csp__should_report_no_violation take a k/n slice of the documents (and, for contrast, of each state document's rows) by index. Every assertion of the whole check stays in each slice, with the setup guard now proving the slice measured every document or state it holds and a further test proving the slices together cover every document and row exactly once. The long_values squeeze check runs in the slice that holds long_values and asserts that it did. The shot config reads WTPOOL_VERIFY_SHOT_WORKERS (8 by default), as the e2e config reads its own; no snapshot name changes, so the approved images still match."
+[change.files]
+"vscode/test/shot/layout.spec.mjs" = "08601d9a91997522863ef78e97a4f5ba8cb99322e3b15b3fb0445d2a19e81e12"
+"vscode/test/shot/look.spec.mjs" = "1991ff7c3ba963945fbcc3a8a50bc977e8c1e325b59395a5c6fa9e9cb7240034"
+"vscode/test/shot/panel.spec.mjs" = "cd8a56720a11b8ae6caef6fb8a40cc0a533fc422f356789c3773d0499f2aff02"
+"vscode/test/shot/playwright.config.mjs" = "ca6f344d177920f9e75e8b65b0546932dc5b0e9d94ad97a2fd0eb0f2607ed904"
+"vscode/test/support/visual-docs.mjs" = "d3063f04cb017756369c6720f3ff29686b9fbc858aa40703813fec36f5743a24"
+
+
+[[change]]
+id = "cover-rest"
+reason = "Tests for lines the cover check found reached by no test, outside wtpool-core. The render checks add the hover label of an agent mark that follows a moving row, hands over to the mark under the pointer, waits again for it and forgets a retired row, the paused header's error line, and each malformed jobSettings answer the machine strip leaves alone. The host check spawns a bare wtpool.path found only through a default PATHEXT extension on a told-Windows platform. The harness check adds one OpenCode event to the panic run, so the OpenCode name of an event prints nothing and exits 0. No assertion is weakened and no other check changes."
+[change.files]
+"vscode/test/host/tab.test.cjs" = "0cfcd787ca4107aa2c938cff12e739a2099cd453af092c0c1f577788e888340b"
+"vscode/test/render/agent-mark.test.mjs" = "8259d63012ad30bc3d0c754e7974b8f9c8dd1060c823f99af44e2251b2bdce24"
+"vscode/test/render/jobs-save.test.mjs" = "8c3cb7af7cbb1e4d94a5be1f62c44b6a978b860ac34c9d065d2ffc6e4520ee8c"
+"vscode/test/render/panel.test.mjs" = "749a346a876fb4d07e0b51b44f8dc7cd22bc92a91369a553a2e817636fa5e84c"
+"xtask/tests/checks/hook_io.rs" = "850a5adbca46ce1efc9fb53999d5b506d17bd4202529cc1a519a909f850e0033"
+
+
+[[change]]
+id = "label-clock"
+reason = "The shot check agent_mark__should_show_its_label_on_hover stopped the page's clock at the time it reads before each hover, so only runFor moves the page's time and a hover that costs real time under load cannot let the label's 300 ms timer fire before the 299 ms sample. Every assertion, text and number stays as it was."
+[change.files]
+"vscode/test/shot/mark-label.spec.mjs" = "12aeb99b04e0373b2d5ecb6234cd8e0b9f80f72f613a60c09666c9a161e5c894"
+
+
+[[change]]
+id = "review-fix"
+reason = "Fixes from the review of round speed. A layer removes only the short links that point into its own folder of the run, the host layer after host and the e2e layer after each e2e config; shot and bench make none and remove none, so shot ending beside quick no longer removes the link of quick's host VS Code. The web build of a run takes turns through a lock in the run's web folder, and shot asks for the package as quick does, so two parts that retry a failed shared build neither install nor remove outputs under each other, and a failed build still fails the part. The contrast guard test asserts that the documents and the three states of each state row make more than 100 states, as the whole check asserted; each contrast slice asserts that each state document shows one row per worktree before it slices them; the layout guard test asserts that long_values is among the documents. The CSP check sorts the scenario names before it slices them. Two js cases: a lookup answer that arrives after the session's deletion sends nothing, and a session first seen in its deletion is not looked up. Comments corrected in the shot config and a render check; verification.md says that ui, not shot, runs the release wtpool."
+[change.files]
+"docs/design/status-panel/verification.md" = "ce744ae293b22955b1c40fd7a390b9657638b81920821a9d8a5cfffb68907a7d"
+"vscode/test/opencode/lookup.test.mjs" = "7cd02dfa4f4385ad06ec747e77adab7027b4304008fce06016123c7579780fc3"
+"vscode/test/render/agent-mark.test.mjs" = "57762661921e80219f76f5c051348a5469a14542e1d4c2634080638e28e9825e"
+"vscode/test/shot/layout.spec.mjs" = "1a120898f5ad06d1af57cba18034d3de610e5d319e52867b2e6f042f91e5b9bf"
+"vscode/test/shot/look.spec.mjs" = "9cb58e91816b34d30bb8e9200b0461ae6819c6d110ba4ff3f39efe5865bb25b9"
+"vscode/test/shot/panel.spec.mjs" = "791b6f6b0a71ab2aabb0aef5233774ec7e6820de538cb17a720bcbb48c624861"
+"vscode/test/shot/playwright.config.mjs" = "59d6c94529330fa8744dc833d1841e3874a9b6d19ac20b3546dbe2e3ee1c4fe6"
+"xtask/src/layers/builds.rs" = "0e96e041ad2de97d1146b95d21ab64faeb03c4de952a480365ac674b07c1c308"
+"xtask/src/layers/e2e.rs" = "842c80fc10ad126519eeae252d39cbf9394ff023584e9205c60ead03ccd486c9"
+"xtask/src/layers/js.rs" = "5f24c41f6f249b917019bc99004c7bd45d8ab0c42b7dd74526874fc40171eadd"
+
+[[change]]
+id = "shots-0.2b"
+reason = "Four more baselines with the agent mark box, several_agents_one_worktree at 1100 px in the four themes: the same change as the seven of shots-0.2, which the check reached only once those passed. The lead accepted them as that approved change, to be confirmed by the owner. No check changes."
+[change.files]
+"verify/shots/approved/dark-several_agents_one_worktree-1100.png" = "554e1b16a5bd8476bf281e1bf2b09b4c8f7791a39aec1abbe2a1848c8c211268"
+"verify/shots/approved/high-contrast-light-several_agents_one_worktree-1100.png" = "24184deb4aa5ee46ade4917435c63f2ad10c016d6a6438bf8f9a06666a118247"
+"verify/shots/approved/high-contrast-several_agents_one_worktree-1100.png" = "d8b811c9a51ce7d4724f0feb2fbf33a32bf953c5d62210228c67b8e9e394a9aa"
+"verify/shots/approved/light-several_agents_one_worktree-1100.png" = "7d089731ab2eea0e101e9464f1278534857791338d7d71290942f6004dd99171"

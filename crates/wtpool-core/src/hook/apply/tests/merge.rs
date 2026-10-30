@@ -10,7 +10,10 @@ fn merge_older__should_keep_the_state_and_take_the_calls() {
     let newer = run(&[Event::CallStart(call("q", "ask", "h"))]);
     let older_result = apply(
         Some(&newer),
-        &Event::TurnEnd(None),
+        &Event::TurnEnd {
+            error: None,
+            subagents_done: false,
+        },
         &change("2026-10-20T12:00:09Z"),
     );
 
@@ -59,10 +62,13 @@ fn merge_older__should_end_a_wait_whose_call_the_older_writer_ended(
     ]);
     let mut newer = apply(
         Some(&before),
-        &Event::PermissionAsked(CallFacts {
-            id: None,
-            ..call("", "run", "h")
-        }),
+        &Event::Wait(
+            WaitReason::Permission,
+            CallRef::Facts(CallFacts {
+                id: None,
+                ..call("", "run", "h")
+            }),
+        ),
         &change("2026-10-20T12:00:05Z"),
     );
     if question {
@@ -71,7 +77,7 @@ fn merge_older__should_end_a_wait_whose_call_the_older_writer_ended(
     }
     let older = apply(
         Some(&newer),
-        &Event::CallEnd(ended.clone()),
+        &Event::CallEnd(CallRef::Facts(ended.clone())),
         &change("2026-10-20T12:00:06Z"),
     );
 
@@ -93,12 +99,19 @@ fn merge_older__should_keep_the_subagent_titles_of_both_writers() {
     let base = apply(None, &Event::TurnStart, &learnt);
     let mut newer_change = change("2026-10-20T12:00:02Z");
     newer_change.found.subagent = Some(subagent("a2", "read"));
-    let newer = apply(Some(&base), &Event::TurnEnd(None), &newer_change);
+    let newer = apply(
+        Some(&base),
+        &Event::TurnEnd {
+            error: None,
+            subagents_done: false,
+        },
+        &newer_change,
+    );
     let mut older_change = change("2026-10-20T12:00:01Z");
     older_change.found.subagent = Some(subagent("a3", "Test"));
     let older = apply(
         Some(&base),
-        &Event::CallEnd(call("c", "spawn", "h")),
+        &Event::CallEnd(CallRef::Facts(call("c", "spawn", "h"))),
         &older_change,
     );
 

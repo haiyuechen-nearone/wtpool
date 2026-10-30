@@ -5,7 +5,7 @@ use std::ffi::OsString;
 
 use rstest::rstest;
 
-use crate::support::Sandbox;
+use crate::support::{Outcome, Sandbox, must_outcome, wtpool_in};
 
 const GAP: &str = "wtpool job: enforce = require refuses nothing in Claude Code yet: ";
 const BLOCK_WITHOUT_POLICY: &str =
@@ -62,4 +62,50 @@ fn job_enforce_require__should_say_when_claude_code_checks_no_shell_call(
         (warn.stdout.as_str(), warn.stderr.as_str()),
         ("enforce: warn (machine)\n", "")
     );
+}
+
+#[test]
+fn job_heavy_suggest__should_print_the_suggestions_as_json() {
+    // Given
+    let sandbox = Sandbox::must_new();
+    std::fs::write(sandbox.foreground.join("Makefile"), "all:\n").unwrap();
+
+    // When
+    let suggest = sandbox.must_run(&["job", "heavy", "suggest"]);
+    let as_json = sandbox.must_run(&["job", "heavy", "suggest", "--json"]);
+
+    // Then
+    assert_eq!(
+        (
+            suggest.code,
+            suggest.stdout.as_str(),
+            suggest.stderr.as_str()
+        ),
+        (
+            Some(0),
+            "suggested: make (Makefile)\nadd them with: wtpool job heavy add --repo --suggested\n",
+            ""
+        )
+    );
+    assert_eq!(as_json.code, Some(0));
+    assert_eq!(
+        as_json.stdout,
+        "{\"suggested\":[{\"pattern\":\"make\",\"from\":\"Makefile\"}]}\n"
+    );
+}
+
+#[test]
+fn job_heavy_suggest__should_print_no_suggestion_outside_a_repository() {
+    // Given
+    let sandbox = Sandbox::must_new_empty();
+
+    // When
+    let outcome = must_outcome(&mut wtpool_in(
+        &sandbox,
+        &sandbox.root,
+        &["job", "heavy", "suggest"],
+    ));
+
+    // Then
+    assert_eq!(outcome, Outcome::ok("suggested: none\n", ""));
 }

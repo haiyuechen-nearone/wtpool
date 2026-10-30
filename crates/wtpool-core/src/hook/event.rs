@@ -4,14 +4,14 @@
 
 use std::path::{Path, PathBuf};
 
-use super::adapter::Adapter;
+use super::adapter::{Adapter, ProcessMode, Rejection, TranscriptTitles};
 use super::apply::{self, Agent, Change, Found, Fresh, Place, Titles, Writer};
 use super::env::{HookEnv, Me};
 use super::gc;
-use super::input::{CallFacts, Event, HookInput};
+use super::input::{CallFacts, CallRef, Event, HookInput};
 use super::log;
-use super::place::{self, Shell, ToolPath, Worktree};
-use super::record::{Record, SubagentTitle};
+use super::place::{self, Shell, ToolPath, Worktree, file_target};
+use super::record::{HarnessProcess, Record, SubagentTitle};
 use super::store::ActivityDir;
 use super::tasks::{self, Started, TaskEvent};
 use super::text::{self, MAX_LABEL, MAX_TEXT};
@@ -31,15 +31,23 @@ struct Context<'a, A> {
     cwd: PathBuf,
     cwd_worktree: Worktree,
     me: Me,
+    /// The harness process of the hook, as the actor's record names it.
+    process: Option<HarnessProcess>,
     now: Timestamp,
 }
 
 /// Handles one raw hook input of the harness `adapter` reads. Malformed input, an id outside
 /// its pattern, a folder outside every pool or a pool without a usable `wtpool-activity/` writes
-/// nothing.
+/// nothing. The hook's log names an input the adapter finds invalid.
 pub fn handle<A: Adapter>(adapter: &A, input: &[u8], env: &HookEnv) {
-    if let Some(input) = adapter.parse(input) {
-        handle_input(adapter, &input, env);
+    match adapter.parse(input) {
+        Ok(input) => handle_input(adapter, &input, env),
+        Err(Rejection::Invalid(reason)) => {
+            if let Some(dir) = &env.log {
+                log::append(dir, &format!("wtpool hook: skipped an event: {reason}"));
+            }
+        }
+        Err(Rejection::Ignored) => {}
     }
 }
 
@@ -58,6 +66,11 @@ fn handle_input<A: Adapter>(adapter: &A, input: &HookInput, env: &HookEnv) {
         return;
     }
     let now = env.clock.now();
+    let me = env.me();
+    let process = me.parent.clone().map(|parent| HarnessProcess {
+        shared: A::PROCESS == ProcessMode::Shared,
+        ..parent
+    });
     let context = Context {
         adapter,
         input,
@@ -70,7 +83,8 @@ fn handle_input<A: Adapter>(adapter: &A, input: &HookInput, env: &HookEnv) {
         },
         cwd,
         cwd_worktree,
-        me: env.me(),
+        me,
+        process,
         now,
     };
     if context.run(&input.event).is_some() && input.event == Event::SessionEnd {
@@ -95,18 +109,29 @@ impl<A: Adapter> Context<'_, A> {
             .ok()
             .or_else(|| self.skipped("its record's lock cannot be taken"))?;
         let current = self.activity.read(&stem);
+        if let Some(other) = current.as_ref().and_then(|r| self.foreign(r)) {
+            return self.skipped(&format!("its record names another harness, {other}"));
+        }
         if let Event::Notified(_) = event
             && current.as_ref().is_some_and(|r| r.waiting.is_some())
         {
             return None;
         }
+        let subagent = self.input.agent_id.is_some();
+        if apply::writes_nothing(current.as_ref(), event, self.now, subagent) {
+            return None;
+        }
         let (event, moved_to) = self.located(event, current.as_ref());
         let change = self.change(current.as_ref(), moved_to);
         let applied = apply::apply(current.as_ref(), &event, &change);
+        let info = event == Event::Info;
         let mut result = match &current {
-            Some(current) => apply::settle(current, applied, &change.writer),
-            None => applied,
+            Some(current) if !info => apply::settle(current, applied, &change.writer),
+            _ => applied,
         };
+        if info && current.as_ref() == Some(&result) {
+            return None;
+        }
         tasks::update(&mut result, &self.task_event(&event), self.now);
         if let Err(error) = self.activity.write(&stem, &result) {
             return self.skipped(&format!("its record cannot be written: {error}"));
@@ -115,6 +140,11 @@ impl<A: Adapter> Context<'_, A> {
         self.end_session_tasks(&stem);
         self.side_effects(&event, &result, &change);
         Some(())
+    }
+
+    /// The harness `record` names when it is not the adapter's: the hook never writes over it.
+    fn foreign<'r>(&self, record: &'r Record) -> Option<&'r str> {
+        (record.harness != A::HARNESS).then_some(record.harness.as_str())
     }
 
     /// Notes in the hook's log that the event wrote nothing, for `reason`, and returns `None`.
@@ -139,7 +169,7 @@ impl<A: Adapter> Context<'_, A> {
     /// session's other records on this event's harness process, as the list covers the whole
     /// session. Nothing else in those records changes.
     fn end_session_tasks(&self, own: &str) {
-        let (Some(running), Some(process)) = (&self.input.tasks_running, &self.me.parent) else {
+        let (Some(running), Some(process)) = (&self.input.tasks_running, &self.process) else {
             return;
         };
         let others = self
@@ -156,7 +186,8 @@ impl<A: Adapter> Context<'_, A> {
                 }
             };
             if let Some(mut record) = self.activity.read(&stem)
-                && record.process.as_ref() == Some(process)
+                && self.foreign(&record).is_none()
+                && record.process.as_ref().is_some_and(|own| own.is(process))
                 && tasks::end_unlisted(&mut record, running, self.now)
                 && let Err(error) = self.activity.write(&stem, &record)
             {
@@ -170,7 +201,7 @@ impl<A: Adapter> Context<'_, A> {
     /// output file the adapter names, and the tasks it ends.
     fn task_event(&self, event: &Event) -> TaskEvent {
         let started = match (event, &self.input.task_start) {
-            (Event::CallEnd(call), Some(task)) => self
+            (Event::CallEnd(CallRef::Facts(call)), Some(task)) => self
                 .adapter
                 .task_file(self.input, task, self.activity.owner().unwrap_or(0))
                 .map(|path| Started {
@@ -203,18 +234,17 @@ impl<A: Adapter> Context<'_, A> {
             |record| PathBuf::from(&record.worktree),
         );
         match event {
-            Event::CallStart(call) | Event::PermissionAsked(call) | Event::CallEnd(call) => {
+            Event::CallStart(call) => {
                 let (target, moved) = self.tool_place(&base);
-                let call = CallFacts {
-                    target,
-                    ..call.clone()
-                };
-                let event = match event {
-                    Event::CallStart(_) => Event::CallStart(call),
-                    Event::PermissionAsked(_) => Event::PermissionAsked(call),
-                    _ => Event::CallEnd(call),
-                };
-                (event, moved)
+                (Event::CallStart(with_target(call, target)), moved)
+            }
+            Event::Wait(reason, call) => {
+                let (target, moved) = self.tool_place(&base);
+                (Event::Wait(*reason, ref_with_target(call, target)), moved)
+            }
+            Event::CallEnd(call) => {
+                let (target, moved) = self.tool_place(&base);
+                (Event::CallEnd(ref_with_target(call, target)), moved)
             }
             Event::CwdChange => (event.clone(), self.cwd_change(current)),
             other => (other.clone(), None),
@@ -242,7 +272,12 @@ impl<A: Adapter> Context<'_, A> {
         }
     }
 
+    /// The worktree a command moves its actor to. A command that starts an agent moves none, as
+    /// that agent works there and its caller stays where it is.
     fn command_place(&self, parsed: &shell::Command) -> Option<String> {
+        if parsed.starts_agent {
+            return None;
+        }
         if let Some(last) = parsed.cds.last() {
             return self.in_pool(last).map(|w| path_text(&w.root));
         }
@@ -286,10 +321,30 @@ impl<A: Adapter> Context<'_, A> {
             agent_type: self.agent_type(),
         });
         let label = agent.as_ref().and_then(|agent| agent.agent_type.clone());
-        let (titles, transcript_offset) = match &agent {
-            Some(_) => (Titles::default(), None),
-            None => self.titles(current),
+        let read = match &agent {
+            Some(_) => None,
+            None => self.transcript(current),
         };
+        let found = read.clone().unwrap_or_default();
+        let given = self.input.session_title.as_deref().and_then(label_text);
+        let titles = Titles {
+            user: agent
+                .is_none()
+                .then(|| given.or_else(|| found.user.as_deref().and_then(label_text)))
+                .flatten(),
+            generated: self
+                .input
+                .title
+                .as_deref()
+                .and_then(title_text)
+                .or_else(|| found.generated.as_deref().and_then(label_text)),
+        };
+        let model = self
+            .input
+            .model
+            .as_deref()
+            .or(found.model.as_deref())
+            .and_then(model_text);
         let subagent = self.input.spawned.as_ref().and_then(|spawned| {
             Some(SubagentTitle {
                 agent_id: spawned.agent_id.clone(),
@@ -301,7 +356,9 @@ impl<A: Adapter> Context<'_, A> {
                 .agent_type
                 .clone()
                 .unwrap_or_else(|| "subagent".to_owned()),
-            None => text::session_label(zone::local_time(self.now, self.env.tz.as_deref())),
+            None => {
+                text::untitled_label(A::LABEL, zone::local_time(self.now, self.env.tz.as_deref()))
+            }
         };
         let place = match (&agent, current) {
             (Some(_), None) => self.parent_place(),
@@ -320,8 +377,9 @@ impl<A: Adapter> Context<'_, A> {
                 moved_to,
                 label,
                 titles,
-                transcript_offset,
+                transcript_offset: read.map(|read| read.offset),
                 subagent,
+                model,
             },
         }
     }
@@ -332,7 +390,7 @@ impl<A: Adapter> Context<'_, A> {
             waiting_tools: A::WAITING_TOOLS,
             now: self.now,
             started_micros: self.me.started_micros,
-            process: self.me.parent.clone(),
+            process: self.process.clone(),
         }
     }
 
@@ -340,25 +398,16 @@ impl<A: Adapter> Context<'_, A> {
         self.input.agent_type.as_deref().and_then(label_text)
     }
 
-    /// The titles a session's event finds: the one the user gave in its payload, else in the
-    /// new part of its transcript, and the newest generated one there, with the transcript's new
-    /// offset. The read starts where the record's last one ended.
-    fn titles(&self, current: Option<&Record>) -> (Titles, Option<u64>) {
+    /// The titles and model the new part of the session's transcript gives, if it can be read.
+    /// The read starts where the record's last one ended.
+    fn transcript(&self, current: Option<&Record>) -> Option<TranscriptTitles> {
         let offset = current.map_or(0, |record| record.transcript_offset);
-        let read = self
-            .input
+        self.input
             .transcript
             .as_deref()
             .map(Path::new)
             .filter(|path| path.is_absolute())
-            .and_then(|path| self.adapter.titles(path, offset));
-        let found = read.clone().unwrap_or_default();
-        let given = self.input.session_title.as_deref().and_then(label_text);
-        let titles = Titles {
-            user: given.or_else(|| found.user.as_deref().and_then(label_text)),
-            generated: found.generated.as_deref().and_then(label_text),
-        };
-        (titles, read.map(|read| read.offset))
+            .and_then(|path| self.adapter.titles(path, offset))
     }
 
     /// A new subagent starts at its session's worktree with the session's [`PlacedBy`].
@@ -379,15 +428,18 @@ impl<A: Adapter> Context<'_, A> {
         }
     }
 
-    /// The change an event makes to other records: [`Event::Idle`] finishes the subagents, and
-    /// the session's end deletes them. An older session on the process of a newer one stays as it
-    /// is, as `wtpool status` reads its end from the records.
+    /// The change an event makes to other records: a turn end that finishes the subagents
+    /// finishes them, and the session's end deletes them. An older session on the process of a
+    /// newer one stays as it is, as `wtpool status` reads its end from the records.
     fn side_effects(&self, event: &Event, result: &Record, change: &Change) {
         if result.is_subagent() {
             return;
         }
         match event {
-            Event::Idle => {
+            Event::TurnEnd {
+                subagents_done: true,
+                ..
+            } => {
                 for stem in self.activity.subagents_of(&self.key) {
                     self.update(&stem, |record| {
                         apply::finish_subagent(record, &change.writer)
@@ -397,7 +449,12 @@ impl<A: Adapter> Context<'_, A> {
             Event::SessionEnd => {
                 for stem in self.activity.subagents_of(&self.key) {
                     if let Ok(lock) = self.activity.lock(&stem) {
-                        self.activity.delete(&stem, lock);
+                        match self.activity.read(&stem) {
+                            Some(record) if self.foreign(&record).is_some() => {
+                                self.dropped(&stem, "it names another harness");
+                            }
+                            _ => self.activity.delete(&stem, lock),
+                        }
                     }
                 }
             }
@@ -412,7 +469,10 @@ impl<A: Adapter> Context<'_, A> {
             Ok(lock) => lock,
             Err(error) => return self.dropped(stem, &format!("its lock cannot be taken: {error}")),
         };
-        if let Some(current) = self.activity.read(stem)
+        let current = self.activity.read(stem);
+        if current.as_ref().is_some_and(|r| self.foreign(r).is_some()) {
+            self.dropped(stem, "it names another harness");
+        } else if let Some(current) = current
             && let Some(changed) = change(&current)
         {
             let result = apply::settle(&current, changed, &self.writer());
@@ -434,39 +494,30 @@ fn label_text(text: &str) -> Option<String> {
     Some(text::clean(text, MAX_LABEL)).filter(|text| !text.is_empty())
 }
 
-/// A file tool's target: its path inside `root` as written, else its file name.
-fn file_target(text: &str, path: &Path, root: &Path) -> String {
-    let root_text = root.to_string_lossy();
-    let relative = text
-        .strip_prefix(root_text.as_ref())
-        .and_then(|rest| rest.strip_prefix('/'))
-        .map(str::to_owned)
-        .or_else(|| {
-            let resolved = place::local(path).map(resolve)?;
-            resolved.strip_prefix(root).ok().map(path_text)
-        })
-        .unwrap_or_else(|| {
-            path.file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-                .unwrap_or_default()
-        });
-    text::clean(&relative, MAX_TEXT)
+/// A title an event names, as a label stores it: `None` when only blanks are left.
+fn title_text(text: &str) -> Option<String> {
+    label_text(text).filter(|text| !text.trim().is_empty())
 }
 
-/// `path` with its existing part's symlinks resolved and the rest kept as written.
-fn resolve(path: &Path) -> PathBuf {
-    let mut existing = path.to_path_buf();
-    let mut rest = Vec::new();
-    while existing.canonicalize().is_err()
-        && let Some(name) = existing.file_name().map(std::ffi::OsStr::to_os_string)
-    {
-        rest.push(name);
-        existing.pop();
+/// A model an event names, as a record stores it, `None` when nothing is left.
+fn model_text(text: &str) -> Option<String> {
+    Some(text::clean(text, MAX_TEXT)).filter(|text| !text.is_empty())
+}
+
+/// `call` with its target in the event's worktree.
+fn with_target(call: &CallFacts, target: String) -> CallFacts {
+    CallFacts {
+        target,
+        ..call.clone()
     }
-    let rejoin = |resolved: PathBuf| rest.iter().rev().fold(resolved, |acc, part| acc.join(part));
-    existing
-        .canonicalize()
-        .map_or_else(|_| path.to_path_buf(), rejoin)
+}
+
+/// `call` with its target, when the event gives its facts.
+fn ref_with_target(call: &CallRef, target: String) -> CallRef {
+    match call {
+        CallRef::Facts(facts) => CallRef::Facts(with_target(facts, target)),
+        CallRef::Id(id) => CallRef::Id(id.clone()),
+    }
 }
 
 #[cfg(test)]

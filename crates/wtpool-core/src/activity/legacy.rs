@@ -2,19 +2,21 @@
 //! alone wrote such calls, so the map stays as that adapter had it, and a new harness's records
 //! always name their kinds.
 
-use super::harness::Harness;
+use super::harness::HarnessName;
 use super::values::CallKind;
 
-/// The kind of a call of `tool` that an older wtpool wrote without one in a record of `harness`.
+/// The kind of a call of `tool` that an older wtpool wrote without one in a record of `harness`:
+/// [`CallKind::Other`] for every harness but [`HarnessName::LEGACY`].
 #[must_use]
-pub fn legacy_kind(harness: Harness, tool: &str) -> CallKind {
-    match harness {
-        Harness::ClaudeCode => match tool {
-            "Bash" => CallKind::Shell,
-            "Edit" | "Write" | "NotebookEdit" => CallKind::Edit,
-            "Agent" => CallKind::Agent,
-            _ => CallKind::Other,
-        },
+pub fn legacy_kind(harness: &HarnessName, tool: &str) -> CallKind {
+    if !harness.is_legacy() {
+        return CallKind::Other;
+    }
+    match tool {
+        "Bash" => CallKind::Shell,
+        "Edit" | "Write" | "NotebookEdit" => CallKind::Edit,
+        "Agent" => CallKind::Agent,
+        _ => CallKind::Other,
     }
 }
 
@@ -38,9 +40,10 @@ mod tests {
         #[case] expected: CallKind,
     ) {
         // When
-        let kind = legacy_kind(Harness::ClaudeCode, tool);
+        let kind = legacy_kind(&HarnessName::LEGACY, tool);
+        let named = legacy_kind(&HarnessName::new("other-harness"), tool);
 
         // Then
-        assert_eq!(kind, expected);
+        assert_eq!((kind, named), (expected, CallKind::Other));
     }
 }

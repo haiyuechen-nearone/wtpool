@@ -8,6 +8,7 @@ import { GROUP_TOKENS, GROUPS, WORDS, rowOrder } from '../support/grammar.mjs';
 import { REPO, SCENARIOS, runDir } from '../support/paths.mjs';
 import { axeRun } from '../support/measure.mjs';
 import { THEME_NAMES, computedThemeColours, openPanel } from '../support/page.mjs';
+import { sliceOf } from '../support/visual-docs.mjs';
 
 const APPROVED = path.join(REPO, 'verify', 'shots', 'approved');
 /** The other shots taken for review in every theme: a scenario and the index of its document. */
@@ -395,37 +396,59 @@ test('motion__should_stop_the_spinner', async ({ browser }) => {
   assert.deepEqual(reduced.arms, ['30deg', '-30deg'], 'the robot arms do not rest at 30 degrees out under vscode-reduce-motion');
 });
 
-test('csp__should_report_no_violation', async ({ page }) => {
+/** The slices of the CSP check's documents, so each test clicks a slice's rows. */
+const CSP_SLICES = 12;
+
+/** Every document the CSP check shows: every scenario document, then every_activity. */
+function cspDocuments() {
+  const names = readdirSync(SCENARIOS).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
+  return [...names.flatMap((name) => scenarioDocuments(name).documents), everyActivity()].map(mustValidate);
+}
+
+for (let k = 1; k <= CSP_SLICES; k += 1) {
+  test(`csp__should_report_no_violation ${k}/${CSP_SLICES}`, async ({ page }) => {
+    // Given
+    const documents = sliceOf(cspDocuments(), k, CSP_SLICES);
+    const panel = await openPanel(page);
+
+    // When
+    for (const status of documents) {
+      await panel.show(status);
+      for (const row of await page.locator('tr[data-row-id]').all()) await row.click();
+      await page.clock.runFor(1500);
+    }
+    const chips = page.locator('.chip:visible');
+    if (await chips.count()) await chips.first().click({ timeout: 5000 });
+    for (const button of await page.locator('button[data-action]').all()) {
+      await button.focus();
+      await page.keyboard.press('Enter');
+    }
+    await page.clock.runFor(5000);
+    const violations = await panel.violations();
+    const styled = await page.evaluate(() =>
+      [...document.querySelectorAll('body [style], body[style], head [style]')].map((el) => el.outerHTML.slice(0, 120)),
+    );
+
+    // Then
+    assert.ok(documents.length > 0, `setup: slice ${k}/${CSP_SLICES} holds no document`);
+    assert.deepEqual(violations, [], 'CSP or Trusted Types violations');
+    const consoleCsp = panel.console.filter((line) => /Content Security Policy|Trusted Type|Refused to/i.test(line));
+    assert.deepEqual(consoleCsp, [], 'CSP messages on the console');
+    assert.deepEqual(styled, [], 'elements with an inline style attribute');
+    assert.deepEqual(panel.errors, [], 'page errors');
+    console.log(`csp__should_report_no_violation ${k}/${CSP_SLICES}: clicked ${documents.length} documents`);
+  });
+}
+
+test('csp__should_report_no_violation slices cover every document exactly once', async () => {
   // Given
-  const names = readdirSync(SCENARIOS).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5));
-  const documents = [
-    ...names.flatMap((name) => scenarioDocuments(name).documents),
-    everyActivity(),
-  ].map(mustValidate);
-  const panel = await openPanel(page);
+  const documents = cspDocuments();
+  const index = new Map(documents.map((doc, i) => [doc, i]));
 
   // When
-  for (const status of documents) {
-    await panel.show(status);
-    for (const row of await page.locator('tr[data-row-id]').all()) await row.click();
-    await page.clock.runFor(1500);
-  }
-  const chips = page.locator('.chip:visible');
-  if (await chips.count()) await chips.first().click({ timeout: 5000 });
-  for (const button of await page.locator('button[data-action]').all()) {
-    await button.focus();
-    await page.keyboard.press('Enter');
-  }
-  await page.clock.runFor(5000);
-  const violations = await panel.violations();
-  const styled = await page.evaluate(() =>
-    [...document.querySelectorAll('body [style], body[style], head [style]')].map((el) => el.outerHTML.slice(0, 120)),
-  );
+  const measured = Array.from({ length: CSP_SLICES }, (_, i) => sliceOf(documents, i + 1, CSP_SLICES)).flat();
 
   // Then
-  assert.deepEqual(violations, [], 'CSP or Trusted Types violations');
-  const consoleCsp = panel.console.filter((line) => /Content Security Policy|Trusted Type|Refused to/i.test(line));
-  assert.deepEqual(consoleCsp, [], 'CSP messages on the console');
-  assert.deepEqual(styled, [], 'elements with an inline style attribute');
-  assert.deepEqual(panel.errors, [], 'page errors');
+  assert.equal(measured.length, documents.length, `setup: the slices hold ${measured.length} documents, not ${documents.length}`);
+  assert.equal(new Set(measured.map((doc) => index.get(doc))).size, documents.length, 'setup: a document is in two slices');
 });

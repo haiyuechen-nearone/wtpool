@@ -1,0 +1,6 @@
+{"line":60,"t":1793301974030,"payload":{"v":1,"kind":"event","name":"session.execution.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df74b4ffe2oILKzQo2zWHFj"}}}
+{"line":81,"t":1793301974042,"payload":{"v":1,"kind":"event","name":"session.renamed","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df74b4ffe2oILKzQo2zWHFj","title":"Stub title s7"}}}
+{"line":82,"t":1793301974062,"payload":{"v":1,"kind":"event","name":"session.step.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df74b4ffe2oILKzQo2zWHFj","model":{"id":"scripted","providerID":"stub"}}}}
+{"line":84,"t":1793301974163,"payload":{"v":1,"kind":"event","name":"session.text.delta","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df74b4ffe2oILKzQo2zWHFj"}}}
+{"line":170,"t":1793301984237,"payload":{"v":1,"kind":"event","name":"session.text.delta","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df74b4ffe2oILKzQo2zWHFj"}}}
+{"line":250,"t":1793301993045,"payload":{"v":1,"kind":"event","name":"session.execution.succeeded","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df74b4ffe2oILKzQo2zWHFj"}}}

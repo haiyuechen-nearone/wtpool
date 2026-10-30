@@ -114,6 +114,187 @@ the licence texts. The font and the bundled code are not in git: the build takes
   2017 Evgeny Poberezkin.
 - Modified: no, only bundled.
 
+### Agent marks
+
+An agent line of the panel shows the mark of its model's maker and the mark of its harness. The
+twelve rows of [vscode/src/shared/marks.ts](vscode/src/shared/marks.ts) hold one mark each as a
+path, copied from the source named below. A row stands alone, so dropping it drops that
+mark. Every mark is its owner's trademark; an icon set's licence covers the file and not the brand.
+
+#### Anthropic mark
+
+- File: the row `anthropic` of `vscode/src/shared/marks.ts`, a path that `vscode/src/html.ts` writes
+  into the page as an inline SVG.
+- Source: `icons/anthropic.svg` of [Simple Icons](https://github.com/simple-icons/simple-icons)
+  16.36.0, from npm. Simple Icons names <https://www.anthropic.com>
+  as the icon's source.
+- Licence: the icon data is [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), which
+  Simple Icons applies to its package. CC0 waives no trademark right.
+- Trademark: the mark is Anthropic's. It names the maker of a model or the harness an agent runs in,
+  and implies no sponsorship or endorsement. See [Anthropic Trademark
+  Guidelines](https://www.anthropic.com/legal/trademark-guidelines).
+- Modified: the path is copied unchanged, the view box is cut to the icon's ink, and the path is
+  drawn in the colour of the line's text.
+
+#### OpenAI mark
+
+- File: the row `openai` of `vscode/src/shared/marks.ts`, a path that `vscode/src/html.ts` writes
+  into the page as an inline SVG.
+- Source: `icons/openai.svg` of [Lobe Icons](https://github.com/lobehub/lobe-icons)
+  (`@lobehub/icons-static-svg` 1.101.0, from npm).
+- Licence: MIT, Copyright (c) 2023 LobeHub. The licence covers the icon collection, not the brand.
+- Trademark: the mark is OpenAI's. It names the maker of a model or the harness an agent runs in,
+  and implies no sponsorship or endorsement. See [OpenAI's brand
+  guidelines](https://openai.com/brand/).
+- Modified: the path is copied unchanged, the view box is cut to the icon's ink, and the path is
+  drawn in the colour of the line's text.
+
+#### Google mark
+
+- File: the row `google` of `vscode/src/shared/marks.ts`, a path that `vscode/src/html.ts` writes
+  into the page as an inline SVG.
+- Source: `icons/google.svg` of [Simple Icons](https://github.com/simple-icons/simple-icons)
+  16.36.0, from npm. Simple Icons names <https://partnermarketinghub.withgoogle.com>
+  as the icon's source.
+- Licence: the icon data is [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), which
+  Simple Icons applies to its package. CC0 waives no trademark right.
+- Trademark: the mark is Google's. It names the maker of a model or the harness an agent runs in,
+  and implies no sponsorship or endorsement. See [Google's brand
+  guidelines](https://partnermarketinghub.withgoogle.com/brands/google/branding-guidelines/how-to-show-googles-brand/).
+- Modified: the path is copied unchanged, the view box is cut to the icon's ink, and the path is
+  drawn in the colour of the line's text.
+
+#### DeepSeek mark
+
+- File: the row `deepseek` of `vscode/src/shared/marks.ts`, a path that `vscode/src/html.ts` writes
+  into the page as an inline SVG.
+- Source: `icons/deepseek.svg` of [Simple Icons](https://github.com/simple-icons/simple-icons)
+  16.36.0, from npm. Simple Icons names <https://www.deepseek.com>
+  as the icon's source.
+- Licence: the icon data is [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), which
+  Simple Icons applies to its package. CC0 waives no trademark right.
+- Trademark: the mark is DeepSeek's. It names the maker of a model or the harness an agent runs in,
+  and implies no sponsorship or endorsement.
+- Modified: the path is copied unchanged, the view box is cut to the icon's ink, and the path is
+  drawn in the colour of the line's text.
+
+#### Zhipu (Z.ai) mark
+
+- File: the row `zhipu` of `vscode/src/shared/marks.ts`, a path that `vscode/src/html.ts` writes
+  into the page as an inline SVG.
+- Source: `icons/zdotai.svg` of [Simple Icons](https://github.com/simple-icons/simple-icons)
+  16.36.0, from npm. Simple Icons names <https://z-cdn.chatglm.cn/z-ai/static/logo.svg>
+  as the icon's source.
+- Licence: the icon data is [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), which
+  Simple Icons applies to its package. CC0 waives no trademark right.
+- Trademark: the mark is Zhipu AI (Z.ai)'s. It names the maker of a model or the harness an agent
+  runs in, and implies no sponsorship or endorsement.
+- Modified: the path is copied unchanged, the view box is cut to the icon's ink, and the path is
+  drawn in the colour of the line's text.
+
+#### Qwen mark
+
+- File: the row `qwen` of `vscode/src/shared/marks.ts`, a path that `vscode/src/html.ts` writes into
+  the page as an inline SVG.
+- Source: `icons/qwen.svg` of [Simple Icons](https://github.com/simple-icons/simple-icons) 16.36.0,
+  from npm. Simple Icons names <https://qwen.ai>
+  as the icon's source.
+- Licence: the icon data is [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), which
+  Simple Icons applies to its package. CC0 waives no trademark right.
+- Trademark: the mark is Alibaba Cloud (Qwen)'s. It names the maker of a model or the harness an
+  agent runs in, and implies no sponsorship or endorsement.
+- Modified: the path is copied unchanged, the view box is cut to the icon's ink, and the path is
+  drawn in the colour of the line's text.
+
+#### Moonshot (Kimi) mark
+
+- File: the row `moonshot` of `vscode/src/shared/marks.ts`, a path that `vscode/src/html.ts` writes
+  into the page as an inline SVG.
+- Source: `icons/kimi.svg` of [Simple Icons](https://github.com/simple-icons/simple-icons) 16.36.0,
+  from npm. Simple Icons names <https://moonshotai.github.io/Branding-Guide>
+  as the icon's source.
+- Licence: the icon data is [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), which
+  Simple Icons applies to its package. CC0 waives no trademark right.
+- Trademark: the mark is Moonshot AI (Kimi)'s. It names the maker of a model or the harness an agent
+  runs in, and implies no sponsorship or endorsement. See [the Kimi branding
+  guide](https://moonshotai.github.io/Branding-Guide).
+- Modified: the path is copied unchanged, the view box is cut to the icon's ink, and the path is
+  drawn in the colour of the line's text.
+
+#### Mistral mark
+
+- File: the row `mistral` of `vscode/src/shared/marks.ts`, a path that `vscode/src/html.ts` writes
+  into the page as an inline SVG.
+- Source: `icons/mistralai.svg` of [Simple Icons](https://github.com/simple-icons/simple-icons)
+  16.36.0, from npm. Simple Icons names <https://chat.mistral.ai>
+  as the icon's source.
+- Licence: the icon data is [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), which
+  Simple Icons applies to its package. CC0 waives no trademark right.
+- Trademark: the mark is Mistral AI's. It names the maker of a model or the harness an agent runs
+  in, and implies no sponsorship or endorsement. See [Mistral's brand
+  page](https://mistral.ai/brand).
+- Modified: the path is copied unchanged, the view box is cut to the icon's ink, and the path is
+  drawn in the colour of the line's text.
+
+#### Meta mark
+
+- File: the row `meta` of `vscode/src/shared/marks.ts`, a path that `vscode/src/html.ts` writes into
+  the page as an inline SVG.
+- Source: `icons/meta.svg` of [Simple Icons](https://github.com/simple-icons/simple-icons) 16.36.0,
+  from npm. Simple Icons names <https://www.meta.com>
+  as the icon's source.
+- Licence: the icon data is [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), which
+  Simple Icons applies to its package. CC0 waives no trademark right.
+- Trademark: the mark is Meta's. It names the maker of a model or the harness an agent runs in, and
+  implies no sponsorship or endorsement. See [Meta's brand
+  resources](https://www.meta.com/brand/resources/meta/company-brand/).
+- Modified: the path is copied unchanged, the view box is cut to the icon's ink, and the path is
+  drawn in the colour of the line's text.
+
+#### xAI mark
+
+- File: the row `xai` of `vscode/src/shared/marks.ts`, a path that `vscode/src/html.ts` writes into
+  the page as an inline SVG.
+- Source: `icons/xai.svg` of [Lobe Icons](https://github.com/lobehub/lobe-icons)
+  (`@lobehub/icons-static-svg` 1.101.0, from npm).
+- Licence: MIT, Copyright (c) 2023 LobeHub. The licence covers the icon collection, not the brand.
+- Trademark: the mark is xAI's. It names the maker of a model or the harness an agent runs in, and
+  implies no sponsorship or endorsement. See [xAI's brand
+  guidelines](https://x.ai/legal/brand-guidelines).
+- Modified: the path is copied unchanged, the view box is cut to the icon's ink, and the path is
+  drawn in the colour of the line's text.
+
+#### MiniMax mark
+
+- File: the row `minimax` of `vscode/src/shared/marks.ts`, a path that `vscode/src/html.ts` writes
+  into the page as an inline SVG.
+- Source: `icons/minimax.svg` of [Simple Icons](https://github.com/simple-icons/simple-icons)
+  16.36.0, from npm. Simple Icons names
+  <https://github.com/MiniMax-AI/MiniMax-01/blob/57cf223b177e99636c7711a0f179e9fdc9c38e8a/figures/minimax.svg> as the icon's source.
+- Licence: the icon data is [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) as in
+  Simple Icons, which lists this icon's licence as "custom": [MiniMax's
+  comment](https://github.com/simple-icons/simple-icons/pull/13982#issuecomment-3531627803) confirms
+  that the file follows MiniMax's design guidelines and waives none of its rights.
+- Trademark: the mark is MiniMax's. It names the maker of a model or the harness an agent runs in,
+  and implies no sponsorship or endorsement.
+- Modified: the path is copied unchanged, the view box is cut to the icon's ink, and the path is
+  drawn in the colour of the line's text.
+
+#### OpenCode mark
+
+- File: the row `opencode` of `vscode/src/shared/marks.ts`, a path that `vscode/src/html.ts` writes
+  into the page as an inline SVG.
+- Source: the frame and the inner block of `packages/identity/mark.svg` at commit
+  1251a870cb384543c150c4a72fb101b55eec971b of
+  [anomalyco/opencode](https://github.com/anomalyco/opencode), the repository of OpenCode (formerly
+  sst/opencode). Simple Icons gives the same file as the source of its `opencode` icon.
+- Licence: MIT, Copyright (c) 2025 opencode, the licence of the repository.
+- Trademark: the mark is OpenCode's. It names the maker of a model or the harness an agent runs in,
+  and implies no sponsorship or endorsement.
+- Modified: the file's dark background square is left out, the frame is drawn in the colour of the
+  line's text, its inner block (the file's grey square) in the same colour at 40% opacity, and the
+  view box is cut to the frame's ink.
+
 ## Dependencies outside the repository
 
 The crates in `Cargo.lock` and `xtask/Cargo.lock` and the npm packages in

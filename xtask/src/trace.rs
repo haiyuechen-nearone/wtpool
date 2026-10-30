@@ -502,6 +502,9 @@ mod tests {
 
     /// The phase of `id`, kept apart from [`TRACE`] so a misphased entry there fails.
     fn spec_phase(id: &str) -> u8 {
+        if id.starts_with("OC") || ["H32", "S17", "U18"].contains(&id) {
+            return 5;
+        }
         let later = [
             "R4", "D5", "A1", "A2", "A3", "A4", "A7", "S5", "S6", "W6", "X18",
         ];
@@ -536,14 +539,15 @@ mod tests {
         let ids_per_letter = [
             ("R", 11),
             ("D", 4),
-            ("H", 30),
+            ("H", 31),
             ("A", 8),
-            ("S", 15),
+            ("S", 16),
             ("W", 10),
             ("X", 22),
-            ("U", 16),
+            ("U", 17),
             ("B", 14),
             ("J", 24),
+            ("OC", 32),
         ];
         let expected_ids: usize = ids_per_letter.iter().map(|(_, count)| count).sum();
         assert_eq!(trace.ids.len(), expected_ids);

@@ -1,0 +1,19 @@
+/* The page's floating label, in VS Code's hover widget colours and box. It is fixed to the visible
+ * area, so it floats over the rows and moves none, and it takes no pointer, so crossing it never
+ * ends the hover that shows it. */
+
+.float-label {
+  position: fixed;
+  z-index: 10;
+  box-sizing: border-box;
+  max-width: min(480px, calc(100vw - 8px));
+  padding: 4px 8px;
+  border: 1px solid var(--vscode-editorHoverWidget-border);
+  border-radius: 3px;
+  background-color: var(--vscode-editorHoverWidget-background);
+  color: var(--vscode-editorHoverWidget-foreground);
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, transparent);
+  line-height: 19px;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}

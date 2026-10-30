@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use super::record::Record;
 use super::store::ActivityDir;
-use crate::activity::{ActorId, Harness, PlacedBy, State};
+use crate::activity::{ActorId, HarnessName, PlacedBy, State};
 use crate::clock::Timestamp;
 pub use crate::test_support::eventually;
 
@@ -20,7 +20,7 @@ pub fn later(seconds: i64) -> Timestamp {
 pub fn record(session: &str) -> Record {
     Record {
         version: 1,
-        harness: Harness::ClaudeCode,
+        harness: HarnessName::LEGACY,
         session_id: ActorId::try_from(session).unwrap(),
         agent_id: None,
         agent_type: None,
@@ -43,6 +43,7 @@ pub fn record(session: &str) -> Record {
         transcript_offset: 0,
         subagents: Vec::new(),
         tasks: Vec::new(),
+        model: None,
     }
 }
 

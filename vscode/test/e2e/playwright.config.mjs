@@ -15,7 +15,7 @@ export default defineConfig({
   // Freeze sets WTPOOL_VERIFY_RETRIES=0, as it only needs each new check to fail once.
   retries: Number(process.env.WTPOOL_VERIFY_RETRIES ?? 2),
   // Each check has its own sandbox and pool, so checks run in parallel.
-  workers: Number(process.env.WTPOOL_VERIFY_E2E_WORKERS ?? 4),
+  workers: Number(process.env.WTPOOL_VERIFY_E2E_WORKERS ?? 6),
   fullyParallel: true,
   outputDir: path.join(runDir, 'e2e', 'artifacts'),
   reporter: [['json', { outputFile: path.join(runDir, 'e2e', 'results.json') }], ['list']],

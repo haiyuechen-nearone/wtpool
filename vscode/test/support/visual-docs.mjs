@@ -162,6 +162,14 @@ export function visualDocuments() {
   return list;
 }
 
+/**
+ * The `k`th of `n` slices of `items` by index. The slices together hold every item exactly once,
+ * in the order of the whole, so several tests can measure one long list.
+ */
+export function sliceOf(items, k, n) {
+  return items.filter((_, i) => i % n === k - 1);
+}
+
 /** The tag each row of `doc` carries: `fg` for the foreground, `unmanaged` for those. */
 export function expectedTags(doc) {
   const out = {};

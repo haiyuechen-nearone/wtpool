@@ -1,0 +1,12 @@
+{
+  "before": null,
+  "payload": {
+    "v": 1,
+    "kind": "event",
+    "name": "session.execution.started",
+    "directory": "{pool}/fg",
+    "data": {}
+  },
+  "after": null,
+  "log": 1
+}

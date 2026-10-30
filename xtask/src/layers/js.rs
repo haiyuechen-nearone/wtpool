@@ -1,12 +1,14 @@
-//! The JavaScript layers of the quick and ui parts: `render` under Vitest, `host` under Mocha in a
-//! VS Code, and `shot` and `e2e` under Playwright, each read from its reporter's results file.
+//! The JavaScript layers of the quick, shot and ui parts: `js` under Node's own test runner,
+//! `render` under Vitest, `host` under Mocha in a VS Code, `shot` under Playwright's headless
+//! Chromium, and `e2e` under Playwright in real VS Code windows, each read from its reporter's
+//! results file.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use super::builds::{self, chromium, oracle_js, web_build};
-use super::{LAYER_LIMIT, Wanted, e2e, focus, manifests, product, statics};
+use super::{LAYER_LIMIT, Wanted, e2e, focus, manifests, oc_plugin, product, statics};
 use crate::cmd;
 use crate::parts::Ctx;
 use crate::results::{CheckResult, FailKind};
@@ -18,8 +20,8 @@ fn windows_allowed() -> bool {
     std::env::var("WTPOOL_VERIFY_WINDOWS").map_or(true, |value| value != "0")
 }
 
-/// The quick part's web layers: npm installs and builds, the static checks of the extension,
-/// `render` and `host`.
+/// The quick part's JavaScript layers: `js`, which needs no build, then npm installs and builds,
+/// the static checks of the extension, `render` and `host`.
 pub fn quick(ctx: &Ctx) -> Vec<CheckResult> {
     let registry = match Registry::load(&ctx.root) {
         Ok(registry) => registry,
@@ -44,6 +46,9 @@ pub fn quick(ctx: &Ctx) -> Vec<CheckResult> {
         product::NO_SOCKET_APIS,
         crate::scrub::NAME,
     ];
+    if wanted.layer(oc_plugin::LAYER) {
+        results.extend(oc_plugin::js(ctx, &wanted));
+    }
     let web_layers = ["static", "render", "host"]
         .iter()
         .any(|layer| wanted.layer(layer))
@@ -70,7 +75,37 @@ pub fn quick(ctx: &Ctx) -> Vec<CheckResult> {
     web::merge(results)
 }
 
-/// The ui part: `shot`, then `e2e`.
+/// The shot part: Playwright's Chromium on the web build.
+pub fn shot(ctx: &Ctx) -> Vec<CheckResult> {
+    let registry = match Registry::load(&ctx.root) {
+        Ok(registry) => registry,
+        Err(error) => return vec![CheckResult::error("web:registry", "shot", error)],
+    };
+    let wanted = Wanted {
+        ctx,
+        registry: &registry,
+    };
+    // The package too, as quick asks for beside it: whichever of the two builds first then leaves
+    // the other nothing to rebuild under its pages.
+    let mut results = web_build(ctx, "shot", true);
+    if !builds::built(&results) {
+        return results;
+    }
+    if !wanted.layer("shot") {
+        return results;
+    }
+    results.extend(chromium(ctx, "shot"));
+    results.extend(playwright(
+        ctx,
+        &wanted,
+        "shot",
+        "vscode/test/shot/playwright.config.mjs",
+        PlaywrightRun::default(),
+    ));
+    web::merge(results)
+}
+
+/// The ui part: `e2e` in real VS Code windows.
 pub fn ui(ctx: &Ctx) -> Vec<CheckResult> {
     let registry = match Registry::load(&ctx.root) {
         Ok(registry) => registry,
@@ -87,16 +122,6 @@ pub fn ui(ctx: &Ctx) -> Vec<CheckResult> {
     results.extend(build);
     if !built {
         return results;
-    }
-    if wanted.layer("shot") {
-        results.extend(chromium(ctx, "shot"));
-        results.extend(playwright(
-            ctx,
-            &wanted,
-            "shot",
-            "vscode/test/shot/playwright.config.mjs",
-            PlaywrightRun::default(),
-        ));
     }
     if wanted.layer("e2e") {
         results.extend(if !windows_allowed() {
@@ -148,14 +173,14 @@ pub(super) struct ResultsFile {
 }
 
 /// The end of a layer's runner, and the log of its run.
-struct Finished<'a> {
-    ran: Result<cmd::Ran, String>,
-    log: &'a Path,
+pub(super) struct Finished<'a> {
+    pub(super) ran: Result<cmd::Ran, String>,
+    pub(super) log: &'a Path,
 }
 
 /// Reads a layer's results file `main`, with the `extra` files a run may leave out, or gives every
 /// wanted check of the layer an error that names the layer's log.
-fn read_results(
+pub(super) fn read_results(
     wanted: &Wanted,
     layer: &str,
     main: &ResultsFile,
@@ -266,7 +291,7 @@ fn host(ctx: &Ctx, wanted: &Wanted) -> Vec<CheckResult> {
     let guard = focus::watch(ctx, "host");
     let ran = ctx.run_logged("host", &mut command, LAYER_LIMIT);
     let front = guard.finish();
-    remove_short_links(ctx);
+    remove_short_links(ctx, "host");
     let log = ctx.log_path("host");
     let mut found = read_results(wanted, "host", &results, &[], Finished { ran, log: &log });
     found.extend(keychain_result(ctx, "host"));
@@ -355,9 +380,7 @@ pub(super) fn run_config(
     } else if let Some(pattern) = wanted.grep_invert() {
         command.args(["--grep-invert", &pattern]);
     }
-    let ran = ctx.run_logged(log, &mut command, LAYER_LIMIT);
-    remove_short_links(ctx);
-    ran
+    ctx.run_logged(log, &mut command, LAYER_LIMIT)
 }
 
 /// Runs a Playwright config for the registry's `layer`.
@@ -392,17 +415,82 @@ pub(super) fn playwright(
 }
 
 /// Removes the short links of `s/` in the harness cache (vscode/test/support/code.mjs) that point
-/// into this run, left behind by a check that stopped before it closed its VS Code.
-fn remove_short_links(ctx: &Ctx) {
+/// into the `layer` folder of this run, left behind by a check that stopped before it closed its
+/// VS Code. A layer running beside it in the same run may still use its own.
+pub(super) fn remove_short_links(ctx: &Ctx, layer: &str) {
     let Ok(cache) = crate::dirs::cache_dir() else {
         return;
     };
-    let Ok(entries) = fs::read_dir(cache.join(crate::dirs::SHORT_LINKS)) else {
+    remove_links_into(
+        &cache.join(crate::dirs::SHORT_LINKS),
+        &ctx.run_dir.join(layer),
+    );
+}
+
+/// Removes each link in `links` whose target lies under `folder`.
+fn remove_links_into(links: &Path, folder: &Path) {
+    let Ok(entries) = fs::read_dir(links) else {
         return;
     };
     for entry in entries.flatten() {
-        if fs::read_link(entry.path()).is_ok_and(|target| target.starts_with(&ctx.run_dir)) {
+        if fs::read_link(entry.path()).is_ok_and(|target| target.starts_with(folder)) {
             let _ = fs::remove_file(entry.path());
         }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use std::os::unix::fs::symlink;
+
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    #[case::e2e_keeps_host("e2e", &["host/sandbox", "hostile", "elsewhere"])]
+    #[case::host_keeps_e2e("host", &["e2e/flow-1", "e2e/flow-2", "hostile", "elsewhere"])]
+    #[case::shot_keeps_every_other(
+        "shot",
+        &["host/sandbox", "e2e/flow-1", "e2e/flow-2", "hostile", "elsewhere"]
+    )]
+    fn remove_links_into__should_keep_the_links_of_another_layer(
+        #[case] layer: &str,
+        #[case] kept: &[&str],
+    ) {
+        // Given
+        let dir = std::env::temp_dir().join(format!("xtask-links-{layer}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let links = dir.join("s");
+        let run = dir.join("run");
+        fs::create_dir_all(&links).unwrap();
+        let targets = [
+            ("host/sandbox", run.join("host/sandbox")),
+            ("e2e/flow-1", run.join("e2e/flow-1")),
+            ("e2e/flow-2", run.join("e2e/flow-2")),
+            ("hostile", run.join("hostile/sandbox")),
+            ("elsewhere", dir.join("other-run/host/sandbox")),
+        ];
+        for (index, (_, target)) in targets.iter().enumerate() {
+            symlink(target, links.join(format!("{index:08x}"))).unwrap();
+        }
+
+        // When
+        remove_links_into(&links, &run.join(layer));
+
+        // Then
+        let mut found: Vec<PathBuf> = fs::read_dir(&links)
+            .unwrap()
+            .map(|entry| fs::read_link(entry.unwrap().path()).unwrap())
+            .collect();
+        found.sort();
+        let mut expected: Vec<PathBuf> = targets
+            .iter()
+            .filter(|(name, _)| kept.contains(name))
+            .map(|(_, target)| target.clone())
+            .collect();
+        expected.sort();
+        assert_eq!(found, expected);
+        let _ = fs::remove_dir_all(&dir);
     }
 }

@@ -1,9 +1,10 @@
-//! The layers besides `int`: the static checks, `render`, `host`, `shot`, `e2e`, `bench` and
-//! `cc`, and the product builds they test through, `npm run build`, `npm run package` and
+//! The layers besides `int`: the static checks, `js`, `render`, `host`, `shot`, `e2e`, `bench`,
+//! `cc` and `oc`, and the product builds they test through, `npm run build`, `npm run package` and
 //! `npm run generate` in vscode/.
 //!
 //! `WTPOOL_VERIFY_WINDOWS=0` records the checks of `host` and `e2e`, the layers that open VS Code
-//! windows, as not run, for runs inside a time when windows may not take focus.
+//! windows, as not run, for runs inside a time when windows may not take focus. `shot` needs no
+//! window, so a run of that time still takes it.
 
 mod bench;
 mod builds;
@@ -13,6 +14,10 @@ mod e2e;
 mod focus;
 mod js;
 mod manifests;
+mod oc;
+mod oc_judge;
+mod oc_plugin;
+mod oc_static;
 mod product;
 mod statics;
 
@@ -21,8 +26,9 @@ pub use builds::{release_wtpool, web_build_once};
 pub use cc::{cc, claude_version_text, replay_only_reason, report_by_replay};
 pub use cc_judge::REPLAY_ONLY;
 pub use e2e::build_pool;
-pub use js::{quick, ui};
+pub use js::{quick, shot, ui};
 pub use manifests::wtpool_path_problem;
+pub use oc::{oc, report_by_replay as oc_report_by_replay};
 pub use statics::{listen_call, network_import, text_findings};
 
 use std::time::Duration;

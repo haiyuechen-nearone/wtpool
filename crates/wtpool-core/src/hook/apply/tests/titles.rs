@@ -32,7 +32,14 @@ fn apply__should_label_a_session_with_its_title(
     for titles in found {
         let mut next = change("2026-10-20T12:00:01Z");
         next.found.titles = titles.clone();
-        record = apply(Some(&record), &Event::TurnEnd(None), &next);
+        record = apply(
+            Some(&record),
+            &Event::TurnEnd {
+                error: None,
+                subagents_done: false,
+            },
+            &next,
+        );
     }
 
     // Then
@@ -50,7 +57,10 @@ fn apply__should_keep_the_transcript_offset_until_a_read_moves_it() {
     // When
     let unread = apply(
         Some(&first),
-        &Event::TurnEnd(None),
+        &Event::TurnEnd {
+            error: None,
+            subagents_done: false,
+        },
         &change("2026-10-20T12:00:01Z"),
     );
 
@@ -72,7 +82,7 @@ fn apply__should_keep_the_newest_16_subagent_titles() {
         next.found.subagent = Some(subagent(&format!("a{n}"), &format!("Task {n}")));
         record = apply(
             Some(&record),
-            &Event::CallEnd(call("c", "spawn", "h")),
+            &Event::CallEnd(CallRef::Facts(call("c", "spawn", "h"))),
             &next,
         );
     }
@@ -80,7 +90,7 @@ fn apply__should_keep_the_newest_16_subagent_titles() {
     again.found.subagent = Some(subagent("a10", "Task ten"));
     record = apply(
         Some(&record),
-        &Event::CallEnd(call("c", "spawn", "h")),
+        &Event::CallEnd(CallRef::Facts(call("c", "spawn", "h"))),
         &again,
     );
 

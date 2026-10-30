@@ -37,8 +37,9 @@ impl fmt::Display for Verdict {
 pub fn required_parts(phase: u8) -> &'static [&'static str] {
     match phase {
         0 => &["quick", "int"],
-        1 => &["quick", "int", "ui", "bench"],
-        _ => &["quick", "int", "ui", "bench", "cc"],
+        1 => &["quick", "int", "shot", "ui", "bench"],
+        2..=4 => &["quick", "int", "shot", "ui", "bench", "cc"],
+        _ => &["quick", "int", "shot", "ui", "bench", "cc", "oc"],
     }
 }
 
@@ -71,9 +72,9 @@ pub fn what_to_do(code: &str) -> &'static str {
         "logged_out" => "Log in to Claude Code, then rerun the cc part.",
         "no_network" => "Restore the network, then rerun the part.",
         "machine_busy" => "Rerun the part when the machine is idle.",
-        "inconclusive" => "Claude Code did not follow the script: rerun the session.",
+        "inconclusive" => "The model did not follow the script: rerun the session.",
         "assumption_broken" => {
-            "Claude Code behaves differently from the spec: read the recording and decide."
+            "The harness behaves differently from the spec: read the recording and decide."
         }
         _ => "Read the listed checks.",
     }

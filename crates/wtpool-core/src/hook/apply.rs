@@ -1,14 +1,27 @@
 //! The change an event makes to a record: its state, calls in flight, waits, placement and
 //! titles. Pure functions of the record and the event.
 
+mod waits;
+
 use super::adapter::WaitingTools;
-use super::input::{CallFacts, Event};
+use super::input::{CallFacts, CallRef, Event};
 use super::record::{
-    Action, Call, Ended, HarnessProcess, MAX_DONE_IDS, MAX_IN_FLIGHT, MAX_SUBAGENTS, Record,
-    SubagentTitle, Title, TitleBy, Wait, push_bounded,
+    Action, Call, Ended, HarnessProcess, MAX_IN_FLIGHT, MAX_SUBAGENTS, Record, SubagentTitle,
+    Title, TitleBy, Wait, push_bounded,
 };
-use crate::activity::{ActorId, CallId, Harness, PlacedBy, RECORD_VERSION, State, WaitReason};
+use crate::activity::{ActorId, HarnessName, PlacedBy, RECORD_VERSION, State, WaitReason};
 use crate::clock::Timestamp;
+use waits::{
+    active_state, call_start_state, end_call, end_listed, end_notified_wait, ends_wait,
+    wait_on_a_question,
+};
+
+/// The seconds after a record's last event in which a progress of its actor writes nothing, so
+/// that a harness that reports progress at its model's pace costs one read per event.
+pub const PROGRESS_GAP: i64 = 10;
+
+/// The action of a working actor whose model generates while no call is in flight.
+const GENERATING: &str = "generating";
 
 /// Everything besides the event that a change to a record takes.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,7 +35,7 @@ pub struct Change {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Writer {
     /// The harness of the event, kept by a new record.
-    pub harness: Harness,
+    pub harness: HarnessName,
     pub waiting_tools: WaitingTools,
     pub now: Timestamp,
     /// The start of the hook process, in microseconds: [`settle`] orders writers by it.
@@ -69,18 +82,51 @@ pub struct Found {
     pub transcript_offset: Option<u64>,
     /// The subagent the event's call started, with its title.
     pub subagent: Option<SubagentTitle>,
+    /// The model the event names for the actor, cleaned as stored strings are.
+    pub model: Option<String>,
 }
 
-/// The titles an event found for its session, cleaned as labels are.
+/// The titles an event found for its actor, cleaned as labels are. A subagent has only one the
+/// harness gave.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Titles {
     pub user: Option<String>,
     pub generated: Option<String>,
 }
 
-/// The record after `event`. `current` is the record as read, `None` when there is none.
+/// `true` when `event` leaves the actor's record as it is, or makes none: the start of a known
+/// session, the info of an unknown subagent, a progress but on a working record at least
+/// [`PROGRESS_GAP`] seconds after its last event, and an answer that ends no wait. `subagent` is
+/// `true` for a subagent's event.
+#[must_use]
+pub fn writes_nothing(
+    current: Option<&Record>,
+    event: &Event,
+    now: Timestamp,
+    subagent: bool,
+) -> bool {
+    match (event, current) {
+        (Event::SessionStart, known) => known.is_some(),
+        (Event::Info, None) => subagent,
+        (Event::Progress | Event::WaitEnd(_), None) => true,
+        (Event::Progress, Some(record)) => {
+            record.state != State::Working || now.seconds_since(record.updated) < PROGRESS_GAP
+        }
+        (Event::WaitEnd(call), Some(record)) => !ends_wait(record, call.as_ref()),
+        _ => false,
+    }
+}
+
+/// The record after `event`. `current` is the record as read, `None` when there is none. An
+/// [`Event::Info`] on a known record changes its titles and model alone, so it needs no
+/// [`settle`].
 #[must_use]
 pub fn apply(current: Option<&Record>, event: &Event, change: &Change) -> Record {
+    if let (Some(current), Event::Info) = (current, event) {
+        let mut record = current.clone();
+        take_names(&mut record, &change.found);
+        return record;
+    }
     let writer = &change.writer;
     let mut record = current.cloned().unwrap_or_else(|| fresh(change));
     take_found(&mut record, &change.found);
@@ -90,17 +136,19 @@ pub fn apply(current: Option<&Record>, event: &Event, change: &Change) -> Record
     record.updated = writer.now;
     let tools = writer.waiting_tools;
     let state = match event {
+        Event::SessionStart | Event::Info if current.is_none() => State::Idle,
+        Event::SessionStart | Event::Info | Event::CwdChange => record.state,
         Event::TurnStart => turn_start(&mut record),
         Event::CallStart(call) => call_start(&mut record, call, writer.now, tools),
-        Event::PermissionAsked(call) => permission_asked(&mut record, call),
+        Event::Wait(reason, call) => waits::wait(&mut record, *reason, call),
+        Event::WaitEnd(call) => waits::wait_end(&mut record, call.as_ref()),
         Event::CallEnd(call) => call_end(&mut record, call, tools),
         Event::CallsEnd(calls) => calls_end(&mut record, calls, tools),
         Event::Notified(reason) => notified(&mut record, *reason),
-        Event::Idle => idle(&mut record),
-        Event::TurnEnd(error) => turn_end(&mut record, error.as_deref()),
+        Event::TurnEnd { error, .. } => turn_end(&mut record, error.as_deref()),
         Event::SubagentStart => State::Working,
         Event::SubagentEnd => subagent_end(&mut record),
-        Event::CwdChange => record.state,
+        Event::Progress => progress(&mut record),
         Event::SessionEnd => session_end(&mut record),
     };
     set_state(&mut record, state, writer.now);
@@ -108,7 +156,7 @@ pub fn apply(current: Option<&Record>, event: &Event, change: &Change) -> Record
     record
 }
 
-/// A subagent marked `done` by its session's [`Event::Idle`], or `None` when it is done already
+/// A subagent marked `done` by its session's turn end, or `None` when it is done already
 /// with nothing in flight, so that it is not written again.
 #[must_use]
 pub fn finish_subagent(current: &Record, writer: &Writer) -> Option<Record> {
@@ -170,7 +218,7 @@ fn fresh(change: &Change) -> Record {
     let Change { writer, fresh, .. } = change;
     Record {
         version: RECORD_VERSION,
-        harness: writer.harness,
+        harness: writer.harness.clone(),
         session_id: fresh.session.clone(),
         agent_id: fresh.agent.as_ref().map(|agent| agent.id.clone()),
         agent_type: fresh
@@ -196,15 +244,27 @@ fn fresh(change: &Change) -> Record {
         transcript_offset: 0,
         subagents: Vec::new(),
         tasks: Vec::new(),
+        model: None,
     }
 }
 
-/// Takes the label, titles, transcript offset, subagent title and worktree the event found.
-fn take_found(record: &mut Record, found: &Found) {
-    if let Some(label) = &found.label {
+/// Takes the label, titles and model the event found. A subagent's type labels it only while
+/// it has no title.
+fn take_names(record: &mut Record, found: &Found) {
+    if let Some(label) = &found.label
+        && record.title.is_none()
+    {
         record.label.clone_from(label);
     }
     retitle(record, &found.titles);
+    if let Some(model) = &found.model {
+        record.model = Some(model.clone());
+    }
+}
+
+/// Takes the names, transcript offset, subagent title and worktree the event found.
+fn take_found(record: &mut Record, found: &Found) {
+    take_names(record, found);
     if let Some(offset) = found.transcript_offset {
         record.transcript_offset = offset;
     }
@@ -239,21 +299,31 @@ fn call_start(record: &mut Record, call: &CallFacts, now: Timestamp, tools: Wait
     call_start_state(record, call, tools)
 }
 
-fn permission_asked(record: &mut Record, call: &CallFacts) -> State {
-    record.action = Some(action_of(call));
-    ask_permission(record, call);
-    State::Waiting
-}
-
-fn call_end(record: &mut Record, call: &CallFacts, tools: WaitingTools) -> State {
+fn call_end(record: &mut Record, call: &CallRef, tools: WaitingTools) -> State {
     let was_waiting = record.waiting.is_some();
-    if let Some(id) = &call.id {
+    if let Some(id) = call.id() {
+        let ended = match call {
+            CallRef::Facts(facts) => Some(Ended {
+                id: id.clone(),
+                tool: facts.tool.clone(),
+                kind: Some(facts.kind),
+            }),
+            CallRef::Id(_) => {
+                record
+                    .in_flight
+                    .iter()
+                    .find(|flying| flying.id == *id)
+                    .map(|flying| Ended {
+                        id: id.clone(),
+                        tool: flying.tool.clone(),
+                        kind: flying.kind,
+                    })
+            }
+        };
         end_call(record, id);
-        record.ended = Some(Ended {
-            id: id.clone(),
-            tool: call.tool.clone(),
-            kind: Some(call.kind),
-        });
+        if ended.is_some() {
+            record.ended = ended;
+        }
     }
     end_notified_wait(record);
     wait_on_a_question(record, was_waiting, tools);
@@ -282,11 +352,6 @@ fn notified(record: &mut Record, reason: WaitReason) -> State {
     State::Waiting
 }
 
-fn idle(record: &mut Record) -> State {
-    end_turn(record);
-    State::Idle
-}
-
 /// A turn that ended with `error` keeps it until the next turn starts. A subagent's error ends
 /// the subagent, as no prompt follows that would start another turn.
 fn turn_end(record: &mut Record, error: Option<&str>) -> State {
@@ -310,6 +375,17 @@ fn subagent_end(record: &mut Record) -> State {
 fn session_end(record: &mut Record) -> State {
     end_turn(record);
     State::Ended
+}
+
+/// The model generates: the action says so while no call is in flight.
+fn progress(record: &mut Record) -> State {
+    if record.in_flight.is_empty() {
+        record.action = Some(Action {
+            tool: GENERATING.to_owned(),
+            target: String::new(),
+        });
+    }
+    record.state
 }
 
 /// Sets the session's title, and with it the label, from the `titles` an event found. A title
@@ -368,138 +444,9 @@ fn add_call(record: &mut Record, call: &CallFacts, now: Timestamp) {
     push_bounded(&mut record.in_flight, flying, MAX_IN_FLIGHT);
 }
 
-/// A call that asks the user, a question or plan as `waiting_tools` say, waits on its own call
-/// unless the actor waits already or the call ended. A call matching an unbound permission wait
-/// binds it. Anything else works unless the actor waits. A call start never ends a wait.
-fn call_start_state(record: &mut Record, call: &CallFacts, waiting_tools: WaitingTools) -> State {
-    let reason = waiting_tools.reason(&call.tool);
-    let ended = call
-        .id
-        .as_ref()
-        .is_some_and(|id| record.done_ids.contains(id));
-    if let Some(reason) = reason
-        && record.waiting.is_none()
-        && !ended
-    {
-        record.waiting = Some(Wait::on_call(
-            reason,
-            &call.tool,
-            &call.target,
-            Some(&call.input_hash),
-            call.id.as_ref(),
-        ));
-        return State::Waiting;
-    }
-    if let Some(wait) = &mut record.waiting
-        && is_unbound_wait_for(wait, call)
-        && let Some(id) = call.id.as_ref().filter(|id| !record.done_ids.contains(id))
-    {
-        wait.call = Some(id.clone());
-    }
-    active_state(record)
-}
-
-/// A permission wait bound to the oldest call in flight with the same tool and input. A wait
-/// on a call already stands, a wait an [`Event::Notified`] set gives way.
-fn ask_permission(record: &mut Record, call: &CallFacts) {
-    if record
-        .waiting
-        .as_ref()
-        .is_some_and(|wait| wait.tool.is_some())
-    {
-        return;
-    }
-    let bound = record
-        .in_flight
-        .iter()
-        .find(|c| same_tool_and_input(Some(&c.tool), c.input_hash.as_deref(), call));
-    record.waiting = Some(Wait::on_call(
-        WaitReason::Permission,
-        &call.tool,
-        &call.target,
-        Some(&call.input_hash),
-        bound.map(|c| &c.id),
-    ));
-}
-
-/// Ends the call `id` and the wait bound to it.
-fn end_call(record: &mut Record, id: &CallId) {
-    record.in_flight.retain(|call| call.id != *id);
-    if !record.done_ids.contains(id) {
-        push_bounded(&mut record.done_ids, id.clone(), MAX_DONE_IDS);
-    }
-    if record
-        .waiting
-        .as_ref()
-        .is_some_and(|wait| wait.call.as_ref() == Some(id))
-    {
-        record.waiting = None;
-    }
-}
-
-/// An [`Event::CallsEnd`] entry ends its call, and an unbound wait with its tool and input.
-fn end_listed(record: &mut Record, call: &CallFacts) {
-    if let Some(id) = &call.id {
-        end_call(record, id);
-    }
-    if record
-        .waiting
-        .as_ref()
-        .is_some_and(|wait| is_unbound_wait_for(wait, call))
-    {
-        record.waiting = None;
-    }
-}
-
-/// After a wait ended with its call, binds a new wait to the oldest question or plan still in
-/// flight.
-fn wait_on_a_question(record: &mut Record, was_waiting: bool, waiting_tools: WaitingTools) {
-    if !was_waiting || record.waiting.is_some() {
-        return;
-    }
-    record.waiting = record.in_flight.iter().find_map(|call| {
-        let reason = waiting_tools.reason(&call.tool)?;
-        Some(Wait::on_call(
-            reason,
-            &call.tool,
-            &call.target,
-            call.input_hash.as_deref(),
-            Some(&call.id),
-        ))
-    });
-}
-
-/// A wait an [`Event::Notified`] set ends on the next call end or [`Event::CallsEnd`].
-fn end_notified_wait(record: &mut Record) {
-    if record
-        .waiting
-        .as_ref()
-        .is_some_and(|wait| wait.tool.is_none())
-    {
-        record.waiting = None;
-    }
-}
-
 fn end_turn(record: &mut Record) {
     record.in_flight.clear();
     record.waiting = None;
-}
-
-fn is_unbound_wait_for(wait: &Wait, call: &CallFacts) -> bool {
-    wait.call.is_none()
-        && same_tool_and_input(wait.tool.as_deref(), wait.input_hash.as_deref(), call)
-}
-
-fn same_tool_and_input(tool: Option<&str>, input_hash: Option<&str>, call: &CallFacts) -> bool {
-    tool == Some(call.tool.as_str()) && input_hash == Some(call.input_hash.as_str())
-}
-
-fn active_state(record: &Record) -> State {
-    if record.waiting.is_some() {
-        State::Waiting
-    } else {
-        State::Working
-    }
 }
 
 #[cfg(test)]

@@ -72,25 +72,29 @@ mod console {
     }
 }
 
-/// Ends this process by `signal` with its default action, else exits 128 plus its number.
-#[cfg(unix)]
-pub fn end_by(signal: JobSignal) -> ! {
-    end_by_number(unix::number(signal))
-}
-
-/// Windows catches no signal, so nothing ends a job's wait by one.
-#[cfg(not(unix))]
-pub fn end_by(signal: JobSignal) -> ! {
-    let _ = signal;
-    std::process::exit(1)
-}
-
 /// How a job ends once its command ended: with an exit code, or by the signal that ended the
 /// command, so a shell sees what it would see of the command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ending {
     Code(u8),
     Signal(i32),
+}
+
+/// A job whose wait for its turn a caught signal ended ends by that signal.
+#[cfg(unix)]
+impl From<JobSignal> for Ending {
+    fn from(signal: JobSignal) -> Self {
+        Self::Signal(unix::number(signal))
+    }
+}
+
+/// Windows catches no signal, so nothing ends a job's wait by one.
+#[cfg(not(unix))]
+impl From<JobSignal> for Ending {
+    fn from(signal: JobSignal) -> Self {
+        let _ = signal;
+        Self::Code(1)
+    }
 }
 
 /// The [`Ending`] of a job whose command ended with `status`. A command ended by SIGINT, SIGQUIT,
@@ -154,6 +158,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
+    use crate::test_support::{CHILD, rerun};
 
     #[rstest]
     #[case::exit_code(3 << 8, Ending::Code(3))]
@@ -184,5 +189,43 @@ mod tests {
 
         // Then
         assert_eq!(codes, [0, 255, 130]);
+    }
+
+    #[test]
+    fn ending_from__should_end_by_the_caught_signal() {
+        // Given
+        let caught = [
+            JobSignal::Interrupt,
+            JobSignal::Quit,
+            JobSignal::Terminate,
+            JobSignal::HangUp,
+        ];
+
+        // When
+        let endings = caught.map(Ending::from);
+
+        // Then
+        assert_eq!(
+            endings,
+            [libc::SIGINT, libc::SIGQUIT, libc::SIGTERM, libc::SIGHUP].map(Ending::Signal)
+        );
+    }
+
+    #[test]
+    fn end_by_number__should_exit_128_plus_a_signal_that_ends_nothing() {
+        // Given
+        if std::env::var(CHILD).as_deref() == Ok("ignored") {
+            end_by_number(libc::SIGURG);
+        }
+
+        // When
+        let child = rerun(
+            "platform::signals::tests::end_by_number__should_exit_128_plus_a_signal_that_ends_nothing",
+            "ignored",
+        )
+        .unwrap();
+
+        // Then
+        assert_eq!(child.code(), Some(128 + libc::SIGURG), "{child:?}");
     }
 }

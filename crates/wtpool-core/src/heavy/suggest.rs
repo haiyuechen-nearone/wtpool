@@ -231,6 +231,39 @@ mod tests {
     }
 
     #[test]
+    fn marker__should_build_its_name_and_wrapper() {
+        // Given
+        let exact = Marker::exact("Makefile", &["make"]);
+        let ending = Marker::ending(".csproj", DOTNET);
+        let wrapped = Marker::exact("pom.xml", &["mvn"]).or_wrapper(MAVEN_WRAPPER);
+        let makefile = names(&["Makefile"]);
+        let project = names(&["App.csproj"]);
+        let only_ending = names(&[".csproj"]);
+        let pom = names(&["pom.xml"]);
+        let pom_with_wrapper = names(&["mvnw", "pom.xml"]);
+
+        // When
+        let found = [
+            exact.find(&makefile),
+            ending.find(&project),
+            ending.find(&only_ending),
+            wrapped.find(&pom),
+        ];
+        let patterns = [
+            wrapped.patterns(&pom_with_wrapper),
+            wrapped.patterns(&pom),
+            exact.patterns(&makefile),
+        ];
+
+        // Then
+        assert_eq!(
+            found,
+            [Some("Makefile"), Some("App.csproj"), None, Some("pom.xml")]
+        );
+        assert_eq!(patterns, [&["mvnw"][..], &["mvn"][..], &["make"][..]]);
+    }
+
+    #[test]
     fn markers__should_hold_only_patterns() {
         // When
         let invalid: Vec<&str> = MARKERS

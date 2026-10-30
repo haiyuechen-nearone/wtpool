@@ -23,10 +23,12 @@ Fixes land on `main`. There are no release branches yet.
 ## Threat model
 
 wtpool runs as you, with your permissions, and has no privileged part. It trusts you, the `git`
-and `gh` on your `PATH`, and Claude Code. A process that already runs as you can change your
-files, settings and `PATH`, so wtpool does not defend against one. The IDs below, such as H3,
-point to rows of the spec, [status-panel.md](docs/design/status-panel/status-panel.md), and those
-of heavy jobs, such as J4, to [jobs.md](docs/design/jobs/jobs.md).
+and `gh` on your `PATH`, and the agent harnesses you hook in, Claude Code and OpenCode. A process
+that already runs as you can change your files, settings and `PATH`, so wtpool does not defend
+against one. The IDs below, such as H3, point to rows of the spec,
+[status-panel.md](docs/design/status-panel/status-panel.md), those of heavy jobs, such as J4, to
+[jobs.md](docs/design/jobs/jobs.md), and those of OpenCode, such as OC12, to
+[opencode.md](docs/design/harnesses/opencode.md).
 
 ### The hook runs on every Claude Code event
 
@@ -96,6 +98,38 @@ Either way, it fails open and keeps nothing:
 So `require` guides agents that cooperate. It is not a sandbox: a command the hook cannot read, a
 heavy command that a script or an editor starts, and an agent tool without this hook all run
 unrefused, and show as not queued.
+
+### The OpenCode plugin runs inside OpenCode's server
+
+`wtpool hook install --harness opencode` prints one TypeScript file, which you save as
+`plugins/wtpool/index.ts` in OpenCode's config folder. OpenCode loads it in every server it runs,
+with that server's permissions, which are yours.
+
+- **A repository can ship an OpenCode plugin.** OpenCode loads the plugins in a project's
+  `.opencode/plugins/` with no trust step, so a repository's plugin can do anything you can. wtpool
+  cannot prevent that. It installs only the user level file, and the install note says so. Read a
+  repository's `.opencode/` before you run OpenCode in it.
+- **The plugin forwards only what it needs** (OC6). It never sends a prompt, message text, a tool's
+  output, a form's answer, a diff, a header, a credential or the environment, so neither the
+  provider key of a model request nor `OPENCODE_SERVER_PASSWORD` leaves OpenCode through it. A
+  payload is at most 1 MiB. It imports nothing, reads and writes no file, opens no socket and
+  starts `wtpool` by argument list with no shell (OC3, OC7).
+- **It changes OpenCode's work only through `--policy`** (OC12). Without that flag it never throws
+  and never waits. With it, a shell call waits at most 2 s for `wtpool hook policy`, and the
+  plugin refuses the call only on one exact deny line from the policy command it started. The
+  policy never allows (HR15). A missing binary, a crash, other output or the 2 s passing lets the
+  call run, so like Claude Code's policy it guides cooperating agents and is no sandbox.
+- **Anyone who can run `wtpool hook --harness opencode`** can write records, as for Claude Code's
+  hook: a project plugin or an injected agent. It writes only `opencode-` records, in the pool of
+  the payload's absolute `directory`, with ids checked or hashed (OC14), strings cleaned (H15), and
+  never over another harness's record (H25).
+- **`WTPOOL_SESSION`** tells `wtpool fg` and `wtpool free` which session of a shared server calls
+  them (OC11, OC21). A forged or inherited value leaves a record out of that check only when the
+  record's process is an ancestor of the command, and the plugin deletes a value it cannot bind to
+  one session. A session that sets it to itself gains nothing it lacks: `--force` skips the check
+  already.
+- **A launched agent's builds, and `launched_by`** come from the process table, not from anything
+  an agent writes (S17, A1). A session cannot name its launcher.
 
 ### Heavy job settings
 
@@ -246,8 +280,9 @@ A Bash call's summary is its program's name. For a few programs, such as `git` a
 next word joins it when it is a lower case word of at most 24 characters (H14). No other word of
 the command is stored, and nothing inside `$(…)` or backquotes reaches the summary.
 
-Session titles can reflect prompt content. Claude Code generates a title from your conversation,
-and wtpool keeps up to 40 characters of it as the session's label. The panel labels a subagent
+Session titles can reflect prompt content. Claude Code and OpenCode generate a title from your
+conversation, and wtpool keeps up to 40 characters of it as the session's label. A record also
+keeps the name of the model, such as `opencode/glm-5.3-flash-free`, never a prompt or a reply. The panel labels a subagent
 with the description that its parent agent wrote in the Agent call.
 
 A heavy job records its summary, label, folder, pid and times, never its arguments, environment
@@ -276,7 +311,17 @@ sessions are locked down:
 - `contract__should_run_in_the_sandbox` fails when your Claude Code install changed during the
   run.
 
+The `oc` part runs the installed `opencode` with the shipped plugin and this repository's
+`wtpool` in a sandbox of its own: `HOME` and the XDG folders in the run folder, only an allowlist
+of your environment variables, OpenCode's background service off and its updater off. Its
+sessions use a scripted model on loopback, and one session uses a free model of OpenCode's own
+provider, which may keep that prompt. That prompt is only the sandbox's test text about the
+sandbox repository, never a file or a variable of yours. It needs no login and costs nothing.
+`contract__should_run_opencode_in_the_sandbox` fails when your OpenCode folders, background
+service or launchd entries changed during the run, or when it reached a host other than loopback
+and OpenCode's own provider.
+
 No other part needs a login. [CONTRIBUTING](CONTRIBUTING.md#the-verify-harness) says when you
-need that run, and the spec's
+need the Claude Code run, and the spec's
 [Contract test](docs/design/status-panel/verification.md#contract-test) says how its sessions are
 kept apart from your own setup.

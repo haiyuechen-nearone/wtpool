@@ -3,7 +3,7 @@
   "displayName": "wtpool",
   "description": "A tab that shows, per worktree of a wtpool pool, the branch, what each agent does there, and whether the worktree needs you or is free.",
   "publisher": "haiyuechen-nearone",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "license": "MIT",
   "icon": "media/marketplace-icon.png",

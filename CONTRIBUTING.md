@@ -6,7 +6,7 @@ behaviour is agreed before you write code. Report security problems privately, a
 
 ## Build and test
 
-You need git, Rust 1.95 or newer, and for the extension Node and npm.
+You need git, Rust 1.95 or newer, and for the extension and the OpenCode plugin Node and npm.
 
 ```sh
 cargo build
@@ -21,7 +21,7 @@ commands, so try your build on a repository with `target/debug/wtpool`, not `car
 ## The verify harness
 
 `cargo xtask verify` runs the checks that decide whether a build meets the spec,
-[status-panel.md](docs/design/status-panel/status-panel.md). It has five parts. Run the ones your
+[status-panel.md](docs/design/status-panel/status-panel.md). It has six parts. Run the ones your
 change touches, then all of them and `--report` before you ask for a merge, if you can.
 
 | Part | Time | What it needs |
@@ -32,6 +32,11 @@ change touches, then all of them and `--report` before you ask for a merge, if y
 | `bench` | about 3 minutes | a quiet machine; it measures timings |
 | `cc` | seconds | nothing more: it uses the recorded live result or the replays |
 | `cc --contract` | about 10 minutes | a Claude Code login, and paid model calls to `claude-haiku-5-5` |
+| `oc` | not timed yet | `opencode` 2.2.0 on the `PATH`. No login and no cost. |
+
+`quick` also runs the `js` layer, Node's own test runner on the OpenCode plugin. The `oc` part runs
+the installed `opencode` with the shipped plugin in a sandbox; its one free model session reaches
+OpenCode's own provider, as [SECURITY.md](SECURITY.md#test-runs) says.
 
 The times are from an Apple silicon Mac with warm caches. `--report` gives PASS only once every
 part has run. You never need `--contract` for a change: it is for a new Claude Code version.

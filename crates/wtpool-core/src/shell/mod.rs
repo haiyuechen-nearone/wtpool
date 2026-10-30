@@ -1,5 +1,5 @@
-//! A reader of shell command lines: the path words, `cd` targets and summary of a command
-//! ([`parse`]), its simple commands ([`simple_commands`]), the start of a simple command's
+//! A reader of shell command lines: the path words, `cd` targets, summary and agent programs of
+//! a command ([`parse`]), its simple commands ([`simple_commands`]), the start of a simple command's
 //! program after its prefixes ([`program_start`]), and its wait loops ([`waits::waits`]).
 
 mod command;

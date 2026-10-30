@@ -160,17 +160,12 @@ impl ActivityDir {
         }
         match wait {
             Wait::Block => file.lock()?,
-            Wait::Never => file.try_lock().map_err(|error| match error {
-                TryLockError::WouldBlock => LockError::Held,
-                TryLockError::Error(error) => LockError::Io(error),
-            })?,
+            Wait::Never => file.try_lock().map_err(lock_error)?,
         }
         let named = path.symlink_metadata()?;
         // Where the system tells no file identity, as on Windows, the lock file still in place
         // counts as the one locked.
-        if !same_file(&named, &held).unwrap_or(true) {
-            return Err(LockError::Replaced);
-        }
+        still_locked(&named, &held)?;
         Ok(Locked {
             _file: file,
             path: path.to_path_buf(),
@@ -281,6 +276,22 @@ impl ActivityDir {
 
 fn is_stem(stem: &str) -> bool {
     Stem::parse(stem).is_some()
+}
+
+/// [`Wait::Never`]'s reading of a lock another process may hold.
+fn lock_error(error: TryLockError) -> LockError {
+    match error {
+        TryLockError::WouldBlock => LockError::Held,
+        TryLockError::Error(error) => LockError::Io(error),
+    }
+}
+
+/// Refuses the lock when the file at the path is no longer the one locked.
+fn still_locked(named: &Metadata, held: &Metadata) -> Result<(), LockError> {
+    match same_file(named, held) {
+        Some(false) => Err(LockError::Replaced),
+        Some(true) | None => Ok(()),
+    }
 }
 
 #[cfg(test)]

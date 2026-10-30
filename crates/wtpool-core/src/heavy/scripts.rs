@@ -106,9 +106,6 @@ pub(super) fn read(path: &Path) -> Result<String, PackageFault> {
     if !meta.is_file() {
         return Err(PackageFault::NotAFile);
     }
-    if meta.len() > MAX_BYTES {
-        return Err(PackageFault::TooLarge);
-    }
     let mut bytes = Vec::new();
     file.take(MAX_BYTES.saturating_add(1))
         .read_to_end(&mut bytes)
@@ -253,7 +250,7 @@ mod tests {
     }
 
     #[test]
-    fn read__should_refuse_a_large_file_or_a_symlink() {
+    fn read__should_refuse_a_large_file() {
         // Given
         let dir = tempfile::tempdir().unwrap();
         let large = dir.path().join("large.json");
@@ -261,20 +258,57 @@ mod tests {
         std::fs::write(&large, vec![b' '; size]).unwrap();
         let fitting = dir.path().join("fitting.json");
         std::fs::write(&fitting, vec![b' '; size - 1]).unwrap();
-        let link = dir.path().join("link.json");
-        #[cfg(unix)]
-        std::os::unix::fs::symlink(&fitting, &link).unwrap();
 
         // When
         let read_large = read(&large);
         let read_fitting = read(&fitting);
-        let read_link = read(&link);
 
         // Then
         assert_eq!(read_large, Err(PackageFault::TooLarge));
         assert!(read_fitting.is_ok());
-        if cfg!(unix) {
-            assert_eq!(read_link, Err(PackageFault::Symlink));
-        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read__should_refuse_a_symlink() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target.json");
+        std::fs::write(&target, "{}").unwrap();
+        let link = dir.path().join("link.json");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        // When
+        let read_link = read(&link);
+
+        // Then
+        assert_eq!(read_link, Err(PackageFault::Symlink));
+        assert_eq!(PackageFault::Symlink.to_string(), "it is a symlink");
+    }
+
+    #[test]
+    fn read__should_say_what_it_cannot_read() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("gone.json");
+        let folder = dir.path().join("folder.json");
+        std::fs::create_dir(&folder).unwrap();
+
+        // When
+        let read_missing = read(&missing);
+        let read_folder = read(&folder);
+
+        // Then
+        assert!(matches!(read_missing, Err(PackageFault::Unreadable(_))));
+        let missing_text = read_missing.unwrap_err().to_string();
+        assert!(
+            missing_text.starts_with("it cannot be read: "),
+            "{missing_text}"
+        );
+        assert_eq!(read_folder, Err(PackageFault::NotAFile));
+        assert_eq!(
+            PackageFault::NotAFile.to_string(),
+            "it is not a regular file"
+        );
     }
 }

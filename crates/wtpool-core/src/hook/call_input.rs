@@ -9,7 +9,7 @@ use std::fmt::{self, Write as _};
 use serde::de::{Deserialize, DeserializeSeed, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde_json::{Number, Value};
 
-use super::sha256;
+use crate::sha256;
 
 /// A call's input: its hash, its top level string fields and the names of its top level fields
 /// that are `true`.

@@ -170,6 +170,71 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn edited_file_read__should_refuse_what_it_cannot_look_at() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let blocker = dir.path().join("blocker");
+        std::fs::write(&blocker, "").unwrap();
+        let under_a_file = blocker.join("inside");
+        let folder = dir.path().join("folder");
+
+        // When
+        let unlooked = read(&under_a_file);
+        std::fs::create_dir(&folder).unwrap();
+        let no_file = read(&folder);
+
+        // Then
+        assert_eq!(
+            unlooked.err().map(|fault| fault.to_string()),
+            Some(format!("Not a directory (os error {})", libc::ENOTDIR))
+        );
+        assert!(matches!(no_file, Err(EditFault::NotAFile)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn edited_file_edit__should_say_where_the_lock_cannot_be_made() {
+        // Given
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let lock = dir.path().join(LOCK_FILE);
+        std::fs::set_permissions(dir.path(), Permissions::from_mode(0o555)).unwrap();
+        // Root writes in a folder no one may write in, so it makes the lock there too.
+        let writes_anyway = std::fs::write(dir.path().join("probe"), "").is_ok();
+
+        // When
+        let refused = EditedFile::repository(dir.path()).edit(|_| Ok(Some("a = 1\n".to_owned())));
+
+        // Then
+        let refusal = refused.as_ref().err().map(|error| {
+            let denied = matches!(&error.fault, EditFault::Io(error) if error.kind() == io::ErrorKind::PermissionDenied);
+            (&error.path, denied)
+        });
+        assert_eq!(
+            refusal,
+            (!writes_anyway).then_some((&lock, true)),
+            "{refused:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn edited_file_link_target__should_name_the_target_of_a_link_that_resolves_to_nothing() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let link = dir.path().join("wtpool.toml");
+        std::os::unix::fs::symlink("gone/machine.toml", &link).unwrap();
+
+        // When
+        let named = link_target(&link);
+
+        // Then
+        assert_eq!(named, dir.path().join("gone/machine.toml"));
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn edited_file_edit__should_keep_the_mode_and_replace_the_file() {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
 

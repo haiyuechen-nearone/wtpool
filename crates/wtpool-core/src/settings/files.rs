@@ -432,4 +432,22 @@ mod tests {
         // Then
         assert_eq!((outside, named_missing), (None, None));
     }
+
+    #[test]
+    fn repository_files_policy__should_refuse_a_repository_without_a_path() {
+        // When
+        let refused = RepositoryFiles::at(Path::new("")).policy(&|_| None);
+
+        // Then
+        assert!(
+            matches!(
+                &refused,
+                Err(Error::Settings(SettingsError::ReadConfig {
+                    path,
+                    fault: ReadFault::Io(_),
+                })) if path == Path::new(CONFIG_FILE)
+            ),
+            "{refused:?}"
+        );
+    }
 }

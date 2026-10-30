@@ -10,6 +10,11 @@ use crate::job::{self, JobAction};
 
 /// The flag that lets `fg` and `free` detach or move a worktree where an agent works or waits.
 const FORCE: &str = "--force";
+/// The flag of `wtpool hook` that names the harness whose payload it reads.
+const HARNESS: &str = "--harness";
+/// The flag of `wtpool hook install` that adds the policy check of shell calls.
+const POLICY: &str = "--policy";
+const HOOK_USAGE: &str = "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]";
 
 /// The command and its arguments as typed, read by [`CommandLine::action`] when no flag before
 /// them answers the whole line.
@@ -33,9 +38,15 @@ pub enum Action {
     Help,
     Version,
     List,
-    Foreground { args: RefArgs, force: bool },
+    Foreground {
+        args: RefArgs,
+        force: bool,
+    },
     Background(RefArgs),
-    Free { arg: String, force: bool },
+    Free {
+        arg: String,
+        force: bool,
+    },
     New(Option<SlotName>),
     Remove(String),
     Path(String),
@@ -43,10 +54,18 @@ pub enum Action {
     ShowConfig(Format),
     Status(StatusMode),
     StatusSchema,
-    HookEvent,
-    HookPolicy,
+    /// `wtpool hook`, for the harness `--harness` names, else Claude Code.
+    HookEvent {
+        harness: Option<String>,
+    },
+    HookPolicy {
+        harness: Option<String>,
+    },
     HookGc,
-    HookInstall,
+    HookInstall {
+        harness: Option<String>,
+        policy: bool,
+    },
     Job(JobAction),
 }
 
@@ -210,18 +229,42 @@ fn named(word: &str, args: Vec<String>) -> Result<Action, Failure> {
                 ));
             }
         },
-        "hook" => match args.as_slice() {
-            [] => Action::HookEvent,
-            [sub] if sub == "policy" => Action::HookPolicy,
-            [sub] if sub == "gc" => Action::HookGc,
-            [sub] if sub == "install" => Action::HookInstall,
-            _ => return Err(Failure::Usage("usage: wtpool hook [policy|gc|install]")),
-        },
-        "job" => {
-            let args: Vec<OsString> = args.into_iter().map(OsString::from).collect();
-            Action::Job(job::parse(&args).map_err(Failure::Job)?)
-        }
+        "hook" => hook(args)?,
         _ => return Err(Failure::UnknownCommand(word.to_owned())),
+    })
+}
+
+/// `wtpool hook [policy|gc|install] [--harness <name>] [--policy]`: the subcommand first, then
+/// `--harness` for all but `gc` and `--policy` for `install`, each at most once.
+fn hook(args: Vec<String>) -> Result<Action, Failure> {
+    let usage = || Failure::Usage(HOOK_USAGE);
+    let mut args = args.into_iter().peekable();
+    let sub = args
+        .next_if(|arg| ["policy", "gc", "install"].contains(&arg.as_str()))
+        .unwrap_or_default();
+    let mut harness = None;
+    let mut policy = false;
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            HARNESS => {
+                let name = args
+                    .next()
+                    .filter(|name| !name.is_empty())
+                    .ok_or_else(usage)?;
+                if harness.replace(name).is_some() {
+                    return Err(usage());
+                }
+            }
+            POLICY if !policy => policy = true,
+            _ => return Err(usage()),
+        }
+    }
+    Ok(match (sub.as_str(), policy) {
+        ("", false) => Action::HookEvent { harness },
+        ("policy", false) => Action::HookPolicy { harness },
+        ("gc", false) if harness.is_none() => Action::HookGc,
+        ("install", _) => Action::HookInstall { harness, policy },
+        _ => return Err(usage()),
     })
 }
 

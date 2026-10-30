@@ -194,6 +194,7 @@ mod tests {
     #[case::interpreter_alone("node", &["node", "--inspect"], &["node"])]
     #[case::no_arguments("node", &[], &["node"])]
     #[case::a_path_with_a_space("cargo", &["/opt/my tools/cargo", "build"], &["cargo", "build"])]
+    #[case::the_root_as_program("cargo", &["/", "build"], &["/", "build"])]
     fn command_words_of_process__should_read_the_arguments(
         #[case] name: &str,
         #[case] cmd: &[&str],

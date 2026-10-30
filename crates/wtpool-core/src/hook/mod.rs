@@ -18,18 +18,17 @@ mod log;
 pub(crate) mod place;
 mod policy;
 mod record;
-mod sha256;
 mod store;
 mod tasks;
 
 pub use crate::activity::text;
 
-pub use adapter::{Adapter, TranscriptTitles, WaitingTools};
+pub use adapter::{Adapter, ProcessMode, Rejection, TranscriptTitles, WaitingTools};
 pub use call_input::CallInput;
 pub use env::HookEnv;
 pub use event::handle;
 pub use gc::{Collected, collect_pool};
-pub use input::{CallFacts, Event, HookInput, Spawned, read_input};
+pub use input::{CallFacts, CallRef, Event, HookInput, Spawned, read_input};
 pub use install::{Printed, is_under_target};
 pub use log::append as log_line;
 pub use place::{Shell, ToolPath};

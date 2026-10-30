@@ -17,11 +17,16 @@ slots agents park branches in.
   wtpool status --json       print the pool's worktrees, git facts and builds as JSON
   wtpool status --watch      print that JSON again on each change until stdin closes
   wtpool status --schema     print the JSON schema of that document
-  wtpool hook                record a Claude Code hook event from stdin (prints nothing)
-  wtpool hook policy         refuse a heavy shell call outside a job, under enforce = require
+  wtpool hook [--harness <name>]
+                             record a hook event of a coding agent from stdin
+                             (prints nothing)
+  wtpool hook policy [--harness <name>]
+                             refuse a heavy shell call outside a job, under
+                             enforce = require
   wtpool hook gc             delete old activity records
-  wtpool hook install        print the hook block for $CLAUDE_CONFIG_DIR/settings.json
-                             (default ~/.claude/settings.json)
+  wtpool hook install [--harness <name>] [--policy]
+                             print the hook config for a harness's user files,
+                             with a note on the hooks it runs
   wtpool job [--label <text>] [--quiet] -- <command>
                              run a heavy command once fewer heavy jobs than this
                              machine's limit run
@@ -38,6 +43,9 @@ slots agents park branches in.
                              print the patterns this repository's files suggest;
                              add them with: wtpool job heavy add --repo --suggested
   wtpool --version           print the version, commit and cargo features of this build
+
+--harness names the coding agent harness: claude-code (the default) or
+opencode. --policy adds the policy check of shell calls to OpenCode's plugin.
 
 <ref> is a PR number, a GitHub PR URL, or a branch name. A PR needs gh and a
 remote on github.com.
@@ -64,3 +72,22 @@ wtpool.toml may also set copy, files copied from the main worktree into each new
 slot when git ignores them, and on_new_slot, a command run there. wtpool config
 shows each value and its source.
 ";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hook::Harness;
+
+    #[test]
+    fn help__should_name_every_registered_harness() {
+        // When
+        let missing: Vec<String> = Harness::ALL
+            .iter()
+            .map(|harness| harness.name().to_string())
+            .filter(|name| !HELP.contains(name.as_str()))
+            .collect();
+
+        // Then
+        assert!(missing.is_empty(), "{missing:?}");
+    }
+}

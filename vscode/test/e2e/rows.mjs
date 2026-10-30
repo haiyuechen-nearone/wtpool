@@ -224,7 +224,8 @@ export function lineProblems(facts, expected) {
     if (got.activityHidden.trim() !== want.activityHidden.trim()) problems.push(`${want.id}: the cell's visually hidden text is ${JSON.stringify(got.activityHidden)}, not ${JSON.stringify(want.activityHidden)} (U12)`);
     if (want.prefixes.length) {
       const prefixes = got.lines.map((line) => line.hidden);
-      if (JSON.stringify(prefixes.map((p) => p.trimEnd())) !== JSON.stringify(want.prefixes.map((p) => p.trimEnd()))) {
+      // The state starts the hidden text; a line with a mark then reads that mark's label (U18).
+      if (prefixes.length !== want.prefixes.length || !prefixes.every((hidden, index) => hidden.startsWith(want.prefixes[index]))) {
         problems.push(`${want.id}: the lines' visually hidden starts are ${JSON.stringify(prefixes)}, not ${JSON.stringify(want.prefixes)} (U13)`);
       }
     }

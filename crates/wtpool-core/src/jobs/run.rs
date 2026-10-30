@@ -15,7 +15,7 @@ use super::{JOB_VARIABLE, JobError, JobPaths};
 use crate::clock::ReadClock;
 use crate::heavy::{CommandWords, HeavyList, RepositoryPatterns};
 use crate::hook::text::{MAX_LABEL, MAX_TEXT, clean};
-use crate::platform::signals::{Ending, JobSignals, end_by, end_by_number, ending};
+use crate::platform::signals::{Ending, JobSignal, JobSignals, end_by_number, ending};
 use crate::processes::{ListProcesses, ProcessQuery};
 use crate::shell;
 
@@ -56,8 +56,8 @@ pub struct JobContext<'a, C, P> {
 /// Runs `command` once its turn comes, with `notes` for the lines on waiting, and returns the
 /// exit code to end with: the command's, 127 when it is not found, 126 when it cannot start
 /// otherwise. A command that a signal ended ends this process by the same signal once the job
-/// left the queue, as [`ending`] says. An error comes before the command runs, and the queue
-/// keeps nothing of the job then.
+/// left the queue, as [`ending`] says, and so does a signal caught while the job waits for its
+/// turn. An error comes before the command runs, and the queue keeps nothing of the job then.
 pub fn run_job<C: ReadClock, P: ListProcesses>(
     command: &JobCommand,
     context: &JobContext<'_, C, P>,
@@ -71,15 +71,18 @@ pub fn run_job<C: ReadClock, P: ListProcesses>(
     }
     let draft = draft(command, context, &config);
     let (place, turn) = Place::join(folder, draft, config.limit, context.clock.now())?;
-    let place = match turn {
-        Turn::Run => place,
+    let waited = match turn {
+        Turn::Run => Ok(place),
         Turn::Wait(standing) => {
             let limit = config.limit;
             wait_for_turn(place, standing, command, context, limit, &signals, notes)?
         }
     };
-    let ending = spawn_and_wait(command, Some(place.id()), &signals, notes);
-    place.leave();
+    let ending = waited.map_or_else(Ending::from, |place| {
+        let ending = spawn_and_wait(command, Some(place.id()), &signals, notes);
+        place.leave();
+        ending
+    });
     Ok(end_as(ending))
 }
 
@@ -107,8 +110,8 @@ fn end_as(ending: Ending) -> u8 {
 }
 
 /// Waits until `place`'s turn comes, checking at the pace of its standing and reading the limit
-/// again for each check. A limit that cannot be read keeps the last one. A caught signal
-/// leaves the queue and ends this process by it.
+/// again for each check. A limit that cannot be read keeps the last one. A signal caught first
+/// leaves the queue, and comes back in place of `place`.
 fn wait_for_turn<C: ReadClock, P>(
     mut place: Place,
     mut standing: Standing,
@@ -117,7 +120,7 @@ fn wait_for_turn<C: ReadClock, P>(
     mut limit: Limit,
     signals: &JobSignals,
     notes: &mut dyn Write,
-) -> Result<Place, JobError> {
+) -> Result<Result<Place, JobSignal>, JobError> {
     let queued = context.clock.system_micros();
     if !command.quiet {
         let _ = writeln!(
@@ -134,7 +137,7 @@ fn wait_for_turn<C: ReadClock, P>(
         };
         if let Some(signal) = signals.next_within(pause) {
             place.leave();
-            end_by(signal);
+            return Ok(Err(signal));
         }
         if let Ok(config) = MachineConfig::read(&context.paths.config, context.cores) {
             limit = config.limit;
@@ -151,7 +154,7 @@ fn wait_for_turn<C: ReadClock, P>(
             waited_text(micros_since(queued, context.clock))
         );
     }
-    Ok(place)
+    Ok(Ok(place))
 }
 
 /// The time from `earlier` until now, both in [`ReadClock::system_micros`], zero should the
@@ -193,13 +196,14 @@ fn spawn_and_wait(
     let waited = child.wait();
     // The reaped pid may soon name another process. Pid 0 hands a signal on to none.
     signals.hand_on_to(0);
-    match waited {
-        Ok(status) => ending(status),
-        Err(error) => {
-            let _ = writeln!(notes, "wtpool job: lost the command: {error}");
-            Ending::Code(NOT_RUNNABLE)
-        }
-    }
+    waited.map_or_else(|error| lost_command(notes, &error), ending)
+}
+
+/// Notes that the command could not be waited for, and gives the code a command that cannot
+/// start exits with.
+fn lost_command(notes: &mut dyn Write, error: &io::Error) -> Ending {
+    let _ = writeln!(notes, "wtpool job: lost the command: {error}");
+    Ending::Code(NOT_RUNNABLE)
 }
 
 /// The record of the job of this process before it queues.

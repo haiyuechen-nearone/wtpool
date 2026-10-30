@@ -1,9 +1,12 @@
-//! Session titles from Claude Code's transcript, the JSON lines file a payload's
+//! Session titles and the model from Claude Code's transcript, the JSON lines file a payload's
 //! `transcript_path` names. Claude Code appends `{"type":"custom-title","customTitle":…}`
 //! when the user names the session (`/rename`) and `{"type":"ai-title","aiTitle":…}` with the
 //! title it generates, and writes both again as the session goes on. Only lines with a JSON
-//! string that ends in `-title` are parsed, and only the title of a title entry is kept: no
-//! other text is read into a string.
+//! string that ends in `-title` are parsed for titles, and only the title of a title entry is
+//! kept; the [`model`] of an answer is read from the head of its line alone. No other text is
+//! read into a string.
+
+mod model;
 
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -33,8 +36,8 @@ struct Entry {
     ai_title: Option<String>,
 }
 
-/// The newest titles of the whole lines after byte `offset` of the transcript at `path`, at
-/// most its last [`MAX_READ`] bytes, and the end of the last whole line. An offset past the end,
+/// The newest titles and model of the whole lines after byte `offset` of the transcript at
+/// `path`, at most its last [`MAX_READ`] bytes, and the end of the last whole line. An offset past the end,
 /// or one that no longer follows a newline, means the file was cut or replaced: it is read again
 /// from its start. `None` for a symlink, a FIFO or anything else that is no regular file.
 #[must_use]
@@ -68,7 +71,9 @@ pub fn titles(path: &Path, offset: u64) -> Option<TranscriptTitles> {
         },
         ..TranscriptTitles::default()
     };
-    read_lines(bytes.get(first..end).unwrap_or_default(), &mut found);
+    let lines = bytes.get(first..end).unwrap_or_default();
+    read_lines(lines, &mut found);
+    found.model = model::newest_model(lines);
     Some(found)
 }
 

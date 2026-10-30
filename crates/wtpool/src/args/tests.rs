@@ -104,10 +104,13 @@ fn reference(name: &str, sync: SyncMode) -> RefArgs {
 #[case::status_json(&["status", "--json"], Action::Status(StatusMode::Json))]
 #[case::status_watch(&["status", "--watch"], Action::Status(StatusMode::Watch))]
 #[case::status_schema(&["status", "--schema"], Action::StatusSchema)]
-#[case::hook(&["hook"], Action::HookEvent)]
-#[case::hook_policy(&["hook", "policy"], Action::HookPolicy)]
+#[case::hook(&["hook"], Action::HookEvent { harness: None })]
+#[case::hook_of_a_harness(&["hook", "--harness", "opencode"], Action::HookEvent { harness: Some("opencode".to_owned()) })]
+#[case::hook_policy(&["hook", "policy"], Action::HookPolicy { harness: None })]
+#[case::hook_policy_of_a_harness(&["hook", "policy", "--harness", "x"], Action::HookPolicy { harness: Some("x".to_owned()) })]
 #[case::hook_gc(&["hook", "gc"], Action::HookGc)]
-#[case::hook_install(&["hook", "install"], Action::HookInstall)]
+#[case::hook_install(&["hook", "install"], Action::HookInstall { harness: None, policy: false })]
+#[case::hook_install_with_policy(&["hook", "install", "--policy", "--harness", "opencode"], Action::HookInstall { harness: Some("opencode".to_owned()), policy: true })]
 #[case::job_ls(&["job", "ls"], Action::Job(JobAction::List { json: false }))]
 #[case::job_run(&["job", "--", "make"], Action::Job(JobAction::Run(JobCommand {
     program: OsString::from("make"),
@@ -141,8 +144,16 @@ fn parse__should_read_each_command(#[case] line: &[&str], #[case] expected: Acti
 #[case::config_with_an_unknown_flag(&["config", "--yaml"], "usage: wtpool config [--json]")]
 #[case::status_without_a_flag(&["status"], "usage: wtpool status --json|--watch|--schema")]
 #[case::status_with_both_flags(&["status", "--json", "--watch"], "usage: wtpool status --json|--watch|--schema")]
-#[case::hook_with_an_unknown_word(&["hook", "now"], "usage: wtpool hook [policy|gc|install]")]
-#[case::hook_install_with_an_argument(&["hook", "install", "x"], "usage: wtpool hook [policy|gc|install]")]
+#[case::hook_with_an_unknown_word(&["hook", "now"], "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]")]
+#[case::hook_install_with_an_argument(&["hook", "install", "x"], "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]")]
+#[case::hook_harness_without_a_name(&["hook", "--harness"], "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]")]
+#[case::hook_harness_with_an_empty_name(&["hook", "--harness", ""], "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]")]
+#[case::hook_two_harnesses(&["hook", "--harness", "a", "--harness", "b"], "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]")]
+#[case::hook_policy_flag_on_events(&["hook", "--policy"], "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]")]
+#[case::hook_policy_flag_on_policy(&["hook", "policy", "--policy"], "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]")]
+#[case::hook_gc_of_a_harness(&["hook", "gc", "--harness", "opencode"], "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]")]
+#[case::hook_install_twice_policy(&["hook", "install", "--policy", "--policy"], "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]")]
+#[case::hook_subcommand_after_a_flag(&["hook", "--harness", "opencode", "policy"], "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]")]
 fn parse__should_refuse_a_bad_command_line(#[case] line: &[&str], #[case] message: &str) {
     // When
     let failure = parse(&argv(line)).unwrap_err();

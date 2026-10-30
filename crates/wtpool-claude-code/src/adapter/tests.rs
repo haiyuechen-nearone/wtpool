@@ -107,6 +107,32 @@ impl Pool {
     }
 }
 
+#[rstest::rstest]
+#[case::no_policy_check(r#"{"hooks":{}}"#, true)]
+#[case::plugin_enabled(r#"{"enabledPlugins":{"wtpool@wtpool":true}}"#, false)]
+fn require_note__should_say_when_claude_code_refuses_nothing(
+    #[case] settings: &str,
+    #[case] noted: bool,
+) {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("settings.json"), settings).unwrap();
+    let adapter = ClaudeCode {
+        config_dir: Some(dir.path().to_path_buf()),
+        ..ClaudeCode::default()
+    };
+
+    // When
+    let note = adapter.require_note("/bin/wtpool");
+
+    // Then
+    let shown = dir.path().join("settings.json").display().to_string();
+    let expected = install::require_gap(Some(dir.path()), None);
+    assert_eq!(note, expected);
+    assert_eq!(note.is_some(), noted);
+    assert!(note.is_none_or(|note| note.contains(&shown)));
+}
+
 #[test]
 fn install__should_read_the_settings_in_the_config_folder() {
     // Given

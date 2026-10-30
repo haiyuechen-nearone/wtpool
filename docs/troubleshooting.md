@@ -15,7 +15,8 @@ wtpool setup
 
 `wtpool setup` creates the folder, and so does every command that changes the pool. Then
 `wtpool status --json` has `"agents":"on"`. If agents still do not show, see
-[Hooks do not fire](#hooks-do-not-fire).
+[Hooks do not fire](#hooks-do-not-fire) for Claude Code, or
+[An OpenCode session does not show](#an-opencode-session-does-not-show).
 
 ## `spawn wtpool ENOENT` in VS Code
 
@@ -59,8 +60,8 @@ git branch feature-y && wtpool bg feature-y
 
 ## Hooks do not fire
 
-Agents are `"on"`, but no agent shows, and no record appears in the activity folder after you
-send Claude Code a prompt:
+Agents are `"on"`, but no Claude Code agent shows, and no record appears in the activity folder
+after you send Claude Code a prompt:
 
 ```sh
 ls "$(git rev-parse --git-common-dir)/wtpool-activity"
@@ -88,6 +89,59 @@ Check these in turn:
 Two hook routes at once make every event run twice. `wtpool hook install` warns about that and
 says how to remove the settings block.
 
+## An OpenCode session does not show
+
+The pool is `"on"`, but no OpenCode agent shows, and no `opencode-…` record appears in the
+activity folder after you send OpenCode a prompt:
+
+```sh
+ls "$(git rev-parse --git-common-dir)/wtpool-activity" | grep '^opencode-'
+```
+
+Check these in turn:
+
+1. **Is the plugin there?** Run `wtpool hook install --harness opencode > /dev/null`. Its stderr
+   starts `hooks present:` when the file holds this `wtpool`'s plugin. Else it starts
+   `hooks missing:` and says why:
+   - *no file*: nothing is at `plugins/wtpool/index.ts` in OpenCode's config folder, which is
+     `$OPENCODE_CONFIG_DIR`, else `$XDG_CONFIG_HOME/opencode`, else `~/.config/opencode`. It must
+     be a folder with `index.ts` in it, not a file `plugins/wtpool.ts`. Check which variable your
+     shell and your OpenCode server see;
+   - *the plugin of another `wtpool` path*: you moved or reinstalled `wtpool`. The plugin runs the
+     absolute path of the `wtpool` that printed it, so print it again and save it over the old one;
+   - *other text*: the file is an older plugin or an edited one. Print it again and save it.
+2. **Restart the service.** OpenCode loads plugins when its server starts, so a plugin you saved
+   after the background service started does nothing until you run `opencode service restart`.
+   That stops the sessions the service runs. `opencode run --standalone` starts its own server
+   and loads the plugin at once.
+3. **The version.** The plugin was recorded with OpenCode 2.2.0 and supports only its v2 plugin
+   API. `opencode --version` shows yours. OpenCode 1.x is not supported.
+4. **The session's folder.** A session records into the repository it works in. A session in a
+   folder outside this pool does not show in this pool.
+5. **The first prompt.** The first session of a folder shows from its first prompt, not from its
+   creation, so a session that has not been prompted yet is not there. A title given with
+   `opencode run --title` in a fresh folder is never seen.
+
+More cases:
+
+- **The session disappeared after an hour.** An `idle` or `quiet` OpenCode session hides once
+  its last event is 1 hour old, as OpenCode sends no event when a session ends. It shows again at
+  its next event, and the hook deletes its record 7 days after its last update.
+- **A project plugin forwards twice.** A plugin in a project's `.opencode/plugins/` loads with no
+  trust step, and the user level one still loads: with both, every event reaches `wtpool` twice.
+  Keep one. Check with `ls .opencode/plugins`.
+- **`wtpool free` or `wtpool fg` refuses because of an OpenCode session you meant to leave
+  out.** One OpenCode server runs many sessions, so wtpool leaves out a session as the caller
+  only when `WTPOOL_SESSION` names it, which the plugin sets for the session's own shell calls.
+  A command you run in a terminal is no session's call, so every OpenCode session in that
+  worktree counts. Run the command as a shell call of the session, after restarting the service
+  so that the plugin is loaded, or pass `--force`.
+- **No `launched by`.** The link needs `opencode run --standalone`. A run through the background
+  service has none: [Coordinating agents across harnesses](status-and-hook.md#coordinating-agents-across-harnesses)
+  says why.
+- **Heavy commands are not refused.** Print the plugin with `--policy` and restart the service:
+  [Heavy jobs](heavy-jobs.md#claude-code-opencode-and-other-agent-tools).
+
 ## What `hook.log` holds
 
 The hook writes its diagnostics to `$XDG_STATE_HOME/wtpool/hook.log`, by default
@@ -95,12 +149,18 @@ The hook writes its diagnostics to `$XDG_STATE_HOME/wtpool/hook.log`, by default
 `%USERPROFILE%\.local\state\wtpool\hook.log`. On Unix the file is created with mode 0600. It
 grows to 1 MiB, then rotates once to `hook.log.1`. The hook never writes it inside a git directory.
 
-It holds three kinds of line only:
+It holds these kinds of line only:
 
 - `wtpool hook: panicked at <file>:<line>`, when the hook panics;
 - `wtpool hook: the watchdog ended a run after 1 s`, when a run took too long;
 - `wtpool hook: skipped an event: <reason>`, when the hook could not take a record's lock or
-  write the record, for example one that does not fit in 16 KiB.
+  write the record, for example one that does not fit in 16 KiB;
+- a line for a `--harness` name the binary does not register;
+- a line for a payload that the adapter of the named harness rejects, such as an OpenCode payload
+  of another plugin version, an event name outside the plugin's list, a missing field, or a folder
+  that is not absolute;
+- a line for an event that would write over the record of another harness. The hook writes nothing
+  then.
 
 The hook logs nothing for input it ignores on purpose, such as malformed JSON, an event outside
 any pool, or a pool without `wtpool-activity/`. So an empty or missing log is normal. No line
@@ -110,8 +170,9 @@ holds payload text.
 
 No cron line or launchd job is needed. The hook deletes old records itself: when a session ends,
 at most once a day per repository, it deletes `ended` or dead records after 7 days, and `done`
-subagents after 15 minutes, keeping the newest per worktree. It spends at most 200 ms on this. A
-repository where no session ends keeps its records until one does.
+subagents after 15 minutes, keeping the newest per worktree. It also deletes a record of a shared
+process, such as an OpenCode server's, 7 days after its last update, live or not. It spends at
+most 200 ms on this. A repository where no session ends keeps its records until one does.
 
 To clean up now, run the same gc by hand in the repository, or with `WTPOOL_FOREGROUND` set:
 

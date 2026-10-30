@@ -1,0 +1,10 @@
+{"line":178,"t":1793302021056,"payload":{"v":1,"kind":"event","name":"session.execution.started","directory":"/sandbox/repo/fg-wt1","data":{"sessionID":"ses_e76debcf9ffeHpD8qD1d4GGR4w"}}}
+{"line":200,"t":1793302021063,"payload":{"v":1,"kind":"event","name":"session.execution.started","directory":"/sandbox/repo/fg-wt2","data":{"sessionID":"ses_e76debcd0ffe6VsidOZRrGVfHj"}}}
+{"line":222,"t":1793302021067,"payload":{"v":1,"kind":"event","name":"session.renamed","directory":"/sandbox/repo/fg-wt1","data":{"sessionID":"ses_e76debcf9ffeHpD8qD1d4GGR4w","title":"Stub title s10"}}}
+{"line":229,"t":1793302021068,"payload":{"v":1,"kind":"event","name":"session.renamed","directory":"/sandbox/repo/fg-wt2","data":{"sessionID":"ses_e76debcd0ffe6VsidOZRrGVfHj","title":"Stub title s10"}}}
+{"line":233,"t":1793302021111,"payload":{"v":1,"kind":"event","name":"session.step.started","directory":"/sandbox/repo/fg-wt2","data":{"sessionID":"ses_e76debcd0ffe6VsidOZRrGVfHj","model":{"id":"scripted","providerID":"stub"}}}}
+{"line":238,"t":1793302021112,"payload":{"v":1,"kind":"event","name":"session.step.started","directory":"/sandbox/repo/fg-wt1","data":{"sessionID":"ses_e76debcf9ffeHpD8qD1d4GGR4w","model":{"id":"scripted","providerID":"stub"}}}}
+{"line":245,"t":1793302021212,"payload":{"v":1,"kind":"event","name":"session.text.delta","directory":"/sandbox/repo/fg-wt2","data":{"sessionID":"ses_e76debcd0ffe6VsidOZRrGVfHj"}}}
+{"line":247,"t":1793302021213,"payload":{"v":1,"kind":"event","name":"session.text.delta","directory":"/sandbox/repo/fg-wt1","data":{"sessionID":"ses_e76debcf9ffeHpD8qD1d4GGR4w"}}}
+{"line":587,"t":1793302027292,"payload":{"v":1,"kind":"event","name":"session.execution.succeeded","directory":"/sandbox/repo/fg-wt2","data":{"sessionID":"ses_e76debcd0ffe6VsidOZRrGVfHj"}}}
+{"line":595,"t":1793302027294,"payload":{"v":1,"kind":"event","name":"session.execution.succeeded","directory":"/sandbox/repo/fg-wt1","data":{"sessionID":"ses_e76debcf9ffeHpD8qD1d4GGR4w"}}}

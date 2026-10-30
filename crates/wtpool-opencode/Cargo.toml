@@ -1,0 +1,25 @@
+[package]
+name = "wtpool-opencode"
+description = "The OpenCode adapter of wtpool: its plugin, which forwards OpenCode's hooks and events, and the reader of what the plugin forwards for wtpool hook."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories = ["development-tools"]
+publish.workspace = true
+
+[dependencies]
+wtpool-core.workspace = true
+serde.workspace = true
+serde_json = "=1.0.154"
+
+[dev-dependencies]
+rstest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

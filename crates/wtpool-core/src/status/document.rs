@@ -210,6 +210,14 @@ pub struct Actor {
     pub updated: RecordTime,
     /// The harness whose hooks wrote the actor's record, such as `claude-code`.
     pub harness: String,
+    /// The newest model the actor used, as its harness names it. Omitted from the JSON when
+    /// unknown.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// The key of the session of another agent that started this session. Omitted from the JSON
+    /// without one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub launched_by: Option<String>,
     /// The actor's running background tasks, newest first, then the one that ended last.
     /// Omitted from the JSON when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]

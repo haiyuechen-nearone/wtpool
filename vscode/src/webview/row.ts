@@ -2,6 +2,7 @@ import type { Actor, Worktree } from '../generated/status';
 import { visible } from '../shared/invisible';
 import { offeredActions, type ActionType } from '../shared/protocol';
 import { bdi, button, cell, line, setText, span, type RunTime } from './dom';
+import { markBox } from './marks';
 import {
   GROUPS,
   WORDS,
@@ -38,13 +39,14 @@ function robot(): Node | null {
 }
 
 /**
- * Makes the start of an agent line: the icon of `actor`'s state and that state for screen readers,
- * or an empty icon box for a line of no actor, so every line's text starts at the same x.
+ * Makes the start of an agent line: the icon of `actor`'s state, the box of its mark, that state
+ * for screen readers and the text of the mark's label. A line of no actor gets empty boxes, so
+ * every line's text starts at the same x.
  */
 function lineStart(actor: Actor | undefined): Node[] {
   const icon = span('line-icon');
   icon.setAttribute('aria-hidden', 'true');
-  if (!actor) return [icon];
+  if (!actor) return [icon, markBox(undefined)];
   const apiError = hasApiError(actor);
   if (actor.state === 'working') {
     const drawn = robot();
@@ -54,7 +56,12 @@ function lineStart(actor: Actor | undefined): Node[] {
   }
   const state = span('visually-hidden');
   state.textContent = apiError ? `${actor.state}, API error: ` : `${actor.state}: `;
-  return [icon, state];
+  const mark = markBox(actor);
+  const label = mark.getAttribute('data-label');
+  if (label === null) return [icon, mark, state];
+  const heard = span('visually-hidden');
+  heard.textContent = `${label} `;
+  return [icon, mark, state, heard];
 }
 
 /**
@@ -159,7 +166,8 @@ export class RowView {
     const lines = agentLines(worktree, flagUnqueued);
     const actors = shownActors(worktree);
     const states = actors.map((actor) => actor.state);
-    const key = JSON.stringify([lines, states]);
+    const marks = actors.map((actor) => [actor.harness, actor.model]);
+    const key = JSON.stringify([lines, states, marks]);
     if (key === this.agentKey) return;
     this.agentKey = key;
     const made = lines.map((pieces, index) => {

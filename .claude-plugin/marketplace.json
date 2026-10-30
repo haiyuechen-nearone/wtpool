@@ -9,7 +9,7 @@
     {
       "name": "wtpool",
       "source": "./plugins/wtpool",
-      "description": "Records what each Claude Code session and subagent does, for wtpool status and its VS Code panel. Needs wtpool on PATH."
+      "description": "Records what each Claude Code session and subagent does, for wtpool status and its VS Code panel, and ships the delegate-agents skill. Needs wtpool on PATH."
     }
   ]
 }

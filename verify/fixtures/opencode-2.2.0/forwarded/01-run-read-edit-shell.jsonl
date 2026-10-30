@@ -1,0 +1,13 @@
+{"line":60,"t":1793301972527,"payload":{"v":1,"kind":"event","name":"session.execution.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq"}}}
+{"line":80,"t":1793301972540,"payload":{"v":1,"kind":"event","name":"session.renamed","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq","title":"Stub title s1"}}}
+{"line":82,"t":1793301972570,"payload":{"v":1,"kind":"event","name":"session.step.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq","model":{"id":"scripted","providerID":"stub"}}}}
+{"line":87,"t":1793301972571,"payload":{"v":1,"kind":"hook","name":"tool.execute.before","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq","id":"call_s1_0_0","tool":"read","input":{"path":"../fg-wt1/notes.txt"}}}}
+{"line":96,"t":1793301972573,"payload":{"v":1,"kind":"event","name":"session.tool.success","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq","id":"call_s1_0_0"}}}
+{"line":112,"t":1793301972595,"payload":{"v":1,"kind":"hook","name":"tool.execute.before","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq","id":"call_s1_1_0","tool":"edit","input":{"path":"/sandbox/repo/fg-wt1/notes.txt"}}}}
+{"line":120,"t":1793301972598,"payload":{"v":1,"kind":"event","name":"session.tool.success","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq","id":"call_s1_1_0"}}}
+{"line":136,"t":1793301972620,"payload":{"v":1,"kind":"hook","name":"tool.execute.before","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq","id":"call_s1_2_0","tool":"shell","input":{"command":"ls"}}}}
+{"line":148,"t":1793301972638,"payload":{"v":1,"kind":"event","name":"session.tool.success","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq","id":"call_s1_2_0"}}}
+{"line":164,"t":1793301972660,"payload":{"v":1,"kind":"hook","name":"tool.execute.before","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq","id":"call_s1_3_0","tool":"shell","input":{"command":"cd ../fg-wt1 && git status"}}}}
+{"line":177,"t":1793301972672,"payload":{"v":1,"kind":"event","name":"session.tool.success","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq","id":"call_s1_3_0"}}}
+{"line":190,"t":1793301972692,"payload":{"v":1,"kind":"event","name":"session.text.delta","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq"}}}
+{"line":195,"t":1793301972700,"payload":{"v":1,"kind":"event","name":"session.execution.succeeded","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7aa0ffe3vdlGbn0I4xCYq"}}}

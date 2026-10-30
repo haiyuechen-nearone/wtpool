@@ -94,6 +94,9 @@
     "--vscode-font-size": "13px",
     "--vscode-editor-font-family": "Menlo, Monaco, \"Courier New\", monospace",
     "--vscode-editor-font-weight": "normal",
-    "--vscode-editor-font-size": "12px"
+    "--vscode-editor-font-size": "12px",
+    "--vscode-editorHoverWidget-background": "#ffffff",
+    "--vscode-editorHoverWidget-border": "#0f4a85",
+    "--vscode-editorHoverWidget-foreground": "#292929"
   }
 }

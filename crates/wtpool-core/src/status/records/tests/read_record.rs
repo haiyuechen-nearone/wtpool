@@ -98,6 +98,8 @@ fn read_record__should_read_every_field() {
             title: "Find the tests".to_owned(),
         }],
         tasks: Vec::new(),
+        shared: false,
+        model: None,
     };
     assert_eq!(content, Content::Record(Box::new(expected)));
 }
@@ -125,16 +127,21 @@ fn read_record__should_read_kinds_and_map_the_tools_of_older_calls(
 ) {
     // Given
     let dir = tempfile::tempdir().unwrap();
+    let name = if harness == "claude-code" {
+        "s1.json".to_owned()
+    } else {
+        format!("{harness}-s1.json")
+    };
     must_write(
         dir.path(),
-        "s1.json",
+        &name,
         &format!(
             r#"{{"version":1,{harness_field}"worktree":"/p","state":"working","updated":"2026-10-20T12:00:00Z","in_flight":{in_flight}}}"#
         ),
     );
 
     // When
-    let content = read_record(&dir.path().join("s1.json"));
+    let content = read_record(&dir.path().join(&name));
 
     // Then
     let record = record_in(&content).unwrap();
@@ -191,6 +198,94 @@ fn read_record__should_need_version_1_worktree_state_and_times(
         "{content:?}"
     );
     assert_eq!(content == Content::Skipped, !read, "{content:?}");
+}
+
+#[rstest]
+#[case::legacy_without_a_name("s1", "", true)]
+#[case::legacy_named_like_another("opencode-s1", r#""harness":"claude-code","#, true)]
+#[case::named_with_its_prefix("opencode-s1", r#""harness":"opencode","#, true)]
+#[case::subagent_with_its_prefix("opencode-s1.a1", r#""harness":"opencode","#, true)]
+#[case::named_without_its_prefix("s1", r#""harness":"opencode","#, false)]
+#[case::named_with_another_prefix("other-s1", r#""harness":"opencode","#, false)]
+#[case::name_without_its_dash("opencodes1", r#""harness":"opencode","#, false)]
+#[case::name_that_is_no_harness("s1", r#""harness":"Open Code","#, false)]
+fn read_record__should_skip_a_stem_of_another_harness(
+    #[case] stem: &str,
+    #[case] harness_field: &str,
+    #[case] read: bool,
+) {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let name = format!("{stem}.json");
+    must_write(
+        dir.path(),
+        &name,
+        &format!(
+            r#"{{"version":1,{harness_field}"worktree":"/p","state":"idle","updated":"2026-10-20T12:00:00Z"}}"#
+        ),
+    );
+
+    // When
+    let content = read_record(&dir.path().join(&name));
+
+    // Then
+    assert_eq!(record_in(&content).is_some(), read, "{content:?}");
+    assert_eq!(content == Content::Skipped, !read, "{content:?}");
+}
+
+#[rstest]
+#[case::shared_with_a_model(
+    r#","process":{"pid":7,"shared":true},"model":"opencode/glm-5.3-flash-free""#,
+    true,
+    Some("opencode/glm-5.3-flash-free")
+)]
+#[case::own_process(
+    r#","process":{"pid":7,"shared":false},"model":"claude-opus-5-5""#,
+    false,
+    Some("claude-opus-5-5")
+)]
+#[case::shared_omitted(r#","process":{"pid":7}"#, false, None)]
+#[case::no_process(r#","model":"m""#, false, Some("m"))]
+#[case::empty_model(r#","model":"""#, false, None)]
+#[case::null_model(r#","model":null"#, false, None)]
+fn read_record__should_read_shared_and_the_model(
+    #[case] fields: &str,
+    #[case] shared: bool,
+    #[case] model: Option<&str>,
+) {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    must_write(
+        dir.path(),
+        "s1.json",
+        &format!(
+            r#"{{"version":1,"worktree":"/p","state":"idle","updated":"2026-10-20T12:00:00Z"{fields}}}"#
+        ),
+    );
+
+    // When
+    let content = read_record(&dir.path().join("s1.json"));
+
+    // Then
+    let record = record_in(&content).unwrap();
+    assert_eq!((record.shared, record.model.as_deref()), (shared, model));
+}
+
+#[test]
+fn read_record__should_skip_a_model_that_is_no_text() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    must_write(
+        dir.path(),
+        "s1.json",
+        r#"{"version":1,"worktree":"/p","state":"idle","updated":"2026-10-20T12:00:00Z","model":1}"#,
+    );
+
+    // When
+    let content = read_record(&dir.path().join("s1.json"));
+
+    // Then
+    assert_eq!(content, Content::Skipped);
 }
 
 #[rstest]

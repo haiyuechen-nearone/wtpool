@@ -289,6 +289,26 @@ mod unix {
     }
 }
 
+#[cfg(unix)]
+#[test]
+fn machine_config_read__should_say_when_the_path_cannot_be_looked_at() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let blocker = dir.path().join("wtpool");
+    std::fs::write(&blocker, "").unwrap();
+    let path = blocker.join("machine.toml");
+
+    // When
+    let error = MachineConfig::read(&path, 16).unwrap_err();
+
+    // Then
+    assert_eq!(error.path, path);
+    assert!(
+        error.fault.to_string().contains("Not a directory"),
+        "{error}"
+    );
+}
+
 #[test]
 fn machine_config_path__should_follow_xdg_then_home() {
     // Given

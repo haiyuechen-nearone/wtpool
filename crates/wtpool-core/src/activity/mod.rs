@@ -13,7 +13,7 @@ mod values;
 pub use files::{
     ACTIVITY_DIR, MAX_RECORD_BYTES, RECORD_VERSION, create_activity, read_record_file,
 };
-pub use harness::{Harness, UnknownHarness};
+pub use harness::{HarnessName, InvalidHarnessName};
 pub use ids::{ActorId, CallId, InvalidId, TaskId};
 pub use key::{ActorKey, Stem};
 pub use legacy::legacy_kind;

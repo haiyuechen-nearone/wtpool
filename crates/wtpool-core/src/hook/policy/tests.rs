@@ -2,8 +2,8 @@ use std::fs;
 use std::path::Path;
 
 use super::*;
-use crate::activity::{Harness, TaskId, WaitReason};
-use crate::hook::adapter::{TranscriptTitles, WaitingTools};
+use crate::activity::{HarnessName, TaskId, WaitReason};
+use crate::hook::adapter::{Rejection, TranscriptTitles, WaitingTools};
 use crate::hook::input::HookInput;
 use crate::hook::install::Printed;
 use crate::policy::{Dialect, Refusal, ShellCall};
@@ -15,11 +15,11 @@ struct Stub {
 }
 
 impl Adapter for Stub {
-    const HARNESS: Harness = Harness::ClaudeCode;
+    const HARNESS: HarnessName = HarnessName::LEGACY;
     const WAITING_TOOLS: WaitingTools = WaitingTools(&[("ask", WaitReason::Question)]);
 
-    fn parse(&self, _: &[u8]) -> Option<HookInput> {
-        None
+    fn parse(&self, _: &[u8]) -> Result<HookInput, Rejection> {
+        Err(Rejection::Ignored)
     }
 
     fn event_name(&self, _: &[u8]) -> Option<String> {

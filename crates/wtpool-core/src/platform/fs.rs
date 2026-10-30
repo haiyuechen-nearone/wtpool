@@ -79,9 +79,8 @@ fn write_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
 /// Creates the folder `path`, private to its owner, and its missing parents as usual. A folder
 /// already there stays as it is.
 pub fn create_private_dir(path: &Path) -> io::Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
+    let parents = path.parent().map_or(Ok(()), std::fs::create_dir_all);
+    parents?;
     let mut builder = DirBuilder::new();
     match private_dir(&mut builder).create(path) {
         Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Ok(()),
@@ -431,6 +430,43 @@ mod tests {
             .map(|entry| entry.unwrap().file_name())
             .collect();
         assert_eq!(names, ["folder"]);
+    }
+
+    #[test]
+    fn create_private_dir__should_say_where_the_parent_cannot_be_made() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let blocker = dir.path().join("blocker");
+        std::fs::write(&blocker, "").unwrap();
+
+        // When
+        let created = create_private_dir(&blocker.join("inside"));
+
+        // Then
+        let kind = created.unwrap_err().kind();
+        let refused = matches!(
+            kind,
+            io::ErrorKind::AlreadyExists | io::ErrorKind::NotADirectory
+        );
+        assert!(refused, "{kind:?}");
+    }
+
+    #[test]
+    fn not_private__should_say_why_a_file_is_not_private() {
+        // When
+        let said = [
+            NotPrivate::OtherOwner.to_string(),
+            NotPrivate::WritableByOthers.to_string(),
+        ];
+
+        // Then
+        assert_eq!(
+            said,
+            [
+                "it belongs to another user",
+                "its group or other users may write to it"
+            ]
+        );
     }
 
     #[cfg(unix)]

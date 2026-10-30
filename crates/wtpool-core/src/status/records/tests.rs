@@ -37,8 +37,10 @@ fn must_write(dir: &Path, name: &str, text: &str) {
 #[rstest]
 #[case::session("s-1.json", true)]
 #[case::subagent("s-1.a-2.json", true)]
-#[case::longest_id(&format!("{}.json", "a".repeat(64)), true)]
-#[case::too_long_id(&format!("{}.json", "a".repeat(65)), false)]
+#[case::named_harness("other-harness-s-1.a-2.json", true)]
+#[case::head_past_an_id(&format!("{}.json", "a".repeat(65)), true)]
+#[case::longest_head(&format!("{}.json", "a".repeat(89)), true)]
+#[case::too_long_head(&format!("{}.json", "a".repeat(90)), false)]
 #[case::three_ids("a.b.c.json", false)]
 #[case::empty_id(".json", false)]
 #[case::empty_agent_id("s..json", false)]
@@ -286,6 +288,8 @@ fn edit_record(ended: Option<(&str, CallKind)>) -> ActorRecord {
         process: None,
         subagents: Vec::new(),
         tasks: Vec::new(),
+        shared: false,
+        model: None,
     }
 }
 

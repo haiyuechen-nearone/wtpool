@@ -32,15 +32,18 @@ without arguments prints its usage.
 
 ```sh
 cargo xtask verify --phase 3 --part quick                           # one part
-cargo xtask verify --phase 3 --part int,bench,quick,cc,ui --run mine  # every part, in waves
+cargo xtask verify --phase 3 --part int,bench,quick,shot,cc,ui --run mine  # every part, in waves
 cargo xtask verify --phase 3 --report --run mine                    # the verdict and the report
 ```
 
-- `--phase N` runs the checks of phase N and every earlier phase. Phase 3 is the last.
+- `--phase N` runs the checks of phase N and every earlier phase. Phase 5a is the last one built.
+- Make it a heavy command once per clone, so a run takes a place in the machine's job queue before
+  it takes the verify lock: `wtpool job heavy add --repo -- 'cargo xtask verify'`. Then run it as
+  `wtpool job -- cargo xtask verify ...`.
 - `--part` names a part, or several joined by commas. Several parts first make the shared builds
   once: the release `wtpool`, the web bundle and the `.vsix`. Then they run in waves: `int` alone,
-  then `bench` alone, then `quick` and `cc` together, then `ui`. A list runs its parts whole, so
-  it refuses `--only`.
+  then `bench` alone, then `quick`, `cc`, `oc` and `shot` together, then `ui`. A list runs its
+  parts whole, so it refuses `--only`.
 - `--run NAME` names the run, whose folder is `verify/out/NAME/`. Without it, the name is the first
   12 characters of the commit, plus `-dirty-` and a hash when the tree has changes. Give every part
   of one run the same name, so that `--report` finds them all.
@@ -52,8 +55,8 @@ cargo xtask verify --phase 3 --report --run mine                    # the verdic
   recordings. Both need `cc` among the parts.
 - `--report` writes `verify/out/<run>/report.md` and `report.html` and prints the verdict. It
   exits 0 for PASS, 1 for FAIL and 2 for NEEDS YOU. **The verdict stays FAIL until every part has
-  run.** Phase 3 needs `quick`, `int`, `ui`, `bench` and `cc`, and the report lists each missing
-  part as a `part:<name>` check that was not run. The one exception is `cc` on a machine without
+  run.** Phase 3 needs `quick`, `int`, `shot`, `ui`, `bench` and `cc`, and the report lists each
+  missing part as a `part:<name>` check that was not run. The one exception is `cc` on a machine without
   recordings, below.
 
 ## What each part costs
@@ -63,16 +66,21 @@ minutes in all. A first run in a fresh clone also builds everything, and takes l
 
 | Part | What it runs | Time | What it needs |
 |---|---|---|---|
-| `quick` | `static` (fmt, clippy, ESLint, stylelint, the repository's own lints and the doc link check), `render` (Vitest) and `host` (the extension's tests in VS Code's extension host) | about 4 minutes | Node and npm; VS Code. It opens VS Code windows, behind yours. |
-| `int` | `unit` and the integration checks on the `verify` build, through nextest, and the replays of recorded Claude Code sessions | about 3 minutes | cargo-nextest; a quiet machine, since its watch checks time file events |
-| `ui` | `shot` (Playwright screenshots in four themes, with axe) and `e2e` (one check per user flow in a real VS Code, with the `.vsix` and the release `wtpool`) | about 5 minutes | VS Code windows, which open behind yours and never take focus; Playwright's Chromium |
+| `quick` | `static` (fmt, clippy, ESLint, stylelint, the repository's own lints and the doc link check, also over the OpenCode plugin), `js` (Node's own test runner on the plugin), `render` (Vitest) and `host` (the extension's tests in VS Code's extension host) | about 4 minutes | Node and npm; VS Code. It opens VS Code windows, behind yours. |
+| `int` | `unit` and the integration checks on the `verify` build, through nextest, and the replays of recorded Claude Code and OpenCode sessions | about 3 minutes | cargo-nextest; a quiet machine, since its watch checks time file events |
+| `shot` | Playwright screenshots in four themes, with axe, in headless Chromium | about 5 minutes | Playwright's Chromium. It opens no window, and runs beside `quick` |
+| `ui` | `e2e` (one check per user flow in a real VS Code, with the `.vsix` and the release `wtpool`) | about 4 minutes | VS Code windows, which open behind yours and never take focus |
 | `bench` | the budgets B1 to B11 | about 3 minutes | a quiet machine. It measures timings and runs alone. |
 | `cc` | the Claude Code contract, judged by the recorded live result or by `int`'s replays | seconds | nothing more |
 | `cc --contract` | about 12 live Claude Code sessions | about 10 minutes | `claude`, logged in, and paid model calls to `claude-haiku-5-5` |
+| `oc` | the installed `opencode` with the shipped plugin and the built `wtpool`, in a sandbox: sessions on a scripted local model, and one on a free model of OpenCode's own provider | not timed yet | `opencode` 2.2.0 on the `PATH`. No login and no cost. |
 | `--report` | coverage, `trace_complete`, `isolation__left_no_trace` and the report | under a minute | cargo-llvm-cov |
 
 Only the live contract run costs money. Run it only when the Claude Code version changes: the
-harness then has no live result for it.
+harness then has no live result for it. The `oc` part costs nothing and needs no login, but its
+free model session reaches OpenCode's own provider: [Security](../SECURITY.md#test-runs) says what
+it sends. Without an installed `opencode`, the `oc` checks count by the replays of the recorded
+sessions alone, and the report says so.
 
 ## What the harness needs
 
@@ -147,6 +155,9 @@ Spec files, by layer:
 - `host/`: `*.test.cjs` checks in the extension host, run by `run.mjs` with `index.cjs`, `support.cjs` and `outputs.cjs`.
 - `e2e/`: Playwright `*.spec.mjs` checks in a real VS Code: flows, panel, headings, CLI and scenarios.
 - `cc/`: `run.mjs` runs the sessions of `sessions.mjs` on sandbox pools, with `sandbox.mjs` and the `recorder.mjs` hook.
+- `opencode/`: `*.test.mjs` checks run by `node --test`, which import the OpenCode plugin as it is
+  and feed it the recorded streams of `verify/fixtures/opencode-2.2.0/`.
+- `oc/`: the live layer of the `oc` part, with the scripted model `stub-model.mjs`.
 - `lint/`: `rules.mjs` holds the rule groups, and `check.mjs` runs one group over the sources.
 - `bench/`: `heap.spec.mjs`, the heap check.
 - `fake-wtpool.mjs`, at the top: the fake `wtpool` of the host layer, which replays documents.
@@ -176,7 +187,8 @@ The harness reads these variables. All are optional.
 | `WTPOOL_VERIFY_VISIBLE_WINDOWS` | `1` keeps the VS Code windows of a run opaque, behind your windows, so you can watch it. | They are transparent and let the mouse through. |
 | `WTPOOL_VERIFY_RETRIES`, `WTPOOL_VERIFY_HOST_RETRIES` | `0` runs each check of `shot`, `e2e` and `host` once, as freeze does. Any other value stops the run. | The runners retry a failed check twice, and a pass on a retry counts as flaky. |
 | `WTPOOL_VERIFY_HOST_ORDER`, `WTPOOL_VERIFY_HOST_INVERT` | For a host run by hand (`vscode/test/host/run.mjs`): `reverse` runs the checks in reverse order, `1` runs every check but those `WTPOOL_VERIFY_HOST_GREP` selects. A verify run takes only `0` and stops on any other value. | The checks run in file order. |
-| `WTPOOL_VERIFY_E2E_WORKERS` | How many e2e checks run at once. | 4. |
+| `WTPOOL_VERIFY_E2E_WORKERS` | How many e2e checks run at once. | 6. |
+| `WTPOOL_VERIFY_SHOT_WORKERS` | How many shot checks run at once. | 8. |
 | `XDG_CACHE_HOME` | Where `wtpool-verify/` keeps clean clones and other caches. | `~/.cache`, so `~/.cache/wtpool-verify`. |
 | `XDG_DATA_HOME` | Where `wtpool-verify/` keeps the build copy of `wtpool` for the contract and the recordings. | `~/.local/share`, so `~/.local/share/wtpool-verify`. |
 | `WTPOOL_FOREGROUND` | Your own pool, which `isolation__left_no_trace` checks for traces of the run. | The checks on your own pool are skipped. |
@@ -272,16 +284,18 @@ is deleted at the end (`--keep` leaves it).
 
 - **The story** is in `vscode/scripts/demo/story.mjs`: the placeholders (`acme/app`, `my-mac`,
   the paths), each status document, the test log and the pointer's moves, on one timeline of
-  25 seconds. Every time a document holds comes from that timeline, and the webview's clock is
+  32 seconds. Every time a document holds comes from that timeline, and the webview's clock is
   shifted to it, so ages and clock times are the same on every run. The detail strip with its
   Output section is closed again before the pointer goes to the last row, so every step fits the
   600 px window.
-- **Later features.** Four parts of the story follow features that may be newer than your
+- **Later features.** Five parts of the story follow features that may be newer than your
   checkout: a session's title as its label (H16), a background task's live output in the detail
-  strip, and an agent whose turn ended working on while its background task runs (A1), and the heavy jobs of the machine button and its strip. The script
+  strip, an agent whose turn ended working on while its background task runs (A1), the heavy jobs
+  of the machine button and its strip, and the agent marks, where a coordinator starts an
+  OpenCode agent (`model`, `launched_by`) and the pointer rests on its mark as a ring. The script
   reads from the spec and the generated schema whether this checkout has them, and records the
   story as this version shows it. `--features all`, `none` or a list such as
-  `labels,outputs,background,jobs` overrides that.
+  `labels,outputs,background,jobs,marks` overrides that.
 - **The frames.** The window is 1000 × 600 in Dark Modern. Screenshots are taken at twice that
   size about 14 times a second, and gifski scales them to 1000 px wide at 10 frames a second.
   The pointer and the click ring are drawn into the window, because screenshots show no cursor.
@@ -294,7 +308,9 @@ is deleted at the end (`--keep` leaves it).
 - Code: `crates/wtpool-core` holds the pool, `wtpool status`, the activity records and the rules
   of `wtpool hook`, the same for every coding agent harness and git hosting service;
   `crates/wtpool-claude-code` is the Claude Code adapter, which reads its hook payloads,
-  transcripts and `settings.json`; `crates/wtpool-github` is the GitHub adapter, which reads PR
+  transcripts and `settings.json`; `crates/wtpool-opencode` is the OpenCode adapter, with the
+  TypeScript plugin in `crates/wtpool-opencode/plugin/` that `wtpool hook install --harness
+  opencode` prints; `crates/wtpool-github` is the GitHub adapter, which reads PR
   refs and remote URLs and looks PR heads up with `gh`; and `crates/wtpool` is the binary, which
   picks the adapters. The extension is in `vscode/src`.
 - Spec: [docs/design/status-panel/status-panel.md](design/status-panel/status-panel.md).

@@ -100,6 +100,15 @@ fn set_value__should_refuse_jobs_that_is_no_table() {
     assert!(matches!(edited, Err(EditFault::NotATable("jobs"))));
 }
 
+#[test]
+fn set_value__should_add_a_key_at_the_top_level() {
+    // When
+    let root = set_value("a = 1\n", TableName::Root, "b", "2");
+
+    // Then
+    assert_eq!(root.unwrap(), "a = 1\nb = 2\n");
+}
+
 #[rstest]
 #[case::with_its_comment(
     "# a\n[jobs]\n# b\nlimit = 3   # three\nenforce = \"warn\"\n",

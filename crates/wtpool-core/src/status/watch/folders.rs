@@ -113,10 +113,10 @@ impl Followed {
                 return;
             }
             let found = nearest_existing(&self.path, Path::is_dir);
-            let Some(target) = self.next_target(found) else {
-                return;
-            };
-            let Some(spellings) = watch(watcher, target.path_for(&self.path)) else {
+            let started = self.next_target(found).and_then(|target| {
+                watch(watcher, target.path_for(&self.path)).map(|spellings| (target, spellings))
+            });
+            let Some((target, spellings)) = started else {
                 return;
             };
             if let Some(before) = self.waiting.take() {
@@ -142,9 +142,17 @@ impl Followed {
     /// `None` while the watch waits in that ancestor already.
     fn next_target(&self, found: Option<Target>) -> Option<Target> {
         let found = found?;
-        let waits_there = matches!(&found, Target::Ancestor { path, .. }
-            if self.waiting.as_ref().is_some_and(|waiting| &waiting.path == path));
-        (!waits_there).then_some(found)
+        match &found {
+            Target::Ancestor { path, .. }
+                if self
+                    .waiting
+                    .as_ref()
+                    .is_some_and(|waiting| &waiting.path == path) =>
+            {
+                None
+            }
+            _ => Some(found),
+        }
     }
 
     fn classify(&self, path: &Path) -> Option<FolderChange> {
@@ -388,7 +396,7 @@ mod tests {
         assert_eq!(target, expected);
     }
 
-    /// Waits for an event at a path called `name` that `folders` reads as `expected`.
+    /// Waits up to 10 s for an event at a path called `name` that `folders` reads as `expected`.
     fn hears(
         folders: &JobFolders,
         events: &Receiver<Message>,
@@ -396,18 +404,63 @@ mod tests {
         expected: &FolderChange,
     ) -> bool {
         let deadline = Instant::now() + Duration::from_secs(10);
-        while let Some(left) = deadline.checked_duration_since(Instant::now()) {
-            let Ok(Message::Paths { paths, .. }) = events.recv_timeout(left) else {
-                return false;
-            };
-            if paths.iter().any(|path| {
-                path.file_name() == Some(OsStr::new(name))
-                    && folders.classify(path).contains(expected)
-            }) {
-                return true;
-            }
-        }
-        false
+        let next = || {
+            events
+                .recv_timeout(deadline.checked_duration_since(Instant::now())?)
+                .ok()
+        };
+        let heard = |path: &PathBuf| {
+            path.file_name() == Some(OsStr::new(name)) && folders.classify(path).contains(expected)
+        };
+        std::iter::from_fn(next).any(
+            |message| matches!(message, Message::Paths { paths, .. } if paths.iter().any(heard)),
+        )
+    }
+
+    #[test]
+    fn job_folders_waits__should_be_true_while_a_folder_is_waited_for() {
+        // Given
+        let watcher = notify::recommended_watcher(drop).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let paths = JobPaths {
+            config: dir.path().join("home/.config/wtpool/machine.toml"),
+            folder: dir.path().join("home/.state/wtpool/jobs"),
+        };
+
+        // When
+        let mut folders = JobFolders::new(watcher, Some(&paths));
+        let before = folders.waits();
+        folders.watch_new();
+        let waiting = folders.waits();
+        folders.watch_new();
+        let twice = folders.waits();
+        std::fs::create_dir_all(&paths.folder).unwrap();
+        std::fs::create_dir_all(paths.config.parent().unwrap()).unwrap();
+        folders.watch_new();
+
+        // Then
+        assert!(!before);
+        assert!(waiting);
+        assert!(twice);
+        assert!(!folders.waits());
+    }
+
+    #[test]
+    fn job_folders_watch_new__should_watch_nothing_of_an_empty_path() {
+        // Given
+        let watcher = notify::recommended_watcher(|_| {}).unwrap();
+        let paths = JobPaths {
+            config: PathBuf::new(),
+            folder: PathBuf::new(),
+        };
+
+        // When
+        let mut folders = JobFolders::new(watcher, Some(&paths));
+        folders.watch_new();
+
+        // Then
+        assert!(!folders.waits());
+        assert!(folders.classify(Path::new("/s/jobs")).is_empty());
     }
 
     #[rstest]

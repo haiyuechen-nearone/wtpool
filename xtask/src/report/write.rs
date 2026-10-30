@@ -79,6 +79,13 @@ fn gather(root: &Path, phase: u8, run: &str, run_dir: &Path) -> Result<Gathered,
                 results.extend(by_replay);
                 continue;
             }
+            // Without the oc part, a machine with no opencode counts the oc checks by replay.
+            if *part == "oc"
+                && let Some(by_replay) = crate::layers::oc_report_by_replay(root, run_dir)
+            {
+                results.extend(by_replay);
+                continue;
+            }
             results.push(CheckResult::not_run(
                 &format!("part:{part}"),
                 "report",
@@ -92,6 +99,11 @@ fn gather(root: &Path, phase: u8, run: &str, run_dir: &Path) -> Result<Gathered,
             crate::layers::REPLAY_ONLY,
             crate::layers::replay_only_reason()
                 .unwrap_or_else(|| "a live result appeared after the cc part ran".to_owned())
+        );
+    }
+    if results.iter().any(|r| r.layer == "oc" && r.replay_only) {
+        contract.push_str(
+            "; the oc checks by this run's oc_replay:<session> alone, as no opencode is installed",
         );
     }
     Ok(Gathered {

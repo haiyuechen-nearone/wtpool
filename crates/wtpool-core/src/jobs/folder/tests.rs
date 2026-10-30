@@ -121,6 +121,120 @@ fn job_folder_sweep__should_delete_dead_records_and_their_locks() {
     drop(held);
 }
 
+#[cfg(unix)]
+#[test]
+fn job_folder_create__should_say_where_it_could_not_make_the_folder() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let blocker = dir.path().join("blocker");
+    std::fs::write(&blocker, "").unwrap();
+    let path = blocker.join("wtpool/jobs");
+
+    // When
+    let error = JobFolder::create(path.clone()).unwrap_err();
+
+    // Then
+    assert_eq!(
+        error.to_string(),
+        format!(
+            "cannot use the job folder {}: Not a directory (os error 20)",
+            path.display()
+        )
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn job_folder_create__should_refuse_a_folder_that_is_no_folder() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("file");
+    std::fs::write(&path, "").unwrap();
+
+    // When
+    let refused = JobFolder::create(path).unwrap_err().to_string();
+
+    // Then
+    assert!(refused.ends_with("it is not a folder"), "{refused}");
+}
+
+#[test]
+fn job_folder_records__should_find_nothing_without_the_folder() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let folder = JobFolder {
+        dir: dir.path().join("gone"),
+    };
+
+    // When
+    let records = folder.records();
+    let orphans = folder.orphan_locks(None);
+
+    // Then
+    assert!(records.is_empty() && orphans.is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn job_folder_create_lock__should_say_where_the_file_cannot_be_made() {
+    // Given
+    let (_dir, folder) = temp_folder();
+    let id = JobId::new(4);
+    std::fs::create_dir(folder.lock_path(&id)).unwrap();
+
+    // When
+    let error = folder.create_lock(&id).unwrap_err();
+
+    // Then
+    assert_eq!(
+        error.to_string(),
+        format!(
+            "cannot use the job folder {}: File exists (os error 17)",
+            folder.dir().display()
+        )
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn job_folder_write_record__should_say_where_the_record_cannot_be_written() {
+    // Given
+    let (_dir, folder) = temp_folder();
+    let id = JobId::new(6);
+    std::fs::create_dir(folder.record_path(&id)).unwrap();
+
+    // When
+    let error = folder.write_record(&record(&id, 1)).unwrap_err();
+
+    // Then
+    let said = error.to_string();
+    assert!(
+        said.starts_with(&format!(
+            "cannot use the job folder {}: ",
+            folder.dir().display()
+        )),
+        "{said}"
+    );
+}
+
+#[test]
+fn job_folder_just_made__should_say_when_another_process_holds_it() {
+    // Given
+    let held = TryLockError::WouldBlock;
+    let failed = TryLockError::Error(io::Error::other("the disk said no"));
+
+    // When
+    let busy = just_made(held);
+    let error = just_made(failed);
+
+    // Then
+    assert_eq!(
+        busy.to_string(),
+        "another process holds a lock file just made"
+    );
+    assert_eq!(error.to_string(), "the disk said no");
+}
+
 #[test]
 fn job_folder_take_ticket__should_count_past_every_ticket() {
     // Given
@@ -172,6 +286,21 @@ fn job_folder_file_kind__should_tell_each_file_of_the_folder(
 
     // Then
     assert_eq!(kind, expected);
+}
+
+#[cfg(unix)]
+#[test]
+fn job_folder_file_kind__should_leave_a_name_no_text_says_alone() {
+    use std::os::unix::ffi::OsStringExt;
+
+    // Given
+    let name = OsString::from_vec(b"42-0badc0de.j\xffson".to_vec());
+
+    // When
+    let kind = JobFolder::file_kind(&name);
+
+    // Then
+    assert_eq!(kind, JobFile::Other);
 }
 
 #[test]

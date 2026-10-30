@@ -1,0 +1,10 @@
+{"line":1,"t":1793302004428,"payload":{"v":1,"kind":"event","name":"session.created","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76defd35ffexxJiBHgMYag24S"}}}
+{"line":15,"t":1793302004439,"payload":{"v":1,"kind":"event","name":"session.execution.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76defd35ffexxJiBHgMYag24S"}}}
+{"line":25,"t":1793302004444,"payload":{"v":1,"kind":"event","name":"session.renamed","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76defd35ffexxJiBHgMYag24S","title":"Stub title s4"}}}
+{"line":26,"t":1793302004451,"payload":{"v":1,"kind":"event","name":"session.step.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76defd35ffexxJiBHgMYag24S","model":{"id":"scripted","providerID":"stub"}}}}
+{"line":31,"t":1793302004452,"payload":{"v":1,"kind":"hook","name":"tool.execute.before","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76defd35ffexxJiBHgMYag24S","id":"call_s4_0_0","tool":"question"}}}
+{"line":35,"t":1793302004452,"payload":{"v":1,"kind":"event","name":"form.created","directory":"/sandbox/repo/fg","data":{"form":{"id":"frm_1892102e4001Sk0QzMXzyXn4JX","sessionID":"ses_e76defd35ffexxJiBHgMYag24S","metadata":{"kind":"question","tool":{"id":"call_s4_0_0"}}}}}}
+{"line":38,"t":1793302007470,"payload":{"v":1,"kind":"event","name":"form.replied","directory":"/sandbox/repo/fg","call":"call_s4_0_0","data":{"id":"frm_1892102e4001Sk0QzMXzyXn4JX","sessionID":"ses_e76defd35ffexxJiBHgMYag24S"}}}
+{"line":39,"t":1793302007471,"payload":{"v":1,"kind":"event","name":"session.tool.success","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76defd35ffexxJiBHgMYag24S","id":"call_s4_0_0"}}}
+{"line":52,"t":1793302007503,"payload":{"v":1,"kind":"event","name":"session.text.delta","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76defd35ffexxJiBHgMYag24S"}}}
+{"line":57,"t":1793302007512,"payload":{"v":1,"kind":"event","name":"session.execution.succeeded","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76defd35ffexxJiBHgMYag24S"}}}

@@ -14,9 +14,9 @@ group, or comes to the front. It runs `wtpool status --watch` while open; closin
 Each window has its own tab. The tab title reads `Worktrees (N)` while N worktrees wait.
 
 To install it, see the [README](../README.md#the-extension). It needs the `wtpool` CLI. Agents
-show only once the hooks are on: the plugin or the settings block, as the
-[README](../README.md#the-hooks) says. Until then the tab names the two steps: `wtpool setup`, then
-the hooks, through the plugin or the block `wtpool hook install` prints.
+show only once the hooks are on: for Claude Code the plugin or the settings block, for OpenCode the
+plugin file, as the [README](../README.md#the-hooks) says. Until then the tab names the two steps:
+`wtpool setup`, then the hooks, through the plugin or the block `wtpool hook install` prints.
 
 ## Which pool it shows
 
@@ -65,9 +65,10 @@ an agent's line or the row's own, with ` (not queued)` in the attention colour.
 
 Each agent line starts with a small icon of its state: the robot at rest while working, a clock
 while quiet, a bell while waiting, a circle while idle, an error sign after an API error, and a
-check mark when done. These icons never move. A `build:` or `no agent` line keeps an empty space
-where the icon goes, so the text of every line starts at the same place. Screen readers read the
-state in place of the icon, as `waiting: `.
+check mark when done. These icons never move. After it comes the agent's mark, a second small box
+of the same size: see [Agent marks](#agent-marks). A `build:` or `no agent` line keeps an empty
+space where each of the two goes, so the text of every line starts at the same place. Screen
+readers read the state in place of the icon, as `waiting: `.
 
 A row with two or more agent lines shows `×N` after its Activity word, as in `working ×5`, in the
 word's colour inside a thin border. `done` lines count, and `build:` and `no agent` lines do not.
@@ -92,7 +93,57 @@ down, and it ticks with the other ages. Hours on a task that should take minutes
 wait that never ends: see [Troubleshooting](troubleshooting.md).
 
 Select a row to see the exact path, upstream, git facts, why `wtpool bg` refuses it, and per agent its
-state, action, how it was placed (`cwd` or `path`) and since when (local time).
+state, action, how it was placed (`cwd` or `path`) and since when (local time). Each agent also
+shows `<harness> · <model>`, such as `opencode · opencode/glm-5.3-flash-free`, or the harness alone
+while its model is unknown. An agent that another agent started shows `launched by <label>`, the
+label of its launcher, else the launcher's key.
+
+An OpenCode session that is `idle` or `quiet` and has had no event for an hour leaves the list. It
+comes back with its next event. One OpenCode server runs many sessions, so it has no end signal
+for an idle one, and a newer session in the same worktree hides an older `idle` one of that
+server.
+
+## Agent marks
+
+Beside its state icon, an agent line shows its model's maker and its harness, so a row that runs
+OpenCode on a free Zhipu model reads differently from one that runs Claude Code. The mark takes
+the colour of the line's text. The state icon alone carries the state's colour.
+
+| The agent | The line shows |
+|---|---|
+| names a model whose maker wtpool knows | the maker's mark, and a small badge of the harness's mark at its lower right corner, unless the harness is the maker's own |
+| names no known model, or a maker wtpool does not know | the harness's mark, without a badge |
+| neither is known | an empty box, and the state icon stays |
+
+Claude Code is Anthropic's, so a Claude Code agent on a Claude model shows Anthropic's mark and no
+badge. An OpenCode agent on `opencode/glm-5.3-flash-free` shows the Zhipu mark with OpenCode's
+badge. The maker comes from the model's name. The panel splits it at `/` and tests the parts from
+the last, by their start and ignoring case:
+
+| The name starts with | Maker |
+|---|---|
+| `claude` | Anthropic |
+| `gpt`, `o1` to `o4`, `codex` | OpenAI |
+| `gemini`, `gemma` | Google |
+| `deepseek` | DeepSeek |
+| `glm`, `z-ai` | Zhipu |
+| `qwen` | Qwen |
+| `kimi`, `moonshot` | Moonshot |
+| `mistral`, `codestral`, `devstral` | Mistral |
+| `llama` | Meta |
+| `grok` | xAI |
+| `minimax` | MiniMax |
+
+Hover a mark for a label that reads `<model> · <harness>`, such as `deepseek-v4.1-flash · OpenCode`,
+or only the harness's name while the model is unknown. The label shows the last `/` part of the
+model, and the harness by its display name. The marks and badges are hidden from screen readers,
+so the label's words follow the line's state for them, and the detail strip carries them too. Each mark is one SVG path in the extension. The source and licence of
+each are in [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md).
+
+An agent that starts another stays on its own row. A coordinator in the foreground that starts an
+OpenCode agent in a slot keeps its line there, and the agent's line appears on the slot with
+`launched by` the coordinator in the detail strip, until its run ends:
+[Coordinating agents across harnesses](status-and-hook.md#coordinating-agents-across-harnesses).
 
 ## Live output
 

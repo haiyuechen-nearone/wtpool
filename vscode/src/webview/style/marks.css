@@ -1,0 +1,55 @@
+/* The box after an agent line's state icon: the same 14 px square with 5 px after it, holding the
+ * model maker's mark in the colour of the line's own text, so the state icon alone carries the
+ * state's colour. Every mark's view box fits its ink, so the longer side of its ink is the size
+ * below, whatever its shape, and it sits in the middle of the box. */
+
+.line-mark {
+  position: relative;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 5px;
+  vertical-align: -2px;
+}
+
+.line-mark > .mark {
+  position: absolute;
+  inset: 0;
+  width: 12px;
+  height: 12px;
+  margin: auto;
+}
+
+/* The harness's badge sits in the box's lower right corner on a ring of the row's background. The
+ * ring stacks the row's colour over the page's, as a hovered or selected row's can be
+ * translucent. */
+.line-badge {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  width: 9px;
+  height: 9px;
+  padding: 1px;
+  border-radius: 2px;
+  background-color: var(--vscode-editor-background);
+  background-image: linear-gradient(
+    var(--row-background, transparent),
+    var(--row-background, transparent)
+  );
+}
+
+.line-badge > .mark {
+  display: block;
+  width: 7px;
+  height: 7px;
+}
+
+/* A badged mark is drawn smaller in the box's upper left corner, so the two keep to their own
+ * halves of the box. */
+.line-mark[data-badge] > .mark {
+  inset: 1px auto auto 1px;
+  width: 10px;
+  height: 10px;
+  margin: 0;
+}

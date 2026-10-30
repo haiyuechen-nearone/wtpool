@@ -98,12 +98,15 @@ pub fn shown(build: &BuildProcess<'_>) -> Build {
 }
 
 /// The builds below each process, by that process's pid: of the builds whose chain of
-/// parents passes through the pid, the nearest first, then the lowest pid. A chain that comes
-/// back to a pid it passed, as a table read while pids are reused can give, stops there.
+/// parents passes through the pid, the nearest first, then the lowest pid. A chain ends at the
+/// first of `harnesses` it reaches, so a build belongs to the nearest harness process above it
+/// and never to the one that started that harness. A chain that comes back to a pid it passed,
+/// as a table read while pids are reused can give, stops there.
 #[must_use]
 pub fn builds_below(
     processes: &[RunningProcess],
     builds: &[BuildProcess<'_>],
+    harnesses: &BTreeSet<u32>,
 ) -> BTreeMap<u32, Vec<BuildBelow>> {
     let parents: BTreeMap<u32, u32> = processes
         .iter()
@@ -119,6 +122,9 @@ pub fn builds_below(
         {
             depth = depth.saturating_add(1);
             found.entry(parent).or_default().push((depth, pid, build));
+            if harnesses.contains(&parent) {
+                break;
+            }
             at = parent;
         }
     }

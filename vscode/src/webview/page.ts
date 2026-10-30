@@ -9,12 +9,13 @@ import {
 } from '../shared/protocol';
 import { DetailStrip } from './detail';
 import { cell, div, paragraph, textSpan } from './dom';
+import { FloatLabel } from './float_label';
 import { Header } from './header';
 import { PoolHeading } from './heading';
 import { MachineStrip } from './machine_strip';
 import { KeyedCache, placeInOrder } from './order';
 import { RowView } from './row';
-import { rowOrder, waitAnnouncement } from './text';
+import { actorLabels, rowOrder, waitAnnouncement } from './text';
 
 /** The columns of the table: the header text and the key of the `col-` class. */
 const COLUMNS = [
@@ -72,6 +73,7 @@ export class Page {
   private readonly detailCell = cell('detail-cell');
   private readonly strip = new DetailStrip();
   private readonly announcer = div('visually-hidden');
+  private readonly label = new FloatLabel(document);
   private readonly rows = new KeyedCache<RowView>();
   /** The rows in their shown order. */
   private order: RowView[] = [];
@@ -82,6 +84,8 @@ export class Page {
   private told: string | null = null;
   /** The time of the last view or tick, so a strip opened between them agrees with its row. */
   private nowMs = 0;
+  /** The label of each actor of the shown pool, by key, for the strip's launchers. */
+  private labels: ReadonlyMap<string, string> = new Map();
 
   constructor(private readonly host: Host) {
     this.selected = savedSelection(host.getState());
@@ -107,6 +111,7 @@ export class Page {
       this.agentsOff,
       this.table(),
       this.announcer,
+      this.label.element,
     );
   }
 
@@ -169,7 +174,9 @@ export class Page {
     );
     this.agentsOff.hidden = pool.agents !== 'off';
     this.header.count(pool);
+    this.labels = actorLabels(pool.worktrees);
     this.renderRows(rowOrder(pool.worktrees), flagsUnqueued(jobs), nowMs);
+    this.label.refresh();
     this.announce(pool.worktrees);
   }
 
@@ -177,6 +184,7 @@ export class Page {
   private clear(): void {
     this.rows.forEach((row) => void row.element.remove());
     this.rows.clear();
+    this.label.hide();
     this.heading.element.hidden = true;
     if (this.machine.element.isConnected) this.toggleMachine();
     this.order = [];
@@ -241,10 +249,11 @@ export class Page {
     const row = id === null ? undefined : this.rows.get(id);
     if (row) {
       if (row.element.nextElementSibling !== this.detail) row.element.after(this.detail);
-      this.strip.update(row.worktree, this.nowMs);
+      this.strip.update(row.worktree, this.nowMs, this.labels);
     } else {
       this.detail.remove();
     }
+    this.label.refresh();
     if (id !== this.selected) {
       this.selected = id;
       this.host.setState({ selected: id });

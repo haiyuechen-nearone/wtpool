@@ -8,6 +8,7 @@ mod facts;
 #[cfg(test)]
 mod fixture;
 mod jobs;
+mod launch;
 mod live;
 mod outputs;
 mod record_time;
@@ -31,6 +32,8 @@ pub use schema::{ToSchema, status_schema, status_schema_text};
 pub use sources::{Host, Sources};
 pub use watch::watch as watch_status;
 
+pub(crate) use launch::Caller;
+
 use crate::clock::ReadClock;
 use crate::config::Config;
 use crate::error::Error;
@@ -53,18 +56,18 @@ pub fn status_line<C: ReadClock, P: ListProcesses>(
 }
 
 /// The actors of each worktree of `paths`, as the document of the pool of `config` shows them at
-/// the time of `sources`, read without the git facts the document also shows, but for those
-/// whose harness process is among `skipped`.
+/// the time of `sources`, read without the git facts the document also shows, but for those of
+/// the sessions `caller` counts as its own.
 pub(crate) fn actors_at(
     config: &Config,
     common: &Path,
     sources: &Sources,
     paths: &[&Path],
     git_mode: GitMode,
-    skipped: &[u32],
+    caller: &Caller<'_>,
 ) -> Result<Vec<Vec<Actor>>, Error> {
     let actors = PoolActors::load(git_mode, config.clone(), common.to_path_buf(), sources)?;
-    Ok(actors.at(paths, sources.clock.now(), skipped))
+    Ok(actors.at(paths, sources.clock.now(), caller))
 }
 
 #[cfg(test)]

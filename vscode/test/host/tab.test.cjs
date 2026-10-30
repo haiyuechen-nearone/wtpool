@@ -269,6 +269,59 @@ describe('tab', () => {
     assert.deepEqual(missingStarts, [], 'a bare wtpool.path ran the file of that name in the workspace folder');
   });
 
+  it('spawn__should_use_the_setting_and_no_shell pathext_fallback', async () => {
+    // Given: a bare wtpool.path whose file exists only with a PATHEXT extension appended, in an
+    // absolute PATH entry, as a Windows search finds it. The platform is told it is Windows for
+    // the run, and PATHEXT is unset, so the file's own extension is not tried.
+    await resetFake({ scenario: 'idle_pool' });
+    const fakes = process.env.WTPOOL_VERIFY_HOST_FAKES;
+    const fake = path.join(__dirname, '..', 'fake-wtpool.mjs');
+    const name = 'wtpool-pathext';
+    const bin = path.join(fakes, 'pathext-bin');
+    fs.mkdirSync(bin, { recursive: true });
+    // Node refuses a `.mjs` under another extension, so the found file runs the fake through node.
+    fs.writeFileSync(
+      path.join(bin, `${name}.EXE`),
+      `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(fake)} "$@"\n`,
+    );
+    fs.chmodSync(path.join(bin, `${name}.EXE`), 0o755);
+    const realFake = fs.realpathSync(fake);
+    const previous = vscode.workspace.getConfiguration('wtpool').inspect('path').globalValue;
+    const previousPath = process.env.PATH;
+    const previousPathext = process.env.PATHEXT;
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform');
+
+    // When
+    let found;
+    let threw;
+    let paused;
+    let ran;
+    try {
+      process.env.PATH = [bin, previousPath].join(path.delimiter);
+      delete process.env.PATHEXT;
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+      await vscode.workspace.getConfiguration('wtpool').update('path', name, vscode.ConfigurationTarget.Global);
+      await openStatus();
+      found = await waitFor(() => starts()[0], 10_000);
+      paused = (await views()).filter((v) => v.connection === 'paused').map((v) => v.error);
+      ran = found ? fs.realpathSync(found.script) : undefined;
+    } catch (error) {
+      threw = error;
+    } finally {
+      if (platform) Object.defineProperty(process, 'platform', platform);
+      process.env.PATH = previousPath;
+      if (previousPathext === undefined) delete process.env.PATHEXT;
+      else process.env.PATHEXT = previousPathext;
+      await vscode.workspace.getConfiguration('wtpool').update('path', previous, vscode.ConfigurationTarget.Global);
+      fs.rmSync(bin, { recursive: true, force: true });
+    }
+
+    // Then
+    assert.equal(threw, undefined, `the run on a told-Windows platform threw: ${threw}`);
+    assert.ok(found, `a bare wtpool.path found no file named with the default PATHEXT extensions: ${paused}`);
+    assert.equal(ran, realFake, 'a bare wtpool.path on Windows did not run the file with the default PATHEXT extension');
+  });
+
   it('messages__should_ignore_everything_outside_the_set failed_action', async () => {
     // Given: open and terminal fail as the VS Code API can, by a rejection and by a throw.
     await resetFake({ scenario: 'idle_pool' });

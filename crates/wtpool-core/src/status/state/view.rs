@@ -20,6 +20,7 @@ use crate::status::document::{
 };
 use crate::status::facts::{self, Busy};
 use crate::status::jobs::{self, Harnesses, JobsFacts, PoolFolders};
+use crate::status::launch::{Caller, HarnessTree};
 use crate::status::records::ActorRecord;
 use crate::status::sources::Sources;
 use crate::worktree::Head;
@@ -34,6 +35,10 @@ struct Counted<'s> {
     shown: Vec<&'s ActorRecord>,
     /// Those of `all` placed in each worktree, in the order of the state's worktrees.
     placed: Vec<Vec<&'s ActorRecord>>,
+    /// The harness processes of the live records of `all`, and their parents.
+    tree: HarnessTree<'s>,
+    /// The launcher of each session of `shown` another agent started, by the session's key.
+    launchers: BTreeMap<String, String>,
 }
 
 /// The machine's jobs, and the patterns that name heavy processes.
@@ -73,14 +78,15 @@ impl PoolActors {
     }
 
     /// The actors of each worktree of `paths` at `now`, as the document shows them, but for
-    /// those whose harness process is among `skipped`.
+    /// those of the sessions `caller` counts as its own.
     #[must_use]
-    pub fn at(&self, paths: &[&Path], now: Timestamp, skipped: &[u32]) -> Vec<Vec<Actor>> {
+    pub fn at(&self, paths: &[&Path], now: Timestamp, caller: &Caller<'_>) -> Vec<Vec<Actor>> {
         let state = &self.0;
         let counted = state.counted();
         let lists = state.job_lists();
         let work = state.work(&counted, &lists);
-        let actors = state.actors(now, &counted, &work, skipped);
+        let left_out = counted.tree.left_out(caller, &counted.launchers);
+        let actors = state.actors(now, &counted, &work, &left_out);
         paths
             .iter()
             .map(|path| {
@@ -129,10 +135,12 @@ impl PoolState {
             .copied()
             .collect();
         let superseded = agents::superseded(&in_pool);
-        let shown = in_pool
+        let shown: Vec<&ActorRecord> = in_pool
             .into_iter()
             .filter(|record| !superseded.contains(record.key.session()))
             .collect();
+        let tree = HarnessTree::new(&self.processes, &all);
+        let launchers = tree.launchers(&shown);
         let placed = self
             .worktrees
             .iter()
@@ -148,6 +156,8 @@ impl PoolState {
             superseded,
             shown,
             placed,
+            tree,
+            launchers,
         }
     }
 
@@ -197,7 +207,7 @@ impl PoolState {
                     .collect()
             })
             .collect();
-        let below = builds_below(&self.processes, &build_list);
+        let below = builds_below(&self.processes, &build_list, &counted.tree.harness_pids());
         let actor_jobs = jobs::actor_jobs(&lists.records, &owners);
         Work {
             table,
@@ -210,13 +220,13 @@ impl PoolState {
     }
 
     /// The sorted actors of each worktree, in the order of the state's worktrees, but for those
-    /// whose harness process is among `skipped`.
+    /// of the sessions `left_out` names.
     fn actors(
         &self,
         now: Timestamp,
         counted: &Counted<'_>,
         work: &Work<'_>,
-        skipped: &[u32],
+        left_out: &BTreeSet<String>,
     ) -> Vec<Vec<Actor>> {
         let building = |path: &Path, key: &str| {
             self.worktrees
@@ -242,15 +252,14 @@ impl PoolState {
             .placed
             .iter()
             .map(|placed| {
-                let skipped = |record: &&&ActorRecord| {
-                    record
-                        .process
-                        .is_some_and(|process| skipped.contains(&process.pid))
-                };
                 let mut actors: Vec<Actor> = placed
                     .iter()
-                    .filter(|record| !skipped(record))
+                    .filter(|record| !left_out.contains(record.key.session()))
                     .filter_map(|record| agents::actor(record, &context))
+                    .map(|mut actor| {
+                        actor.launched_by = counted.launchers.get(&actor.key).cloned();
+                        actor
+                    })
                     .collect();
                 agents::sort(&mut actors);
                 actors
@@ -264,7 +273,7 @@ impl PoolState {
         counted: &Counted<'_>,
         work: &Work<'_>,
     ) -> Vec<WorktreeStatus> {
-        let actors = self.actors(now, counted, work, &[]);
+        let actors = self.actors(now, counted, work, &BTreeSet::new());
         self.worktrees
             .iter()
             .zip(&work.builds)

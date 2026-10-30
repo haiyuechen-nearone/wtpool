@@ -19,6 +19,8 @@ use xtask::pool::{Pool, PoolSpec};
 
 use super::{Sandbox, must_repo, must_status_json, must_wtpool_bin, set_executable};
 
+pub mod opencode;
+
 /// The pid of the fake `claude` most checks run their hooks from.
 pub const CLAUDE: u32 = 7001;
 pub const CLAUDE_STARTED: &str = "2026-10-20T11:00:00Z";

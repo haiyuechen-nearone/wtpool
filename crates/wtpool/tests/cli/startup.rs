@@ -26,11 +26,16 @@ slots agents park branches in.
   wtpool status --json       print the pool's worktrees, git facts and builds as JSON
   wtpool status --watch      print that JSON again on each change until stdin closes
   wtpool status --schema     print the JSON schema of that document
-  wtpool hook                record a Claude Code hook event from stdin (prints nothing)
-  wtpool hook policy         refuse a heavy shell call outside a job, under enforce = require
+  wtpool hook [--harness <name>]
+                             record a hook event of a coding agent from stdin
+                             (prints nothing)
+  wtpool hook policy [--harness <name>]
+                             refuse a heavy shell call outside a job, under
+                             enforce = require
   wtpool hook gc             delete old activity records
-  wtpool hook install        print the hook block for $CLAUDE_CONFIG_DIR/settings.json
-                             (default ~/.claude/settings.json)
+  wtpool hook install [--harness <name>] [--policy]
+                             print the hook config for a harness's user files,
+                             with a note on the hooks it runs
   wtpool job [--label <text>] [--quiet] -- <command>
                              run a heavy command once fewer heavy jobs than this
                              machine's limit run
@@ -47,6 +52,9 @@ slots agents park branches in.
                              print the patterns this repository's files suggest;
                              add them with: wtpool job heavy add --repo --suggested
   wtpool --version           print the version, commit and cargo features of this build
+
+--harness names the coding agent harness: claude-code (the default) or
+opencode. --policy adds the policy check of shell calls to OpenCode's plugin.
 
 <ref> is a PR number, a GitHub PR URL, or a branch name. A PR needs gh and a
 remote on github.com.
@@ -168,8 +176,8 @@ fn unknown_command__should_point_to_help(#[case] command: &str) {
 #[case::status_without_a_flag(&["status"], "usage: wtpool status --json|--watch|--schema")]
 #[case::status_with_an_unknown_flag(&["status", "--yaml"], "usage: wtpool status --json|--watch|--schema")]
 #[case::status_with_both_flags(&["status", "--json", "--watch"], "usage: wtpool status --json|--watch|--schema")]
-#[case::hook_with_an_unknown_argument(&["hook", "now"], "usage: wtpool hook [policy|gc|install]")]
-#[case::hook_install_with_an_argument(&["hook", "install", "x"], "usage: wtpool hook [policy|gc|install]")]
+#[case::hook_with_an_unknown_argument(&["hook", "now"], "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]")]
+#[case::hook_install_with_an_argument(&["hook", "install", "x"], "usage: wtpool hook [policy|gc|install] [--harness <name>] [--policy]")]
 fn arguments__should_be_refused_before_the_configuration_is_read(
     #[case] args: &[&str],
     #[case] message: &str,

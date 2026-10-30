@@ -112,7 +112,7 @@ fn builds_below__should_order_the_builds_of_each_ancestor_nearest_first() {
     let builds = build_processes(&table, &BTreeMap::new());
 
     // When
-    let below = builds_below(&processes, &builds);
+    let below = builds_below(&processes, &builds, &BTreeSet::new());
 
     // Then
     let first = |pid: u32| {
@@ -149,7 +149,7 @@ fn builds_below__should_stop_where_a_chain_comes_back() {
     let builds = build_processes(&table, &BTreeMap::new());
 
     // When
-    let below = builds_below(&processes, &builds);
+    let below = builds_below(&processes, &builds, &BTreeSet::new());
 
     // Then
     let cargo = vec![BuildBelow {
@@ -158,4 +158,30 @@ fn builds_below__should_stop_where_a_chain_comes_back() {
     }];
     let expected = BTreeMap::from([(6, cargo.clone()), (7, cargo)]);
     assert_eq!(below, expected);
+}
+
+#[test]
+fn builds_below__should_end_at_the_nearest_harness_process() {
+    // Given
+    let processes = vec![
+        child(100, 1, "claude"),
+        child(110, 100, "zsh"),
+        child(120, 110, "opencode"),
+        child(121, 120, "zsh"),
+        child(122, 121, "cargo"),
+        child(130, 100, "cargo"),
+    ];
+    let table = HeavyTable::new(&processes, &list(&["cargo"]), &list(&[]), &[]);
+    let builds = build_processes(&table, &BTreeMap::new());
+    let harnesses = BTreeSet::from([100, 120]);
+
+    // When
+    let below = builds_below(&processes, &builds, &harnesses);
+
+    // Then
+    let pids: Vec<(u32, usize)> = below
+        .iter()
+        .map(|(pid, builds)| (*pid, builds.len()))
+        .collect();
+    assert_eq!(pids, vec![(100, 1), (120, 1), (121, 1)]);
 }

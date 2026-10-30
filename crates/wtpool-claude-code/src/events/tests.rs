@@ -27,10 +27,22 @@ fn call(id: Option<&str>, tool: &str, kind: CallKind, input_hash: &str) -> CallF
 
 #[rstest]
 #[case::prompt("UserPromptSubmit", "", Some(Event::TurnStart))]
-#[case::permission_request("PermissionRequest", "", Some(Event::PermissionAsked(no_call())))]
-#[case::post("PostToolUse", "", Some(Event::CallEnd(no_call())))]
-#[case::post_failure("PostToolUseFailure", "", Some(Event::CallEnd(no_call())))]
-#[case::denied("PermissionDenied", "", Some(Event::CallEnd(no_call())))]
+#[case::permission_request(
+    "PermissionRequest",
+    "",
+    Some(Event::Wait(WaitReason::Permission, CallRef::Facts(no_call())))
+)]
+#[case::post("PostToolUse", "", Some(Event::CallEnd(CallRef::Facts(no_call()))))]
+#[case::post_failure(
+    "PostToolUseFailure",
+    "",
+    Some(Event::CallEnd(CallRef::Facts(no_call())))
+)]
+#[case::denied(
+    "PermissionDenied",
+    "",
+    Some(Event::CallEnd(CallRef::Facts(no_call())))
+)]
 #[case::batch_without_calls("PostToolBatch", "", Some(Event::CallsEnd(Vec::new())))]
 #[case::permission_prompt(
     "Notification",
@@ -47,11 +59,15 @@ fn call(id: Option<&str>, tool: &str, kind: CallKind, input_hash: &str) -> CallF
     "elicitation_url_dialog",
     Some(Event::Notified(WaitReason::Input))
 )]
-#[case::idle_prompt("Notification", "idle_prompt", Some(Event::Idle))]
+#[case::idle_prompt("Notification", "idle_prompt", Some(Event::TurnEnd { error: None, subagents_done: true }))]
 #[case::other_notification("Notification", "auth_success", None)]
 #[case::notification_without_a_type("Notification", "", None)]
-#[case::stop("Stop", "", Some(Event::TurnEnd(None)))]
-#[case::stop_failure("StopFailure", "", Some(Event::TurnEnd(Some("error".to_owned()))))]
+#[case::stop("Stop", "", Some(Event::TurnEnd { error: None, subagents_done: false }))]
+#[case::stop_failure(
+    "StopFailure",
+    "",
+    Some(Event::TurnEnd { error: Some("error".to_owned()), subagents_done: false })
+)]
 #[case::subagent_start("SubagentStart", "", Some(Event::SubagentStart))]
 #[case::subagent_stop("SubagentStop", "", Some(Event::SubagentEnd))]
 #[case::cwd_changed("CwdChanged", "", Some(Event::CwdChange))]
@@ -73,7 +89,7 @@ fn parse__should_follow_the_event_table(
     let parsed = parse(input.as_bytes());
 
     // Then
-    assert_eq!(parsed.map(|input| input.event), expected);
+    assert_eq!(parsed.map(|input| input.event).ok(), expected);
     assert_eq!(no_call().kind, CallKind::Other);
 }
 

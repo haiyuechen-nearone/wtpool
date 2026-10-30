@@ -5,7 +5,8 @@
 //!    churn of other parts (quick's coverage rebuild, VS Code profiles) backs up the system's
 //!    file event service (fseventsd on macOS).
 //! 2. `bench` alone, so nothing skews its timings.
-//! 3. `quick` and `cc`, in parallel. `cc` reads the int part's `cc_replay:<name>`.
+//! 3. `quick`, `cc`, `oc` and `shot`, in parallel. `cc` reads the int part's `cc_replay:<name>`.
+//!    `shot` needs no window, so it goes beside `quick` rather than after it.
 //! 4. `ui` alone, the only part with VS Code windows besides quick's host layer of wave 3.
 //!
 //! The shared builds, and the jobs of each part but bench, start at a priority that yields the
@@ -24,7 +25,12 @@ use std::process::{Child, Command, ExitCode, Stdio};
 
 use crate::parts::{Contract, Ctx};
 
-const WAVES: [&[&str]; 4] = [&["int"], &["bench"], &["quick", "cc"], &["ui"]];
+const WAVES: [&[&str]; 4] = [
+    &["int"],
+    &["bench"],
+    &["quick", "cc", "oc", "shot"],
+    &["ui"],
+];
 
 /// The variable that names the command prefix of each part.
 pub const WRAPPER: &str = "WTPOOL_VERIFY_WRAPPER";
@@ -138,12 +144,15 @@ pub fn run_parts(
     .with_low_priority(true);
     if wanted
         .iter()
-        .any(|p| ["int", "ui", "bench", "cc"].contains(p))
+        .any(|p| ["int", "ui", "bench", "cc", "oc"].contains(p))
         && let Err(error) = crate::layers::release_wtpool(&ctx)
     {
         eprintln!("the shared release build failed, each part retries it: {error}");
     }
-    if wanted.iter().any(|p| ["quick", "ui", "bench"].contains(p)) {
+    if wanted
+        .iter()
+        .any(|p| ["quick", "shot", "ui", "bench"].contains(p))
+    {
         for result in crate::layers::web_build_once(&ctx) {
             if result.outcome != crate::results::Outcome::Pass {
                 eprintln!(
@@ -235,6 +244,27 @@ mod tests {
             (Err(error), Err(start)) => assert!(error.starts_with(start), "{error}"),
             (found, expected) => panic!("{found:?}, expected {expected:?}"),
         }
+    }
+
+    #[rstest]
+    #[case::shot_beside_quick("shot", &["quick", "cc", "oc", "shot"])]
+    #[case::ui_after_quick("ui", &["ui"])]
+    fn waves__should_run_a_part_in_its_wave(#[case] part: &str, #[case] expected: &[&str]) {
+        // When
+        let found = WAVES.iter().find(|wave| wave.contains(&part));
+
+        // Then
+        assert_eq!(found.copied(), Some(expected));
+    }
+
+    #[test]
+    fn waves__should_put_shot_before_ui() {
+        // When
+        let shot = WAVES.iter().position(|wave| wave.contains(&"shot"));
+        let ui = WAVES.iter().position(|wave| wave.contains(&"ui"));
+
+        // Then
+        assert!(shot < ui, "{shot:?} {ui:?}");
     }
 
     #[rstest]

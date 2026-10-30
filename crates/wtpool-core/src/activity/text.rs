@@ -56,12 +56,12 @@ pub fn clean(text: &str, limit: usize) -> String {
         .collect()
 }
 
-/// `session HH:MM`, the label of a session without a title, at the local time `local`.
+/// `<noun> HH:MM`, the label of a session without a title, at the local time `local`.
 #[must_use]
-pub fn session_label(local: Option<jiff::civil::Time>) -> String {
+pub fn untitled_label(noun: &str, local: Option<jiff::civil::Time>) -> String {
     match local {
-        Some(time) => format!("session {:02}:{:02}", time.hour(), time.minute()),
-        None => "session".to_owned(),
+        Some(time) => format!("{noun} {:02}:{:02}", time.hour(), time.minute()),
+        None => noun.to_owned(),
     }
 }
 
@@ -112,24 +112,26 @@ mod tests {
     }
 
     #[rstest]
-    #[case::noon(jiff::civil::time(12, 0, 0, 0), "session 12:00")]
-    #[case::evening(jiff::civil::time(17, 30, 59, 0), "session 17:30")]
-    #[case::midnight(jiff::civil::time(0, 5, 0, 0), "session 00:05")]
-    fn session_label__should_name_the_local_time(
+    #[case::noon("session", jiff::civil::time(12, 0, 0, 0), "session 12:00")]
+    #[case::evening("session", jiff::civil::time(17, 30, 59, 0), "session 17:30")]
+    #[case::midnight("session", jiff::civil::time(0, 5, 0, 0), "session 00:05")]
+    #[case::other_noun("agent", jiff::civil::time(14, 2, 0, 0), "agent 14:02")]
+    fn untitled_label__should_name_the_noun_and_the_local_time(
+        #[case] noun: &str,
         #[case] local: jiff::civil::Time,
         #[case] expected: &str,
     ) {
         // When
-        let label = session_label(Some(local));
+        let label = untitled_label(noun, Some(local));
 
         // Then
         assert_eq!(label, expected);
     }
 
     #[test]
-    fn session_label__should_name_no_time_it_does_not_know() {
+    fn untitled_label__should_name_no_time_it_does_not_know() {
         // When
-        let label = session_label(None);
+        let label = untitled_label("session", None);
 
         // Then
         assert_eq!(label, "session");

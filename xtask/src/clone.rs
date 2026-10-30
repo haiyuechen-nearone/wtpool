@@ -203,7 +203,7 @@ impl ScratchClone {
         let phase_text = phase.to_string();
         let run_dir = self.dir.join("verify/out").join(&run);
         let mut order: Vec<&str> = Vec::new();
-        for part in ["int", "quick", "ui", "bench", "cc"] {
+        for part in ["int", "quick", "shot", "ui", "bench", "cc"] {
             let needed = parts.contains(&part)
                 || (part == "int" && parts.contains(&"cc"))
                 || (parts.contains(&"report")

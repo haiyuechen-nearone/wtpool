@@ -334,11 +334,9 @@ fn int_tests(ctx: &Ctx, env: &TestEnv) -> Vec<CheckResult> {
         None => format!("not {budgets}{later}"),
     };
     tests.args(["-E", &filter]);
-    // `--only cc_replay:<name>` or `--only cc_replay:*` runs only the replay, no int test.
-    let replay_only = ctx
-        .only
-        .as_deref()
-        .is_some_and(|only| only.starts_with(crate::replay::PREFIX));
+    // `--only cc_replay:<name>`, `--only oc_translate:*` and the like run only the replays, no
+    // int test.
+    let replay_only = ctx.only.as_deref().is_some_and(crate::replay::is_replay);
     let ran = if replay_only {
         Err("only the replay runs".to_owned())
     } else {
@@ -365,21 +363,25 @@ fn int_tests(ctx: &Ctx, env: &TestEnv) -> Vec<CheckResult> {
     results
 }
 
-/// `cc_replay:<name>`: the recorded contract sessions through the verify build, from phase 2.
+/// `cc_replay:<name>`: the recorded contract sessions through the verify build, from phase 2;
+/// `oc_replay:<session>` and `oc_translate:<case>` from their phase in the trace.
 fn replays(ctx: &Ctx, coverage: &Coverage) -> Vec<CheckResult> {
-    let wanted = ctx.phase >= 2
-        && ctx
-            .only
-            .as_deref()
-            .is_none_or(|only| only.starts_with(crate::replay::PREFIX));
+    let wanted = ctx.phase >= 2 && ctx.only.as_deref().is_none_or(crate::replay::is_replay);
     let wtpool = coverage.wtpool();
     if !wanted || !wtpool.exists() {
         return Vec::new();
     }
     let profile = coverage.profile();
-    let every = ctx.only.as_deref() == Some("cc_replay:*");
-    let mut results = crate::replay::replay_all(&ctx.root, &ctx.run_dir, &wtpool, Some(&profile));
-    results.retain(|r| every || ctx.wants(&r.check) || ctx.only.is_none());
+    // `--only <prefix>*` keeps every replay of that prefix.
+    let every = ctx.only.as_deref().and_then(|only| only.strip_suffix('*'));
+    let counts = |check: &str| ctx.counts(check);
+    let mut results =
+        crate::replay::replay_all(&ctx.root, &ctx.run_dir, &wtpool, Some(&profile), &counts);
+    results.retain(|r| {
+        every.is_some_and(|prefix| r.check.starts_with(prefix))
+            || ctx.wants(&r.check)
+            || ctx.only.is_none()
+    });
     results
 }
 

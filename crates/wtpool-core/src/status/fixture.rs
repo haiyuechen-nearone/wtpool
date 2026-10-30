@@ -85,6 +85,7 @@ pub fn fixed_sources<C>(
             cores: 1,
         },
         forge_repository: https_path,
+        named_session: None,
     }
 }
 

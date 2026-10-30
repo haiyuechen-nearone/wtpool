@@ -19,6 +19,10 @@ fn words_of(tokens: &[Token]) -> Vec<&Word> {
 #[case::backquotes("`a \\`b\\``", &["`a \\`b\\``"], &["a `b`"])]
 #[case::parameter("${A:-x y} z", &["${A:-x y}", "z"], &[])]
 #[case::unclosed("a $(b 'c", &["a", "$(b 'c)"], &["b 'c"])]
+#[case::ansi_c_quoted_left_open("$'a\\'", &["a'"], &[])]
+#[case::ansi_c_quoted_simple("$'a\\nb'", &["anb"], &[])]
+#[case::escaped_newline("a\\\nb", &["ab"], &[])]
+#[case::case_end_and_more("case x in a) y;;& z", &["case", "x", "in", "a", "y", "z"], &[])]
 fn tokenize__should_keep_substitutions_in_their_word(
     #[case] command: &str,
     #[case] words: &[&str],

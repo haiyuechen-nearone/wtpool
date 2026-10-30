@@ -115,3 +115,34 @@ test('machine_strip__should_show_each_save_state shown_without_answer', async ()
   // Then
   assert.deepEqual(looks(webview, parts), { button: 'Save', disabled: false, status: 'Saved.', failed: false }, 'a save the next document shows, with no answer, does not read Saved. (U11)');
 });
+
+/** Answers the page no jobSettings at all: each one is a shape the webview must leave alone. */
+const MALFORMED = [
+  ['not_a_record', 'jobSettings'],
+  ['no_type', { version: 1, ok: true }],
+  ['another_type', { type: 'output', version: 1, ok: true }],
+  ['another_version', { type: 'jobSettings', version: 2, ok: true }],
+  ['no_ok', { type: 'jobSettings', version: 1 }],
+  ['ok_is_text', { type: 'jobSettings', version: 1, ok: 'yes' }],
+  ['error_is_a_number', { type: 'jobSettings', version: 1, ok: false, error: 7 }],
+  ['another_scope', { type: 'jobSettings', version: 1, ok: true, scope: 'elsewhere' }],
+];
+
+for (const [name, message] of MALFORMED) {
+  test(`machine_strip__should_show_each_save_state malformed_answer_${name}`, async () => {
+    // Given: a save of 6 waits for its answer.
+    const parts = await saveSix();
+    const waiting = looks(webview, parts);
+    const live = announced(webview);
+
+    // When: the extension posts a jobSettings message of another shape.
+    webview.post(message);
+    const after = looks(webview, parts);
+
+    // Then
+    assert.deepEqual(waiting, { button: 'Saving…', disabled: true, status: '', failed: false }, 'setup: the save does not wait for its answer');
+    assert.deepEqual(after, waiting, `a jobSettings message ${name} ended the save (U11)`);
+    assert.equal(announced(webview), live, `a jobSettings message ${name} was announced`);
+    assert.deepEqual(webview.errors.map(String), [], `a jobSettings message ${name} raised an error`);
+  });
+}

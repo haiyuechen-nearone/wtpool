@@ -7,6 +7,7 @@ mod support;
 mod config;
 mod jobs;
 mod ls;
+mod opencode;
 mod refs;
 mod slots;
 mod startup;

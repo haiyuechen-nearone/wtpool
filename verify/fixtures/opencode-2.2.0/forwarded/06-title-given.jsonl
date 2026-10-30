@@ -1,0 +1,5 @@
+{"line":59,"t":1793301973597,"payload":{"v":1,"kind":"lookup","name":"session.get","directory":"/sandbox/repo/fg","data":{"id":"ses_e76df7664ffedgE7XnaFkg7IHa","title":"Given title probe"}}}
+{"line":60,"t":1793301973602,"payload":{"v":1,"kind":"event","name":"session.execution.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7664ffedgE7XnaFkg7IHa"}}}
+{"line":72,"t":1793301973631,"payload":{"v":1,"kind":"event","name":"session.step.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7664ffedgE7XnaFkg7IHa","model":{"id":"scripted","providerID":"stub"}}}}
+{"line":74,"t":1793301973631,"payload":{"v":1,"kind":"event","name":"session.text.delta","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7664ffedgE7XnaFkg7IHa"}}}
+{"line":79,"t":1793301973641,"payload":{"v":1,"kind":"event","name":"session.execution.succeeded","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76df7664ffedgE7XnaFkg7IHa"}}}

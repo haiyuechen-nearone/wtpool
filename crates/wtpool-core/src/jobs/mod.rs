@@ -64,6 +64,11 @@ impl JobPaths {
         let folder_of = |name: &str| var(name).map(PathBuf::from);
         let config = machine_config_path(folder_of("XDG_CONFIG_HOME").as_deref(), home.as_deref());
         let state = dirs::state_folder(folder_of("XDG_STATE_HOME").as_deref(), home.as_deref());
+        Self::from_folders(config, state)
+    }
+
+    /// The paths of the config file and the state folder, refused while either is missing.
+    fn from_folders(config: Option<PathBuf>, state: Option<PathBuf>) -> Result<Self, JobError> {
         match (config, state) {
             (Some(config), Some(state)) => Ok(Self {
                 config,
@@ -82,6 +87,34 @@ mod tests {
 
     fn absolute(name: &str) -> PathBuf {
         std::env::temp_dir().join(name)
+    }
+
+    #[test]
+    fn job_paths_from_folders__should_refuse_a_missing_config_or_state_folder() {
+        // Given
+        let config = std::env::temp_dir().join("config/wtpool/machine.toml");
+        let state = std::env::temp_dir().join("state");
+
+        // When
+        let both = JobPaths::from_folders(Some(config.clone()), Some(state.clone()));
+        let no_config = JobPaths::from_folders(None, Some(state.clone()));
+        let no_state = JobPaths::from_folders(Some(config.clone()), None);
+
+        // Then
+        assert_eq!(
+            both.ok(),
+            Some(JobPaths {
+                config,
+                folder: state.join("wtpool/jobs"),
+            })
+        );
+        assert!(matches!(no_config, Err(JobError::NoHome)));
+        assert!(matches!(no_state, Err(JobError::NoHome)));
+        assert!(
+            JobError::NoHome
+                .to_string()
+                .starts_with("no folder for the machine config")
+        );
     }
 
     #[test]

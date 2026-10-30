@@ -1,6 +1,8 @@
 // Imports only types from `vscode`, so plain Node can load this module.
 import type { Webview } from 'vscode';
 
+import { MARKS } from './shared/marks';
+
 /**
  * The page's first script, inline at the top of <head>. VS Code hands the messages it queued for
  * a loading page over at the page's `load` event or after 200 ms, and a message with no listener
@@ -48,6 +50,20 @@ const ROBOT = [
   '</svg>',
 ].join('');
 
+/**
+ * One template per mark, static markup the rows copy as they copy the robot. A mark is a filled
+ * path in the colour of the text around it, with a second path at 40% opacity where it has two
+ * tones.
+ */
+const MARK_TEMPLATES = MARKS.map(({ id, viewBox, path, dim }) => {
+  const second = dim ? `<path fill="currentColor" fill-opacity=".4" d="${dim}"/>` : '';
+  return (
+    `<template id="mark-${id}"><svg class="mark" viewBox="${viewBox}" width="14" height="14"` +
+    ` aria-hidden="true" focusable="false"><path fill="currentColor" d="${path}"/>${second}` +
+    '</svg></template>'
+  );
+}).join('\n');
+
 /** The page of the Worktrees tab. `webview.options.localResourceRoots[0]` must be vscode/media. */
 export function buildHtml(webview: Webview, nonce: string): string {
   const [media] = webview.options.localResourceRoots ?? [];
@@ -73,6 +89,7 @@ export function buildHtml(webview: Webview, nonce: string): string {
 </head>
 <body>
 <template id="robot">${ROBOT}</template>
+${MARK_TEMPLATES}
 <script nonce="${nonce}" src="${asset('webview.js')}"></script>
 </body>
 </html>

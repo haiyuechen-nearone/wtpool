@@ -46,12 +46,17 @@ fn property_maps<'a>(value: &'a Value, at: &str, found: &mut Vec<(String, &'a Va
     }
 }
 
+/// The oracle's phase 4 schema, with the optional actor properties of phase 5a.
 fn must_oracle_schema() -> Value {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../verify/schema/status.phase-4.schema.json"
     );
-    serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    let mut schema: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    for name in ["model", "launched_by"] {
+        schema["$defs"]["actor"]["properties"][name] = json!({ "type": "string", "minLength": 1 });
+    }
+    schema
 }
 
 #[test]
@@ -134,4 +139,19 @@ fn status_schema_text__should_be_the_pretty_schema_with_a_final_newline() {
         "{text}"
     );
     assert!(status_schema()["title"].is_string() && status_schema()["$id"].is_string());
+}
+
+#[test]
+fn definitions__should_merge_every_job_definition() {
+    // When
+    let definitions = definitions();
+    let jobs = jobs::definitions();
+
+    // Then
+    assert_eq!(jobs.len(), 4);
+    for (name, schema) in jobs {
+        assert_eq!(definitions[name], schema, "{name}");
+    }
+    let added = definitions.as_object().map_or(0, |map| map.len());
+    assert!(added > 4, "{added}");
 }

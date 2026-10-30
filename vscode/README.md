@@ -3,8 +3,8 @@
 ![The Worktrees tab in VS Code: one row per worktree of the pool, with its branch, git state and what each agent there does](https://raw.githubusercontent.com/haiyuechen-nearone/wtpool/main/docs/images/demo.gif)
 
 A VS Code editor tab that shows the worktrees of a [wtpool](https://github.com/haiyuechen-nearone/wtpool)
-pool. Per worktree it shows the branch, the git state, what each Claude Code agent there does, and
-whether the worktree needs you or is free.
+pool. Per worktree it shows the branch, the git state, what each Claude Code or OpenCode agent
+there does, with its model's mark, and whether the worktree needs you or is free.
 
 Screenshots and the meaning of each row, activity and action are in
 [docs/panel.md](https://github.com/haiyuechen-nearone/wtpool/blob/main/docs/panel.md).
@@ -16,9 +16,9 @@ Screenshots and the meaning of each row, activity and action are in
 - VS Code 1.140 or newer.
 - A git repository open in the window. A github.com remote (`origin` unless wtpool's `remote` setting
   names another) gives the `owner/repo` heading, and wtpool needs it and `gh` for PR numbers and URLs.
-- For agent activity: Claude Code 2.1.295 or newer, its hooks (see [Agent activity](#agent-activity)),
-  and `wtpool setup` run once in the pool. Without them the tab shows git state and builds only, and
-  says how to turn agents on.
+- For agent activity: Claude Code 2.1.295 or newer or OpenCode 2.2.0, their hooks or plugin (see
+  [Agent activity](#agent-activity)), and `wtpool setup` run once in the pool. Without them the
+  tab shows git state and builds only, and says how to turn agents on.
 
 Cursor and other editors built on VS Code may work if their VS Code version meets the `engines`
 range, 1.140 or newer. They are not tested.
@@ -51,8 +51,10 @@ user settings to the full path, such as the output of `command -v wtpool`.
 
 ## Agent activity
 
-The tab shows what each Claude Code agent does from the records of wtpool's hooks. Run
-`wtpool setup` once in the pool, then add the hooks to Claude Code in one of two ways.
+The tab shows what each agent does from the records of wtpool's hooks. Run `wtpool setup` once in
+the pool, then add the hooks for each harness you use.
+
+**Claude Code.** Add the hooks in one of two ways.
 
 The plugin: run these two lines in Claude Code.
 
@@ -68,6 +70,16 @@ never over them. Use one way, not both, or every event runs twice.
 Each hook runs `wtpool hook`, so `wtpool` must be on the `PATH` that Claude Code's hooks see. To
 check, run `wtpool hook install`: it says whether the hooks are present, and what is missing when
 they are not.
+
+**OpenCode.** Save the plugin that `wtpool hook install --harness opencode` prints as
+`~/.config/opencode/plugins/wtpool/index.ts` (in `$OPENCODE_CONFIG_DIR` when you set it), then run
+`opencode service restart`, which stops the sessions the service runs. To check, run
+`wtpool hook install --harness opencode > /dev/null`. The
+[wtpool README](https://github.com/haiyuechen-nearone/wtpool#opencode) has the steps.
+
+Each agent line shows its model maker's mark beside the state icon, with a badge for the harness
+unless the harness is the maker's own. A tooltip reads `<harness> · <model>`, and the detail strip
+adds `launched by` for an agent that another agent started.
 
 ## Use
 
@@ -93,8 +105,8 @@ reads `wtpool did not start: spawn wtpool ENOENT`, VS Code cannot find `wtpool`:
 [`spawn wtpool ENOENT`](#spawn-wtpool-enoent).
 
 Click a row, or press Enter on it, to open its detail strip: the exact path, upstream, git facts,
-why `wtpool bg` would not take it, and each agent's state, action and start time. It follows every
-update while it is open. When an agent runs a background command, such as a Claude Code Bash call
+why `wtpool bg` would not take it, and each agent's state, action, harness, model and start time.
+It follows every update while it is open. When an agent runs a background command, such as a Claude Code Bash call
 with `run_in_background`, the strip's Output section shows the last 15 lines of that command's
 output as it grows, for each running command and the one that ended last. **Follow** opens a VS
 Code terminal that streams the whole output from its last 40 lines on. The extension reads that

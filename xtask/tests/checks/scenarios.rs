@@ -6,11 +6,21 @@ use std::ffi::OsStr;
 
 use serde_json::Value;
 use xtask::pool;
-use xtask::scenario::{HOOK_CLOCK, JobStep, PROCESS_STARTED, ProcessStep, ScenarioFile, Step};
+use xtask::scenario::{
+    HOOK_CLOCK, HookStep, JobStep, PROCESS_STARTED, ProcessStep, ScenarioFile, Step,
+};
 
 use super::scenarios_jobs::{ScenarioJobs, job_differences};
 use crate::support::hook::{CLAUDE, Hooks, Proc, RunOptions};
 use crate::support::{must_repo, must_status_json, schema_errors};
+
+/// What a hook step sends, for a problem text: its fixture, else its event name.
+fn hook_name(hook: &HookStep) -> String {
+    match &hook.payload {
+        Some(payload) => payload["name"].as_str().unwrap_or("a payload").to_owned(),
+        None => hook.fixture.clone(),
+    }
+}
 
 fn must_load(name: &str) -> ScenarioFile {
     xtask::scenario::load(&must_repo(), name).unwrap_or_else(|e| panic!("setup: {e}"))
@@ -81,6 +91,7 @@ pub(super) fn must_run_scenario(name: &str) {
                 let mut options = RunOptions {
                     parent: Some(hook.process),
                     cwd: Some(xtask::hooks::step_folder(&hook.cwd, &hooks.pool)),
+                    args: hook.adapter_args(),
                     ..RunOptions::default()
                 };
                 if let Some(home) = &hook.home {
@@ -93,7 +104,7 @@ pub(super) fn must_run_scenario(name: &str) {
                 if run.code() != Some(0) || !run.output.stdout.is_empty() {
                     problems.push(format!(
                         "step {index}: wtpool hook for {} {}",
-                        hook.fixture,
+                        hook_name(hook),
                         run.describe()
                     ));
                 }
@@ -358,4 +369,34 @@ fn jobs_queue() {
 #[test]
 fn build_not_queued() {
     must_run_scenario("build_not_queued");
+}
+
+#[test]
+fn opencode_two_sessions_one_process() {
+    must_run_scenario("opencode_two_sessions_one_process");
+}
+
+#[test]
+fn opencode_older_idle_hidden() {
+    must_run_scenario("opencode_older_idle_hidden");
+}
+
+#[test]
+fn opencode_permission_replied() {
+    must_run_scenario("opencode_permission_replied");
+}
+
+#[test]
+fn opencode_long_answer() {
+    must_run_scenario("opencode_long_answer");
+}
+
+#[test]
+fn opencode_build_under_shared_process() {
+    must_run_scenario("opencode_build_under_shared_process");
+}
+
+#[test]
+fn coordinator_launches_opencode() {
+    must_run_scenario("coordinator_launches_opencode");
 }

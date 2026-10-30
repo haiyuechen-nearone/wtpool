@@ -1,23 +1,24 @@
 //! The actor a record belongs to, and the file stem that names it.
 
-use super::harness::Harness;
+use super::harness::HarnessName;
 use super::ids::ActorId;
 
-/// The longest head of a record stem: the longest harness prefix and the longest session id.
-const MAX_HEAD: usize = Harness::LONGEST_STEM_PREFIX + ActorId::MAX_LEN;
+/// The longest head of a record stem: the longest harness name, its dash and the longest session
+/// id.
+const MAX_HEAD: usize = HarnessName::MAX_LEN + 1 + ActorId::MAX_LEN;
 
 /// An actor of one harness: a session, or a subagent of one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorKey {
-    pub harness: Harness,
+    pub harness: HarnessName,
     pub session: ActorId,
     /// `None` for the session itself.
     pub agent: Option<ActorId>,
 }
 
 /// A record file stem, `<head>` for a session or `<head>.<agent>` for a subagent of it. The head
-/// is the session id after its harness's prefix. The grammar names no harness, so the records of
-/// every harness read alike.
+/// is `<harness>-<session>`, or the session id alone for [`HarnessName::LEGACY`]. The grammar names
+/// no harness, so the records of every harness read alike.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Stem<'a> {
     pub head: &'a str,
@@ -46,7 +47,11 @@ impl ActorKey {
 
     /// The head of every stem of the actor's session.
     fn head(&self) -> String {
-        format!("{}{}", self.harness.stem_prefix(), self.session)
+        if self.harness.is_legacy() {
+            self.session.to_string()
+        } else {
+            format!("{}-{}", self.harness, self.session)
+        }
     }
 }
 
@@ -78,9 +83,9 @@ mod tests {
 
     use super::*;
 
-    fn key(session: &str, agent: Option<&str>) -> ActorKey {
+    fn key(harness: HarnessName, session: &str, agent: Option<&str>) -> ActorKey {
         ActorKey {
-            harness: Harness::ClaudeCode,
+            harness,
             session: ActorId::try_from(session).unwrap(),
             agent: agent.map(|agent| ActorId::try_from(agent).unwrap()),
         }
@@ -89,8 +94,10 @@ mod tests {
     #[rstest]
     #[case::session("s-1", Some(("s-1", None)))]
     #[case::subagent("s-1.a-2", Some(("s-1", Some("a-2"))))]
-    #[case::longest_id(&"a".repeat(64), Some((&*"a".repeat(64), None)))]
-    #[case::too_long_id(&"a".repeat(65), None)]
+    #[case::head_past_an_id(&"a".repeat(65), Some((&*"a".repeat(65), None)))]
+    #[case::longest_head(&"a".repeat(89), Some((&*"a".repeat(89), None)))]
+    #[case::too_long_head(&"a".repeat(90), None)]
+    #[case::too_long_agent(&format!("s.{}", "a".repeat(65)), None)]
     #[case::three_ids("a.b.c", None)]
     #[case::empty_id("", None)]
     #[case::empty_agent_id("s.", None)]
@@ -108,32 +115,49 @@ mod tests {
         assert_eq!(found.map(|stem| (stem.head, stem.agent)), expected);
     }
 
-    #[test]
-    fn stem__should_name_the_actor_and_its_session() {
+    #[rstest]
+    #[case::legacy(HarnessName::LEGACY, "s1", "s1.a1")]
+    #[case::named(
+        HarnessName::new("other-harness"),
+        "other-harness-s1",
+        "other-harness-s1.a1"
+    )]
+    fn stem__should_name_the_actor_and_its_session(
+        #[case] harness: HarnessName,
+        #[case] session_stem: &str,
+        #[case] subagent_stem: &str,
+    ) {
         // Given
-        let subagent = key("s1", Some("a1"));
+        let subagent = key(harness.clone(), "s1", Some("a1"));
 
         // When
         let session = subagent.session_key();
 
         // Then
-        assert_eq!(session, key("s1", None));
+        assert_eq!(session, key(harness, "s1", None));
         assert_eq!(
             (subagent.stem(), session.stem()),
-            ("s1.a1".to_owned(), "s1".to_owned())
+            (subagent_stem.to_owned(), session_stem.to_owned())
         );
         let of = |stem: &str| Stem::parse(stem).unwrap().of_session(&subagent);
-        assert_eq!((of("s1"), of("s1.a9"), of("s10")), (true, true, false));
+        let read = [
+            session_stem,
+            &format!("{session_stem}.a9"),
+            &format!("{session_stem}0"),
+        ]
+        .map(of);
+        assert_eq!(read, [true, true, false]);
     }
 
     #[test]
-    fn parse__should_read_the_longest_stem_of_every_harness() {
+    fn parse__should_read_the_longest_stem_of_any_harness() {
         // Given
-        let longest = "a".repeat(ActorId::MAX_LEN);
-        let keys = Harness::ALL.map(|harness| ActorKey {
+        let longest = ActorId::try_from("a".repeat(ActorId::MAX_LEN)).unwrap();
+        let longest_name = HarnessName::try_from("h".repeat(HarnessName::MAX_LEN)).unwrap();
+        let keys = [HarnessName::LEGACY, longest_name].map(|harness| ActorKey {
             harness,
-            session: ActorId::try_from(longest.as_str()).unwrap(),
-            agent: Some(ActorId::try_from(longest.as_str()).unwrap()),
+            session: longest.clone(),
+            agent: Some(longest.clone()),
         });
 
         // When
@@ -143,6 +167,6 @@ mod tests {
         });
 
         // Then
-        assert!(parsed.iter().all(|read| *read), "{parsed:?}");
+        assert_eq!(parsed, [true, true]);
     }
 }

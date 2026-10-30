@@ -1,7 +1,7 @@
 # The layers that run each check that is not an int test, read by the harness. A part runs the
-# checks of its layers (verification.md, "The report"): quick runs static, render and host, ui
-# runs shot and e2e, bench runs bench, cc runs cc. A check a layer reports that is not listed here for that
-# layer is an error, and so is a listed check the layer reported no result for. Scenario checks
+# checks of its layers (verification.md, "The report"): quick runs static, js, render and host,
+# shot runs shot, ui runs e2e, bench runs bench, cc runs cc, oc runs oc. A check a layer reports that is
+# not listed here for that layer is an error, and so is a listed check the layer reported no result for. Scenario checks
 # take their layers from `layers` in verify/scenarios/<name>.json. In e2e a scenario check gets
 # its outcome from its case of flow__every_activity_shows, `flow__every_activity_shows <name>`,
 # which writes it to <run>/e2e/scenarios/<name>.json (xtask/src/layers/e2e.rs).
@@ -288,3 +288,50 @@ flow__jobs_old_wtpool = ["e2e"]
 flow__jobs_wtpool_missing = ["e2e"]
 flow__jobs_remote_window = ["e2e"]
 flow__several_agents_in_one_row = ["e2e"]
+
+# Phase 5 (opencode.md, "Verification"), OpenCode 2.2.0 and agents that start agents of another
+# harness.
+# js, in the quick part: Node's own test runner on vscode/test/opencode/, the plugin of
+# crates/wtpool-opencode/plugin/ with a test CONFIG line, a fake ctx and a fake Bun, fed the raw
+# recordings of verify/fixtures/opencode-2.2.0/.
+plugin__should_register_only_its_hooks = ["js"]
+plugin__should_import_nothing = ["js"]
+plugin__should_forward_each_event_once_per_process = ["js"]
+plugin__should_keep_only_the_listed_fields = ["js"]
+plugin__should_send_one_progress_per_session_per_10_s = ["js"]
+plugin__should_attach_the_root_and_the_call = ["js"]
+plugin__should_never_await_or_throw_on_the_record_path = ["js"]
+plugin__should_deny_only_on_a_deny_line = ["js"]
+plugin__should_set_wtpool_session_for_its_own_shell_calls = ["js"]
+plugin__should_forward_the_recorded_streams_as_frozen = ["js"]
+plugin__should_look_up_a_session_first_seen_without_its_title = ["js"]
+# static: each agent mark the extension ships names its source and licence (U18). The plugin's
+# ESLint, Prettier and `static:plugin_types` are `static:` checks of the layer.
+marks__should_name_their_licence = ["static"]
+# render, shot and e2e: the agent marks (U18, U13, U5) and the user flow of a coordinator that
+# launches an OpenCode agent.
+agent_mark__should_follow_model_and_harness = ["render"]
+agent_mark__should_meet_contrast_and_size = ["shot"]
+agent_mark__should_show_its_label_on_hover = ["shot"]
+flow__coordinator_launches_opencode = ["e2e"]
+# oc: the installed opencode with the release wtpool and the printed plugin in a sandbox
+# (crate::layers::oc), on a scripted local model and on one free model of OpenCode's own
+# provider. Without an installed opencode the report counts them by this run's
+# oc_replay:<session> alone.
+oc_read_edit_shell = ["oc"]
+oc_subagent = ["oc"]
+oc_permission = ["oc"]
+oc_permission_reject = ["oc"]
+oc_question = ["oc"]
+oc_interrupt = ["oc"]
+oc_long_answer = ["oc"]
+oc_deny = ["oc"]
+oc_two_sessions = ["oc"]
+oc_session_delete = ["oc"]
+oc_title = ["oc"]
+oc_run_title = ["oc"]
+oc_shell_env = ["oc"]
+oc_coordinator = ["oc"]
+oc_wtpool_missing = ["oc"]
+oc_real_model = ["oc"]
+contract__should_run_opencode_in_the_sandbox = ["oc"]

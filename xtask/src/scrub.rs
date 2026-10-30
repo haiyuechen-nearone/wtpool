@@ -8,6 +8,11 @@
 //! one hook payload per line, as the recorder hook read it. `config`, Claude Code's configuration
 //! folder in the run folder, is absent from recordings made before it moved there.
 //!
+//! The recordings of another harness, such as OpenCode's in `verify/fixtures/opencode-<version>/`,
+//! were scrubbed where they were recorded, and no raw copy is locked. The same check reads each of
+//! their files for what no scrubbed recording holds: a home folder but `/Users/me`, an email
+//! address, a key or a bearer token.
+//!
 //! The scrubbed copy drops the header. It writes `{pool}` for the pool folder, `/Users/verify`
 //! for the home and `/Users/verify/.claude` for the configuration folder, so a transcript path
 //! reads as with the default one. The folder names Claude Code makes from these paths get
@@ -21,9 +26,14 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
+use crate::hooks::{CLAUDE_CODE_RECORDINGS, OPENCODE_RECORDINGS};
 use crate::oracle::{LOCK, load_lock_text};
 use crate::repo::{sha256, walk};
 use crate::results::CheckResult;
+
+mod personal;
+
+use personal::personal_data;
 
 pub const NAME: &str = "fixtures__should_match_a_fresh_scrub";
 const LAYER: &str = "static";
@@ -266,8 +276,19 @@ pub fn problems(root: &Path, locked: &BTreeMap<String, String>, recordings: &Pat
     let skip = |_: &str| false;
     let fixtures = root.join(FIXTURES);
     for rel in walk(&fixtures, &fixtures, &skip) {
-        if rel.starts_with("claude-") && rel.ends_with(".jsonl") && !locked.contains_key(&rel) {
+        if rel.starts_with(CLAUDE_CODE_RECORDINGS)
+            && rel.ends_with(".jsonl")
+            && !locked.contains_key(&rel)
+        {
             found.push(format!("{FIXTURES}/{rel} comes from no locked recording"));
+        }
+        if rel.starts_with(OPENCODE_RECORDINGS) {
+            let text = fs::read_to_string(fixtures.join(&rel)).unwrap_or_default();
+            found.extend(
+                personal_data(&text)
+                    .into_iter()
+                    .map(|what| format!("{FIXTURES}/{rel} holds {what}")),
+            );
         }
     }
     found
@@ -458,6 +479,23 @@ mod tests {
         );
         assert_eq!(line["file"], "{tmp}/wtpool-1/f");
         assert_eq!(line["lookalike"], "/Users/verify/tmpfiles/claude-501/kept");
+    }
+
+    #[test]
+    fn problems__should_find_no_personal_data_in_the_opencode_recordings() {
+        // Given
+        let root = crate::repo::root();
+        let locked = BTreeMap::from([("claude-0/none.jsonl".to_owned(), "h".to_owned())]);
+
+        // When
+        let found = problems(&root, &locked, Path::new("/nonexistent"));
+
+        // Then
+        let foreign: Vec<&String> = found
+            .iter()
+            .filter(|p| p.contains(OPENCODE_RECORDINGS))
+            .collect();
+        assert!(foreign.is_empty(), "{foreign:?}");
     }
 
     #[test]

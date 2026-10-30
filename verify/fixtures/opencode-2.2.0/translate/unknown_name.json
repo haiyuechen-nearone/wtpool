@@ -1,0 +1,17 @@
+{
+  "before": null,
+  "payload": {
+    "v": 1,
+    "kind": "event",
+    "name": "session.status",
+    "directory": "{pool}/fg",
+    "data": {
+      "sessionID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq",
+      "status": {
+        "type": "busy"
+      }
+    }
+  },
+  "after": null,
+  "log": 1
+}

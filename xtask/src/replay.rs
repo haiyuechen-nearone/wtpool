@@ -1,8 +1,10 @@
-//! `cc_replay:<name>`: every `int` run replays the scrubbed recordings of the live contract run
-//! through the `verify` build of `wtpool hook`, from a fake `claude` at a fake time, and judges
-//! each session's wtpool asserts again. The live result keeps the Claude Code asserts. The replay
-//! gives the wtpool asserts for the build under test, so a session recorded once counts for every
-//! later build.
+//! Every `int` run replays the scrubbed recordings of each harness through the `verify` build of
+//! `wtpool hook`, from a fake harness process at a fake time, and judges each session's wtpool
+//! asserts again: `cc_replay:<name>` for Claude Code's live contract run, `oc_replay:<session>` for
+//! the streams OpenCode's plugin forwards. The live result keeps the harness's own asserts. The
+//! replay gives the wtpool asserts for the build under test, so a session recorded once counts for
+//! every later build. `oc_translate:<case>` sends the single payloads of OpenCode's
+//! translation cases.
 
 use std::fs;
 use std::io::Write;
@@ -16,15 +18,29 @@ use crate::pool::{self, Pool};
 use crate::results::CheckResult;
 
 mod judge;
+mod oc_judge;
+mod opencode;
+mod translate;
 
 pub const PREFIX: &str = "cc_replay:";
+pub const OC_PREFIX: &str = "oc_replay:";
+pub use translate::PREFIX as TRANSLATE_PREFIX;
 /// The start of a replay's failure when `wtpool hook` printed. A session fails on that before its
 /// asserts.
 pub const PRINTED: &str = "wtpool hook printed";
 const LAYER: &str = "int";
 const CLAUDE: u32 = 7001;
-const CLAUDE_STARTED: &str = "2026-10-20T11:00:00Z";
+const HARNESS_STARTED: &str = "2026-10-20T11:00:00Z";
 const START_SECONDS: i64 = 0;
+/// The time after a session's last event at which its late status is taken.
+const LATE_SECONDS: i64 = 125;
+
+/// True when `check`, a check name or a `--only` value, names a replay or a translation case.
+pub fn is_replay(check: &str) -> bool {
+    [PREFIX, OC_PREFIX, TRANSLATE_PREFIX]
+        .iter()
+        .any(|prefix| check.starts_with(prefix))
+}
 
 /// Adds the hook's own line to a copy of the fake process table, then `exec`s `wtpool`, so the hook
 /// keeps the pid its line names. A POSIX shell, on Unix only: only `exec` keeps a pid, and Windows
@@ -39,12 +55,54 @@ WTPOOL_VERIFY_PROCS=\"$table\" exec \"$wtpool\" \"$@\"
 const NO_EXEC: &str = "the replay names wtpool hook by the pid its shell wrapper execs it under, and \
      this system has no exec";
 
+/// What a replay needs to know of the harness whose sessions it replays.
+struct Harness {
+    prefix: &'static str,
+    /// The name and pid of the fake harness process, the parent of every hook.
+    process: &'static str,
+    pid: u32,
+    /// The arguments `wtpool` runs the hook with.
+    args: &'static [&'static str],
+    event: fn(&Value) -> &str,
+    cwd: fn(&Value) -> Option<&str>,
+    /// The event before which a session's late status is taken. Without one it is taken after the
+    /// session's last event.
+    late_before: Option<&'static str>,
+}
+
+const CLAUDE_CODE: Harness = Harness {
+    prefix: PREFIX,
+    process: "claude",
+    pid: CLAUDE,
+    args: &["hook"],
+    event,
+    cwd: claude_cwd,
+    late_before: Some("SessionEnd"),
+};
+
+const OPENCODE: Harness = Harness {
+    prefix: OC_PREFIX,
+    process: "opencode",
+    pid: opencode::SERVER,
+    args: &["hook", "--harness", "opencode"],
+    event: opencode::name,
+    cwd: opencode::directory,
+    late_before: None,
+};
+
 /// One state of the replay: the document of `wtpool status --json` and the records after
 /// `payload`.
 struct ReplayState {
     payload: Value,
     status: Value,
     records: Vec<Value>,
+}
+
+/// One payload of a recorded session, placeholders unresolved, and the clock it runs at in
+/// seconds after the start.
+struct Step {
+    payload: Value,
+    at: i64,
 }
 
 /// `2026-10-20T12:00:00Z` plus `seconds`.
@@ -70,10 +128,16 @@ struct ReplaySandbox {
     runs: usize,
     /// Where the instrumented `wtpool` writes its coverage.
     profile: Option<PathBuf>,
+    harness: &'static Harness,
 }
 
 impl ReplaySandbox {
-    fn new(dir: &Path, wtpool: &Path, profile: Option<&Path>) -> Result<Self, String> {
+    fn new(
+        dir: &Path,
+        wtpool: &Path,
+        profile: Option<&Path>,
+        harness: &'static Harness,
+    ) -> Result<Self, String> {
         let _ = fs::remove_dir_all(dir);
         for sub in ["home", "tmp", "state"] {
             fs::create_dir_all(dir.join(sub)).map_err(|e| e.to_string())?;
@@ -83,7 +147,7 @@ impl ReplaySandbox {
         fs::write(&wrapper, WRAPPER).map_err(|e| e.to_string())?;
         let table = dir.join("procs.jsonl");
         let line = serde_json::json!({
-            "pid": CLAUDE, "ppid": 1, "started": CLAUDE_STARTED, "name": "claude",
+            "pid": harness.pid, "ppid": 1, "started": HARNESS_STARTED, "name": harness.process,
             "cwd": pool.fg.to_string_lossy(),
         });
         fs::write(&table, format!("{line}\n")).map_err(|e| e.to_string())?;
@@ -98,6 +162,7 @@ impl ReplaySandbox {
             wrapper,
             runs: 0,
             profile: profile.map(Path::to_path_buf),
+            harness,
         })
     }
 
@@ -132,8 +197,7 @@ impl ReplaySandbox {
         self.runs += 1;
         let copy = self.dir.join(format!("procs-{}.jsonl", self.runs));
         fs::copy(&self.table, &copy).map_err(|e| e.to_string())?;
-        let cwd = payload["cwd"]
-            .as_str()
+        let cwd = (self.harness.cwd)(payload)
             .map(PathBuf::from)
             .filter(|p| p.is_dir())
             .unwrap_or_else(|| self.pool.fg.clone());
@@ -141,9 +205,9 @@ impl ReplaySandbox {
         command
             .arg(&self.wrapper)
             .arg(&copy)
-            .arg(CLAUDE.to_string())
+            .arg(self.harness.pid.to_string())
             .arg(&self.wtpool)
-            .arg("hook")
+            .args(self.harness.args)
             .env("WTPOOL_VERIFY_PROCS", &self.table)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -197,12 +261,24 @@ impl ReplaySandbox {
     }
 }
 
+/// The value at `path` below `value`, null when a key is missing.
+fn field<'a>(value: &'a Value, path: &[&str]) -> &'a Value {
+    static NULL: Value = Value::Null;
+    path.iter()
+        .try_fold(value, |value, key| value.get(*key))
+        .unwrap_or(&NULL)
+}
+
 fn event(payload: &Value) -> &str {
     payload["hook_event_name"].as_str().unwrap_or_default()
 }
 
-/// Every scrubbed recording session: (name, payloads with `{pool}` unresolved).
-fn sessions(root: &Path) -> Vec<(String, Vec<Value>)> {
+fn claude_cwd(payload: &Value) -> Option<&str> {
+    payload["cwd"].as_str()
+}
+
+/// Every scrubbed recording session of Claude Code: (name, steps), one second apart.
+fn sessions(root: &Path) -> Vec<(String, Vec<Step>)> {
     let mut found = Vec::new();
     let Ok(dirs) = fs::read_dir(root.join("verify/fixtures")) else {
         return found;
@@ -233,12 +309,14 @@ fn sessions(root: &Path) -> Vec<(String, Vec<Value>)> {
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let payloads: Vec<Value> = fs::read_to_string(&file)
+        let steps: Vec<Step> = fs::read_to_string(&file)
             .unwrap_or_default()
             .lines()
             .filter_map(|line| serde_json::from_str(line).ok())
+            .zip(1..)
+            .map(|(payload, at)| Step { payload, at })
             .collect();
-        found.push((name, payloads));
+        found.push((name, steps));
     }
     found
 }
@@ -248,62 +326,75 @@ fn replay(
     dir: &Path,
     wtpool: &Path,
     profile: Option<&Path>,
+    harness: &'static Harness,
     name: &str,
-    payloads: &[Value],
+    steps: &[Step],
 ) -> Result<(Result<(), String>, Vec<Value>), String> {
-    let mut sandbox = ReplaySandbox::new(dir, wtpool, profile)?;
+    let mut sandbox = ReplaySandbox::new(dir, wtpool, profile, harness)?;
     let mut states = Vec::new();
     let mut late = Value::Null;
-    let mut seconds = START_SECONDS;
+    let mut last = START_SECONDS;
     let mut printed = Vec::new();
-    for payload in payloads {
-        let mut payload = payload.clone();
+    for step in steps {
+        let mut payload = step.payload.clone();
         pool::resolve_placeholders(&mut payload, &sandbox.pool);
-        if event(&payload) == "SessionEnd" && late.is_null() {
-            sandbox.set_clock(seconds + 125)?;
+        let event = (harness.event)(&payload);
+        if harness.late_before == Some(event) && late.is_null() {
+            sandbox.set_clock(last + LATE_SECONDS)?;
             late = sandbox.status();
-            sandbox.set_clock(seconds)?;
+            sandbox.set_clock(last)?;
         }
-        seconds += 1;
-        sandbox.set_clock(seconds)?;
+        last = step.at;
+        sandbox.set_clock(last)?;
         let stdout = sandbox.hook(&payload)?;
         if !stdout.is_empty() {
-            printed.push(format!("{}: {stdout:?}", event(&payload)));
+            printed.push(format!("{}: {stdout:?}", (harness.event)(&payload)));
         }
         states.push(sandbox.state(&payload));
     }
+    if harness.late_before.is_none() {
+        sandbox.set_clock(last + LATE_SECONDS)?;
+        late = sandbox.status();
+    }
     let records = sandbox.records();
-    let verdict = if printed.is_empty() {
+    let verdict = if !printed.is_empty() {
+        Err(format!("{PRINTED}: {}", printed.join("; ")))
+    } else if harness.prefix == PREFIX {
         judge::judge(name, &states, &late)
     } else {
-        Err(format!("{PRINTED}: {}", printed.join("; ")))
+        oc_judge::judge(name, &states, &late)
     };
     Ok((verdict, records))
 }
 
-/// `cc_replay:<name>` for every recorded session, and `cc_replay:cc_records_claude_pid`.
-pub fn replay_all(
-    root: &Path,
+/// The sessions of `harness` whose check `counts`, each replayed, with the records they left.
+fn replay_sessions(
     run_dir: &Path,
     wtpool: &Path,
     profile: Option<&Path>,
-) -> Vec<CheckResult> {
-    if !cfg!(unix) {
-        return sessions(root)
-            .into_iter()
-            .map(|(name, _)| CheckResult::error(&format!("{PREFIX}{name}"), LAYER, NO_EXEC))
-            .collect();
-    }
+    harness: &'static Harness,
+    sessions: Vec<(String, Vec<Step>)>,
+    counts: &dyn Fn(&str) -> bool,
+) -> (Vec<CheckResult>, Vec<Value>) {
     let mut results = Vec::new();
     let mut every_record = Vec::new();
-    for (name, payloads) in sessions(root) {
-        let check = format!("{PREFIX}{name}");
+    for (name, steps) in sessions {
+        let check = format!("{}{name}", harness.prefix);
+        if !counts(&check) {
+            continue;
+        }
+        let folder = if harness.prefix == PREFIX {
+            name.clone()
+        } else {
+            format!("oc-{name}")
+        };
         match replay(
-            &run_dir.join("replay").join(&name),
+            &run_dir.join("replay").join(folder),
             wtpool,
             profile,
+            harness,
             &name,
-            &payloads,
+            &steps,
         ) {
             Err(error) => results.push(CheckResult::error(&check, LAYER, error)),
             Ok((Ok(()), records)) => {
@@ -316,33 +407,129 @@ pub fn replay_all(
             }
         }
     }
-    if !results.is_empty() {
-        let check = format!("{PREFIX}cc_records_claude_pid");
-        let wrong = every_record
-            .iter()
-            .filter(|r| {
-                r.get("process")
-                    .and_then(|p| p.get("pid"))
-                    .and_then(Value::as_u64)
-                    != Some(u64::from(CLAUDE))
-            })
-            .count();
-        results.push(if every_record.is_empty() {
-            CheckResult::assertion(
-                &check,
-                LAYER,
-                "wtpool wrote no record in any replayed session",
-            )
-        } else if wrong > 0 {
-            CheckResult::assertion(
-                &check,
-                LAYER,
-                format!("{wrong} records without claude's pid {CLAUDE}"),
-            )
-        } else {
-            CheckResult::pass(&check, LAYER, "")
-        });
+    (results, every_record)
+}
+
+/// `cc_replay:<name>` for every recorded session and `cc_replay:cc_records_claude_pid`, then
+/// `oc_replay:<session>` and `oc_translate:<case>`, each that `counts`.
+pub fn replay_all(
+    root: &Path,
+    run_dir: &Path,
+    wtpool: &Path,
+    profile: Option<&Path>,
+    counts: &dyn Fn(&str) -> bool,
+) -> Vec<CheckResult> {
+    if !cfg!(unix) {
+        let claude = sessions(root)
+            .into_iter()
+            .map(|(name, _)| format!("{PREFIX}{name}"));
+        let opencode = opencode::sessions(root)
+            .into_iter()
+            .map(|(name, _)| format!("{OC_PREFIX}{name}"));
+        let cases = translate::case_names(root)
+            .into_iter()
+            .map(|name| format!("{TRANSLATE_PREFIX}{name}"));
+        return claude
+            .chain(opencode)
+            .chain(cases)
+            .filter(|check| counts(check))
+            .map(|check| CheckResult::error(&check, LAYER, NO_EXEC))
+            .collect();
     }
+    let (mut results, every_record) = replay_sessions(
+        run_dir,
+        wtpool,
+        profile,
+        &CLAUDE_CODE,
+        sessions(root),
+        counts,
+    );
+    if !results.is_empty() {
+        results.push(claude_pid(&every_record));
+    }
+    let (opencode, _) = replay_sessions(
+        run_dir,
+        wtpool,
+        profile,
+        &OPENCODE,
+        opencode::sessions(root),
+        counts,
+    );
+    results.extend(opencode);
+    results.extend(translate::translate_all(
+        root,
+        &run_dir.join("replay").join("oc-translate"),
+        wtpool,
+        profile,
+        counts,
+    ));
     let _ = fs::remove_dir_all(run_dir.join("replay"));
     results
+}
+
+/// `cc_replay:cc_records_claude_pid`: every record of the Claude Code replays names `claude`.
+fn claude_pid(every_record: &[Value]) -> CheckResult {
+    let check = format!("{PREFIX}cc_records_claude_pid");
+    let wrong = every_record
+        .iter()
+        .filter(|r| {
+            r.get("process")
+                .and_then(|p| p.get("pid"))
+                .and_then(Value::as_u64)
+                != Some(u64::from(CLAUDE))
+        })
+        .count();
+    if every_record.is_empty() {
+        CheckResult::assertion(
+            &check,
+            LAYER,
+            "wtpool wrote no record in any replayed session",
+        )
+    } else if wrong > 0 {
+        CheckResult::assertion(
+            &check,
+            LAYER,
+            format!("{wrong} records without claude's pid {CLAUDE}"),
+        )
+    } else {
+        CheckResult::pass(&check, LAYER, "")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case::claude_code("cc_replay:cc_interrupt", true)]
+    #[case::every_claude_code_session("cc_replay:*", true)]
+    #[case::opencode("oc_replay:subagent", true)]
+    #[case::translation("oc_translate:session_created", true)]
+    #[case::live_session("cc_interrupt", false)]
+    #[case::int_check("hook__should_run_no_git", false)]
+    fn is_replay__should_name_the_replay_prefixes(#[case] check: &str, #[case] expected: bool) {
+        // When
+        let found = is_replay(check);
+
+        // Then
+        assert_eq!(found, expected);
+    }
+
+    #[test]
+    fn sessions__should_step_claude_code_one_second_apart() {
+        // Given
+        let root = crate::repo::root();
+
+        // When
+        let found = sessions(&root);
+
+        // Then
+        assert!(!found.is_empty(), "no Claude Code recordings");
+        for (name, steps) in &found {
+            let at: Vec<i64> = steps.iter().map(|s| s.at).collect();
+            let expected: Vec<i64> = (1..).take(steps.len()).collect();
+            assert_eq!(at, expected, "{name}");
+        }
+    }
 }

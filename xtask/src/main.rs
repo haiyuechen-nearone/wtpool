@@ -9,7 +9,7 @@ use xtask::results::Outcome;
 use xtask::{clone, repo};
 
 const USAGE: &str = "usage:
-  cargo xtask verify --phase N --part quick|int|ui|bench|cc [--only CHECK] [--run NAME] [--contract [--record]] [--fresh]
+  cargo xtask verify --phase N --part quick|int|shot|ui|bench|cc|oc [--only CHECK] [--run NAME] [--contract [--record]] [--fresh]
   cargo xtask verify --phase N --part PART,PART... [--run NAME] [--contract [--record]] [--fresh]
   cargo xtask verify --phase N --report [--run NAME]
   cargo xtask bench --phase N [--only CHECK] [--run NAME]

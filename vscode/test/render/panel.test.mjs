@@ -250,6 +250,43 @@ test('header__should_show_live_updated_and_paused', async () => {
   assert.ok(pausedLaterWanted.includes(pausedLater), `N does not count down to retry_at, 5 s: ${pausedLater}`);
 });
 
+test('header__should_show_live_updated_and_paused paused_error', async () => {
+  // Given: a paused view after a start of wtpool that failed, with wtpool's own last line on stderr.
+  const status = mustValidate(document([worktree('fg'), worktree('wt1')]));
+  const failure = 'wtpool: the foreground folder is gone: /Users/verify/pool/fg';
+  webview = await mount();
+  const error = () => webview.document.querySelector('.wtpool-error');
+  const shownError = () => (isShown(webview.window, error()) ? text(error()) : null);
+
+  // When: the paused view names the failure, then a later live view does not.
+  webview.post({ ...view(status, { connection: 'paused', lastLine: ago(4), retryAt: ago(-6) }), error: failure });
+  const paused = shownError();
+  webview.post(view(status, { connection: 'live', lastLine: ago(1) }));
+  const live = shownError();
+
+  // Then
+  assert.equal(paused, failure, 'a paused view after a failed start does not show wtpool\'s own line');
+  assert.equal(live, null, 'the error of a failed start stays under a live header');
+});
+
+test('header__should_show_live_updated_and_paused paused_error_ignored', async () => {
+  // Given: views that carry an error the header must not show.
+  const status = mustValidate(document([worktree('fg'), worktree('wt1')]));
+  webview = await mount();
+  const error = () => webview.document.querySelector('.wtpool-error');
+  const shownError = () => (isShown(webview.window, error()) ? text(error()) : null);
+
+  // When
+  webview.post({ ...view(status, { connection: 'live', lastLine: ago(1) }), error: 'wtpool: a live line' });
+  const live = shownError();
+  webview.post({ ...view(null, { connection: 'paused', lastLine: ago(1) }), error: 'wtpool: no folder', no_folder: true });
+  const noFolder = shownError();
+
+  // Then
+  assert.equal(live, null, 'a live view with an error shows it');
+  assert.equal(noFolder, null, 'the error shows with no folder open');
+});
+
 test('header__should_show_paused_before_the_first_document', async () => {
   // Given
   webview = await mount();

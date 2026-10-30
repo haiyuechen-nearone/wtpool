@@ -182,6 +182,8 @@
         "error": { "description": "The API error of the last turn, else null.", "type": ["string", "null"] },
         "since": { "description": "When the actor's record began.", "$ref": "#/$defs/time" },
         "updated": { "description": "The actor's last event.", "$ref": "#/$defs/time" },
+        "model": { "description": "The newest model the actor's record names, as the harness names it; absent when none is known (S11, H32).", "type": "string", "minLength": 1 },
+        "launched_by": { "description": "The key of the main session that started this session, absent when none did (S17).", "type": "string", "minLength": 1 },
         "outputs": {
           "description": "The actor's running background tasks, newest first, then the one that ended last; absent when it has none (S13).",
           "type": "array",

@@ -18,7 +18,7 @@ export const PLACEHOLDERS = {
 /** The local wall time the recording starts at, in the time zone VS Code runs in. */
 const START = { date: '2026-03-10', time: '09:41:00' };
 
-export const LENGTH_SECONDS = 25;
+export const LENGTH_SECONDS = 32;
 
 /**
  * The lines the background `cargo test` of slot 1 prints, one every {@link LOG_GAP} seconds from
@@ -91,8 +91,8 @@ const CLEAN_GIT = {
  * Returns the story for `features` in `timeZone`, with slot 1's test log at `logPath`, as
  * `{first, steps, pathOf}`. `first` is the document the fake prints at start. A step at `at`
  * seconds does one of these: `emit` a document, `log` a line, move the pointer `to` a target
- * (`row:<name>`, `machine`, `action:<name>:<action>`, `dialog:<button>` or `rest`) over `ms` and maybe
- * `click`, or `waitFor` the fake's start with that argv before the next step.
+ * (`row:<name>`, `mark:<name>`, `machine`, `action:<name>:<action>`, `dialog:<button>` or `rest`) over `ms` and maybe
+ * `click` or rest as a ring (`focus`), or `waitFor` the fake's start with that argv before the next step.
  *
  * The documents list `outputs` whatever `features.outputs` says: an extension without that
  * feature ignores the property.
@@ -102,6 +102,10 @@ export function story({ features, timeZone, logPath }) {
   const repo = PLACEHOLDERS.repository.split('/').at(-1);
   const slot = (n) => `${repo}-wt${n}`;
   const pathOf = (name) => `${PLACEHOLDERS.parent}/${name}`;
+  // The models of the agents, which the marks and their labels show.
+  const modelOf = (model) => (features.marks ? { model } : {});
+  const worker = modelOf('claude-sonnet-5-5');
+  const COORDINATOR = 'f7b2c6a0-split';
 
   const session = (key, title, firstEventAt, fields) => ({
     key,
@@ -168,7 +172,8 @@ export function story({ features, timeZone, logPath }) {
     }),
   );
   rows.set(slot(1), worktree(slot(1), { last_change: at(-75 * 60) }));
-  const oauth = (fields) => session('5c1d8e20-oauth', 'Add OAuth callback route', -14 * 60, fields);
+  const oauth = (fields) =>
+    session('5c1d8e20-oauth', 'Add OAuth callback route', -14 * 60, { ...worker, ...fields });
   rows.set(
     slot(2),
     worktree(slot(2), {
@@ -180,13 +185,15 @@ export function story({ features, timeZone, logPath }) {
       last_change: at(-400),
     }),
   );
-  const deps = (fields) => session('9e4b7a31-deps', 'Bump dependencies', -29 * 60, fields);
+  const deps = (fields) =>
+    session('9e4b7a31-deps', 'Bump dependencies', -29 * 60, { ...worker, ...fields });
   // A second agent in slot 3 has run `cargo test` in the background for a while: its run time
   // is 3 m 12 s at CARGO_READ seconds, when the machine strip is open (the tab shows `3 m`).
-  const CARGO_READ = 19;
+  const CARGO_READ = 28;
   const cargoTest = backgroundTask('c5m1x7', 'cargo test', CARGO_READ - (3 * 60 + 12));
   const retry = () =>
     session('d2a6f815-retry', 'Add retry', -9 * 60, {
+      ...worker,
       state: features.background ? 'working' : 'idle',
       action: features.background ? { tool: 'background:', target: 'cargo test' } : null,
       since: at(-190),
@@ -288,6 +295,7 @@ export function story({ features, timeZone, logPath }) {
         builds: running ? [{ name: 'cargo', pid: 48213 }] : [],
         actors: [
           session('a3f09c4e-login', 'Fix flaky login test', 1, {
+            ...worker,
             state: 'working',
             action,
             since: at(1.5),
@@ -352,6 +360,7 @@ export function story({ features, timeZone, logPath }) {
       last_event: at(7.8),
     }),
   );
+  change(12, () => set(repo, { activity: 'foreground', builds: [], last_event: at(12) }));
   login(9.4, { tool: 'Edit', target: 'src/auth/session.rs' }, 2, true);
   // Slot 1's agent asks for a place to run `cargo build`: the machine button reads `1 queued`.
   change(9.4, () => {
@@ -413,15 +422,73 @@ export function story({ features, timeZone, logPath }) {
   );
   steps.push({ at: 16.1, to: 'rest', ms: 900 });
 
-  // 8. The user opens the machine strip from the heading's machine button: the limit and the
-  // policy on the left, the running and the queued job on the right. It closes again.
-  if (features.jobs) {
-    steps.push({ at: 17.4, to: 'machine', ms: 700, click: true });
-    steps.push({ at: 22.4, to: 'machine', ms: 200, click: true });
-    steps.push({ at: 23.2, to: 'rest', ms: 900 });
+  // 8. The coordinator in the foreground, a Claude Code session, reuses the freed slot: it parks a
+  // branch there and starts an OpenCode agent with a DeepSeek model, which names it as its
+  // launcher. The user rests the pointer on the agent's mark for its label, then opens the row's
+  // detail strip, whose last line says `launched by`.
+  if (features.marks) {
+    const coordinator = (seconds, action) =>
+      change(seconds, () =>
+        set(repo, {
+          activity: 'working',
+          actors: [
+            session(COORDINATOR, 'Split the auth work', 16.2, {
+              ...modelOf('claude-opus-5-5'),
+              state: 'working',
+              action,
+              since: at(16.2),
+              updated: at(seconds),
+            }),
+          ],
+          last_event: at(seconds),
+        }),
+      );
+    coordinator(16.2, { tool: 'Read', target: 'tests/login.rs' });
+    coordinator(17.2, { tool: 'Bash', target: 'wtpool' });
+    change(17.9, () =>
+      set(slot(4), {
+        ...onBranch('docs/oauth', { upstream: null }),
+        git: { ...CLEAN_GIT, ahead: null, behind: null },
+        activity: 'unused',
+        last_change: at(17.9),
+      }),
+    );
+    coordinator(18.3, { tool: 'Bash', target: 'opencode' });
+    const docs = (seconds, action, dirty) =>
+      change(seconds, () =>
+        set(slot(4), {
+          git: { ...CLEAN_GIT, ahead: null, behind: null, dirty },
+          activity: 'working',
+          actors: [
+            session('opencode-ses-b41c9d7e2f0aXq5LrT8mYvN3', 'Write the OAuth docs', 18.3, {
+              harness: 'opencode',
+              ...modelOf('deepseek/deepseek-v4.1-flash'),
+              ...(features.marks ? { launched_by: COORDINATOR } : {}),
+              state: 'working',
+              action,
+              since: at(18.3),
+              updated: at(seconds),
+            }),
+          ],
+          last_event: at(seconds),
+        }),
+      );
+    docs(18.3, null, 0);
+    docs(19.4, { tool: 'edit', target: 'docs/oauth.md' }, 1);
+    steps.push({ at: 18.9, to: `mark:${slot(4)}`, ms: 700, focus: true });
+    steps.push({ at: 21.8, to: `row:${slot(4)}`, ms: 500, click: true });
+    steps.push({ at: 25.4, to: `row:${slot(4)}`, ms: 150, click: true });
   }
 
-  // 9. A pause until LENGTH_SECONDS, then the GIF loops.
+  // 9. The user opens the machine strip from the heading's machine button: the limit and the
+  // policy on the left, the running and the queued job on the right. It closes again.
+  if (features.jobs) {
+    steps.push({ at: 26.4, to: 'machine', ms: 700, click: true });
+    steps.push({ at: 30.4, to: 'machine', ms: 200, click: true });
+    steps.push({ at: 31.1, to: 'rest', ms: 700 });
+  }
+
+  // 10. A pause until LENGTH_SECONDS, then the GIF loops.
   changes.sort((a, b) => a.seconds - b.seconds);
   for (const { seconds, edit } of changes) {
     edit();
@@ -440,7 +507,9 @@ export const KEYFRAMES = [
   { at: 11.6, name: 'output-and-building' },
   { at: 13.4, name: 'background-and-hover' },
   { at: 15.3, name: 'confirm-free' },
-  { at: 17.6, name: 'slot-freed' },
-  { at: 19.6, name: 'machine-strip' },
-  { at: 24.4, name: 'strip-closed' },
+  { at: 17.6, name: 'coordinator-parks-branch' },
+  { at: 20.8, name: 'agent-mark-label' },
+  { at: 24.0, name: 'launched-by-strip' },
+  { at: 28.0, name: 'machine-strip' },
+  { at: 31.8, name: 'strip-closed' },
 ];

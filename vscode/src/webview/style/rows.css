@@ -6,10 +6,14 @@
 }
 
 .row:hover {
+  --row-background: var(--vscode-list-hoverBackground);
+
   background-color: var(--vscode-list-hoverBackground);
 }
 
 .row[aria-selected="true"] {
+  --row-background: var(--vscode-list-activeSelectionBackground);
+
   background-color: var(--vscode-list-activeSelectionBackground);
   color: var(--vscode-list-activeSelectionForeground);
   outline: 1px dotted var(--vscode-contrastActiveBorder, transparent);

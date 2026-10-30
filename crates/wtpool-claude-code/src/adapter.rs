@@ -2,8 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
-use wtpool_core::activity::{Harness, TaskId};
-use wtpool_core::hook::{Adapter, HookInput, Printed, TranscriptTitles, WaitingTools};
+use wtpool_core::activity::{HarnessName, TaskId};
+use wtpool_core::hook::{Adapter, HookInput, Printed, Rejection, TranscriptTitles, WaitingTools};
 use wtpool_core::platform::dirs;
 use wtpool_core::policy::{Refusal, ShellCall};
 
@@ -34,10 +34,10 @@ impl ClaudeCode {
 }
 
 impl Adapter for ClaudeCode {
-    const HARNESS: Harness = Harness::ClaudeCode;
+    const HARNESS: HarnessName = HarnessName::new("claude-code");
     const WAITING_TOOLS: WaitingTools = tools::WAITING;
 
-    fn parse(&self, input: &[u8]) -> Option<HookInput> {
+    fn parse(&self, input: &[u8]) -> Result<HookInput, Rejection> {
         events::parse(input)
     }
 
@@ -69,6 +69,12 @@ impl Adapter for ClaudeCode {
 
     fn refusal(&self, refusal: &Refusal) -> Option<String> {
         Some(policy::refusal(refusal))
+    }
+
+    /// The note while Claude Code's user settings have it check no shell call. Claude Code runs
+    /// the hooks of whichever wtpool its settings name, so `binary` changes nothing.
+    fn require_note(&self, _binary: &str) -> Option<String> {
+        install::require_gap(self.config_dir.as_deref(), self.home.as_deref())
     }
 }
 

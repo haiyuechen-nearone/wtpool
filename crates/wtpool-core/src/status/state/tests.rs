@@ -1,4 +1,5 @@
 use super::*;
+use crate::jobs::JobPaths;
 use crate::names::RemoteName;
 use crate::processes::RunningProcess;
 use crate::processes::StartTime;
@@ -186,6 +187,76 @@ fn document__should_show_what_the_last_refresh_read() {
     let later = Some(Timestamp::from_system_time(later));
     assert!(before.0 == Agents::On && before.1 < later, "{before:?}");
     assert_eq!(read(&state), (Agents::Off, later));
+}
+
+#[test]
+fn refresh_machine_and_repository_config__should_read_the_files_again() {
+    // Given
+    let fixture = must_fixture();
+    let config = fixture.root.join("config/wtpool/machine.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    let paths = JobPaths {
+        config: config.clone(),
+        folder: fixture.root.join("state/wtpool/jobs"),
+    };
+    let sources = fixed_sources(FixedClock, FixedProcesses::default(), Some(paths));
+    let mut state = PoolState::load(fixture.config(), fixture.common.clone(), &sources).unwrap();
+    std::fs::write(&config, "[jobs]\nlimit = 2\n").unwrap();
+    std::fs::write(fixture.common.join("wtpool.toml"), "heavy = [\"just\"]\n").unwrap();
+
+    // When
+    state.refresh_machine_config();
+    state.refresh_repository_config();
+
+    // Then
+    let document = state.document(Timestamp::from_seconds(0));
+    let jobs = document.machine.jobs.unwrap_or_else(|| panic!("no jobs"));
+    assert_eq!(jobs.limit, Some(2));
+    assert_eq!(
+        jobs.heavy
+            .iter()
+            .map(|entry| entry.pattern.as_str())
+            .collect::<Vec<_>>(),
+        ["just"]
+    );
+}
+
+#[test]
+fn refresh_processes__should_read_the_table_again() {
+    // Given
+    let fixture = must_fixture();
+    let mut state = fixture.must_load(vec![fixture.process(7, "make", "x/src")]);
+    let later = vec![fixture.process(8, "cargo", "x/src")];
+
+    // When
+    state.refresh_processes(&FixedProcesses::new(later.clone()));
+
+    // Then
+    assert_eq!(state.processes, later);
+}
+
+#[test]
+fn refresh_jobs__should_read_the_jobs_and_the_process_table() {
+    // Given
+    let fixture = must_fixture();
+    let mut state = fixture.must_load(Vec::new());
+    let processes = FixedProcesses::default();
+    processes.set(vec![fixture.process(7, "make", "x/src")]);
+
+    // When
+    state.refresh_jobs(&BTreeSet::new(), true, &processes);
+
+    // Then
+    let document = state.document(Timestamp::from_seconds(0));
+    assert_eq!(
+        document.pools[0]
+            .worktrees
+            .iter()
+            .flat_map(|worktree| worktree.builds.iter())
+            .map(|build| build.name.as_str())
+            .collect::<Vec<_>>(),
+        ["make"]
+    );
 }
 
 #[test]

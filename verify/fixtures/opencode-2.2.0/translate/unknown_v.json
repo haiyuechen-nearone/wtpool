@@ -1,0 +1,14 @@
+{
+  "before": null,
+  "payload": {
+    "v": 2,
+    "kind": "event",
+    "name": "session.execution.started",
+    "directory": "{pool}/fg",
+    "data": {
+      "sessionID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq"
+    }
+  },
+  "after": null,
+  "log": 1
+}

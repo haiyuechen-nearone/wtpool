@@ -2,7 +2,9 @@
 
 use wtpool_core::activity::{ActorId, CallId, WaitReason};
 use wtpool_core::hook::text::{self, MAX_TEXT};
-use wtpool_core::hook::{CallFacts, CallInput, Event, HookInput, Spawned, ToolPath};
+use wtpool_core::hook::{
+    CallFacts, CallInput, CallRef, Event, HookInput, Rejection, Spawned, ToolPath,
+};
 
 use crate::payload::Payload;
 use crate::{tasks, tools};
@@ -85,14 +87,18 @@ impl HookEvent {
     }
 }
 
-/// The event of the Claude Code payload in `input`. `None` when the payload does not parse,
-/// names an id outside its pattern, or names an event the hook ignores.
-#[must_use]
-pub fn parse(input: &[u8]) -> Option<HookInput> {
+/// The event of the Claude Code payload in `input`. [`Rejection::Ignored`] when the payload does
+/// not parse, names an id outside its pattern, or names an event the hook ignores: Claude Code
+/// sends each of its hook events to every entry, so none of these is worth a log line.
+pub fn parse(input: &[u8]) -> Result<HookInput, Rejection> {
+    parse_payload(input).ok_or(Rejection::Ignored)
+}
+
+fn parse_payload(input: &[u8]) -> Option<HookInput> {
     let payload = Payload::parse(input)?;
     let event = event_of(&payload)?;
     let tool_path = match event {
-        Event::CallStart(_) | Event::PermissionAsked(_) | Event::CallEnd(_) => tools::tool_path(
+        Event::CallStart(_) | Event::Wait(..) | Event::CallEnd(_) => tools::tool_path(
             payload.tool_name.as_deref().unwrap_or_default(),
             &payload.tool_input,
         ),
@@ -121,6 +127,8 @@ pub fn parse(input: &[u8]) -> Option<HookInput> {
         task_start,
         tasks_running,
         task_stopped,
+        title: None,
+        model: None,
     })
 }
 
@@ -156,9 +164,9 @@ fn event_of(payload: &Payload) -> Option<Event> {
     Some(match payload.event()? {
         HookEvent::UserPromptSubmit => Event::TurnStart,
         HookEvent::PreToolUse => Event::CallStart(call()),
-        HookEvent::PermissionRequest => Event::PermissionAsked(call()),
+        HookEvent::PermissionRequest => Event::Wait(WaitReason::Permission, CallRef::Facts(call())),
         HookEvent::PostToolUse | HookEvent::PostToolUseFailure | HookEvent::PermissionDenied => {
-            Event::CallEnd(call())
+            Event::CallEnd(CallRef::Facts(call()))
         }
         HookEvent::PostToolBatch => Event::CallsEnd(
             payload
@@ -177,14 +185,23 @@ fn event_of(payload: &Payload) -> Option<Event> {
         HookEvent::Notification => match payload.notification_type.as_deref()? {
             "permission_prompt" => Event::Notified(WaitReason::Permission),
             "elicitation_dialog" | "elicitation_url_dialog" => Event::Notified(WaitReason::Input),
-            "idle_prompt" => Event::Idle,
+            "idle_prompt" => Event::TurnEnd {
+                error: None,
+                subagents_done: true,
+            },
             _ => return None,
         },
-        HookEvent::Stop => Event::TurnEnd(None),
-        HookEvent::StopFailure => Event::TurnEnd(Some(text::clean(
-            &payload.error_text().unwrap_or_else(|| "error".to_owned()),
-            MAX_TEXT,
-        ))),
+        HookEvent::Stop => Event::TurnEnd {
+            error: None,
+            subagents_done: false,
+        },
+        HookEvent::StopFailure => Event::TurnEnd {
+            error: Some(text::clean(
+                &payload.error_text().unwrap_or_else(|| "error".to_owned()),
+                MAX_TEXT,
+            )),
+            subagents_done: false,
+        },
         HookEvent::SubagentStart => Event::SubagentStart,
         HookEvent::SubagentStop => Event::SubagentEnd,
         HookEvent::CwdChanged => Event::CwdChange,

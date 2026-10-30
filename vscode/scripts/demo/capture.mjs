@@ -17,7 +17,13 @@ export async function installPointer(window, start) {
     ring.style.cssText =
       'position:absolute;left:-18px;top:-18px;width:36px;height:36px;border-radius:50%;' +
       'border:3px solid gold;box-sizing:border-box;opacity:0';
+    const focus = document.createElement('div');
+    focus.id = 'wtpool-demo-focus';
+    focus.style.cssText =
+      'position:absolute;left:-12px;top:-12px;width:24px;height:24px;border-radius:50%;' +
+      'border:2px solid gold;box-sizing:border-box;opacity:0';
     const rim = document.createElement('div');
+    rim.id = 'wtpool-demo-arrow';
     rim.style.cssText =
       'position:absolute;left:0;top:0;filter:drop-shadow(0 0 1px black) drop-shadow(0 1px 1.5px black)';
     const arrow = document.createElement('div');
@@ -25,7 +31,7 @@ export async function installPointer(window, start) {
       'width:15px;height:23px;background:white;' +
       'clip-path:polygon(0 0,0 19px,4.6px 14.8px,8.2px 22.5px,11px 21.2px,7.5px 13.8px,13.6px 13.8px)';
     rim.append(arrow);
-    layer.append(ring, rim);
+    layer.append(ring, focus, rim);
     document.body.append(layer);
   }, start);
   await window.mouse.move(start.x, start.y);
@@ -60,6 +66,17 @@ export async function movePointer(window, from, to, ms) {
     }
     await sleep(12);
   }
+}
+
+/**
+ * Swaps the arrow for a ring around the pointer's spot while `on`, so a pointer resting on a small
+ * mark covers neither it nor the label that comes up.
+ */
+export async function focusPointer(window, on) {
+  await window.evaluate((shown) => {
+    document.getElementById('wtpool-demo-arrow').style.opacity = shown ? '0' : '1';
+    document.getElementById('wtpool-demo-focus').style.opacity = shown ? '1' : '0';
+  }, on);
 }
 
 /** Clicks where the pointer is, with the ring growing and fading around the tip. */

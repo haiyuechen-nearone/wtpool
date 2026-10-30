@@ -3,6 +3,7 @@
 mod files;
 pub mod hook;
 pub mod jobs;
+pub mod shared;
 pub mod status;
 mod watch;
 

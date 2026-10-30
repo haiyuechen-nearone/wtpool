@@ -157,7 +157,8 @@ impl<'a> Harnesses<'a> {
 
     /// The key of the actor the process `pid`, named `summary`, belongs to: of the actors whose
     /// harness process is the nearest of its ancestors, the one with a shell call in flight on
-    /// `summary`, the newest first, else the session.
+    /// `summary`, the newest first, else the session. A shared process runs many sessions, so
+    /// there is no session to fall back to.
     #[must_use]
     pub fn actor_of(&self, pid: u32, summary: &str, table: &HeavyTable<'_>) -> Option<String> {
         let by_pid: BTreeMap<u32, &RunningProcess> = table
@@ -165,7 +166,7 @@ impl<'a> Harnesses<'a> {
             .iter()
             .map(|process| (process.pid, process))
             .collect();
-        table.ancestors(pid).find_map(|ancestor| {
+        let on_nearest = table.ancestors(pid).find_map(|ancestor| {
             let process = by_pid.get(&ancestor)?;
             let on_it: Vec<&ActorRecord> = self
                 .records
@@ -173,8 +174,12 @@ impl<'a> Harnesses<'a> {
                 .copied()
                 .filter(|record| is_harness(record, process))
                 .collect();
-            choose(&on_it, summary).map(|record| record.key.to_string())
-        })
+            (!on_it.is_empty()).then_some(on_it)
+        })?;
+        let shared = on_nearest.iter().any(|record| record.shared);
+        calling(&on_nearest, summary)
+            .or_else(|| session_of(&on_nearest).filter(|_| !shared))
+            .map(|record| record.key.to_string())
     }
 }
 
@@ -185,9 +190,9 @@ fn is_harness(record: &ActorRecord, process: &RunningProcess) -> bool {
 }
 
 /// Of the actors of one harness process, the one with a shell call in flight on `summary`, the
-/// newest first, else the session.
-fn choose<'a>(records: &[&'a ActorRecord], summary: &str) -> Option<&'a ActorRecord> {
-    let calling = records
+/// newest first.
+fn calling<'a>(records: &[&'a ActorRecord], summary: &str) -> Option<&'a ActorRecord> {
+    records
         .iter()
         .copied()
         .filter(|record| {
@@ -205,15 +210,17 @@ fn choose<'a>(records: &[&'a ActorRecord], summary: &str) -> Option<&'a ActorRec
                 .at()
                 .cmp(&b.since.at())
                 .then_with(|| b.key.cmp(&a.key))
-        });
-    calling.or_else(|| {
-        records
-            .iter()
-            .copied()
-            .filter(|record| !record.key.is_subagent())
-            .max_by_key(|record| record.updated.at())
-            .or_else(|| records.first().copied())
-    })
+        })
+}
+
+/// Of the actors of one harness process, the newest main session, else the first.
+fn session_of<'a>(records: &[&'a ActorRecord]) -> Option<&'a ActorRecord> {
+    records
+        .iter()
+        .copied()
+        .filter(|record| !record.key.is_subagent())
+        .max_by_key(|record| record.updated.at())
+        .or_else(|| records.first().copied())
 }
 
 /// The jobs of each actor of `owners`, the actor of each job of `records` by its place there.

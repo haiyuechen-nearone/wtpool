@@ -79,10 +79,10 @@ impl ReadClock for SystemClock {
     /// system's range counts in whole seconds.
     fn until(&self, time: Timestamp) -> Duration {
         let since_epoch = Duration::from_secs(u64::try_from(time.seconds()).unwrap_or(0));
-        match UNIX_EPOCH.checked_add(since_epoch) {
-            Some(at) => at.duration_since(SystemTime::now()).unwrap_or_default(),
-            None => whole_seconds_until(self.now(), time),
-        }
+        let at = UNIX_EPOCH
+            .checked_add(since_epoch)
+            .and_then(|at| at.duration_since(SystemTime::now()).ok());
+        at.unwrap_or_else(|| whole_seconds_until(self.now(), time))
     }
 }
 

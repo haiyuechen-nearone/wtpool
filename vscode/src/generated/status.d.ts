@@ -281,6 +281,14 @@ export interface Actor {
    */
   label: string;
   /**
+   * The `key` of the session of another agent whose harness process this session's harness process descends from, read from the process table; absent without one (S17).
+   */
+  launched_by?: string;
+  /**
+   * The newest model the actor used, as its harness names it, such as `claude-opus-5-5`; absent when unknown (S11, H32).
+   */
+  model?: string;
+  /**
    * The actor's running background tasks, newest first, then the one that ended last; absent when it has none (S13).
    */
   outputs?: Output[];

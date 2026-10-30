@@ -18,8 +18,14 @@ use crate::support::{Sandbox, Watch, is_status, must_make_unreadable, must_wtpoo
 
 /// Runs the release `wtpool hook` once with `payload` and returns its run time and exit code.
 fn hook(sandbox: &Sandbox, payload: &Value) -> (Duration, Option<i32>) {
+    hook_of(sandbox, payload, &[])
+}
+
+/// [`hook`] with `harness`, the arguments that name another harness than Claude Code.
+fn hook_of(sandbox: &Sandbox, payload: &Value, harness: &[&str]) -> (Duration, Option<i32>) {
     let cwd = payload["cwd"]
         .as_str()
+        .or_else(|| payload["directory"].as_str())
         .map_or_else(|| sandbox.pool_dir(), PathBuf::from);
     let cwd = if cwd.is_dir() {
         cwd
@@ -29,6 +35,7 @@ fn hook(sandbox: &Sandbox, payload: &Value) -> (Duration, Option<i32>) {
     let mut command = sandbox.command(&must_wtpool_bin(), &cwd);
     command
         .arg("hook")
+        .args(harness)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
@@ -51,14 +58,29 @@ fn read_payload(pool: &Pool, session: &str, worktree: &str, id: &str, fixture_na
     payload
 }
 
+/// The arguments of `wtpool hook` for OpenCode's plugin.
+const OPENCODE: [&str; 2] = ["--harness", "opencode"];
+
 pub(crate) fn budget_b1() {
     // Given
     let bench = must_bench_pool("b1");
     let pool = Pool::at(&bench.dir).unwrap_or_else(|e| panic!("setup: {e}"));
     let fixtures = every_fixture(&pool);
     assert!(!fixtures.is_empty(), "setup: no fixtures");
+    let mut forwarded = xtask::hooks::forwarded_payloads(&crate::support::must_repo())
+        .unwrap_or_else(|e| panic!("setup: {e}"));
+    forwarded
+        .iter_mut()
+        .for_each(|(_, payload)| xtask::pool::resolve_placeholders(payload, &pool));
+    assert!(
+        !forwarded.is_empty(),
+        "setup: no forwarded OpenCode payloads"
+    );
     for (_, payload) in fixtures.iter().take(20) {
         let _ = hook(&bench.sandbox, payload);
+    }
+    for (_, payload) in forwarded.iter().take(20) {
+        let _ = hook_of(&bench.sandbox, payload, &OPENCODE);
     }
 
     // When
@@ -66,21 +88,30 @@ pub(crate) fn budget_b1() {
         .filter_map(|n| fixtures.get(n % fixtures.len()))
         .map(|(_, payload)| hook(&bench.sandbox, payload))
         .collect();
+    let opencode_runs: Vec<(Duration, Option<i32>)> = (0..1000)
+        .filter_map(|n| forwarded.get(n % forwarded.len()))
+        .map(|(_, payload)| hook_of(&bench.sandbox, payload, &OPENCODE))
+        .collect();
 
     // Then
-    let failed = runs.iter().filter(|(_, code)| *code != Some(0)).count();
-    assert_eq!(failed, 0, "{failed} of 1000 hook runs did not exit 0");
-    let samples: Vec<Duration> = runs.iter().map(|(took, _)| *took).collect();
-    let p95 = p95(&samples);
-    let max = samples.iter().max().copied().unwrap_or_default();
-    assert!(
-        p95 <= Duration::from_millis(5),
-        "wtpool hook p95 is {p95:?}, more than 5 ms (B1)"
-    );
-    assert!(
-        max <= Duration::from_millis(30),
-        "wtpool hook max is {max:?}, more than 30 ms (B1)"
-    );
+    for (harness, runs) in [("", &runs), (" --harness opencode", &opencode_runs)] {
+        let failed = runs.iter().filter(|(_, code)| *code != Some(0)).count();
+        assert_eq!(
+            failed, 0,
+            "{failed} of 1000 wtpool hook{harness} runs did not exit 0"
+        );
+        let samples: Vec<Duration> = runs.iter().map(|(took, _)| *took).collect();
+        let p95 = p95(&samples);
+        let max = samples.iter().max().copied().unwrap_or_default();
+        assert!(
+            p95 <= Duration::from_millis(5),
+            "wtpool hook{harness} p95 is {p95:?}, more than 5 ms (B1)"
+        );
+        assert!(
+            max <= Duration::from_millis(30),
+            "wtpool hook{harness} max is {max:?}, more than 30 ms (B1)"
+        );
+    }
 }
 
 /// Writes records through `wtpool hook` in a watched bench pool and returns the time each took to

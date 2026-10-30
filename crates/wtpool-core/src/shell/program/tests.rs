@@ -56,6 +56,7 @@ fn program_start__should_skip_leading_words(
 #[case::rcfile(&["--rcfile", "f", "-c", "x"], Some(3))]
 #[case::script_file(&["./x.sh", "-c"], None)]
 #[case::no_script(&["-c"], None)]
+#[case::option_before_c(&["+x", "-c", "x"], Some(2))]
 fn shell_script__should_find_the_script_after_an_option_with_c(
     #[case] args: &[&str],
     #[case] expected: Option<usize>,

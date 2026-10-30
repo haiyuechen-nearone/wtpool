@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crate::error::{Error, Refusal};
 use crate::processes::ListProcesses;
-use crate::status::{self, Actor, ActorState, Sources};
+use crate::status::{self, Actor, ActorState, Caller, Sources};
 use crate::worktree::Worktree;
 
 use super::Pool;
@@ -36,17 +36,15 @@ impl<F> Pool<F> {
             .map(|worktree| worktree.path().as_path())
             .collect();
         let git_mode = self.git().mode();
-        // The session that runs this command, and its subagents, share the harness process that
-        // this one descends from, so a session may repoint or detach the worktree it works in.
-        let own_session = sources.processes.ancestors();
-        let actors = status::actors_at(
-            &self.config,
-            common_dir,
-            sources,
-            &paths,
-            git_mode,
-            &own_session,
-        )?;
+        // A session may repoint or detach the worktree it works in, so the actors of the session
+        // that runs this command, found through its ancestors, are left out.
+        let ancestors = sources.processes.ancestors();
+        let caller = Caller {
+            ancestors: &ancestors,
+            named_session: sources.named_session.as_deref(),
+        };
+        let actors =
+            status::actors_at(&self.config, common_dir, sources, &paths, git_mode, &caller)?;
         for (worktree, actors) in worktrees.iter().zip(actors) {
             let agents: Vec<String> = actors.iter().filter_map(busy).collect();
             if !agents.is_empty() {

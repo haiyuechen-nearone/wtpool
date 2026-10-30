@@ -1,8 +1,7 @@
-#[cfg(unix)]
 use rstest::rstest;
 
 use super::*;
-use crate::activity::{ActorId, Harness};
+use crate::activity::{ActorId, HarnessName};
 use crate::hook::fixture::{self, eventually, must_activity};
 
 #[cfg(unix)]
@@ -132,7 +131,7 @@ fn delete__should_remove_the_record_and_its_lock() {
 
     // When
     let session = ActorKey {
-        harness: Harness::ClaudeCode,
+        harness: HarnessName::LEGACY,
         session: ActorId::try_from("s1").unwrap(),
         agent: None,
     };
@@ -253,4 +252,72 @@ fn lock_now__should_not_wait_for_a_held_lock() {
     // Then
     assert!(matches!(while_held, Err(LockError::Held)), "{while_held:?}");
     assert!(after);
+}
+
+#[rstest]
+#[case::foreign_owner(LockError::ForeignOwner, "the lock file belongs to another user")]
+#[case::not_a_file(LockError::NotAFile, "the lock file is not a regular file")]
+#[case::held(LockError::Held, "another process holds the lock")]
+#[case::replaced(LockError::Replaced, "the lock file was replaced while it was locked")]
+fn lock_error__should_say_why_a_lock_was_not_taken(#[case] error: LockError, #[case] text: &str) {
+    // Given
+    let io_error = io::Error::other("the disk said no");
+    let io = LockError::Io(io_error);
+
+    // When
+    let said = error.to_string();
+    let wrapped = std::error::Error::source(&io).map(ToString::to_string);
+    let bare = [
+        LockError::ForeignOwner,
+        LockError::NotAFile,
+        LockError::Held,
+        LockError::Replaced,
+    ]
+    .map(|error| std::error::Error::source(&error).is_some());
+
+    // Then
+    assert_eq!(said, text);
+    assert_eq!(wrapped.as_deref(), Some("the disk said no"));
+    assert_eq!(bare, [false, false, false, false]);
+    assert_eq!(io.to_string(), "the disk said no");
+    assert_eq!(
+        LockError::from(io::Error::other("the disk said no")).to_string(),
+        "the disk said no"
+    );
+}
+
+#[test]
+fn lock_error__should_keep_what_the_system_said_of_a_try() {
+    // Given
+    let would_block = TryLockError::WouldBlock;
+    let failed = TryLockError::Error(io::Error::other("the disk said no"));
+
+    // When
+    let busy = lock_error(would_block);
+    let error = lock_error(failed);
+
+    // Then
+    assert!(matches!(busy, LockError::Held));
+    assert_eq!(error.to_string(), "the disk said no");
+}
+
+#[cfg(unix)]
+#[test]
+fn still_locked__should_refuse_a_file_the_path_no_longer_names() {
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("first");
+    let second = dir.path().join("second");
+    std::fs::write(&first, "").unwrap();
+    std::fs::write(&second, "").unwrap();
+    let held = first.metadata().unwrap();
+    let other = second.metadata().unwrap();
+
+    // When
+    let same = still_locked(&first.metadata().unwrap(), &held);
+    let replaced = still_locked(&other, &held);
+
+    // Then
+    assert!(same.is_ok());
+    assert!(matches!(replaced, Err(LockError::Replaced)));
 }

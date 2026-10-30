@@ -1,0 +1,7 @@
+{"line":1,"t":1793302018821,"payload":{"v":1,"kind":"event","name":"session.created","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76dec4fcffehDzdiw3h7KDoSH","title":"Given title via API"}}}
+{"line":11,"t":1793302018829,"payload":{"v":1,"kind":"event","name":"session.execution.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76dec4fcffehDzdiw3h7KDoSH"}}}
+{"line":16,"t":1793302018840,"payload":{"v":1,"kind":"event","name":"session.step.started","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76dec4fcffehDzdiw3h7KDoSH","model":{"id":"scripted","providerID":"stub"}}}}
+{"line":18,"t":1793302018840,"payload":{"v":1,"kind":"event","name":"session.text.delta","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76dec4fcffehDzdiw3h7KDoSH"}}}
+{"line":23,"t":1793302018848,"payload":{"v":1,"kind":"event","name":"session.execution.succeeded","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76dec4fcffehDzdiw3h7KDoSH"}}}
+{"line":24,"t":1793302018849,"payload":{"v":1,"kind":"event","name":"session.renamed","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76dec4fcffehDzdiw3h7KDoSH","title":"Renamed via API"}}}
+{"line":25,"t":1793302019862,"payload":{"v":1,"kind":"event","name":"session.deleted","directory":"/sandbox/repo/fg","data":{"sessionID":"ses_e76dec4fcffehDzdiw3h7KDoSH"}}}

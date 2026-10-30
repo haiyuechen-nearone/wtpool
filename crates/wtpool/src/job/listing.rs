@@ -362,6 +362,29 @@ mod tests {
     }
 
     #[test]
+    fn text__should_name_the_error_of_an_invalid_config() {
+        // Given
+        let dir = tempfile::tempdir().unwrap();
+        let listing = gathered(
+            dir.path(),
+            Some("[jobs]\nlimit = 0\n"),
+            RepositoryPatterns::default(),
+            Vec::new(),
+        );
+
+        // When
+        let text = text(&listing, Timestamp::from_seconds(0));
+
+        // Then
+        let first = text.lines().next().unwrap_or_default();
+        assert!(
+            first.starts_with("error: invalid machine config "),
+            "{text}"
+        );
+        assert!(first.contains("limit = 0"), "{text}");
+    }
+
+    #[test]
     fn suggested_json__should_name_each_pattern_and_its_marker() {
         // When
         let json = suggested_json(&[suggestion("make", "Makefile")]);

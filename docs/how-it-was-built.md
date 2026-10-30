@@ -136,3 +136,11 @@ variables it reads. A fresh clone needs no `spec-base` tag, no recordings and no
 run. Every verify part runs on sandbox pools in `verify/out/<run>/`, and `isolation__left_no_trace`
 fails a run that left traces outside its run folder, including in your own pool when
 `WTPOOL_FOREGROUND` names it.
+
+## Phase 5a
+
+Phase 5a added OpenCode, the second agent harness, as its own crate, `crates/wtpool-opencode`, with a
+TypeScript plugin that forwards its events. Like the earlier phases, it was built oracle-first: the
+checks, which include replays of sessions recorded from OpenCode 2.2.0, were written from the
+design, and the product was changed to meet them. Each later change to a check goes into
+`verify/oracle-changes.toml` with its reason.

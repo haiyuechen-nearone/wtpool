@@ -82,13 +82,13 @@ fn definitions() -> Value {
         "actor": Actor::to_schema(),
         "build": Build::to_schema(),
         "output": Output::to_schema(),
-    });
-    if let Value::Object(map) = &mut definitions {
-        for (name, schema) in jobs::definitions() {
-            map.insert(name.to_owned(), schema);
-        }
+    })
+    .as_object_mut()
+    .map_or_else(Map::new, std::mem::take);
+    for (name, schema) in jobs::definitions() {
+        definitions.insert(name.to_owned(), schema);
     }
-    definitions
+    Value::Object(definitions)
 }
 
 /// An object that requires these properties, each given with its schema and description, and
@@ -406,6 +406,18 @@ impl ToSchema for Actor {
                 "The coding agent harness whose hooks wrote the record, such as `claude-code` (S11).",
             ),
         ]);
+        let actor = with_optional(
+            actor,
+            "model",
+            text(),
+            "The newest model the actor used, as its harness names it, such as `claude-opus-5-5`; absent when unknown (S11, H32).",
+        );
+        let actor = with_optional(
+            actor,
+            "launched_by",
+            text(),
+            "The `key` of the session of another agent whose harness process this session's harness process descends from, read from the process table; absent without one (S17).",
+        );
         with_optional(
             actor,
             "outputs",

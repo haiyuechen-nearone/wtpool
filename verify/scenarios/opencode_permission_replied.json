@@ -1,0 +1,654 @@
+{
+  "phase": 5,
+  "covers": [
+    "H13",
+    "OC18",
+    "R3",
+    "U1"
+  ],
+  "layers": [
+    "int",
+    "render",
+    "host"
+  ],
+  "pool": {
+    "agents": true,
+    "worktrees": {
+      "fg": {
+        "branch": "main",
+        "upstream": true
+      },
+      "wt1": {
+        "detached": true
+      },
+      "wt2": {
+        "detached": true
+      },
+      "wt3": {
+        "detached": true
+      },
+      "x": {
+        "branch": "side"
+      }
+    }
+  },
+  "steps": [
+    {
+      "process": {
+        "start": {
+          "pid": 7101,
+          "name": "opencode",
+          "in": "fg",
+          "cmd": [
+            "opencode",
+            "serve",
+            "--stdio",
+            "--port",
+            "0"
+          ]
+        }
+      }
+    },
+    {
+      "hook": {
+        "harness": "opencode",
+        "cwd": "wt2",
+        "process": 7101,
+        "payload": {
+          "v": 1,
+          "kind": "event",
+          "name": "session.created",
+          "directory": "{pool}/wt2",
+          "data": {
+            "sessionID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq",
+            "title": "fix the docs"
+          }
+        }
+      }
+    },
+    {
+      "hook": {
+        "harness": "opencode",
+        "cwd": "wt2",
+        "process": 7101,
+        "payload": {
+          "v": 1,
+          "kind": "event",
+          "name": "session.execution.started",
+          "directory": "{pool}/wt2",
+          "data": {
+            "sessionID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq"
+          }
+        }
+      }
+    },
+    {
+      "hook": {
+        "harness": "opencode",
+        "cwd": "wt2",
+        "process": 7101,
+        "payload": {
+          "v": 1,
+          "kind": "hook",
+          "name": "tool.execute.before",
+          "directory": "{pool}/wt2",
+          "data": {
+            "sessionID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq",
+            "id": "call_s1_0_0",
+            "tool": "shell",
+            "input": {
+              "command": "git status"
+            }
+          }
+        }
+      }
+    },
+    {
+      "hook": {
+        "harness": "opencode",
+        "cwd": "wt2",
+        "process": 7101,
+        "payload": {
+          "v": 1,
+          "kind": "event",
+          "name": "permission.asked",
+          "directory": "{pool}/wt2",
+          "data": {
+            "sessionID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq",
+            "id": "per_e76df7aa1001Zk3",
+            "source": {
+              "id": "call_s1_0_0"
+            }
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "type": "status",
+        "version": 1,
+        "generated": "2026-10-20T12:00:04Z",
+        "machine": {
+          "name": "verify-mac"
+        },
+        "pools": [
+          {
+            "common_dir": "{common}",
+            "repository": {
+              "name": "fg",
+              "github": null
+            },
+            "agents": "on",
+            "skipped_records": 0,
+            "worktrees": [
+              {
+                "path": "{pool}/fg",
+                "name": "fg",
+                "role": "foreground",
+                "missing": false,
+                "branch": "main",
+                "upstream": "origin/main",
+                "git": {
+                  "dirty": 0,
+                  "ahead": 0,
+                  "behind": 0,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "foreground"
+                ],
+                "activity": "foreground",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:55:00Z"
+              },
+              {
+                "path": "{pool}/wt1",
+                "name": "wt1",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:57:00Z"
+              },
+              {
+                "path": "{pool}/wt2",
+                "name": "wt2",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "waiting",
+                "actors": [
+                  {
+                    "key": "opencode-ses-e76df7aa0ffe3vdlGbn0I4xCYq",
+                    "kind": "session",
+                    "harness": "opencode",
+                    "label": "fix the docs",
+                    "state": "waiting",
+                    "reason": "permission",
+                    "action": {
+                      "tool": "shell",
+                      "target": "git status"
+                    },
+                    "placed_by": "cwd",
+                    "error": null,
+                    "since": "2026-10-20T12:00:04Z",
+                    "updated": "2026-10-20T12:00:04Z"
+                  }
+                ],
+                "builds": [],
+                "last_event": "2026-10-20T12:00:04Z",
+                "last_change": "2026-10-20T11:59:58Z"
+              },
+              {
+                "path": "{pool}/wt3",
+                "name": "wt3",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T10:00:00Z"
+              },
+              {
+                "path": "{pool}/x",
+                "name": "x",
+                "role": "unmanaged",
+                "missing": false,
+                "branch": "side",
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "unmanaged"
+                ],
+                "activity": "unused",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-18T09:00:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "hook": {
+        "harness": "opencode",
+        "cwd": "wt2",
+        "process": 7101,
+        "payload": {
+          "v": 1,
+          "kind": "event",
+          "name": "permission.replied",
+          "directory": "{pool}/wt2",
+          "call": "call_s1_0_0",
+          "data": {
+            "sessionID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq",
+            "requestID": "per_e76df7aa1001Zk3",
+            "reply": "once"
+          }
+        }
+      }
+    },
+    {
+      "expect": {
+        "type": "status",
+        "version": 1,
+        "generated": "2026-10-20T12:00:05Z",
+        "machine": {
+          "name": "verify-mac"
+        },
+        "pools": [
+          {
+            "common_dir": "{common}",
+            "repository": {
+              "name": "fg",
+              "github": null
+            },
+            "agents": "on",
+            "skipped_records": 0,
+            "worktrees": [
+              {
+                "path": "{pool}/fg",
+                "name": "fg",
+                "role": "foreground",
+                "missing": false,
+                "branch": "main",
+                "upstream": "origin/main",
+                "git": {
+                  "dirty": 0,
+                  "ahead": 0,
+                  "behind": 0,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "foreground"
+                ],
+                "activity": "foreground",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:55:00Z"
+              },
+              {
+                "path": "{pool}/wt1",
+                "name": "wt1",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T11:57:00Z"
+              },
+              {
+                "path": "{pool}/wt2",
+                "name": "wt2",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "working",
+                "actors": [
+                  {
+                    "key": "opencode-ses-e76df7aa0ffe3vdlGbn0I4xCYq",
+                    "kind": "session",
+                    "harness": "opencode",
+                    "label": "fix the docs",
+                    "state": "working",
+                    "reason": null,
+                    "action": {
+                      "tool": "shell",
+                      "target": "git status"
+                    },
+                    "placed_by": "cwd",
+                    "error": null,
+                    "since": "2026-10-20T12:00:05Z",
+                    "updated": "2026-10-20T12:00:05Z"
+                  }
+                ],
+                "builds": [],
+                "last_event": "2026-10-20T12:00:05Z",
+                "last_change": "2026-10-20T11:59:58Z"
+              },
+              {
+                "path": "{pool}/wt3",
+                "name": "wt3",
+                "role": "slot",
+                "missing": false,
+                "branch": null,
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": true,
+                "reasons": [],
+                "activity": "free",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-20T10:00:00Z"
+              },
+              {
+                "path": "{pool}/x",
+                "name": "x",
+                "role": "unmanaged",
+                "missing": false,
+                "branch": "side",
+                "upstream": null,
+                "git": {
+                  "dirty": 0,
+                  "ahead": null,
+                  "behind": null,
+                  "unreferenced": 0,
+                  "operation": null,
+                  "unknown": false
+                },
+                "free": false,
+                "reasons": [
+                  "unmanaged"
+                ],
+                "activity": "unused",
+                "actors": [],
+                "builds": [],
+                "last_event": null,
+                "last_change": "2026-10-18T09:00:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "hook": {
+        "harness": "opencode",
+        "cwd": "wt2",
+        "process": 7101,
+        "payload": {
+          "v": 1,
+          "kind": "event",
+          "name": "session.tool.success",
+          "directory": "{pool}/wt2",
+          "data": {
+            "sessionID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq",
+            "id": "call_s1_0_0"
+          }
+        }
+      }
+    },
+    {
+      "hook": {
+        "harness": "opencode",
+        "cwd": "wt2",
+        "process": 7101,
+        "payload": {
+          "v": 1,
+          "kind": "event",
+          "name": "session.execution.succeeded",
+          "directory": "{pool}/wt2",
+          "data": {
+            "sessionID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq"
+          }
+        }
+      }
+    }
+  ],
+  "expect": {
+    "type": "status",
+    "version": 1,
+    "generated": "2026-10-20T12:00:07Z",
+    "machine": {
+      "name": "verify-mac"
+    },
+    "pools": [
+      {
+        "common_dir": "{common}",
+        "repository": {
+          "name": "fg",
+          "github": null
+        },
+        "agents": "on",
+        "skipped_records": 0,
+        "worktrees": [
+          {
+            "path": "{pool}/fg",
+            "name": "fg",
+            "role": "foreground",
+            "missing": false,
+            "branch": "main",
+            "upstream": "origin/main",
+            "git": {
+              "dirty": 0,
+              "ahead": 0,
+              "behind": 0,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "foreground"
+            ],
+            "activity": "foreground",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T11:55:00Z"
+          },
+          {
+            "path": "{pool}/wt1",
+            "name": "wt1",
+            "role": "slot",
+            "missing": false,
+            "branch": null,
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": true,
+            "reasons": [],
+            "activity": "free",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T11:57:00Z"
+          },
+          {
+            "path": "{pool}/wt2",
+            "name": "wt2",
+            "role": "slot",
+            "missing": false,
+            "branch": null,
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": true,
+            "reasons": [],
+            "activity": "idle",
+            "actors": [
+              {
+                "key": "opencode-ses-e76df7aa0ffe3vdlGbn0I4xCYq",
+                "kind": "session",
+                "harness": "opencode",
+                "label": "fix the docs",
+                "state": "idle",
+                "reason": null,
+                "action": {
+                  "tool": "shell",
+                  "target": "git status"
+                },
+                "placed_by": "cwd",
+                "error": null,
+                "since": "2026-10-20T12:00:07Z",
+                "updated": "2026-10-20T12:00:07Z"
+              }
+            ],
+            "builds": [],
+            "last_event": "2026-10-20T12:00:07Z",
+            "last_change": "2026-10-20T11:59:58Z"
+          },
+          {
+            "path": "{pool}/wt3",
+            "name": "wt3",
+            "role": "slot",
+            "missing": false,
+            "branch": null,
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": true,
+            "reasons": [],
+            "activity": "free",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-20T10:00:00Z"
+          },
+          {
+            "path": "{pool}/x",
+            "name": "x",
+            "role": "unmanaged",
+            "missing": false,
+            "branch": "side",
+            "upstream": null,
+            "git": {
+              "dirty": 0,
+              "ahead": null,
+              "behind": null,
+              "unreferenced": 0,
+              "operation": null,
+              "unknown": false
+            },
+            "free": false,
+            "reasons": [
+              "unmanaged"
+            ],
+            "activity": "unused",
+            "actors": [],
+            "builds": [],
+            "last_event": null,
+            "last_change": "2026-10-18T09:00:00Z"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -12,10 +12,12 @@ pub const CHECKS: &str = "verify/checks.toml";
 /// The part that runs a layer's checks.
 pub fn layer_part(layer: &str) -> &'static str {
     match layer {
-        "static" | "render" | "host" => "quick",
-        "shot" | "e2e" => "ui",
+        "static" | "js" | "render" | "host" => "quick",
+        "shot" => "shot",
+        "e2e" => "ui",
         "bench" | "bench-chromium" => "bench",
         "cc" => "cc",
+        "oc" => "oc",
         _ => "int",
     }
 }
@@ -65,10 +67,11 @@ impl Registry {
             .unwrap_or_default()
     }
 
-    /// The part a canary or freeze runs `check` in: int first, then quick, ui, bench and cc.
+    /// The part a canary or freeze runs `check` in: int first, then quick, shot, ui, bench, cc and
+    /// oc.
     pub fn part(&self, check: &str) -> Option<&'static str> {
         let parts = self.parts(check);
-        ["int", "quick", "ui", "bench", "cc"]
+        ["int", "quick", "shot", "ui", "bench", "cc", "oc"]
             .into_iter()
             .find(|part| parts.contains(part))
     }
@@ -95,6 +98,10 @@ mod tests {
                     "csp__should_report_no_violation".to_owned(),
                     BTreeSet::from(["shot".to_owned()]),
                 ),
+                (
+                    "flow__every_activity_shows".to_owned(),
+                    BTreeSet::from(["e2e".to_owned()]),
+                ),
             ]),
         };
 
@@ -103,10 +110,14 @@ mod tests {
             registry.part("idle_pool"),
             registry.part("budget__b8"),
             registry.part("csp__should_report_no_violation"),
+            registry.part("flow__every_activity_shows"),
             registry.part("unknown"),
         );
 
         // Then
-        assert_eq!(parts, (Some("int"), Some("bench"), Some("ui"), None));
+        assert_eq!(
+            parts,
+            (Some("int"), Some("bench"), Some("shot"), Some("ui"), None)
+        );
     }
 }

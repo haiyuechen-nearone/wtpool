@@ -3,25 +3,29 @@ use rstest::rstest;
 use super::super::adapter::{TranscriptTitles, WaitingTools};
 use super::super::install::Printed;
 use super::*;
-use crate::activity::{ActorId, CallId, CallKind, Harness, TaskId, WaitReason};
+use crate::activity::{ActorId, CallId, CallKind, HarnessName, TaskId, WaitReason};
 use crate::clock::{Clock, Timestamp};
 use crate::hook::fixture::must_pool;
 use crate::processes::ProcessTable;
 
-/// An adapter that reads every input as the hook input it holds, finds `titles` in every
-/// transcript and names each task's output file in `tasks`.
+mod neutral;
+mod subagents;
+
+/// An adapter that reads every input as the hook input it holds, else as `rejection`, finds
+/// `titles` in every transcript and names each task's output file in `tasks`.
 struct Fake {
     input: Option<HookInput>,
+    rejection: Rejection,
     titles: TranscriptTitles,
     tasks: PathBuf,
 }
 
 impl Adapter for Fake {
-    const HARNESS: Harness = Harness::ClaudeCode;
+    const HARNESS: HarnessName = HarnessName::LEGACY;
     const WAITING_TOOLS: WaitingTools = WaitingTools(&[("ask", WaitReason::Question)]);
 
-    fn parse(&self, _: &[u8]) -> Option<HookInput> {
-        self.input.clone()
+    fn parse(&self, _: &[u8]) -> Result<HookInput, Rejection> {
+        self.input.clone().ok_or_else(|| self.rejection.clone())
     }
 
     fn event_name(&self, _: &[u8]) -> Option<String> {
@@ -42,6 +46,34 @@ impl Adapter for Fake {
             stdout: binary.to_owned(),
             stderr: String::new(),
         }
+    }
+}
+
+/// [`Fake`] as the adapter of a harness other than [`HarnessName::LEGACY`].
+struct Named(Fake);
+
+impl Adapter for Named {
+    const HARNESS: HarnessName = HarnessName::new("other-harness");
+    const WAITING_TOOLS: WaitingTools = Fake::WAITING_TOOLS;
+
+    fn parse(&self, input: &[u8]) -> Result<HookInput, Rejection> {
+        self.0.parse(input)
+    }
+
+    fn event_name(&self, input: &[u8]) -> Option<String> {
+        self.0.event_name(input)
+    }
+
+    fn titles(&self, transcript: &Path, offset: u64) -> Option<TranscriptTitles> {
+        self.0.titles(transcript, offset)
+    }
+
+    fn task_file(&self, input: &HookInput, task: &TaskId, owner: u32) -> Option<String> {
+        self.0.task_file(input, task, owner)
+    }
+
+    fn install(&self, binary: &str) -> Printed {
+        self.0.install(binary)
     }
 }
 
@@ -90,28 +122,19 @@ impl Pool {
     /// A hook input of session `s1` in the foreground worktree.
     fn input(&self, event: Event) -> HookInput {
         HookInput {
-            event,
-            session_id: ActorId::try_from("s1").unwrap(),
-            agent_id: None,
-            agent_type: None,
-            session_title: None,
             transcript: Some(self.path("s1.log")),
-            spawned: None,
-            cwd: self.path("fg"),
-            new_cwd: None,
-            tool_path: ToolPath::None,
-            task_start: None,
-            tasks_running: None,
-            task_stopped: None,
+            ..HookInput::new(event, ActorId::try_from("s1").unwrap(), self.path("fg"))
         }
     }
 
     fn adapter(&self, input: HookInput) -> Fake {
         Fake {
             input: Some(input),
+            rejection: Rejection::Ignored,
             titles: TranscriptTitles {
                 user: None,
                 generated: Some("Generated".to_owned()),
+                model: None,
                 offset: 7,
             },
             tasks: self.root.join("tasks"),
@@ -184,6 +207,33 @@ fn handle__should_place_an_actor_and_move_it_by_a_command() {
 }
 
 #[test]
+fn handle__should_read_back_the_record_of_a_named_harness() {
+    // Given
+    let pool = Pool::must_new();
+    let send = |id: &str| {
+        let input = pool.input(Event::CallStart(call(id, "run", CallKind::Shell)));
+        handle(&Named(pool.adapter(input)), b"", &pool.env);
+    };
+
+    // When
+    send("c1");
+    send("c2");
+
+    // Then
+    let record = pool.record("other-harness-s1").unwrap();
+    let calls: Vec<&str> = record
+        .in_flight
+        .iter()
+        .map(|call| call.id.as_str())
+        .collect();
+    assert_eq!(
+        (record.harness.as_str(), calls),
+        ("other-harness", vec!["c1", "c2"])
+    );
+    assert_eq!(pool.record("s1"), None);
+}
+
+#[test]
 fn handle__should_wait_on_a_tool_the_adapter_names() {
     // Given
     let pool = Pool::must_new();
@@ -212,11 +262,18 @@ fn handle__should_record_a_task_in_the_file_the_adapter_names() {
         .unwrap_or(0);
     let started = HookInput {
         task_start: Some(TaskId::try_from("b1").unwrap()),
-        ..pool.input(Event::CallEnd(call("c1", "run", CallKind::Shell)))
+        ..pool.input(Event::CallEnd(CallRef::Facts(call(
+            "c1",
+            "run",
+            CallKind::Shell,
+        ))))
     };
     let listed = HookInput {
         tasks_running: Some(Vec::new()),
-        ..pool.input(Event::TurnEnd(None))
+        ..pool.input(Event::TurnEnd {
+            error: None,
+            subagents_done: false,
+        })
     };
 
     // When
@@ -275,8 +332,14 @@ fn handle__should_log_a_skip_when_the_record_cannot_fit() {
 }
 
 #[rstest]
-#[case::idle(Event::Idle, None)]
-#[case::task_list(Event::TurnEnd(None), Some(Vec::new()))]
+#[case::idle(Event::TurnEnd {
+        error: None,
+        subagents_done: true,
+    }, None)]
+#[case::task_list(Event::TurnEnd {
+        error: None,
+        subagents_done: false,
+    }, Some(Vec::new()))]
 fn handle__should_log_a_change_to_another_record_it_cannot_write(
     #[case] event: Event,
     #[case] tasks_running: Option<Vec<TaskId>>,
@@ -286,7 +349,11 @@ fn handle__should_log_a_change_to_another_record_it_cannot_write(
     let subagent = HookInput {
         agent_id: Some(ActorId::try_from("a1").unwrap()),
         task_start: Some(TaskId::try_from("b1").unwrap()),
-        ..pool.input(Event::CallEnd(call("c1", "run", CallKind::Shell)))
+        ..pool.input(Event::CallEnd(CallRef::Facts(call(
+            "c1",
+            "run",
+            CallKind::Shell,
+        ))))
     };
     pool.send(subagent);
     let lock = pool.root.join("fg/.git/wtpool-activity/s1.a1.json.lock");
@@ -352,23 +419,46 @@ fn handle__should_write_nothing_without_an_input_in_the_pool(#[case] cwd: Option
     assert_eq!(adapter.install("wtpool").stdout, "wtpool");
 }
 
-#[rstest]
-#[case::missing_parent("{root}/missing/../e.txt", "e.txt")]
-#[case::inside("{root}/wt1/a/b.txt", "a/b.txt")]
-#[case::other_spelling("{root}/fg/../wt1/c.txt", "c.txt")]
-#[case::outside("/elsewhere/d.txt", "d.txt")]
-#[case::unc_shaped("/{root}/wt1/a/b.txt", "b.txt")]
-fn file_target__should_name_the_path_inside_the_worktree(
-    #[case] text: &str,
-    #[case] expected: &str,
-) {
+#[test]
+fn handle__should_log_a_task_change_to_another_record_it_cannot_write() {
     // Given
-    let (_dir, root) = must_pool();
-    let text = text.replace("{root}", &root.to_string_lossy());
+    let pool = Pool::must_new();
+    let subagent = HookInput {
+        agent_id: Some(ActorId::try_from("a1").unwrap()),
+        task_start: Some(TaskId::try_from("b1").unwrap()),
+        ..pool.input(Event::CallEnd(CallRef::Facts(call(
+            "c1",
+            "run",
+            CallKind::Shell,
+        ))))
+    };
+    pool.send(subagent);
+    let activity = ActivityDir::open(&pool.root.join("fg/.git")).unwrap();
+    let mut record = activity.read("s1.a1").unwrap();
+    record.tasks[0].started = crate::hook::fixture::later(-300);
+    activity.write("s1.a1", &record).unwrap();
+    let temp = activity
+        .record_path("s1.a1")
+        .with_file_name(format!(".s1.a1.json.{}.tmp", std::process::id()));
+    std::fs::create_dir(&temp).unwrap();
+    std::fs::write(temp.join("x"), "").unwrap();
 
     // When
-    let target = file_target(&text, Path::new(&text), &root.join("wt1"));
+    pool.send(HookInput {
+        tasks_running: Some(Vec::new()),
+        ..pool.input(Event::TurnEnd {
+            error: None,
+            subagents_done: false,
+        })
+    });
 
     // Then
-    assert_eq!(target, expected);
+    let log = pool.log();
+    assert!(
+        log.starts_with(
+            "wtpool hook: skipped a change to the record s1.a1: it cannot be written: "
+        ),
+        "{log:?}"
+    );
+    assert_eq!(pool.record("s1.a1").unwrap().tasks[0].ended, None);
 }

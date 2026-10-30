@@ -1,4 +1,7 @@
-//! The labels of sessions and subagents, from payload and transcript titles.
+//! The labels of sessions and subagents, from payload and transcript titles, and the model of a
+//! session from its transcript.
+
+use std::io::Write;
 
 use super::*;
 
@@ -74,4 +77,54 @@ fn handle__should_prefer_the_payload_title_and_keep_subagent_titles() {
         record["subagents"],
         json!([{"agent_id": "a1", "title": "Find the parser tests"}])
     );
+}
+
+/// An answer of `model` as Claude Code writes it in a transcript.
+fn answer(model: &str) -> String {
+    json!({"parentUuid": "p", "message": {"model": model, "role": "assistant", "content": []},
+           "type": "assistant"})
+    .to_string()
+}
+
+#[test]
+fn model__should_follow_the_claude_code_transcript() {
+    // Given
+    let pool = Pool::must_new();
+    let transcript = pool.root.join("s1.jsonl");
+    std::fs::write(&transcript, format!("{}\n", answer("claude-sonnet-4-5"))).unwrap();
+    let path = transcript.to_string_lossy().into_owned();
+    pool.send(pool.event("UserPromptSubmit", json!({"transcript_path": path})));
+    let first = pool.record("s1").unwrap();
+    let later = [answer("claude-opus-5-5"), answer("<synthetic>")];
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&transcript)
+        .unwrap();
+    writeln!(file, "{}\n{}", later[0], later[1]).unwrap();
+
+    // When
+    pool.send(pool.event("Stop", json!({"transcript_path": path})));
+    pool.send(pool.event(
+        "SubagentStart",
+        json!({"agent_id": "a1", "agent_type": "Explore", "transcript_path": path}),
+    ));
+    pool.send(pool.event("UserPromptSubmit", json!({"transcript_path": path})));
+
+    // Then
+    assert_eq!(first["model"], "claude-sonnet-4-5");
+    assert_eq!(pool.record("s1").unwrap()["model"], "claude-opus-5-5");
+    assert_eq!(pool.record("s1.a1").unwrap().get("model"), None);
+}
+
+#[test]
+fn model__should_stay_out_of_a_record_without_one() {
+    // Given
+    let pool = Pool::must_new();
+
+    // When
+    pool.send(pool.event("UserPromptSubmit", json!({})));
+
+    // Then
+    let text = std::fs::read_to_string(pool.activity().join("s1.json")).unwrap();
+    assert!(!text.contains("model"), "{text}");
 }

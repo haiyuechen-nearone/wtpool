@@ -4,7 +4,25 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.1.0 - Unreleased
+## 0.2.0 - 2026-10-30
+
+### Added
+
+- **OpenCode.** `wtpool` records what OpenCode agents do, from OpenCode 2.2.0, the version with the
+  v2 plugin API; OpenCode 1.x is not supported. `wtpool hook install --harness opencode` prints the
+  plugin to save in OpenCode's config folder, then restart OpenCode's service, which stops the
+  sessions it runs. `--policy` lets OpenCode refuse a heavy command that skips the job queue.
+- **Agents that start agents.** A coordinator in one harness, such as Claude Code in the
+  foreground, can start OpenCode agents in the slots. An agent started with `opencode run
+  --standalone` names its coordinator as `launched_by`, and the panel's detail strip says
+  `launched by` it. The coordinator stays where it works, and `wtpool fg` and `wtpool free` leave
+  out the agents it launched. The Claude Code plugin ships the skill `delegate-agents`.
+- **Agent marks.** Beside its state icon, each agent line shows its model's maker and its harness,
+  with a badge for the harness when the model's maker is not the harness's own.
+- **Status.** `wtpool status --json` gives an agent its `model`, once its harness has reported one,
+  and its `launched_by`, when another agent started it.
+
+## 0.1.0 - 2026-10-26
 
 The first version. It is alpha: tested on macOS; Linux and Windows build but are untested.
 

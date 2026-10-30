@@ -68,9 +68,10 @@ impl JobFolder {
     /// The folder at `dir`, created private when missing. A symlink, anything but a folder, or
     /// a folder of another user or that others may write to is refused.
     pub fn create(dir: PathBuf) -> Result<Self, FolderError> {
-        if let Err(source) = create_private_dir(&dir) {
-            return Err(FolderError::Io { path: dir, source });
-        }
+        create_private_dir(&dir).map_err(|source| FolderError::Io {
+            path: dir.clone(),
+            source,
+        })?;
         Self::checked(dir)
     }
 
@@ -183,13 +184,9 @@ impl JobFolder {
             &self.lock_path(id),
         )
         .map_err(|error| self.io_error(error))?;
-        match file.try_lock() {
-            Ok(()) => Ok(file),
-            Err(TryLockError::WouldBlock) => Err(self.io_error(io::Error::other(
-                "another process holds a lock file just made",
-            ))),
-            Err(TryLockError::Error(error)) => Err(self.io_error(error)),
-        }
+        file.try_lock()
+            .map_err(|error| self.io_error(just_made(error)))?;
+        Ok(file)
     }
 
     /// The state of the lock of the job `id`. A lock that cannot be probed counts as held.
@@ -291,6 +288,14 @@ impl JobFolder {
 /// The text of the small regular file at `path`, never through a symlink.
 fn read_text(path: &Path) -> Option<String> {
     String::from_utf8(read_regular(path, MAX_RECORD_BYTES).ok()?).ok()
+}
+
+/// The error of a lock file this process just made: only another process could hold it.
+fn just_made(error: TryLockError) -> io::Error {
+    match error {
+        TryLockError::WouldBlock => io::Error::other("another process holds a lock file just made"),
+        TryLockError::Error(error) => error,
+    }
 }
 
 #[cfg(test)]

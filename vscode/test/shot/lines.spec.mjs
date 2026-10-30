@@ -9,6 +9,8 @@ import { away, clickRow, hoverRow, settle, showPlain, visualPanel } from '../sup
 
 /** The tolerances of an icon's box and of its ink, in CSS px. */
 const BOX_PX = 0.5;
+/** The text starts after the state icon's box, 5 px, the mark's 14 px box and 5 px more (U13). */
+const TEXT_AFTER_ICON_PX = 5 + 14 + 5;
 const INK_PX = 1;
 /** The colour token of each line state: its group's, the problem colour for an API error. */
 const STATE_TOKENS = {
@@ -132,7 +134,7 @@ for (const theme of THEME_NAMES) {
         continue;
       }
       if (Math.abs(f.icon.w - 14) > BOX_PX || Math.abs(f.icon.h - 14) > BOX_PX) problems.push(`${at}: icon box ${f.icon.w} x ${f.icon.h} px, not 14 px`);
-      if (f.textLeft === null || Math.abs(f.textLeft - (f.icon.x + f.icon.w) - 5) > BOX_PX) problems.push(`${at}: text starts ${f.textLeft === null ? 'nowhere' : `${Math.round((f.textLeft - f.icon.x - f.icon.w) * 10) / 10} px`} after the icon box, not 5 px`);
+      if (f.textLeft === null || Math.abs(f.textLeft - (f.icon.x + f.icon.w) - TEXT_AFTER_ICON_PX) > BOX_PX) problems.push(`${at}: text starts ${f.textLeft === null ? 'nowhere' : `${Math.round((f.textLeft - f.icon.x - f.icon.w) * 10) / 10} px`} after the icon box, not ${TEXT_AFTER_ICON_PX} px`);
     }
     const lefts = plain.filter((f) => f.textLeft !== null).map((f) => f.textLeft);
     if (Math.max(...lefts) - Math.min(...lefts) > BOX_PX) problems.push(`the Agent column's lines start at ${[...new Set(lefts.map((x) => Math.round(x * 10) / 10))].join(', ')} px, not one x`);

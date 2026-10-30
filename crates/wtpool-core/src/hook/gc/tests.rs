@@ -28,7 +28,16 @@ fn record(session: &str, agent: Option<&str>, state: State, age: i64, alive: boo
     record.process = Some(HarnessProcess {
         pid: if alive { 7001 } else { 7099 },
         started: "2026-10-20T11:00:00Z".to_owned(),
+        shared: false,
     });
+    record
+}
+
+/// `record` as one of a process that runs many sessions.
+fn shared(mut record: Record) -> Record {
+    if let Some(process) = &mut record.process {
+        process.shared = true;
+    }
     record
 }
 
@@ -38,6 +47,8 @@ fn record(session: &str, agent: Option<&str>, state: State, age: i64, alive: boo
 #[case::dead_8_days(record("s", None, State::Idle, 8 * 86_400, false), false)]
 #[case::live_8_days(record("s", None, State::Working, 8 * 86_400, true), true)]
 #[case::done_16_minutes_alone(record("s", Some("a"), State::Done, 16 * 60, true), true)]
+#[case::shared_live_8_days(shared(record("s", None, State::Idle, 8 * 86_400, true)), false)]
+#[case::shared_live_6_days(shared(record("s", None, State::Idle, 6 * 86_400, true)), true)]
 fn collect__should_delete_only_old_dead_or_ended_records(
     #[case] record: Record,
     #[case] kept: bool,
@@ -197,6 +208,67 @@ fn after_session_end__should_leave_the_day_open_when_stopped() {
     assert_eq!(again.map(|c| c.deleted), Some(2));
 }
 
+#[cfg(unix)]
+#[test]
+fn collect__should_keep_a_record_whose_lock_cannot_be_taken() {
+    // Given
+    let (_dir, activity, table) = ended_week_old(1);
+    let unreadable = activity.record_path("s9");
+    std::fs::write(&unreadable, "{").unwrap();
+    let old = std::time::UNIX_EPOCH
+        + std::time::Duration::from_secs(u64::try_from(later(-8 * 86_400).seconds()).unwrap());
+    std::fs::File::open(&unreadable)
+        .unwrap()
+        .set_modified(old)
+        .unwrap();
+    let made = std::process::Command::new("mkfifo")
+        .arg(activity.record_path("s9").with_extension("json.lock"))
+        .status()
+        .unwrap();
+    assert!(made.success());
+
+    // When
+    let collected = collect(&activity, NOW, &table, None);
+
+    // Then
+    assert_eq!(
+        collected,
+        Collected {
+            kept: 0,
+            deleted: 1,
+            stopped: false
+        }
+    );
+    assert!(unreadable.symlink_metadata().is_ok());
+}
+
+#[cfg(unix)]
+#[test]
+fn collect__should_keep_an_expired_record_whose_lock_another_process_holds() {
+    // Given
+    let (_dir, activity, table) = ended_week_old(1);
+    let held = activity.lock_now("s0").unwrap();
+    let mut live = record("s0", None, State::Working, 8 * 86_400, true);
+    live.updated = later(-8 * 86_400);
+    live.state = State::Ended;
+    activity.write("s0", &live).unwrap();
+
+    // When
+    let collected = collect(&activity, NOW, &table, None);
+
+    // Then
+    drop(held);
+    assert_eq!(
+        collected,
+        Collected {
+            kept: 1,
+            deleted: 0,
+            stopped: false
+        }
+    );
+    assert!(activity.read("s0").is_some());
+}
+
 #[test]
 fn collect_now__should_run_on_a_fresh_stamp_and_stamp_the_pool() {
     // Given
@@ -233,6 +305,7 @@ fn collect_pool__should_find_nothing_without_the_folder() {
 }
 
 /// Gives `path` the last write `seconds` before [`NOW`].
+#[cfg(unix)]
 fn written_before(path: &std::path::Path, seconds: i64) {
     let at = std::time::UNIX_EPOCH
         + std::time::Duration::from_secs(u64::try_from(later(-seconds).seconds()).unwrap());

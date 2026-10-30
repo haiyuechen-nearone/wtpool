@@ -27,10 +27,9 @@ impl fmt::Display for Refusal {
             Self::WaitUnbounded => write!(f, "wtpool: {NO_TIME_LIMIT} {BOUNDED_FORMS}"),
             Self::Heavy { names, wrapped } => {
                 let words = names.join(", ");
-                write!(
-                    f,
-                    "wtpool: {words} is heavy on this machine (enforce = require). "
-                )?;
+                let fault =
+                    format!("wtpool: {words} is heavy on this machine (enforce = require). ");
+                f.write_str(&fault)?;
                 if wrapped.chars().count() > MAX_WRAPPED_CHARS {
                     write!(f, "Run each heavy command as {WRAPPER}<command>: {words}")
                 } else {

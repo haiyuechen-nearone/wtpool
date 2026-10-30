@@ -49,11 +49,13 @@
 }
 
 .actor-state,
-.actor-facts {
+.actor-facts,
+.actor-harness {
   overflow-wrap: anywhere;
 }
 
-.actor-facts {
+.actor-facts,
+.actor-harness {
   color: var(--vscode-descriptionForeground);
 }
 

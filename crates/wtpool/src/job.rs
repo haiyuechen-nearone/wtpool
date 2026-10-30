@@ -8,7 +8,6 @@ use std::ffi::OsString;
 use std::fmt;
 use std::io::{self, Write};
 use std::num::NonZeroUsize;
-use std::path::PathBuf;
 use std::process::ExitCode;
 
 use wtpool_core::clock::{Clock, ReadClock as _};
@@ -17,14 +16,13 @@ use wtpool_core::jobs::{
     EditError, Enforce, InvalidEnforce, InvalidLimit, JOB_VARIABLE, JobCommand, JobContext,
     JobError, JobListing, JobPaths, MachineConfigError, run_job,
 };
-use wtpool_core::platform::dirs;
 use wtpool_core::processes::{ProcessTable, SystemProcesses};
 use wtpool_core::{Error, RepositoryFiles, RepositoryHeavy};
 
 use crate::text::visible;
 use crate::verify_files;
 
-const USAGE: &str = "\
+pub(crate) const USAGE: &str = "\
 usage: wtpool job [--label <text>] [--quiet] -- <program> [<arg>...]
        wtpool job ls [--json]
        wtpool job limit [<N>|default]
@@ -268,16 +266,14 @@ fn list(json: bool) -> Result<(), JobCliError> {
     Ok(())
 }
 
-/// The note that `enforce` refuses nothing in Claude Code while its hooks check no shell call:
-/// only under `require`, and only while the settings file says so.
+/// One note per harness whose hooks refuse no shell call yet: only under `require`, and only
+/// while the harness's user files say so.
 pub(crate) fn require_notes(enforce: Enforce) -> Vec<String> {
     if enforce != Enforce::Require {
         return Vec::new();
     }
-    let config_dir = std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from);
-    wtpool_claude_code::require_gap(config_dir.as_deref(), dirs::home().as_deref())
-        .into_iter()
-        .collect()
+    let binary = crate::hook::this_binary().unwrap_or_default();
+    crate::hook::require_notes(&binary.to_string_lossy())
 }
 
 /// The repository `WTPOOL_FOREGROUND` names, else the one holding the current folder, found
@@ -332,6 +328,7 @@ fn fail(message: &str) {
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
+    use wtpool_core::jobs::{EditFault, MachineConfigFault};
 
     use super::*;
 
@@ -401,6 +398,30 @@ mod tests {
         JobCliError::NoRepository,
         "no repository: --repo edits the wtpool.toml of the repository WTPOOL_FOREGROUND names, else of the one you are in"
     )]
+    #[case::usage(JobCliError::Usage, USAGE)]
+    #[case::config(
+        JobCliError::Config(MachineConfigError {
+            path: std::path::PathBuf::from("/p/machine.toml"),
+            fault: MachineConfigFault::NotAFile,
+        }),
+        "invalid machine config /p/machine.toml: not a regular file"
+    )]
+    #[case::edit(
+        JobCliError::Edit(EditError {
+            path: std::path::PathBuf::from("/r/wtpool.toml"),
+            fault: EditFault::NotAFile,
+        }),
+        "cannot edit /r/wtpool.toml: it is not a regular file"
+    )]
+    #[case::no_working_folder(
+        JobCliError::NoWorkingFolder(io::Error::new(io::ErrorKind::NotFound, "no such file")),
+        "cannot tell the working folder: no such file"
+    )]
+    #[case::repository(
+        JobCliError::Repository(Error::NoMatch("feature".to_owned())),
+        "no worktree matches 'feature'"
+    )]
+    #[case::command_failed(JobCliError::CommandFailed(3), "the command exited with status 3")]
     fn job_cli_error__should_name_the_value_and_the_way_out(
         #[case] error: JobCliError,
         #[case] expected: &str,

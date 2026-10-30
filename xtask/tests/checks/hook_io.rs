@@ -158,6 +158,29 @@ fn hook__should_exit_zero_for_every_fixture() {
     );
 }
 
+/// One `wtpool hook --harness opencode` run that panics on its event's OpenCode name: the fixture's
+/// name and what the run printed, its exit code, and whether it kept stdout empty.
+fn opencode_event(hooks: &Hooks) -> (String, String, Option<i32>, bool) {
+    let payload = hooks.oc_event(
+        "session.execution.started",
+        json!({"sessionID": "ses-e76d"}),
+    );
+    let options = RunOptions {
+        envs: vec![(
+            "WTPOOL_VERIFY_PANIC".to_owned(),
+            "session.execution.started".into(),
+        )],
+        ..RunOptions::default()
+    };
+    let run = hooks.oc_run_with(&payload, &options);
+    (
+        "session.execution.started under opencode".to_owned(),
+        run.describe(),
+        run.code(),
+        run.output.stdout.is_empty(),
+    )
+}
+
 #[test]
 fn hook__should_exit_zero_after_a_panic() {
     // Given
@@ -181,6 +204,7 @@ fn hook__should_exit_zero_after_a_panic() {
                 run.output.stdout.is_empty(),
             )
         })
+        .chain([opencode_event(&hooks)])
         .collect();
 
     // Then

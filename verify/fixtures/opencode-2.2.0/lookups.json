@@ -1,0 +1,12 @@
+{
+  "06-title-given": {
+    "ses_e76df7664ffedgE7XnaFkg7IHa": {
+      "id": "ses_e76df7664ffedgE7XnaFkg7IHa",
+      "projectID": "3d7fadac9684354168a1bd2b0daa4d54c10c0a11",
+      "cost": 0,
+      "tokens": { "input": 0, "output": 0, "reasoning": 0, "cache": { "read": 0, "write": 0 } },
+      "title": "Given title probe",
+      "location": { "directory": "/sandbox/repo/fg" }
+    }
+  }
+}

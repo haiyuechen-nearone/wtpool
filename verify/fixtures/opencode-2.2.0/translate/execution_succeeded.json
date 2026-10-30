@@ -1,0 +1,86 @@
+{
+  "before": {
+    "version": 1,
+    "harness": "opencode",
+    "session_id": "ses-e76df7aa0ffe3vdlGbn0I4xCYq",
+    "agent_id": null,
+    "agent_type": null,
+    "label": "opencode 11:59",
+    "worktree": "{pool}/fg",
+    "placed_by": "cwd",
+    "state": "working",
+    "waiting": null,
+    "action": {
+      "tool": "read",
+      "target": "notes.txt"
+    },
+    "in_flight": [
+      {
+        "id": "call_s1_0_0",
+        "tool": "read",
+        "kind": "other",
+        "target": "notes.txt",
+        "since": "2026-10-20T11:59:00Z",
+        "match": "14e1ce5449d728c4dda72aff167f01c7df18e45e16441bc0d8fe42784b000195"
+      }
+    ],
+    "done_ids": [],
+    "error": null,
+    "since": "2026-10-20T11:59:00Z",
+    "updated": "2026-10-20T11:59:00Z",
+    "writer_started": 1792495740000000,
+    "process": {
+      "pid": 7101,
+      "started": "2026-10-20T11:00:00Z",
+      "shared": true
+    },
+    "first_cwd": "{pool}/fg",
+    "ended": null,
+    "title": null,
+    "transcript_offset": 0,
+    "subagents": [],
+    "tasks": []
+  },
+  "payload": {
+    "v": 1,
+    "kind": "event",
+    "name": "session.execution.succeeded",
+    "directory": "{pool}/fg",
+    "data": {
+      "sessionID": "ses_e76df7aa0ffe3vdlGbn0I4xCYq"
+    }
+  },
+  "after": {
+    "version": 1,
+    "harness": "opencode",
+    "session_id": "ses-e76df7aa0ffe3vdlGbn0I4xCYq",
+    "agent_id": null,
+    "agent_type": null,
+    "label": "opencode 11:59",
+    "worktree": "{pool}/fg",
+    "placed_by": "cwd",
+    "state": "idle",
+    "waiting": null,
+    "action": {
+      "tool": "read",
+      "target": "notes.txt"
+    },
+    "in_flight": [],
+    "done_ids": [],
+    "error": null,
+    "since": "2026-10-20T12:00:00Z",
+    "updated": "2026-10-20T12:00:00Z",
+    "process": {
+      "pid": 7101,
+      "started": "2026-10-20T11:00:00Z",
+      "shared": true
+    },
+    "first_cwd": "{pool}/fg",
+    "ended": null,
+    "title": null,
+    "transcript_offset": 0,
+    "subagents": [],
+    "tasks": []
+  },
+  "log": 0
+}

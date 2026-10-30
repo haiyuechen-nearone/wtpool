@@ -118,3 +118,24 @@ fn parse__should_survive_deep_nesting() {
     assert_eq!(parsed.summary, "echo");
     assert_eq!(parsed.paths, vec![PathBuf::from("/p/wt2")]);
 }
+
+#[rstest]
+#[case::bare("goose run x", true)]
+#[case::after_cd("cd /p/wt3 && goose run --interactive x", true)]
+#[case::full_path("/opt/homebrew/bin/claude -p x", true)]
+#[case::after_prefixes("TOKEN=s timeout 600 codex exec x", true)]
+#[case::in_a_script("sh -c 'cd /p/wt3 && claude -p x'", true)]
+#[case::in_a_subshell("(cd /p/wt3 && aider) &", true)]
+#[case::later_in_a_pipeline("echo hi | gemini", true)]
+#[case::in_a_substitution("X=$(claude -p x); ls /p/wt3", false)]
+#[case::as_an_argument("which goose", false)]
+#[case::looked_up("command -v claude", false)]
+#[case::other_program("cd /p/wt3 && ls", false)]
+#[case::longer_name("claudette -p x", false)]
+fn parse__should_tell_a_command_that_starts_an_agent(#[case] command: &str, #[case] agent: bool) {
+    // When
+    let parsed = parse(command, Path::new(CWD), Some(Path::new(HOME)));
+
+    // Then
+    assert_eq!(parsed.starts_agent, agent);
+}

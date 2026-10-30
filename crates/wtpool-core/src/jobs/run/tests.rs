@@ -9,6 +9,8 @@ use crate::heavy::Pattern;
 use crate::jobs::{JobRecord, JobState};
 use crate::processes::{RunningProcess, StartTime};
 use crate::test_support::eventually;
+#[cfg(unix)]
+use crate::test_support::{CHILD, rerun};
 
 fn command(program: &str, args: &[&str]) -> JobCommand {
     JobCommand {
@@ -42,6 +44,51 @@ fn summary__should_name_the_pattern_else_the_program(
 
     // Then
     assert_eq!(summary, expected);
+}
+
+#[test]
+fn lost_command__should_note_it_and_give_the_not_runnable_code() {
+    // Given
+    let mut notes = Vec::new();
+    let error = io::Error::other("no child");
+
+    // When
+    let ending = lost_command(&mut notes, &error);
+
+    // Then
+    assert_eq!(ending, Ending::Code(126));
+    assert_eq!(
+        String::from_utf8_lossy(&notes),
+        "wtpool job: lost the command: no child\n"
+    );
+}
+
+#[test]
+fn end_as__should_give_the_code_of_a_command_that_ended_with_one() {
+    // When
+    let code = end_as(Ending::Code(3));
+
+    // Then
+    assert_eq!(code, 3);
+}
+
+#[cfg(unix)]
+#[test]
+fn end_as__should_end_this_process_by_the_signal_of_an_ending_by_one() {
+    // Given
+    if std::env::var(CHILD).as_deref() == Ok("signal") {
+        std::process::exit(i32::from(end_as(Ending::Signal(libc::SIGURG))));
+    }
+
+    // When
+    let child = rerun(
+        "jobs::run::tests::end_as__should_end_this_process_by_the_signal_of_an_ending_by_one",
+        "signal",
+    )
+    .unwrap();
+
+    // Then
+    assert_eq!(child.code(), Some(128 + libc::SIGURG), "{child:?}");
 }
 
 #[rstest]
@@ -325,9 +372,70 @@ fn wait_for_turn__should_run_once_the_limit_rises_and_time_the_wait_by_the_clock
     let place = wait_for_turn(place, standing, &job, &context, one, &signals, &mut notes);
 
     // Then
-    assert!(place.is_ok());
+    assert!(matches!(place, Ok(Ok(_))));
     assert_eq!(
         String::from_utf8_lossy(&notes),
         "wtpool job: 1 of 1 jobs run; waiting, 0 ahead\nwtpool job: started after 3 m 12 s\n"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn wait_for_turn__should_leave_the_queue_for_a_signal_caught_first() {
+    // Given
+    if std::env::var(CHILD).as_deref() == Ok("caught") {
+        return leave_the_queue_for_a_caught_signal();
+    }
+
+    // When
+    let child = rerun(
+        "jobs::run::tests::wait_for_turn__should_leave_the_queue_for_a_signal_caught_first",
+        "caught",
+    )
+    .unwrap();
+
+    // Then
+    assert!(child.success(), "{child:?}");
+}
+
+/// The child run of [`wait_for_turn__should_leave_the_queue_for_a_signal_caught_first`], as the
+/// signal reaches every test of its process.
+#[cfg(unix)]
+fn leave_the_queue_for_a_caught_signal() {
+    use rustix::process::{Signal, getpid, kill_process};
+
+    // Given
+    let dir = tempfile::tempdir().unwrap();
+    let processes = Lineage(Vec::new());
+    let context = context(dir.path(), &SystemClock, &processes);
+    let folder = JobFolder::create(context.paths.folder.clone()).unwrap();
+    let (running, _held) = running_job(&folder, OUTER);
+    let one = Limit::new(1).unwrap();
+    let config = MachineConfig::defaults(PathBuf::new(), 4);
+    let job = command("make", &[]);
+    let (place, turn) = Place::join(
+        folder,
+        draft(&job, &context, &config),
+        one,
+        Timestamp::from_seconds(0),
+    )
+    .unwrap();
+    let Turn::Wait(standing) = turn else {
+        panic!("the job ran over its limit");
+    };
+    let signals = JobSignals::catch().unwrap();
+    kill_process(getpid(), Signal::TERM).unwrap();
+    let mut notes = Vec::new();
+
+    // When
+    let waited = wait_for_turn(place, standing, &job, &context, one, &signals, &mut notes);
+
+    // Then
+    assert!(matches!(waited, Ok(Err(JobSignal::Terminate))));
+    let folder = JobFolder::create(context.paths.folder.clone()).unwrap();
+    assert_eq!(folder.records(), vec![running]);
+    assert_eq!(
+        String::from_utf8_lossy(&notes),
+        "wtpool job: 1 of 1 jobs run; waiting, 0 ahead\n"
     );
 }

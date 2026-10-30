@@ -276,12 +276,10 @@ mod tests {
         let keys = ["cargo", "cargo.exe", "CARGO.EXE"].map(program_key);
 
         // Then
-        let expected = if cfg!(windows) {
-            ["cargo", "cargo", "cargo"]
-        } else {
-            ["cargo", "cargo.exe", "CARGO.EXE"]
-        };
-        assert_eq!(keys, expected);
+        #[cfg(windows)]
+        assert_eq!(keys, ["cargo", "cargo", "cargo"]);
+        #[cfg(not(windows))]
+        assert_eq!(keys, ["cargo", "cargo.exe", "CARGO.EXE"]);
     }
 
     #[cfg(unix)]

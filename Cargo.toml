@@ -3,12 +3,13 @@ resolver = "3"
 members = [
     "crates/wtpool-core",
     "crates/wtpool-claude-code",
+    "crates/wtpool-opencode",
     "crates/wtpool-github",
     "crates/wtpool",
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
@@ -21,6 +22,7 @@ publish = false
 [workspace.dependencies]
 wtpool-core = { path = "crates/wtpool-core" }
 wtpool-claude-code = { path = "crates/wtpool-claude-code" }
+wtpool-opencode = { path = "crates/wtpool-opencode" }
 wtpool-github = { path = "crates/wtpool-github" }
 terminal_size = "=0.4.4"
 libc = "=0.2.190"

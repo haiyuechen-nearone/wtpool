@@ -93,14 +93,8 @@ fn route_caught(
     command: &AtomicU32,
     sender: &Sender<JobSignal>,
 ) {
-    let mut bytes = [0_u8; 16];
-    loop {
-        match reader.read(&mut bytes) {
-            Ok(0) => return,
-            Ok(_) => {}
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
-            Err(_) => return,
-        }
+    let mut byte = [0_u8; 1];
+    while reader.read_exact(&mut byte).is_ok() {
         for (signal, flag) in flags {
             if !flag.swap(false, Ordering::SeqCst) {
                 continue;
@@ -135,6 +129,8 @@ fn hand_on(signal: JobSignal, pid: u32) {
 
 #[cfg(test)]
 mod tests {
+    use std::os::unix::process::ExitStatusExt;
+
     use rstest::rstest;
 
     use super::*;
@@ -168,5 +164,177 @@ mod tests {
             numbers,
             [libc::SIGINT, libc::SIGQUIT, libc::SIGTERM, libc::SIGHUP]
         );
+    }
+
+    #[test]
+    fn next_within__should_wait_out_its_time_when_no_signal_comes() {
+        // Given
+        let (_sender, received) = mpsc::channel();
+        let caught = Caught {
+            received,
+            command: Arc::new(AtomicU32::new(0)),
+        };
+        let timeout = Duration::from_millis(20);
+
+        // When
+        let start = std::time::Instant::now();
+        let signal = caught.next_within(timeout);
+
+        // Then
+        assert!(signal.is_none());
+        assert!(start.elapsed() >= timeout, "{:?}", start.elapsed());
+    }
+
+    #[test]
+    fn next_within__should_give_the_caught_signal_at_once() {
+        // Given
+        let (sender, received) = mpsc::channel();
+        let caught = Caught {
+            received,
+            command: Arc::new(AtomicU32::new(0)),
+        };
+        sender.send(JobSignal::Quit).unwrap();
+
+        // When
+        let signal = caught.next_within(Duration::from_secs(5));
+
+        // Then
+        assert_eq!(signal, Some(JobSignal::Quit));
+    }
+
+    #[test]
+    fn next_within__should_wait_out_its_time_once_its_thread_is_gone() {
+        // Given
+        let (sender, received) = mpsc::channel();
+        let caught = Caught {
+            received,
+            command: Arc::new(AtomicU32::new(0)),
+        };
+        drop(sender);
+        let timeout = Duration::from_millis(20);
+
+        // When
+        let start = std::time::Instant::now();
+        let signal = caught.next_within(timeout);
+
+        // Then
+        assert!(signal.is_none());
+        assert!(start.elapsed() >= timeout, "{:?}", start.elapsed());
+    }
+
+    #[test]
+    fn hand_on_to__should_store_the_command_and_hand_a_caught_signal_on() {
+        // Given
+        let (sender, received) = mpsc::channel();
+        let caught = Caught {
+            received,
+            command: Arc::new(AtomicU32::new(0)),
+        };
+        let mut child = std::process::Command::new("sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
+        sender.send(JobSignal::Terminate).unwrap();
+
+        // When
+        caught.hand_on_to(child.id());
+        let ended = child.wait().unwrap();
+
+        // Then
+        assert_eq!(ended.signal(), Some(libc::SIGTERM), "{ended:?}");
+        assert_eq!(caught.command.load(Ordering::SeqCst), child.id());
+    }
+
+    #[test]
+    fn hand_on_to__should_ignore_a_signal_that_is_not_handed_on() {
+        // Given
+        let (sender, received) = mpsc::channel();
+        let caught = Caught {
+            received,
+            command: Arc::new(AtomicU32::new(0)),
+        };
+        let mut child = std::process::Command::new("sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
+        sender.send(JobSignal::Interrupt).unwrap();
+
+        // When
+        caught.hand_on_to(child.id());
+        let alive = child.try_wait().unwrap().is_none();
+        // A SIGINT handed on before this SIGTERM would end the child first.
+        hand_on(JobSignal::Terminate, child.id());
+        let ended = child.wait().unwrap();
+
+        // Then
+        assert!(alive);
+        assert_eq!(ended.signal(), Some(libc::SIGTERM), "{ended:?}");
+        assert_eq!(caught.command.load(Ordering::SeqCst), child.id());
+        assert!(caught.received.try_recv().is_err());
+    }
+
+    #[test]
+    fn hand_on__should_send_the_signal_to_a_live_process() {
+        // Given
+        let mut child = std::process::Command::new("sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
+
+        // When
+        hand_on(JobSignal::Terminate, child.id());
+        let ended = child.wait().unwrap();
+
+        // Then
+        assert_eq!(ended.signal(), Some(libc::SIGTERM), "{ended:?}");
+    }
+
+    #[test]
+    fn route_caught__should_report_a_signal_before_the_command_runs() {
+        // Given
+        let (reader, mut writer) = io::pipe().unwrap();
+        let flag = Arc::new(AtomicBool::new(false));
+        let flags = vec![(JobSignal::Interrupt, Arc::clone(&flag))];
+        let command = AtomicU32::new(0);
+        let (sender, received) = mpsc::channel();
+        let consumer = std::thread::spawn(move || route_caught(reader, &flags, &command, &sender));
+        flag.store(true, Ordering::SeqCst);
+
+        // When
+        use std::io::Write;
+        writer.write_all(b"x").unwrap();
+        let reported = received.recv_timeout(Duration::from_secs(5));
+
+        // Then
+        drop(writer);
+        let _ = consumer.join();
+        assert_eq!(reported.unwrap(), JobSignal::Interrupt);
+    }
+
+    #[test]
+    fn route_caught__should_hand_a_signal_on_while_the_command_runs() {
+        // Given
+        let (reader, mut writer) = io::pipe().unwrap();
+        let flag = Arc::new(AtomicBool::new(false));
+        let flags = vec![(JobSignal::Terminate, Arc::clone(&flag))];
+        let mut child = std::process::Command::new("sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
+        let command = AtomicU32::new(child.id());
+        let (sender, received) = mpsc::channel();
+        let consumer = std::thread::spawn(move || route_caught(reader, &flags, &command, &sender));
+        flag.store(true, Ordering::SeqCst);
+
+        // When
+        use std::io::Write;
+        writer.write_all(b"x").unwrap();
+        let ended = child.wait().unwrap();
+
+        // Then
+        drop(writer);
+        let _ = consumer.join();
+        assert_eq!(ended.signal(), Some(libc::SIGTERM), "{ended:?}");
+        assert!(received.try_recv().is_err());
     }
 }

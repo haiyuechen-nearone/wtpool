@@ -2,7 +2,7 @@
 //! installs, `npm run build` and `npm run package` in vscode/, and the Chromium that Playwright
 //! drives.
 
-use std::fs;
+use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
 use super::SETUP_LIMIT;
@@ -123,8 +123,14 @@ struct Script {
 /// The npm installs, `npm run build` and, with `package`, `npm run package`, once per run. The
 /// first part that needs them builds them and records the hash of `vscode/` in
 /// `<run>/web/<script>.inputs`. A later part of the run takes the outputs while the hash holds
-/// and the outputs exist. A stale build is removed before it is rebuilt.
+/// and the outputs exist. A stale build is removed before it is rebuilt. Parts of a run that
+/// build at once take turns, so none installs or removes outputs under another.
 pub(super) fn web_build(ctx: &Ctx, layer: &str, package: bool) -> Vec<CheckResult> {
+    let stamps = ctx.run_dir.join("web");
+    let _turn = match build_turn(&stamps) {
+        Ok(turn) => turn,
+        Err(error) => return vec![CheckResult::error("web:lock", layer, error)],
+    };
     for (dir, name) in [(oracle_js(ctx), "npm_ci_oracle"), (vscode(ctx), "npm_ci")] {
         if let Err(error) = npm_ci(ctx, &dir, name) {
             return vec![CheckResult::error(&format!("web:{name}"), layer, error)];
@@ -134,8 +140,6 @@ pub(super) fn web_build(ctx: &Ctx, layer: &str, package: bool) -> Vec<CheckResul
         Ok(hash) => hash,
         Err(error) => return vec![CheckResult::error("web:inputs", layer, error)],
     };
-    let stamps = ctx.run_dir.join("web");
-    let _ = fs::create_dir_all(&stamps);
     let stamp = |script: &Script| stamps.join(format!("{}.inputs", script.name));
     let fresh = |script: &Script| {
         fs::read_to_string(stamp(script)).is_ok_and(|text| text.trim() == hash)
@@ -181,6 +185,21 @@ pub(super) fn web_build(ctx: &Ctx, layer: &str, package: bool) -> Vec<CheckResul
     results
 }
 
+/// Holds `build.lock` in `stamps` alone until the file drops, after any other part's turn.
+fn build_turn(stamps: &Path) -> Result<File, String> {
+    fs::create_dir_all(stamps).map_err(|e| format!("{}: {e}", stamps.display()))?;
+    let path = stamps.join("build.lock");
+    let file = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(&path)
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    file.lock()
+        .map_err(|e| format!("lock {}: {e}", path.display()))?;
+    Ok(file)
+}
+
 /// The web build and package of a run, done before its parts start.
 pub fn web_build_once(ctx: &Ctx) -> Vec<CheckResult> {
     web_build(ctx, "static", true)
@@ -207,5 +226,36 @@ fn remove_build_outputs(ctx: &Ctx) {
         {
             let _ = fs::remove_file(entry.path());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use super::*;
+
+    #[test]
+    fn build_turn__should_wait_until_the_turn_before_it_ends() {
+        // Given
+        let stamps = std::env::temp_dir().join(format!("xtask-build-turn-{}", std::process::id()));
+        let first = build_turn(&stamps).expect("the first turn");
+        let release = Duration::from_millis(300);
+        let started = Instant::now();
+        let holder = std::thread::spawn(move || {
+            std::thread::sleep(release);
+            drop(first);
+        });
+
+        // When
+        let second = build_turn(&stamps);
+        let waited = started.elapsed();
+
+        // Then
+        assert!(second.is_ok(), "{second:?}");
+        assert!(waited >= release, "took the turn after {waited:?}");
+        let _ = holder.join();
+        drop(second);
+        let _ = fs::remove_dir_all(&stamps);
     }
 }

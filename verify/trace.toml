@@ -20,6 +20,7 @@ contract__should_run_in_the_sandbox = 2
 "harness:fmt" = 0
 "harness:clippy" = 0
 "harness:rustdoc" = 0
+earlier_builds__should_be_the_machine_config_of_the_js_sandboxes = 4
 
 [check_phase]
 budget__b1 = 2
@@ -126,6 +127,33 @@ flow__jobs_old_wtpool = 4
 flow__jobs_wtpool_missing = 4
 flow__jobs_remote_window = 4
 flow__several_agents_in_one_row = 4
+
+# Phase 5a (opencode.md §13): the new checks of the rows its §12 changes run from phase 5.
+agent_mark__should_follow_model_and_harness = 5
+agent_mark__should_meet_contrast_and_size = 5
+flow__coordinator_launches_opencode = 5
+gc__should_delete_shared_records_by_age = 5
+guard__should_leave_out_only_the_named_shared_session = 5
+guard__should_leave_out_sessions_the_caller_launched = 5
+hook__should_never_write_over_another_harness_record = 5
+ids__should_map_opencode_ids = 5
+info__should_set_title_and_model_only = 5
+jobs__should_attribute_a_shared_process_job_by_its_call_only = 5
+labels__should_use_the_adapters_noun = 5
+model__should_follow_the_claude_code_transcript = 5
+"oc_replay:provider_error_401" = 5
+"oc_translate:other_harness_record" = 5
+placement__should_not_move_a_caller_that_starts_an_agent = 5
+progress__should_keep_only_working_records_busy = 5
+records__should_follow_the_open_stem_grammar = 5
+session_start__should_create_an_idle_record_once = 5
+shared__should_hide_after_an_hour = 5
+shared__should_hide_an_older_idle_session_in_its_worktree = 5
+shared__should_never_work_on_a_build = 5
+shared__should_not_supersede = 5
+turn_end__should_finish_subagents_with_an_error = 5
+wait__should_bind_by_call_id_first = 5
+wait_end__should_end_only_its_wait = 5
 
 [ids.R1]
 phase = 1
@@ -246,7 +274,7 @@ checks = ["placement__should_read_the_path_field_of_each_tool"]
 
 [ids.H9]
 phase = 2
-checks = ["bash_paths__should_match_the_table"]
+checks = ["bash_paths__should_match_the_table", "placement__should_not_move_a_caller_that_starts_an_agent", "flow__coordinator_launches_opencode"]
 
 [ids.H10]
 phase = 2
@@ -254,7 +282,7 @@ checks = ["cc_read_edit_bash", "cc_subagent_elsewhere", "cc_cd_into_slot"]
 
 [ids.H11]
 phase = 2
-checks = ["transitions__should_match_the_event_table", "cc_stop_failure", "idle_prompt__should_leave_done_subagents_unchanged"]
+checks = ["transitions__should_match_the_event_table", "cc_stop_failure", "idle_prompt__should_leave_done_subagents_unchanged", "session_start__should_create_an_idle_record_once", "info__should_set_title_and_model_only", "progress__should_keep_only_working_records_busy", "turn_end__should_finish_subagents_with_an_error", "wait__should_bind_by_call_id_first", "wait_end__should_end_only_its_wait"]
 
 [ids.H12]
 phase = 2
@@ -277,11 +305,11 @@ checks = ["sanitize__should_strip_controls_bidi_and_zero_width", "hook__should_s
 # H16 (status-panel.md revision 18): the transcript's titles and the Agent call's description.
 [ids.H16]
 phase = 2
-checks = ["labels__should_prefer_session_title", "labels__should_use_agent_type", "labels__should_follow_the_transcript_title", "labels__should_use_the_description_of_the_agent_call"]
+checks = ["labels__should_prefer_session_title", "labels__should_use_agent_type", "labels__should_follow_the_transcript_title", "labels__should_use_the_description_of_the_agent_call", "labels__should_use_the_adapters_noun", "model__should_follow_the_claude_code_transcript"]
 
 [ids.H17]
 phase = 2
-checks = ["hook__should_refuse_ids_outside_the_pattern"]
+checks = ["hook__should_refuse_ids_outside_the_pattern", "ids__should_map_opencode_ids"]
 
 [ids.H18]
 phase = 2
@@ -289,7 +317,7 @@ checks = ["hook__should_not_follow_a_symlinked_record", "hook__should_keep_recor
 
 [ids.H19]
 phase = 2
-checks = ["liveness__should_record_the_parent_process", "liveness__should_keep_the_record_when_reparented", "cc_records_claude_pid"]
+checks = ["liveness__should_record_the_parent_process", "liveness__should_keep_the_record_when_reparented", "cc_records_claude_pid", "shared__should_not_supersede"]
 
 [ids.H20]
 phase = 2
@@ -297,7 +325,7 @@ checks = ["cc_session_end"]
 
 [ids.H21]
 phase = 2
-checks = ["gc__should_delete_only_old_dead_or_ended_records", "gc__should_delete_done_subagents_but_the_newest", "gc__should_delete_the_lock_with_the_record", "gc__should_run_once_a_day_on_session_end"]
+checks = ["gc__should_delete_only_old_dead_or_ended_records", "gc__should_delete_done_subagents_but_the_newest", "gc__should_delete_the_lock_with_the_record", "gc__should_run_once_a_day_on_session_end", "gc__should_delete_shared_records_by_age"]
 
 [ids.H22]
 phase = 2
@@ -315,7 +343,7 @@ checks = ["merge__should_refuse_an_older_state", "hook__should_lose_no_update_un
 # which wtpool status reads instead of tool names.
 [ids.H25]
 phase = 2
-checks = ["hook__should_tag_records_with_the_harness"]
+checks = ["hook__should_tag_records_with_the_harness", "records__should_follow_the_open_stem_grammar", "hook__should_never_write_over_another_harness_record", "oc_translate:other_harness_record"]
 
 [ids.H26]
 phase = 2
@@ -341,7 +369,7 @@ checks = ["plugin__should_hold_the_printed_block", "install__should_report_the_p
 # A1 (round publish): a background task of a session or subagent keeps it working.
 [ids.A1]
 phase = 2
-checks = ["decay__should_match_the_table", "cc_interrupt", "builds__should_keep_the_session_that_started_them_working", "builds__should_keep_no_session_working_through_other_children", "background__should_keep_a_session_working_until_its_task_ends", "background__should_keep_a_subagent_working_until_its_task_ends", "flow__jobs_not_queued"]
+checks = ["decay__should_match_the_table", "cc_interrupt", "builds__should_keep_the_session_that_started_them_working", "builds__should_keep_no_session_working_through_other_children", "background__should_keep_a_session_working_until_its_task_ends", "background__should_keep_a_subagent_working_until_its_task_ends", "flow__jobs_not_queued", "shared__should_never_work_on_a_build", "shared__should_hide_after_an_hour", "shared__should_hide_an_older_idle_session_in_its_worktree"]
 
 # A2 (status-panel.md revision 32): a subagent whose turn ended in an API error is done and
 # leaves after the minute, and its line reads done with the error.
@@ -428,7 +456,7 @@ checks = [
 
 [ids.S11]
 phase = 1
-checks = ["status__should_give_each_actor_its_harness"]
+checks = ["status__should_give_each_actor_its_harness", "info__should_set_title_and_model_only", "oc_replay:provider_error_401"]
 
 [ids.S12]
 phase = 1
@@ -550,6 +578,8 @@ checks = [
   "guard__should_never_refuse_for_idle_done_or_elsewhere_agents",
   "free__should_name_an_agent_by_its_escaped_label_else_its_key",
   "guard__should_skip_only_the_agents_of_the_calling_session",
+  "guard__should_leave_out_only_the_named_shared_session",
+  "guard__should_leave_out_sessions_the_caller_launched",
 ]
 
 [ids.X13]
@@ -605,7 +635,7 @@ checks = ["actions__should_match_the_row_kind", "actions__should_not_cover_anoth
 
 [ids.U5]
 phase = 1
-checks = ["detail__should_show_every_fact_and_actor", "detail__should_update_while_open", "detail__should_post_each_document_while_open"]
+checks = ["detail__should_show_every_fact_and_actor", "detail__should_update_while_open", "detail__should_post_each_document_while_open", "agent_mark__should_follow_model_and_harness", "flow__coordinator_launches_opencode"]
 
 [ids.U6]
 phase = 1
@@ -850,7 +880,7 @@ checks = [
 
 [ids.S15]
 phase = 4
-checks = ["status__should_attribute_jobs"]
+checks = ["status__should_attribute_jobs", "jobs__should_attribute_a_shared_process_job_by_its_call_only"]
 
 [ids.W10]
 phase = 4
@@ -913,6 +943,7 @@ checks = [
   "line_icons__should_never_move",
   "flow__several_agents_in_one_row",
   "flow__reduced_motion",
+  "agent_mark__should_meet_contrast_and_size",
 ]
 
 [ids.U14]
@@ -973,4 +1004,395 @@ checks = [
   "heavy_editor__should_show_every_ring_whole_in_contrast",
   "flow__jobs_edit_patterns",
   "flow__keyboard_only",
+]
+
+# Phase 5a (opencode.md, revision 2): OpenCode 2.2.0 and agents that start agents of another
+# harness. OC1 also holds G5's check, Claude Code's outputs as the base build made them; OC32's
+# docs and skill add no hook entry, so H28's block stays the plugin's.
+
+[ids.OC1]
+phase = 5
+checks = [
+  "oc_replay:provider_error_401",
+  "oc_replay:serve_shutdown",
+  "oc_replay:run_read_edit_shell",
+  "oc_replay:subagent",
+  "oc_replay:permission_approve_reject",
+  "oc_replay:permission_run_autoreject",
+  "oc_replay:question",
+  "oc_replay:interrupt",
+  "oc_replay:title_given",
+  "oc_replay:long_answer",
+  "oc_replay:deny",
+  "oc_replay:delete_api",
+  "oc_replay:two_folders",
+  "contract__should_run_opencode_in_the_sandbox",
+  "oc_read_edit_shell",
+  "oc_subagent",
+  "oc_permission",
+  "oc_permission_reject",
+  "oc_question",
+  "oc_interrupt",
+  "oc_long_answer",
+  "oc_deny",
+  "oc_two_sessions",
+  "oc_session_delete",
+  "oc_title",
+  "oc_run_title",
+  "oc_shell_env",
+  "oc_coordinator",
+  "oc_wtpool_missing",
+  "oc_real_model",
+  "claude_code__should_stay_byte_identical",
+]
+
+[ids.OC2]
+phase = 5
+checks = [
+  "flow__coordinator_launches_opencode",
+  "oc_read_edit_shell",
+  "oc_coordinator",
+  "oc_two_sessions",
+]
+
+[ids.OC3]
+phase = 5
+checks = [
+  "plugin__should_register_only_its_hooks",
+  "plugin__should_import_nothing",
+  "static:plugin_types",
+]
+
+[ids.OC4]
+phase = 5
+checks = [
+  "plugin__should_forward_the_recorded_streams_as_frozen",
+  "install__should_print_the_opencode_plugin",
+]
+
+[ids.OC5]
+phase = 5
+checks = [
+  "plugin__should_forward_each_event_once_per_process",
+  "plugin__should_forward_the_recorded_streams_as_frozen",
+  "plugin__should_look_up_a_session_first_seen_without_its_title",
+  "oc_two_sessions",
+  "oc_run_title",
+]
+
+[ids.OC6]
+phase = 5
+checks = [
+  "plugin__should_keep_only_the_listed_fields",
+  "plugin__should_forward_the_recorded_streams_as_frozen",
+]
+
+[ids.OC7]
+phase = 5
+checks = [
+  "plugin__should_never_await_or_throw_on_the_record_path",
+  "plugin__should_forward_the_recorded_streams_as_frozen",
+  "oc_wtpool_missing",
+]
+
+[ids.OC8]
+phase = 5
+checks = [
+  "plugin__should_attach_the_root_and_the_call",
+  "plugin__should_forward_the_recorded_streams_as_frozen",
+]
+
+[ids.OC9]
+phase = 5
+checks = [
+  "plugin__should_send_one_progress_per_session_per_10_s",
+  "plugin__should_forward_the_recorded_streams_as_frozen",
+  "oc_long_answer",
+  "oc_replay:long_answer",
+]
+
+[ids.OC10]
+phase = 5
+checks = [
+  "plugin__should_forward_each_event_once_per_process",
+  "plugin__should_forward_the_recorded_streams_as_frozen",
+]
+
+[ids.OC11]
+phase = 5
+checks = [
+  "plugin__should_set_wtpool_session_for_its_own_shell_calls",
+  "oc_shell_env",
+]
+
+[ids.OC12]
+phase = 5
+checks = [
+  "plugin__should_deny_only_on_a_deny_line",
+  "oc_deny",
+]
+
+[ids.OC13]
+phase = 5
+checks = [
+  "oc_translate:call_id_hashed",
+  "oc_translate:execution_failed",
+  "oc_translate:execution_failed_child",
+  "oc_translate:execution_interrupted_shutdown",
+  "oc_translate:execution_interrupted_user",
+  "oc_translate:execution_started",
+  "oc_translate:execution_started_child",
+  "oc_translate:execution_succeeded",
+  "oc_translate:execution_succeeded_child",
+  "oc_translate:first_event_unknown_session",
+  "oc_translate:form_created_input",
+  "oc_translate:form_created_question",
+  "oc_translate:form_replied",
+  "oc_translate:ids_hashed",
+  "oc_translate:ids_readable",
+  "oc_translate:ids_too_long",
+  "oc_translate:ids_valid_without_underscore",
+  "oc_translate:missing_field",
+  "oc_translate:other_harness_record",
+  "oc_translate:permission_asked",
+  "oc_translate:permission_asked_unknown_call",
+  "oc_translate:permission_replied_once",
+  "oc_translate:permission_replied_reject",
+  "oc_translate:permission_replied_without_call",
+  "oc_translate:reasoning_delta",
+  "oc_translate:relative_directory",
+  "oc_translate:session_created",
+  "oc_translate:session_created_child",
+  "oc_translate:session_created_titled",
+  "oc_translate:session_deleted",
+  "oc_translate:session_deleted_child",
+  "oc_translate:session_renamed",
+  "oc_translate:session_renamed_child",
+  "oc_translate:session_renamed_unknown_session",
+  "oc_translate:step_started_child",
+  "oc_translate:step_started_model",
+  "oc_translate:text_delta_idle",
+  "oc_translate:text_delta_working",
+  "oc_translate:title_blank",
+  "oc_translate:title_null",
+  "oc_translate:title_placeholder",
+  "oc_translate:tool_before_child",
+  "oc_translate:tool_before_edit",
+  "oc_translate:tool_before_question",
+  "oc_translate:tool_before_read_relative",
+  "oc_translate:tool_before_shell",
+  "oc_translate:tool_before_shell_cd_slot",
+  "oc_translate:tool_before_subagent",
+  "oc_translate:tool_before_write",
+  "oc_translate:tool_failed_aborted",
+  "oc_translate:tool_failed_denied",
+  "oc_translate:tool_failed_permission_rejected",
+  "oc_translate:tool_input_delta",
+  "oc_translate:tool_success",
+  "oc_translate:unknown_name",
+  "oc_translate:unknown_v",
+]
+
+[ids.OC14]
+phase = 5
+checks = [
+  "ids__should_map_opencode_ids",
+  "oc_translate:ids_hashed",
+  "oc_translate:ids_readable",
+  "oc_translate:ids_too_long",
+  "oc_translate:ids_valid_without_underscore",
+]
+
+[ids.OC15]
+phase = 5
+checks = [
+  "ids__should_map_opencode_ids",
+  "oc_translate:call_id_hashed",
+]
+
+[ids.OC16]
+phase = 5
+checks = [
+  "oc_translate:tool_before_child",
+  "oc_translate:tool_before_edit",
+  "oc_translate:tool_before_question",
+  "oc_translate:tool_before_read_relative",
+  "oc_translate:tool_before_shell",
+  "oc_translate:tool_before_shell_cd_slot",
+  "oc_translate:tool_before_subagent",
+  "oc_translate:tool_before_write",
+]
+
+[ids.OC17]
+phase = 5
+checks = [
+  "labels__should_use_the_adapters_noun",
+  "info__should_set_title_and_model_only",
+  "oc_translate:session_created",
+  "oc_translate:session_created_child",
+  "oc_translate:session_created_titled",
+  "oc_translate:session_renamed",
+  "oc_translate:session_renamed_child",
+  "oc_translate:session_renamed_unknown_session",
+  "oc_translate:lookup_title",
+  "oc_translate:lookup_title_working",
+  "oc_translate:title_blank",
+  "oc_translate:title_null",
+  "oc_translate:title_placeholder",
+]
+
+[ids.OC18]
+phase = 5
+checks = [
+  "wait__should_bind_by_call_id_first",
+  "wait_end__should_end_only_its_wait",
+  "oc_translate:form_created_input",
+  "oc_translate:form_created_question",
+  "oc_translate:form_replied",
+  "oc_translate:permission_asked",
+  "oc_translate:permission_asked_unknown_call",
+  "oc_translate:permission_replied_once",
+  "oc_translate:permission_replied_reject",
+  "oc_translate:permission_replied_without_call",
+]
+
+[ids.OC19]
+phase = 5
+checks = [
+  "oc_translate:execution_failed_child",
+  "oc_translate:execution_started_child",
+  "oc_translate:execution_succeeded_child",
+  "oc_translate:session_created_child",
+  "oc_translate:session_deleted_child",
+  "oc_translate:session_renamed_child",
+  "oc_translate:step_started_child",
+  "oc_translate:tool_before_child",
+  "oc_replay:subagent",
+]
+
+[ids.OC20]
+phase = 5
+checks = [
+  "shared__should_not_supersede",
+  "shared__should_never_work_on_a_build",
+  "shared__should_hide_after_an_hour",
+  "shared__should_hide_an_older_idle_session_in_its_worktree",
+  "gc__should_delete_shared_records_by_age",
+  "jobs__should_attribute_a_shared_process_job_by_its_call_only",
+  "oc_two_sessions",
+  "oc_replay:two_folders",
+]
+
+[ids.OC21]
+phase = 5
+checks = [
+  "guard__should_leave_out_only_the_named_shared_session",
+  "oc_shell_env",
+]
+
+[ids.OC22]
+phase = 5
+checks = [
+  "policy__should_encode_the_opencode_deny",
+  "policy__should_never_allow",
+  "oc_deny",
+]
+
+[ids.OC23]
+phase = 5
+checks = [
+  "job__should_note_each_harness_that_refuses_nothing",
+]
+
+[ids.OC24]
+phase = 5
+checks = [
+  "install__should_print_the_opencode_plugin",
+]
+
+[ids.OC25]
+phase = 5
+checks = [
+  "install__should_report_opencode_presence",
+]
+
+[ids.OC26]
+phase = 5
+checks = [
+  "hook__should_ignore_an_unknown_harness",
+]
+
+[ids.OC27]
+phase = 5
+checks = [
+  "oc_coordinator",
+  "flow__coordinator_launches_opencode",
+]
+
+[ids.OC28]
+phase = 5
+checks = [
+  "launch__should_name_the_launching_session",
+  "guard__should_leave_out_sessions_the_caller_launched",
+  "shared__should_never_work_on_a_build",
+  "oc_coordinator",
+]
+
+[ids.OC29]
+phase = 5
+checks = [
+  "placement__should_not_move_a_caller_that_starts_an_agent",
+  "oc_coordinator",
+]
+
+[ids.OC30]
+phase = 5
+checks = [
+  "info__should_set_title_and_model_only",
+  "model__should_follow_the_claude_code_transcript",
+  "oc_translate:step_started_model",
+  "oc_translate:step_started_child",
+  "oc_real_model",
+]
+
+[ids.OC31]
+phase = 5
+checks = [
+  "agent_mark__should_follow_model_and_harness",
+  "agent_mark__should_meet_contrast_and_size",
+  "agent_mark__should_show_its_label_on_hover",
+  "oc_real_model",
+]
+
+[ids.OC32]
+phase = 5
+checks = [
+  "plugin__should_hold_the_printed_block",
+]
+
+[ids.H32]
+phase = 5
+checks = [
+  "info__should_set_title_and_model_only",
+  "model__should_follow_the_claude_code_transcript",
+  "oc_translate:step_started_model",
+  "oc_replay:provider_error_401",
+]
+
+[ids.S17]
+phase = 5
+checks = [
+  "launch__should_name_the_launching_session",
+  "guard__should_leave_out_sessions_the_caller_launched",
+  "flow__coordinator_launches_opencode",
+]
+
+[ids.U18]
+phase = 5
+checks = [
+  "agent_mark__should_follow_model_and_harness",
+  "agent_mark__should_meet_contrast_and_size",
+  "agent_mark__should_show_its_label_on_hover",
+  "marks__should_name_their_licence",
+  "flow__coordinator_launches_opencode",
 ]

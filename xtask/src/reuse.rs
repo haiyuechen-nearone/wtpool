@@ -39,8 +39,8 @@ pub fn is_part_input(part: &str, rel: &str) -> bool {
     let rust = RUST_INPUTS.iter().any(|p| under(p));
     match part {
         "quick" => !under("docs/") && !under("verify/reviews/") && !under("verify/out/"),
-        "ui" => rust || under("vscode/"),
-        "int" | "bench" | "cc" => rust,
+        "shot" | "ui" => rust || under("vscode/"),
+        "int" | "bench" | "cc" | "oc" => rust,
         _ => true,
     }
 }
@@ -171,6 +171,35 @@ fn vscode_platform() -> &'static str {
     }
 }
 
+/// The installed `opencode` by its resolved path, size and modification time. It never runs:
+/// any `opencode` command outside the oc layer's sandbox would write into the owner's OpenCode
+/// folders.
+fn opencode_identity() -> String {
+    let found = cmd::output(
+        Command::new("/usr/bin/which").arg("opencode"),
+        Duration::from_secs(10),
+    );
+    let Ok(text) = found else {
+        return "opencode: not found".to_owned();
+    };
+    let path = fs::canonicalize(text.trim()).unwrap_or_else(|_| PathBuf::from(text.trim()));
+    match fs::metadata(&path) {
+        Ok(meta) => {
+            let modified = meta
+                .modified()
+                .ok()
+                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                .map_or(0, |since| since.as_secs());
+            format!(
+                "{} {} bytes, modified {modified}",
+                path.display(),
+                meta.len()
+            )
+        }
+        Err(error) => format!("{}: {error}", path.display()),
+    }
+}
+
 /// The tool versions every part's hash holds.
 pub fn tool_versions() -> BTreeMap<String, String> {
     let cli = vscode_cli();
@@ -184,6 +213,7 @@ pub fn tool_versions() -> BTreeMap<String, String> {
         ("node".to_owned(), version("node", &["-v"])),
         ("vscode".to_owned(), vscode.clone()),
         ("claude".to_owned(), version("claude", &["--version"])),
+        ("opencode".to_owned(), opencode_identity()),
     ]);
     // The tests run this executable even when `WTPOOL_VERIFY_VSCODE_CLI` names another VS Code's
     // command line, so its own command line reports its version.
@@ -424,6 +454,9 @@ mod tests {
     #[case::ui_reads_vscode("ui", "vscode/src/extension.ts", true)]
     #[case::ui_reads_crates("ui", "crates/wtpool/src/main.rs", true)]
     #[case::ui_ignores_other_docs("ui", "docs/other.md", false)]
+    #[case::shot_reads_vscode("shot", "vscode/src/extension.ts", true)]
+    #[case::shot_reads_crates("shot", "crates/wtpool/src/main.rs", true)]
+    #[case::shot_ignores_other_docs("shot", "docs/other.md", false)]
     #[case::quick_reads_readme("quick", "README.md", true)]
     #[case::quick_reads_vscode("quick", "vscode/package.json", true)]
     #[case::quick_ignores_other_docs("quick", "docs/other.md", false)]

@@ -166,3 +166,16 @@ slot_prefix  app-wt               main worktree name + -wt
 slot_count   3                    default
 remote       origin               default
 ```
+
+## Variables of the agent harnesses
+
+These are no settings: `wtpool config` does not list them, and `wtpool.toml` has no key for them.
+
+| Variable | Used by | Meaning |
+|---|---|---|
+| `CLAUDE_CONFIG_DIR` | `wtpool hook install` | The folder of Claude Code's `settings.json`, by default `~/.claude`. |
+| `OPENCODE_CONFIG_DIR` | OpenCode, and `wtpool hook install --harness opencode` | The folder OpenCode loads plugins from, as `plugins/<name>/index.ts`. Else `$XDG_CONFIG_HOME/opencode`, else `~/.config/opencode`. The install note checks `plugins/wtpool/index.ts` there. |
+| `WTPOOL_SESSION` | set by the OpenCode plugin, read by `wtpool fg` and `wtpool free` | The record stem of the OpenCode session whose shell call runs the command, such as `opencode-ses-e76df7aa0ffe3vdlGbn0I4xCYq`. It tells the command which session called it when one server runs many ([Commands](commands.md#safety)). Do not set it yourself: the plugin sets it for each shell call, and removes a value it cannot bind to one session. |
+
+`OPENCODE_CONFIG_DIR` is OpenCode's own variable. Set it in the environment of the OpenCode server,
+the same one that loads the plugin, and in the shell where you run `wtpool hook install`.
